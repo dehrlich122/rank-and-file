@@ -1,6 +1,6 @@
 // Milestone 0 harness: run any Python in the worker and see exactly what comes
 // back. Handy for checking the engine without a level around it.
-import { PyClient, PythonHungError, StoppedError, startPythonWorker, type ClientStatus } from "./py/client";
+import { PythonHungError, StoppedError, type PyClient } from "./py/client";
 import type { SnippetResult } from "./py/protocol";
 import { h } from "./ui/dom";
 import { createEditor, getCode, setCode } from "./ui/editor";
@@ -33,8 +33,7 @@ const EXAMPLES: Array<{ label: string; code: string }> = [
   },
 ];
 
-export function mountHarness(root: HTMLElement): void {
-  const status = h("span", { class: "status", "data-state": "loading" }, "Loading Python…");
+export function mountHarness(root: HTMLElement, client: PyClient): () => void {
   const runButton = h("button", { class: "btn btn-primary", onClick: () => void run() }, "Run ▶");
   const stopButton = h("button", { class: "btn", disabled: true, onClick: () => client.restart() }, "Stop ■");
   const meta = h("div", { class: "run-meta" }, "Press Run (or Ctrl+Enter).");
@@ -55,9 +54,8 @@ export function mountHarness(root: HTMLElement): void {
     h(
       "div",
       { class: "harness" },
-      h("header", { class: "topbar" }, h("h1", {}, "Rank & File"), h("span", { class: "muted" }, "M0 harness"), status),
       h(
-        "main",
+        "div",
         { class: "harness-main" },
         h("section", { class: "panel" }, h("div", { class: "toolbar" }, runButton, stopButton), editorHost, examples),
         h("section", { class: "panel" }, h("h2", {}, "Output"), meta, output, errorBox),
@@ -66,7 +64,6 @@ export function mountHarness(root: HTMLElement): void {
   );
 
   const editor = createEditor({ parent: editorHost, code: EXAMPLES[0]!.code, onRun: () => void run() });
-  const client = new PyClient({ createWorker: startPythonWorker, timeoutMs: WATCHDOG_MS, onStatus: showStatus });
   let running = false;
 
   async function run(): Promise<void> {
@@ -91,13 +88,6 @@ export function mountHarness(root: HTMLElement): void {
     }
   }
 
-  function showStatus(next: ClientStatus): void {
-    status.dataset.state = next.state;
-    if (next.state === "loading") status.textContent = "Loading Python…";
-    else if (next.state === "ready")
-      status.textContent = `Python ${next.pythonVersion} ready · loaded in ${(next.loadMs / 1000).toFixed(1)} s`;
-    else status.textContent = `Python failed to load: ${next.message}`;
-  }
 
   function showResult(result: SnippetResult, roundTripMs: number): void {
     const timing = `${result.lines_run.toLocaleString()} lines · Python ${result.duration_ms.toFixed(1)} ms · round trip ${roundTripMs.toFixed(0)} ms`;
@@ -133,4 +123,6 @@ export function mountHarness(root: HTMLElement): void {
     }
     errorBox.hidden = false;
   }
+
+  return () => editor.destroy();
 }

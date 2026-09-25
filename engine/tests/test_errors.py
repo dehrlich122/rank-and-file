@@ -52,3 +52,8 @@ def test_game_errors_raised_inside_the_engine_still_point_at_the_players_line(co
     result = run_level(corridor, "pawn.move()\npawn.move()\npawn.move(5)")
     assert result.error.line == 3
     assert result.error.traceback.count('File "<player>"') == 1
+
+
+def test_game_errors_read_like_builtin_errors_in_tracebacks(corridor):
+    result = run_level(corridor, "pawn.turn_right()\npawn.move()")
+    assert result.error.traceback.rstrip().splitlines()[-1] == "BlockedError: Your pawn bumped into a wall on c1."

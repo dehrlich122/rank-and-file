@@ -9,7 +9,7 @@ ordinary Python.
 import json
 
 from . import runner
-from .levels import LevelError, parse_level
+from .levels import LevelError, parse_level, sandbox_level
 from .repl import Repl
 
 _repl = Repl()
@@ -31,6 +31,10 @@ def load_level(level_json: str) -> str:
 def run_level(level_json: str, code: str) -> str:
     level = parse_level(json.loads(level_json))
     return json.dumps(runner.run_level(level, code).to_dict())
+
+
+def load_sandbox(api_json: str) -> str:
+    return json.dumps(sandbox_level(json.loads(api_json)).describe())
 
 
 def run_sandbox(code: str, api_json: str) -> str:

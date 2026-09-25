@@ -1,0 +1,132 @@
+// Playback of a recorded run: play, pause, step, rewind, scrub.
+//
+// A run is recorded once (by the engine) and then replayed here, so moving
+// backwards never re-runs any code. Frame 0 is the moment before the program
+// starts; frame k is the moment after step k (the k-th line that ran).
+import type { GameEvent, LevelResult, PieceState, Step } from "../py/protocol";
+
+export interface Frame {
+  step: Step | null; // null for frame 0
+  state: PieceState; // where the piece is after this frame
+  output: string; // everything printed up to and including this frame
+}
+
+export function buildFrames(result: Pick<LevelResult, "start" | "steps">): Frame[] {
+  const frames: Frame[] = [{ step: null, state: result.start, output: "" }];
+  let state = result.start;
+  let output = "";
+  for (const step of result.steps) {
+    for (const event of step.events) state = event.state;
+    output += step.output;
+    frames.push({ step, state, output });
+  }
+  return frames;
+}
+
+export const BASE_STEP_MS = 420;
+
+/** How long a frame's animation takes: longer when a line does several things. */
+export function frameDuration(frame: Frame, speed: number): number {
+  const events = frame.step?.events.length ?? 0;
+  return (BASE_STEP_MS * Math.max(1, events * 0.75)) / speed;
+}
+
+export interface RenderOptions {
+  animate: boolean; // play this frame's events, or jump straight to it
+  durationMs: number;
+}
+
+export type Render = (frame: Frame, index: number, options: RenderOptions) => void;
+
+export class Player {
+  index = 0;
+  playing = false;
+  speed = 1;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(
+    readonly frames: Frame[],
+    private readonly render: Render,
+    private readonly onChange: () => void = () => {},
+  ) {
+    this.render(frames[0]!, 0, { animate: false, durationMs: 0 });
+  }
+
+  get last(): number {
+    return this.frames.length - 1;
+  }
+
+  get atEnd(): boolean {
+    return this.index === this.last;
+  }
+
+  play(): void {
+    if (this.atEnd) this.go(0, false);
+    this.playing = true;
+    this.onChange();
+    this.scheduleNext(this.index === 0 ? 200 : 0);
+  }
+
+  pause(): void {
+    this.playing = false;
+    this.clearTimer();
+    this.onChange();
+  }
+
+  toggle(): void {
+    if (this.playing) this.pause();
+    else this.play();
+  }
+
+  next(): void {
+    this.pause();
+    if (!this.atEnd) this.go(this.index + 1, true);
+  }
+
+  previous(): void {
+    this.pause();
+    if (this.index > 0) this.go(this.index - 1, false);
+  }
+
+  seek(index: number): void {
+    this.pause();
+    this.go(Math.max(0, Math.min(this.last, index)), false);
+  }
+
+  setSpeed(speed: number): void {
+    this.speed = speed;
+    this.onChange();
+  }
+
+  /** Every events-carrying frame up to `index`, in order (for tests and debugging). */
+  eventsUpTo(index: number): GameEvent[] {
+    return this.frames.slice(1, index + 1).flatMap((frame) => frame.step?.events ?? []);
+  }
+
+  dispose(): void {
+    this.clearTimer();
+  }
+
+  private go(index: number, animate: boolean): void {
+    this.index = index;
+    const frame = this.frames[index]!;
+    this.render(frame, index, { animate, durationMs: frameDuration(frame, this.speed) });
+    this.onChange();
+  }
+
+  private scheduleNext(delay: number): void {
+    this.clearTimer();
+    this.timer = setTimeout(() => {
+      if (!this.playing) return;
+      if (this.index + 1 >= this.last) this.playing = false; // the next frame is the final one
+      if (!this.atEnd) this.go(this.index + 1, true);
+      if (this.playing) this.scheduleNext(frameDuration(this.frames[this.index]!, this.speed));
+      else this.onChange();
+    }, delay);
+  }
+
+  private clearTimer(): void {
+    if (this.timer !== null) clearTimeout(this.timer);
+    this.timer = null;
+  }
+}

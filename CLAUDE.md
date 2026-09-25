@@ -52,12 +52,17 @@ live in Python.** The UI only renders what the engine reports.
 1. `src/py/client.ts` (`PyClient`, UI thread) queues requests one at a time.
 2. `src/py/worker.ts` receives them.
 3. It calls `engine/rankfile/bridge.py`, which takes strings and returns JSON strings.
-4. The bridge calls `runner.py`.
-5. `runner.py` runs the code under `tracer.py`.
+4. The bridge calls `runner.py` (`run_level`, `run_sandbox`, `run_snippet`) or
+   `repl.py`.
+5. `runner.py` checks the code (`constraints.py`), builds a `World` and the
+   piece (`pieces.py`), and runs the code under `tracer.py`, which records one
+   step per player line. World events and printed output are attached to the
+   step that caused them.
 6. The worker parses the JSON. The result shapes are declared in
-   `src/py/protocol.ts`, which must mirror the dataclasses in `runner.py`.
-   Change both together, and add new request kinds to `Requests` in
-   `protocol.ts` and to `handlers` in `worker.ts`.
+   `src/py/protocol.ts`, which must mirror the engine's dataclasses
+   (`LevelResult`, `ErrorInfo`, `Level.describe()`). Change both together, and
+   add new request kinds to `Requests` in `protocol.ts`, to `handlers` in
+   `worker.ts`, and to `bridge.py`.
 
 **How the engine reaches the browser:**
 - `worker.ts` pulls in `engine/rankfile/*.py` as raw text via
@@ -89,24 +94,43 @@ filename `"<player>"` (`tracer.PLAYER_FILENAME`), and three things depend on it:
    worker. `PyClient` is tested with a fake `WorkerLike`, so its logic needs no
    browser.
 
-**Planned for M1** (see `docs/ARCHITECTURE.md`):
-- A run returns a recording of per-line steps (line number, locals, game events,
-  output) that the UI plays back. This is how step, pause and rewind work
-  without re-running code.
-- Levels are YAML (ASCII `map:` + `legend:`), normalized by the Python engine.
-  The UI never re-implements rules.
-- Constraints are checked with `ast`, never with string matching.
-- Every level needs a reference solution and at least one naive solution that
-  must fail, both in `solutions/`. `engine/tests/test_levels.py` enforces this.
-- Adding a level must never require engine changes.
+**Record, then replay.** A run returns the whole recording at once; the UI
+(`src/ui/playback.ts`) replays it. Every event carries the piece's full state
+after it, so any frame can be drawn directly: step back, scrub and rewind never
+re-run code. The UI never re-implements game rules; it draws what the engine
+reports.
+
+**Friendly errors.** `errors.explain()` produces `friendly` text (never with line
+numbers; the UI shows the line) and keeps the real traceback trimmed to player
+frames. Game errors in `exceptions.py` carry their own player-facing message
+and set `__module__ = "builtins"` so tracebacks don't show engine paths. New
+error translations belong in `errors.py`, with a case in
+`engine/tests/test_errors.py`.
+
+**Levels are data.** YAML in `levels/chNN/`, lesson in `lessons/chNN/`,
+solutions in `solutions/chNN/`. The format is documented in
+`docs/ARCHITECTURE.md`. Adding a level must never require engine changes.
+`engine/tests/test_levels.py` checks every level automatically:
+- the reference solution solves it
+- each `<id>.naive*.py` fails with the outcome named on its first line
+  (`# expect: constraint`)
+- lessons have ≤150 words of prose and 1–3 runnable snippets, and every snippet
+  runs (```` ```python run error ```` marks one that must fail)
+
+Constraints are checked with `ast`/`tokenize`, never with string matching.
 
 ## UI conventions
 
 - TypeScript, no framework. Build DOM with `h()` from `src/ui/dom.ts`.
   Attributes starting with `on` become listeners; string children become text
   nodes, so player text is never inserted as HTML.
-- The current page is the M0 harness (`src/harness.ts`). It has demo buttons for
-  each failure path (endless loop, C-level hang, syntax and runtime errors).
+- Routes live in `src/app.ts`: `#/` (level select), `#/level/<id>`
+  (`ui/levelView.ts`), and `#/harness` (the M0 page for running raw Python,
+  with demo buttons for each failure path).
+- One `PyClient` is shared by the whole app; the scratch REPL's session lives
+  in the worker, so it resets if the watchdog restarts Python.
+- Level content is bundled by `src/content.ts`. Solutions are deliberately not
+  bundled until M2's post-solve reveal.
 - Colors are CSS custom properties in `src/styles.css`, with a dark-mode override.
 
 ## Git

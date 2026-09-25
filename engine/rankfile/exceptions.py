@@ -34,3 +34,10 @@ class GameArgumentError(GameError, TypeError):
 
 class CantChangePieceError(GameError, AttributeError):
     """Player code tried to set an attribute on a piece, e.g. pawn.position = (0, 7)."""
+
+
+# Tracebacks name an exception by its module, e.g. `rankfile.exceptions.BlockedError`.
+# Claiming the builtins module makes them read like Python's own errors
+# (`BlockedError: ...`), without the engine's internals in the way.
+for _error in (GameError, BlockedError, LockedAbilityError, GameArgumentError, CantChangePieceError):
+    _error.__module__ = "builtins"

@@ -40,6 +40,9 @@ class StepBudgetExceeded(BaseException):
         self.line = line
 
 
+StepBudgetExceeded.__module__ = "builtins"  # so tracebacks don't show the engine's module path
+
+
 @dataclass
 class Step:
     line: int

@@ -177,6 +177,7 @@ def test_bridge_speaks_json():
     assert described["ok"] and described["level"]["goal"] == [0, 1]
     assert json.loads(bridge.run_level(json.dumps(level), "pawn.move()"))["status"] == "solved"
     assert json.loads(bridge.run_sandbox("pawn.move()", '["move"]'))["status"] == "finished"
+    assert json.loads(bridge.load_sandbox('["move"]'))["start"] == {"pos": [2, 0], "facing": "north"}
     assert json.loads(bridge.run_snippet("print(1)"))["output"] == "1\n"
 
     broken = json.loads(bridge.load_level(json.dumps({**level, "map": "G\n"})))
