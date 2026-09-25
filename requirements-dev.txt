@@ -1,0 +1,4 @@
+# Local Python tooling for the game engine (engine/). The engine itself has no
+# third-party dependencies: it runs unchanged inside Pyodide in the browser.
+pytest>=8
+PyYAML>=6

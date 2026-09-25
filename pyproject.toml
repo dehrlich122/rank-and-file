@@ -1,0 +1,10 @@
+[project]
+name = "rankfile"
+version = "0.0.0"
+description = "Game engine for Rank & File. Runs in Pyodide in the browser, and in CPython for tests."
+requires-python = ">=3.14"
+
+[tool.pytest.ini_options]
+testpaths = ["engine/tests"]
+pythonpath = ["engine"]
+addopts = "-q"

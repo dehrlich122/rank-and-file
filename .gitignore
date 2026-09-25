@@ -1,0 +1,10 @@
+node_modules/
+dist/
+public/pyodide/
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.log
+.DS_Store
+.vite/

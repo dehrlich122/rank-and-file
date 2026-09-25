@@ -1,0 +1,226 @@
+:root {
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-code: "Cascadia Code", "JetBrains Mono", Consolas, ui-monospace, monospace;
+
+  --bg: #f4f1ea;
+  --panel: #fffdf8;
+  --border: #ddd5c4;
+  --text: #2a2622;
+  --muted: #7a7166;
+  --accent: #2f6f4f;
+  --accent-text: #ffffff;
+  --ok: #2f6f4f;
+  --warn: #9a6a00;
+  --error: #b3261e;
+  --error-bg: #fbeceb;
+  --code-bg: #f1ece1;
+  --radius: 8px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1a18;
+    --panel: #252220;
+    --border: #3a3531;
+    --text: #ece6dc;
+    --muted: #a39a8e;
+    --accent: #5fae84;
+    --accent-text: #0f1a14;
+    --ok: #5fae84;
+    --warn: #e0b04a;
+    --error: #f08a80;
+    --error-bg: #3a2322;
+    --code-bg: #1f1d1b;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 var(--font-ui);
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: 650;
+}
+
+h1 {
+  font-size: 18px;
+}
+
+h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+pre {
+  margin: 0;
+  font-family: var(--font-code);
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* ---- buttons ---- */
+
+.btn {
+  font: inherit;
+  font-weight: 550;
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.btn-small {
+  padding: 3px 10px;
+  font-size: 13px;
+}
+
+/* ---- status pill ---- */
+
+.status {
+  margin-left: auto;
+  font-size: 13px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.status[data-state="ready"] {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.status[data-state="failed"] {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+/* ---- M0 harness layout ---- */
+
+.harness {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.harness-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  min-height: 0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.toolbar,
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor {
+  flex: 1;
+  min-height: 200px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.run-meta {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.output {
+  flex: 1;
+  overflow: auto;
+  padding: 10px;
+  background: var(--code-bg);
+  border-radius: var(--radius);
+}
+
+.error-card {
+  padding: 10px 12px;
+  border-left: 4px solid var(--error);
+  background: var(--error-bg);
+  border-radius: 4px;
+}
+
+.error-card p {
+  margin: 0 0 6px;
+}
+
+.error-card summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.traceback {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+@media (max-width: 800px) {
+  .harness-main {
+    grid-template-columns: 1fr;
+  }
+}
