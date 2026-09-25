@@ -1,0 +1,21 @@
+id: ch01-l03
+chapter: 1
+title: Around the Corner
+trains: "Sequencing: Python runs your lines in order, and order matters"
+brief: The goal is around a corner. Good news, your pawn has learned to turn!
+piece: pawn
+map: |
+  # # # # #
+  . . . . G
+  . # # # #
+  . # # # #
+  P # # # #
+start: {facing: north}
+objectives: [reach_goal]
+api: [move, turn_left, turn_right]
+par: {lines: 3}
+hints:
+  - Trace the path with your finger first. Which way, how far, and where does it bend?
+  - Turning doesn't move the pawn, and moving doesn't turn it. Each has to happen at the right moment.
+  - Up the a-file first, then a turn, then along the 4th rank.
+lesson: ch01/ch01-l03.md

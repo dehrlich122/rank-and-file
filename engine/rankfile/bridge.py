@@ -1,14 +1,46 @@
 """The only module the browser's Web Worker calls into.
 
-Each function takes plain strings and returns a JSON string. Keeping the
-boundary this simple means JavaScript never holds references to Python
-objects, and everything else in the engine stays ordinary Python.
+Every function takes plain strings (JSON where the data is structured) and
+returns a JSON string. Keeping the boundary this simple means JavaScript never
+holds references to Python objects, and everything else in the engine stays
+ordinary Python.
 """
 
 import json
 
 from . import runner
+from .levels import LevelError, parse_level
+from .repl import Repl
+
+_repl = Repl()
 
 
 def run_snippet(code: str) -> str:
     return json.dumps(runner.run_snippet(code).to_dict())
+
+
+def load_level(level_json: str) -> str:
+    """Check a level and describe it for drawing. Returns {"ok": true, "level": ...} or {"ok": false, "error": ...}."""
+    try:
+        level = parse_level(json.loads(level_json))
+    except LevelError as exc:
+        return json.dumps({"ok": False, "error": str(exc)})
+    return json.dumps({"ok": True, "level": level.describe()})
+
+
+def run_level(level_json: str, code: str) -> str:
+    level = parse_level(json.loads(level_json))
+    return json.dumps(runner.run_level(level, code).to_dict())
+
+
+def run_sandbox(code: str, api_json: str) -> str:
+    return json.dumps(runner.run_sandbox(code, json.loads(api_json)).to_dict())
+
+
+def repl_push(line: str) -> str:
+    return json.dumps(_repl.push(line))
+
+
+def repl_reset() -> str:
+    _repl.reset()
+    return json.dumps({"ok": True})

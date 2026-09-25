@@ -1,0 +1,5 @@
+# Chapter list, in play order. Each chapter's levels live in levels/chNN/.
+- chapter: 1
+  title: First Moves
+  tier: pawn
+  summary: Calling functions, arguments, sequencing, comments and print().

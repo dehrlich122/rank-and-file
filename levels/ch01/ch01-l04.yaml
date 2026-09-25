@@ -1,0 +1,28 @@
+id: ch01-l04
+chapter: 1
+title: The Password
+trains: "print() and comments"
+brief: >-
+  Walk to the gate and say the password written on the signpost.
+  Leave a comment in your code for the next pawn, too.
+piece: pawn
+map: |
+  # # # # #
+  # S # # #
+  G . . # #
+  # # . # #
+  # # P # #
+legend:
+  S: {tile: sign, text: "The password is: Pawns never retreat"}
+start: {facing: north}
+objectives:
+  - reach_goal
+  - say: Pawns never retreat
+api: [move, turn_left, turn_right]
+constraints: {min_comments: 1}
+par: {lines: 4}
+hints:
+  - Two jobs here. Getting to the gate is like the last level; saying something is new.
+  - print() shows text in the console. Text goes inside quote marks, exactly as written on the sign.
+  - A comment is any line (or end of a line) starting with #. Python skips it.
+lesson: ch01/ch01-l04.md
