@@ -345,9 +345,13 @@ pre {
   flex-direction: column;
 }
 
-/* a solved level's best stars (M2) */
-.card-stars {
+/* a solved level's best stars (M2), or a note that its solution was seen */
+.card-stars,
+.card-tag {
   margin-left: auto;
+}
+
+.card-stars {
   display: inline-flex;
   gap: 1px;
   color: var(--star);
@@ -713,6 +717,14 @@ pre {
 
 .hints p {
   margin: 6px 0 0;
+}
+
+.give-up-confirm {
+  margin-top: 8px;
+}
+
+.give-up-confirm p {
+  margin: 0 0 6px;
 }
 
 .sign-text {

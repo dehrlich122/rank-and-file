@@ -52,6 +52,7 @@ export function renderLevelSelect(chapters: Chapter[], progress: ProgressStore):
                 h("span", { class: "level-number" }, solved(level.id) ? "✓" : String(i + 1)),
                 h("span", { class: "level-text" }, h("strong", {}, level.title), h("span", { class: "muted small" }, level.trains)),
                 solved(level.id) ? stars(level.id) : null,
+                !solved(level.id) && progress.level(level.id).helped ? h("span", { class: "card-tag muted small" }, "Solution seen") : null,
               ),
             ),
           ),

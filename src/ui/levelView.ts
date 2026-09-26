@@ -234,15 +234,30 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     h("button", { class: "btn btn-small", onClick: () => openComparison(source.id, code()) }, "Compare with an idiomatic solution");
 
   function updateSolutionSection(): void {
-    if (!progress.level(source.id).solved) {
+    const { solved, helped } = progress.level(source.id);
+    if (!solved && !helped) {
       solutionSection.replaceChildren();
       return;
     }
-    solutionSection.replaceChildren(
-      h("h3", {}, "Solution"),
-      h("p", { class: "muted small" }, "You've solved this level. See your code next to an idiomatic solution, and why it's written that way."),
-      compareButton(() => getCode(editor)),
-    );
+    const why = solved
+      ? "You've solved this level. See your code next to an idiomatic solution, and why it's written that way."
+      : "You've seen a solution. Solve the level yourself to earn its stars.";
+    solutionSection.replaceChildren(h("h3", {}, "Solution"), h("p", { class: "muted small" }, why), compareButton(() => getCode(editor)));
+  }
+
+  /** The player confirmed "Show me a solution" (M2): mark it seen, then show it. */
+  function giveUp(): void {
+    progress.update(source.id, { helped: true });
+    updateSolutionSection();
+    openComparison(source.id, getCode(editor));
+  }
+
+  /** A run that didn't solve the level counts towards "Show me a solution" once every hint is open. */
+  function countFailureAfterHints(): void {
+    const { failedAfterHints, solved, helped } = progress.level(source.id);
+    if (!hints?.allOpen || solved || helped) return;
+    progress.update(source.id, { failedAfterHints: failedAfterHints + 1 });
+    hints.refresh();
   }
 
   // -- loading the level ------------------------------------------------------------
@@ -257,7 +272,10 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       level = loaded.level;
       board = new BoardView(level);
       boardHost.replaceChildren(board.element);
-      hints = new HintsPanel(level.hints, progress.level(source.id).hints, (opened) => progress.update(source.id, { hints: opened }));
+      hints = new HintsPanel(level.hints, () => progress.level(source.id), {
+        open: (opened) => progress.update(source.id, { hints: opened }),
+        giveUp,
+      });
       challengePanel.replaceChildren(...describeChallenge(level), hints.element, solutionSection);
       updateSolutionSection();
       updateControls();
@@ -350,6 +368,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       const earned = result.stars.filter((star) => star.earned).length;
       progress.update(source.id, { solved: true, stars: Math.max(progress.level(source.id).stars, earned) });
       updateSolutionSection();
+      hints?.refresh();
       const solvedWith = recordedCode ?? getCode(editor);
       const next = nextLevel(source.id);
       actions.push(
@@ -359,10 +378,12 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
           : h("a", { class: "btn btn-primary btn-small", href: "#/" }, "Back to the levels"),
       );
       window.setTimeout(() => board?.setCelebrating(true), afterMs);
-    } else if (hints && !hints.allOpen) {
-      // Points to the hints rather than opening one: the Hints section says
-      // what a hint costs before the player decides.
-      actions.push(h("button", { class: "btn btn-small", onClick: () => showHints() }, "Need a hint?"));
+    } else if (hints) {
+      // Both buttons point to the Hints section rather than acting at once:
+      // it says what a hint costs, and asks before showing a solution.
+      countFailureAfterHints();
+      if (!hints.allOpen) actions.push(h("button", { class: "btn btn-small", onClick: () => showHints() }, "Need a hint?"));
+      else if (hints.canGiveUp) actions.push(h("button", { class: "btn btn-small", onClick: () => showHints() }, "Show me a solution…"));
     }
     outcomeHost.replaceChildren(outcomeCard(result, actions));
   }
@@ -371,7 +392,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     if (layout.classList.contains("learn-collapsed")) setCollapsed(false);
     showTab("challenge");
     hints?.element.scrollIntoView({ block: "nearest" });
-    hints?.element.querySelector<HTMLElement>(".hint-button")?.focus();
+    hints?.element.querySelector<HTMLElement>(".hint-button, .give-up-button")?.focus();
   }
 
   function updateControls(): void {

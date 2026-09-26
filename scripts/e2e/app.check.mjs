@@ -169,6 +169,59 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(inPanel, "no comparison button in the Challenge panel of a solved level");
   });
 
+  // -- M2: giving up ------------------------------------------------------------------------
+  const offersSolution = () => b.evaluate(`[...document.querySelectorAll('.outcome-host button')].some((e) => e.textContent === 'Show me a solution…')`);
+
+  await check("M2: with every hint open, the third failed run offers 'Show me a solution'", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    await challengeTab();
+    for (let i = 0; i < 3; i++) await b.evaluate(`document.querySelector('.hints .hint-button').click()`);
+    await setCode("pawn.fly()\n");
+    const offered = [];
+    for (let i = 0; i < 3; i++) {
+      await run();
+      offered.push(await offersSolution());
+    }
+    const needHint = await b.evaluate(`[...document.querySelectorAll('.outcome-host button')].some((e) => e.textContent === 'Need a hint?')`);
+    expect(JSON.stringify(offered) === "[false,false,true]", `offered after runs 1-3: ${JSON.stringify(offered)}`);
+    expect(!needHint, "'Need a hint?' is still offered with every hint open");
+  });
+
+  await check("M2: 'Show me a solution' asks first; 'Show it' opens the comparison and marks the level", async () => {
+    await b.evaluate(`[...document.querySelectorAll('.outcome-host button')].find((e) => e.textContent === 'Show me a solution…').click()`);
+    const focused = await b.evaluate(`document.activeElement?.classList.contains('give-up-button') ?? false`);
+    await b.evaluate(`document.querySelector('.give-up-button').click()`);
+    const asked = await b.evaluate(`!!document.querySelector('.give-up-confirm')`);
+    await b.evaluate(`[...document.querySelectorAll('.give-up-confirm button')].find((e) => e.textContent === 'Not yet').click()`);
+    const cancelled = await b.evaluate(`!document.querySelector('.give-up-confirm') && !!document.querySelector('.give-up-button') && !document.querySelector('.compare-dialog')`);
+    await b.evaluate(`document.querySelector('.give-up-button').click()`);
+    await b.evaluate(`[...document.querySelectorAll('.give-up-confirm button')].find((e) => e.textContent === 'Show it').click()`);
+    await b.waitFor(`!!document.querySelector('.compare-dialog .compare-idiomatic .cm-line')`, 10_000, "the comparison");
+    const idiomatic = (await paneText("compare-idiomatic")) === solution("ch01-l01").trimEnd();
+    await b.key("Escape");
+    const tag = await b.evaluate(`!!document.querySelector('.solution-section button')`);
+    expect(focused && asked && cancelled, `focused: ${focused}; asked: ${asked}; 'Not yet' cancelled: ${cancelled}`);
+    expect(idiomatic && tag, `solution shown: ${idiomatic}; Solution section: ${tag}`);
+    const cards = await b.evaluate(`(async () => {
+      location.hash = '#/';
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const card = document.querySelector('a[href="#/level/ch01-l01"]');
+      return { tag: card.querySelector('.card-tag')?.textContent ?? null, solved: card.classList.contains('solved') };
+    })()`);
+    expect(cards.tag === "Solution seen" && !cards.solved, `level card: ${JSON.stringify(cards)}`);
+  });
+
+  await check("M2: solving it yourself afterwards counts, with two stars (the hints were open)", async () => {
+    await openLevel("ch01-l01");
+    await setCode(solution("ch01-l01"));
+    const r = await run();
+    const card = await levelCards().then(() =>
+      b.evaluate(`(() => { const card = document.querySelector('a[href="#/level/ch01-l01"]'); return { tag: !!card.querySelector('.card-tag'), stars: card.querySelectorAll('.icon-star').length }; })()`),
+    );
+    expect(r.head === "Solved!" && r.stars === 2, `${r.stars} stars: ${brief(r)}`);
+    expect(!card.tag && card.stars === 2, `level card: ${JSON.stringify(card)}`);
+  });
+
   // -- QA-002: level 4's locked gate --------------------------------------------------------
   await check("QA-002: level 4 starts with the guard's comment, and the panels don't give the passphrase away", async () => {
     await openLevel("ch01-l04", { fresh: true });

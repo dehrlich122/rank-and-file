@@ -1,5 +1,5 @@
-// The player's progress, level by level: whether it's solved, its best stars,
-// how many hints were opened, and the code they wrote for it. Saved in localStorage (see storage.ts), so
+// The player's progress, level by level: whether it's solved (or its solution
+// was seen), its best stars, the hints opened, and the code written for it. Saved in localStorage (see storage.ts), so
 // it survives reloads. Settings → Reset progress clears it.
 import { asRecord, browserStorage, readJson, writeJson, type StorageLike } from "./storage";
 
@@ -7,11 +7,13 @@ export interface LevelProgress {
   solved: boolean; // solved by running code
   stars: number; // the best a solving run has earned, 0 to 3
   hints: number; // how many hint tiers are open
+  failedAfterHints: number; // runs that failed after every hint was open (3 unlock "Show me a solution")
+  helped: boolean; // saw a solution before solving it
   code: string | null; // the editor's contents; null means the level's starter code
 }
 
 const STORAGE_KEY = "rank-and-file:progress";
-const UNTOUCHED: LevelProgress = { solved: false, stars: 0, hints: 0, code: null };
+const UNTOUCHED: LevelProgress = { solved: false, stars: 0, hints: 0, failedAfterHints: 0, helped: false, code: null };
 
 export class ProgressStore {
   private levels: Record<string, LevelProgress>;
@@ -44,6 +46,8 @@ export function sanitize(raw: unknown): Record<string, LevelProgress> {
       solved: entry.solved === true,
       stars: count(entry.stars, 3),
       hints: count(entry.hints, 10),
+      failedAfterHints: count(entry.failedAfterHints, 99),
+      helped: entry.helped === true,
       code: typeof entry.code === "string" ? entry.code : null,
     };
   }
