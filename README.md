@@ -48,6 +48,6 @@ blurred so no level solution is shown.
 
 ## License
 
-The code is under the [MIT License](LICENSE). The level and lesson content in
-`levels/` and `lessons/` is under [CC BY-NC-SA 4.0](LICENSE-CONTENT): free to
-share and adapt for non-commercial use, with credit, under the same license.
+The code is under the [MIT License](LICENSE). The level content in `levels/`,
+`lessons/` and `solutions/` is under [CC BY-NC-SA 4.0](LICENSE-CONTENT): free
+to share and adapt for non-commercial use, with credit, under the same license.

@@ -1,9 +1,9 @@
-Rank & File level and lesson content
+Rank & File level content
 
 Copyright (c) 2026 David Ehrlich
 
-The level and lesson content in this repository, meaning everything in
-`levels/` and `lessons/`, is licensed under the Creative Commons
+The level content in this repository, meaning everything in `levels/`,
+`lessons/` and `solutions/`, is licensed under the Creative Commons
 Attribution-NonCommercial-ShareAlike 4.0 International License
 (CC BY-NC-SA 4.0):
 
@@ -14,5 +14,5 @@ content for non-commercial purposes, as long as you give appropriate credit,
 indicate if changes were made, and release your adaptations under the same
 license.
 
-Everything else in this repository (the engine, the browser UI, the scripts
-and the level solutions) is under the MIT License in `LICENSE`.
+Everything else in this repository (the engine, the browser UI and the
+scripts) is under the MIT License in `LICENSE`.
