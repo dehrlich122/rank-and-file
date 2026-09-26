@@ -361,8 +361,10 @@ export default async function uiChecks({ browser: b, base, root, check }) {
   // -- QA-015: wrap long lines ------------------------------------------------------------
   // A long comment line then a short one; only layout facts come back, never the code.
   const longLines = `# ${"wrap ".repeat(60)}\n# two`;
+  // CodeMirror lines the gutter up with the text in its next layout pass (an
+  // animation frame after a change), so measure after two frames.
   const wrapState = (scope = ".level-right") =>
-    b.evaluate(`(() => {
+    b.evaluate(`new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))).then(() => {
       const editor = document.querySelector('${scope} .cm-editor');
       const scroller = editor.querySelector('.cm-scroller');
       const lines = [...editor.querySelectorAll('.cm-line')];
@@ -375,7 +377,7 @@ export default async function uiChecks({ browser: b, base, root, check }) {
         button: document.querySelector('.level-right .btn-toggle')?.getAttribute('aria-pressed'),
         menu: document.querySelector('input[name="setting-wrapLines"]:checked')?.value,
       };
-    })()`);
+    })`);
 
   await check("QA-015: long lines wrap by default; the Wrap button and Settings both say On", async () => {
     await b.evaluate(`localStorage.clear()`);
