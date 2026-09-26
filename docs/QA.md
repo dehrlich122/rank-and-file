@@ -811,8 +811,9 @@ The rest of PR #3's manual test list passed *(Designer, 2026-09-26)*:
 
 Item 6 (hidden boards) became QA-016.
 
-### QA-016 · "Hidden boards": the name, and a goal that seems to move · Fixed
+### QA-016 · "Hidden boards": the name, and a goal that seems to move · Verified
 
+- **Verified** *(Designer, 2026-09-26)*: passes, looks good.
 - **Fixed** in `bec7f85` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - The practice level is now **Blindfold**. It has one map, with no flag and four **?** squares (b3, b5, b6, b8). The Challenge panel says the goal is hidden on one of them and the code runs once for each.
   - After a run, each ? square shows ✓ or ✗. Above the board, a row of buttons names every case ("b3 ✗", "b6 ✓", …) and replays that case's run, with the flag where the goal was.
