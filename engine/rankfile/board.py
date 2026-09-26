@@ -57,11 +57,20 @@ class Tile(Enum):
     PIT = "pit"  # stepping in loses the run (M3.1)
     WAYPOINT = "waypoint"  # must be crossed before the goal (M3.1)
     GEM = "gem"  # collected by walking over it (M3.1)
+    TIMED_GATE = "timed_gate"  # open only on every Nth tick of its clock (M3.1)
 
     @property
     def blocks(self) -> bool:
         """Always in the way. (Gates block only while locked, which the World tracks.)"""
         return self in (Tile.WALL, Tile.SIGN)
+
+
+@dataclass
+class Timer:
+    """When a timed gate is open: whenever its clock's tick count is a multiple of `every`."""
+
+    every: int
+    clock: str = "action"
 
 
 @dataclass
@@ -71,6 +80,8 @@ class Board:
     tiles: dict[Pos, Tile] = field(default_factory=dict)  # squares not listed are floor
     signs: dict[Pos, str] = field(default_factory=dict)  # text written on sign tiles
     gates: dict[Pos, str] = field(default_factory=dict)  # the passphrase for each gate
+    questions: dict[Pos, str] = field(default_factory=dict)  # what the guard asks, at gates that ask (M3.1)
+    timers: dict[Pos, Timer] = field(default_factory=dict)  # when each timed gate is open (M3.1)
 
     def contains(self, pos: Pos) -> bool:
         x, y = pos

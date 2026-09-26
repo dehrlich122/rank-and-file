@@ -10,11 +10,11 @@ checker instead of confusing a player.
 import ast
 from dataclasses import asdict, dataclass, field, replace
 
-from .board import Board, Direction, Pos, Tile, square_name
+from .board import Board, Direction, Pos, Tile, Timer, square_name
 from .constraints import describe_rules
 from .pieces import PIECES
 from .words import and_list, count
-from .world import World
+from .world import CLOCKS, World
 
 
 class LevelError(ValueError):
@@ -25,8 +25,20 @@ class LevelError(ValueError):
 # SPOT marks a square the goal might be on, when the goal is hidden (M2).
 START, GOAL, SPOT = "P", "G", "?"
 BUILTIN_SYMBOLS = {".": Tile.FLOOR, "#": Tile.WALL, START: Tile.FLOOR, GOAL: Tile.FLOOR, SPOT: Tile.FLOOR}
-# Legend tiles that need one extra detail, e.g. `S: {tile: sign, text: "..."}`.
-TILE_DETAILS = {Tile.SIGN: "text", Tile.GATE: "passphrase"}
+# Legend tiles that take details, e.g. `S: {tile: sign, text: "..."}`: the
+# details each one needs, then the ones it may add.
+TILE_DETAILS: dict[Tile, tuple[set[str], set[str]]] = {
+    Tile.SIGN: ({"text"}, set()),
+    Tile.GATE: ({"passphrase"}, {"question"}),
+    Tile.TIMED_GATE: ({"every"}, {"clock"}),
+}
+
+# What makes each clock tick, in words: "one square for ..." (M3.1).
+CLOCK_TICKS = {
+    "action": "each square you move, each turn and each wait",
+    "line": "each line of your code that runs",
+    "new_line": "each line of your code that runs for the first time",
+}
 
 ALLOWED_KEYS = {
     "id", "chapter", "title", "trains", "brief", "piece", "map", "legend", "start",
@@ -130,7 +142,10 @@ class Level:
         elif self.objectives.collect:
             goals.append(f"Collect at least {count(self.objectives.collect, 'gem')} of the {gems} by walking over them.")
         for gate in sorted(self.board.gates):
-            goals.append(f"Get past the locked gate on {square_name(gate)}. A guard keeps it shut.")
+            if question := self.board.questions.get(gate):
+                goals.append(f'Get past the gate on {square_name(gate)}. The guard asks: "{question}" Print the answer next to the gate.')
+            else:
+                goals.append(f"Get past the locked gate on {square_name(gate)}. A guard keeps it shut.")
         if self.variants:
             goals.append(f"Your code is also checked on {count(len(self.variants), 'other board')}.")
         return goals
@@ -148,6 +163,11 @@ class Level:
         if pits:
             where = f"A pit on {pits[0]}" if len(pits) == 1 else f"Pits on {and_list(pits)}"
             obstacles.append(f"{where}: step in and the run is lost.")
+        for pos, timer in sorted(self.board.timers.items()):
+            obstacles.append(
+                f"The gate on {square_name(pos)} is open at the start, then shut for {count(timer.every - 1, 'tick')}, "
+                f"then open again, over and over. It ticks once for {CLOCK_TICKS[timer.clock]}."
+            )
         return obstacles
 
     def star_goals(self) -> list[str]:
@@ -173,6 +193,8 @@ class Level:
                 for y in range(self.board.height)
             ],
             "signs": [{"pos": list(pos), "text": text} for pos, text in self.board.signs.items()],
+            "questions": [{"pos": list(pos), "text": text} for pos, text in self.board.questions.items()],
+            "timed_gates": [{"pos": list(pos), **asdict(timer)} for pos, timer in self.board.timers.items()],
             "goal": list(self.goal) if self.goal else None,
             "goal_spots": [list(spot) for spot in self.goal_spots],
             "case_title": self.case_words[0] if self.goal_spots or self.variants else "",
@@ -251,7 +273,7 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
         raise LevelError("every map row must have the same number of squares")
 
     symbols = dict(BUILTIN_SYMBOLS)
-    details: dict[str, str] = {}  # symbol -> its sign text or gate passphrase
+    details: dict[str, dict] = {}  # symbol -> its details, e.g. a sign's text or a gate's passphrase
     for symbol, meaning in legend.items():
         symbol = str(symbol)
         if symbol in BUILTIN_SYMBOLS:
@@ -261,14 +283,7 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
             tile = symbols[symbol] = Tile(meaning.get("tile"))
         except ValueError:
             raise LevelError(f"legend {symbol!r}: unknown tile {meaning.get('tile')!r}") from None
-        needs = TILE_DETAILS.get(tile)
-        unknown = set(meaning) - {"tile"} - ({needs} if needs else set())
-        if unknown:
-            raise LevelError(f"legend {symbol!r}: a {tile.value} doesn't take {', '.join(sorted(unknown))}")
-        if needs:
-            if not isinstance(meaning.get(needs), str) or not meaning[needs]:
-                raise LevelError(f"legend {symbol!r}: a {tile.value} needs {needs}")
-            details[symbol] = meaning[needs]
+        details[symbol] = _parse_details(symbol, tile, meaning)
 
     board = Board(width, height)
     start: Pos | None = None
@@ -283,9 +298,13 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
             if tile is not Tile.FLOOR:
                 board.tiles[(x, y)] = tile
             if tile is Tile.SIGN:
-                board.signs[(x, y)] = details[symbol]
+                board.signs[(x, y)] = details[symbol]["text"]
             if tile is Tile.GATE:
-                board.gates[(x, y)] = details[symbol]
+                board.gates[(x, y)] = details[symbol]["passphrase"]
+                if "question" in details[symbol]:
+                    board.questions[(x, y)] = details[symbol]["question"]
+            if tile is Tile.TIMED_GATE:
+                board.timers[(x, y)] = Timer(**details[symbol])
             if symbol == START:
                 if start is not None:
                     raise LevelError("the map has more than one start square (P)")
@@ -301,6 +320,26 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
     if goal is not None and spots:
         raise LevelError("a map has a goal (G) or squares a hidden goal might be on (?), not both")
     return board, start, goal, sorted(spots)
+
+
+def _parse_details(symbol: str, tile: Tile, meaning: dict) -> dict:
+    """A legend tile's details, checked: each text is non-empty, and a timed gate's timing makes sense."""
+    needs, may = TILE_DETAILS.get(tile, (set(), set()))
+    unknown = set(meaning) - {"tile"} - needs - may
+    if unknown:
+        raise LevelError(f"legend {symbol!r}: a {tile.value} doesn't take {', '.join(sorted(unknown))}")
+    details = {key: value for key, value in meaning.items() if key != "tile"}
+    for key in needs | set(details):
+        value = details.get(key)
+        if key == "every":
+            if not (_positive(value) and value >= 2):
+                raise LevelError(f"legend {symbol!r}: a timed gate needs every: a whole number of ticks, 2 or more")
+        elif key == "clock":
+            if value not in CLOCKS:
+                raise LevelError(f"legend {symbol!r}: clock must be one of {', '.join(CLOCKS)}, not {value!r}")
+        elif not isinstance(value, str) or not value:
+            raise LevelError(f"legend {symbol!r}: a {tile.value} needs {key}")
+    return details
 
 
 @dataclass

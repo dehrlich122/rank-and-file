@@ -11,6 +11,9 @@ cheap.
 once for every square the piece moves, every turn and every wait: the piece
 acts, then everything on that clock takes its turn, like chess.
 
+The `line` and `new_line` clocks tick as the player's code runs: the tracer
+calls `on_line` as each line starts.
+
 **Losing** (M3.1). Falling into a pit ends the run: the World raises `Lost`,
 and remembers it in `lost`, so the run stays lost even if the player's code
 catches the exception.
@@ -30,6 +33,8 @@ Event = dict
 # What the guard at a locked gate says. Every level with a gate shares these.
 GUARD_WRONG_PHRASE = "The guard called your mother a hamster! The gate remains locked."
 GUARD_GATE_LOCKED = "Does your father really smell of elderberries? Maybe try the passphrase first."
+# ...and at a gate whose guard asks a question (M3.1).
+GUARD_WRONG_ANSWER = '"Wrong!" says the guard. The gate remains locked.'
 
 CLOCKS = ("action", "line", "new_line")
 
@@ -45,6 +50,9 @@ class World:
         self.crossed: set[Pos] = set()  # waypoints the piece has passed over
         self.collected: set[Pos] = set()  # gems the piece has picked up
         self.ticks = dict.fromkeys(CLOCKS, 0)
+        self.lines_seen: set[int] = set()  # for the new_line clock
+        # The clocks something keeps time with: their ticks show up in the recording.
+        self.clocked = {timer.clock for timer in self.board.timers.values()}
         self.lost: Lost | None = None
         self.listeners: list[Callable[[Event], None]] = []
 
@@ -52,7 +60,7 @@ class World:
         return {
             "pos": list(self.pos),
             "facing": self.facing.value,
-            "opened": [list(pos) for pos in sorted(self.opened)],
+            "opened": [list(pos) for pos in sorted(self.opened | self._open_timed_gates())],
             "crossed": [list(pos) for pos in sorted(self.crossed)],
             "collected": [list(pos) for pos in sorted(self.collected)],
             "tick": self.ticks["action"],
@@ -68,6 +76,13 @@ class World:
         if self._locked_gate(target):
             self._emit("bump", at=list(target))
             raise GateLockedError(self._gate_locked_message(target), at=target)
+        if self.board.tile(target) is Tile.TIMED_GATE and target not in self._open_timed_gates():
+            self._emit("bump", at=list(target))
+            every = self.board.timers[target].every
+            raise BlockedError(
+                f"Your {self.level.piece} bumped into the gate on {square_name(target)}. It's shut right now: it opens every {every} ticks.",
+                at=target,
+            )
         self.pos = target
         self._pass_over(target)
         self._emit("move")
@@ -99,6 +114,17 @@ class World:
     def tick(self, clock: str) -> None:
         """One tick of `clock`: everything that keeps time with it takes its turn."""
         self.ticks[clock] += 1
+        if clock in self.clocked:
+            self._emit("tick", clock=clock)
+
+    def on_line(self, line: int) -> None:
+        """A line of the player's code is starting to run: the code's own clocks tick."""
+        if self.lost is not None:
+            return
+        self.tick("line")
+        if line not in self.lines_seen:
+            self.lines_seen.add(line)
+            self.tick("new_line")
 
     def hear(self, line: str, printed_on: int | None = None) -> None:
         """React to one line the program printed (on line `printed_on` of the player's code).
@@ -117,7 +143,8 @@ class World:
                 self._emit("gate_open", at=list(gate))
             else:
                 self.refused[gate] = printed_on
-                self._emit("guard", at=list(gate), message=GUARD_WRONG_PHRASE)
+                reply = GUARD_WRONG_ANSWER if gate in self.board.questions else GUARD_WRONG_PHRASE
+                self._emit("guard", at=list(gate), message=reply)
 
     def _pass_over(self, pos: Pos) -> None:
         """Crossing a waypoint or a gem counts even when the piece walks straight on."""
@@ -144,11 +171,16 @@ class World:
         the error points back to it: working from a crash back to its cause is
         a core debugging skill (QA-008).
         """
+        question = self.board.questions.get(gate)
+        locked = f'The guard won\'t open the gate until you answer: "{question}"' if question else GUARD_GATE_LOCKED
         if gate not in self.refused:
-            return GUARD_GATE_LOCKED
+            return locked
         line = self.refused[gate]
         said = f"what line {line} printed" if line is not None else "what you said earlier"
-        return f"{GUARD_GATE_LOCKED}\nThe guard didn't accept {said}."
+        return f"{locked}\nThe guard didn't accept {said}."
+
+    def _open_timed_gates(self) -> set[Pos]:
+        return {pos for pos, timer in self.board.timers.items() if self.ticks[timer.clock] % timer.every == 0}
 
     def _locked_gate(self, pos: Pos) -> bool:
         return self.board.tile(pos) is Tile.GATE and pos not in self.opened

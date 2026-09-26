@@ -255,7 +255,7 @@ def execute(
 ) -> Execution:
     """Run compiled player code under the tracer, capturing everything it prints."""
     remember_source(source)
-    tracer = Tracer(line_budget, record=record)
+    tracer = Tracer(line_budget, record=record, on_line=world.on_line if world is not None else None)
     output = _StepOutput(tracer, world)
     if world is not None:
         world.listeners.append(tracer.add_event)

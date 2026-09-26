@@ -54,6 +54,9 @@
   --pit-rim: light-dark(#5b4a3b, #3a2f26);
   --pit-hole: light-dark(#1d1712, #0c0907);
   --waypoint: light-dark(#2c6fb0, #7fb2e8);
+  --badge-bg: light-dark(#fffaf0, #2a2521);
+  --badge-border: light-dark(#8a7658, #c9b48e);
+  --badge-text: light-dark(#3f3a36, #f3e2c7);
   --gem: light-dark(#1f9d8a, #5fd3c0);
   --gem-facets: light-dark(#d9f5ef, #1b4f47);
   --game-message: light-dark(#8a4b00, #e6b555);
@@ -1190,6 +1193,18 @@ pre {
 
 .gate.open .gate-lock {
   opacity: 0;
+}
+
+/* a small label on a tile or an enemy, e.g. a timed gate's "every 3" (M3.1) */
+.badge {
+  fill: var(--badge-bg);
+  stroke: var(--badge-border);
+  stroke-width: 1;
+}
+
+.badge-text {
+  font: 700 10px var(--font-ui);
+  fill: var(--badge-text);
 }
 
 .gate.refusing .gate-frame {

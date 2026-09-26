@@ -1,5 +1,5 @@
 // The board, drawn as SVG: squares, tiles (walls, signposts, gates, pits,
-// waypoints, gems), the goal and the piece.
+// waypoints, gems, timed gates), the goal and the piece.
 //
 // The board never decides anything. It draws the states the engine reported:
 // `show()` jumps straight to a state, `animate()` plays a step's events in order.
@@ -7,7 +7,7 @@
 // Each tile type has its own draw function (TILE_ART below) and CSS classes, and
 // every colour comes from the CSS custom properties in styles.css, so a visual
 // redesign can reskin tiles without touching the logic.
-import type { Facing, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
+import type { Clock, Facing, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
 
 const SVG = "http://www.w3.org/2000/svg";
 const S = 64; // size of one square, in SVG units
@@ -139,6 +139,7 @@ export class BoardView {
     this.piece.style.transform = `translate(${left + S / 2}px, ${top + S / 2}px)`;
     this.pointer.style.transform = `rotate(${this.angle}deg)`;
     this.mark("gate", "open", state.opened);
+    this.mark("timed_gate", "open", state.opened);
     this.mark("waypoint", "crossed", state.crossed);
     this.mark("gem", "collected", state.collected);
     this.element.classList.toggle("lost", Boolean(state.lost));
@@ -203,9 +204,17 @@ type TileArt = (left: number, top: number, level: LevelInfo, pos: Pos) => SVGGEl
 const TILE_ART: Record<TileKind, TileArt | null> = {
   floor: null,
   wall: (left, top) => wall(left, top),
-  sign: (left, top, level, [x, y]) =>
-    signpost(left, top, level.signs.find((sign) => sign.pos[0] === x && sign.pos[1] === y)?.text ?? ""),
-  gate: (left, top) => gate(left, top),
+  sign: (left, top, level, pos) => signpost(left, top, find(level.signs, pos)?.text ?? ""),
+  gate: (left, top, level, pos) => {
+    const question = find(level.questions, pos)?.text;
+    return question ? gate(left, top, `The guard asks: "${question}"`, "?") : gate(left, top, "A locked gate. A guard keeps it shut.");
+  },
+  timed_gate: (left, top, level, pos) => {
+    const timer = find(level.timed_gates, pos);
+    const every = timer?.every ?? 0;
+    const title = `A timed gate: open at the start, then every ${every} ticks.`;
+    return gate(left, top, title, `${clockwork(timer?.clock) ? "⚙ " : ""}every ${every}`, "timed-gate");
+  },
   pit: (left, top) => pit(left, top),
   waypoint: (left, top) => waypoint(left, top),
   gem: (left, top) => gem(left, top),
@@ -233,11 +242,25 @@ function signpost(left: number, top: number, text: string): SVGGElement {
   return group;
 }
 
-/** A barred gate with a padlock. The `open` class lifts the bars (see styles.css). */
-function gate(left: number, top: number): SVGGElement {
-  const group = svg("g", { class: "gate" });
+/** The entry for the square `pos`, from one of the level's lists of details. */
+function find<T extends { pos: Pos }>(items: T[], [x, y]: Pos): T | undefined {
+  return items.find((item) => item.pos[0] === x && item.pos[1] === y);
+}
+
+/** Clocks that keep time with the code rather than the piece: shown with a gear (M3.1). */
+function clockwork(clock: Clock | undefined): boolean {
+  return clock === "line" || clock === "new_line";
+}
+
+/**
+ * A barred gate. The `open` class lifts the bars (see styles.css). A guarded
+ * gate has a padlock; a timed one (M3.1) has none. `badge`: a short label
+ * along the bottom, e.g. a timed gate's "every 3", or "?" for a guard's question.
+ */
+function gate(left: number, top: number, text: string, badge = "", kind = "guarded"): SVGGElement {
+  const group = svg("g", { class: kind === "guarded" ? "gate" : "gate timed-gate" });
   const title = svg("title", {});
-  title.textContent = "A locked gate. A guard keeps it shut.";
+  title.textContent = text;
   const bars = svg("g", { class: "gate-bars" });
   for (let i = 0; i < 5; i++) {
     bars.append(svg("rect", { x: left + 9 + i * 10.5, y: top + 6, width: 4, height: S - 12, rx: 1.5 }));
@@ -249,7 +272,14 @@ function gate(left: number, top: number): SVGGElement {
     svg("path", { d: `M ${left + S / 2 - 6} ${top + S / 2 - 2} v -5 a 6 6 0 0 1 12 0 v 5`, class: "gate-shackle" }),
     svg("rect", { x: left + S / 2 - 9, y: top + S / 2 - 2, width: 18, height: 14, rx: 2.5, class: "gate-padlock" }),
   );
-  group.append(title, svg("rect", { x: left + 2, y: top + 2, width: S - 4, height: S - 4, rx: 3, class: "gate-frame" }), bars, lock);
+  group.append(title, svg("rect", { x: left + 2, y: top + 2, width: S - 4, height: S - 4, rx: 3, class: "gate-frame" }), bars);
+  if (kind === "guarded") group.append(lock);
+  if (badge) {
+    const width = Math.max(16, badge.length * 6.5 + 8);
+    const label = svg("text", { x: left + S / 2, y: top + S - 5.5, "text-anchor": "middle", class: "badge-text" });
+    label.textContent = badge;
+    group.append(svg("rect", { x: left + S / 2 - width / 2, y: top + S - 16, width, height: 14, rx: 7, class: "badge" }), label);
+  }
   return group;
 }
 

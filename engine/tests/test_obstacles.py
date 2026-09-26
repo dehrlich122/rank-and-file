@@ -171,3 +171,97 @@ def test_a_board_with_only_gems_to_collect():
 def test_pits_are_listed_as_obstacles():
     level = make_level("O . O\n. G .\nO P .\n", legend={"O": "pit"})
     assert level.describe()["obstacles"] == ["Pits on a1, a3 and c3: step in and the run is lost."]
+
+
+# -- timed gates -------------------------------------------------------------------------
+
+
+@pytest.fixture
+def portcullis():
+    """Pawn on a1 facing east; a gate on c1 open every 3 ticks; the goal on d1."""
+    return make_level("P . T G\n", legend={"T": {"tile": "timed_gate", "every": 3}}, api=API, start={"facing": "east"})
+
+
+def test_a_timed_gate_is_open_on_every_nth_tick(portcullis):
+    result = run_level(portcullis, "pawn.wait()\npawn.wait()\npawn.wait()\npawn.wait()")
+    ticks = [(event["state"]["tick"], event["state"]["opened"]) for event in events(result, "tick")]
+    assert ticks == [(1, []), (2, []), (3, [[2, 0]]), (4, [])]
+    assert portcullis.describe()["start"]["opened"] == [[2, 0]]  # open at the start
+
+
+def test_a_shut_timed_gate_blocks_like_a_wall(portcullis):
+    result = run_level(portcullis, "pawn.move(3)")  # reaches the gate on tick 1
+    assert result.status == "error"
+    assert result.error.friendly == "Your pawn bumped into the gate on c1. It's shut right now: it opens every 3 ticks."
+    assert events(result, "bump")[-1]["at"] == [2, 0]
+
+
+def test_arriving_while_it_is_open_goes_through(portcullis):
+    result = run_level(portcullis, "pawn.move()\npawn.wait()\npawn.wait()\npawn.move(2)")
+    assert result.status == "solved"
+
+
+def test_a_timed_gate_can_keep_time_with_the_code():
+    level = make_level("P T G\n", legend={"T": {"tile": "timed_gate", "every": 2, "clock": "line"}}, start={"facing": "east"})
+    assert run_level(level, "pawn.move(2)").status == "error"  # line 1 ticks it shut
+    assert run_level(level, "x = 1\npawn.move(2)").status == "solved"  # two lines: open again
+
+
+def test_the_new_line_clock_ticks_once_per_line():
+    level = make_level("P T G\n", legend={"T": {"tile": "timed_gate", "every": 2, "clock": "new_line"}}, start={"facing": "east"})
+    looped = "for i in range(3):\n    x = i\npawn.move(2)"  # 3 new lines: shut
+    assert run_level(level, looped).status == "error"
+    copied = "x = 0\nx = 1\nx = 2\npawn.move(2)"  # 4 new lines: open
+    assert run_level(level, copied).status == "solved"
+
+
+def test_timed_gates_are_described():
+    level = make_level("P T G\n", legend={"T": {"tile": "timed_gate", "every": 3}}, start={"facing": "east"})
+    described = level.describe()
+    assert described["timed_gates"] == [{"pos": [1, 0], "every": 3, "clock": "action"}]
+    assert described["obstacles"] == [
+        "The gate on b1 is open at the start, then shut for 2 ticks, then open again, over and over. "
+        "It ticks once for each square you move, each turn and each wait."
+    ]
+
+
+@pytest.mark.parametrize(
+    ("meaning", "message"),
+    [
+        ({"tile": "timed_gate"}, "needs every"),
+        ({"tile": "timed_gate", "every": 1}, "2 or more"),
+        ({"tile": "timed_gate", "every": 3, "clock": "sometimes"}, "clock must be one of"),
+        ({"tile": "timed_gate", "every": 3, "passphrase": "x"}, "doesn't take passphrase"),
+        ({"tile": "gate", "passphrase": "4", "question": ""}, "needs question"),
+    ],
+)
+def test_gate_details_are_checked(meaning, message):
+    with pytest.raises(LevelError, match=message):
+        make_level("P T G\n", legend={"T": meaning})
+
+
+# -- guards with a question ----------------------------------------------------------------
+
+
+@pytest.fixture
+def toll():
+    """Pawn on a1 facing north; a gate on a3 whose guard asks a question; the goal on a4."""
+    legend = {"X": {"tile": "gate", "question": "What is two plus two?", "passphrase": "4"}}
+    return make_level("G\nX\n.\nP\n", legend=legend, api=API)
+
+
+def test_the_right_answer_opens_the_gate(toll):
+    assert run_level(toll, "pawn.move()\nprint(2 + 2)\npawn.move(2)").status == "solved"
+
+
+def test_a_wrong_answer_gets_the_guards_reply(toll):
+    result = run_level(toll, "pawn.move()\nprint(5)\npawn.move(2)")
+    assert [event["message"] for event in events(result, "guard")] == ['"Wrong!" says the guard. The gate remains locked.']
+    assert result.error.friendly == "The guard won't open the gate until you answer: \"What is two plus two?\"\nThe guard didn't accept what line 2 printed."
+
+
+def test_the_question_is_shown_and_the_answer_is_not(toll):
+    described = toll.describe()
+    assert described["questions"] == [{"pos": [0, 2], "text": "What is two plus two?"}]
+    assert 'The guard asks: "What is two plus two?" Print the answer next to the gate.' in described["goals"][1]
+    assert '"4"' not in str(described)
