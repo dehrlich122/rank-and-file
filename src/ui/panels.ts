@@ -1,7 +1,8 @@
 // The small read-only panels around the board: variables, console output,
 // and the outcome of a run.
-import type { ErrorInfo, LevelResult, Var } from "../py/protocol";
+import type { ErrorInfo, LevelResult, Star, Var } from "../py/protocol";
 import { h } from "./dom";
+import { icon } from "./icons";
 import type { LogEntry } from "./playback";
 
 /** Shows the player's variables at the current moment of playback. */
@@ -98,6 +99,7 @@ export function outcomeCard(result: LevelResult, actions: HTMLElement[] = []): H
     const summary = result.status === "solved" ? result.summary.replace(/^Solved! /, "") : result.summary;
     body.push(h("p", {}, summary));
   }
+  if (result.stars.length) body.push(starList(result.stars));
   if (result.truncated) {
     body.push(h("p", { class: "muted small" }, "This run was very long, so only its beginning was recorded for playback."));
   }
@@ -106,6 +108,16 @@ export function outcomeCard(result: LevelResult, actions: HTMLElement[] = []): H
     { class: `outcome outcome-${TONE[result.status]}`, role: "status" },
     h("div", { class: "outcome-head" }, h("strong", {}, HEADLINE[result.status]), ...actions),
     ...body,
+  );
+}
+
+/** A solved run's stars, each with what it's for (M2). */
+function starList(stars: Star[]): HTMLElement {
+  const earned = stars.filter((star) => star.earned).length;
+  return h(
+    "ul",
+    { class: "stars", "aria-label": `${earned} of ${stars.length} stars` },
+    ...stars.map((star) => h("li", { class: star.earned ? "earned" : undefined }, icon(star.earned ? "star" : "starOutline"), star.label)),
   );
 }
 

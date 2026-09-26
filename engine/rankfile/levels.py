@@ -41,6 +41,13 @@ class Constraints:
 
 
 @dataclass
+class Par:
+    """The target a skilled solution meets; meeting it earns a star (M2)."""
+
+    lines: int | None = None  # lines of code, counted like max_lines
+
+
+@dataclass
 class Objectives:
     reach_goal: bool = True
     say: list[str] = field(default_factory=list)  # phrases the program must print
@@ -60,7 +67,7 @@ class Level:
     objectives: Objectives
     api: list[str]
     constraints: Constraints
-    par: dict = field(default_factory=dict)
+    par: Par = field(default_factory=Par)
     hints: list[str] = field(default_factory=list)
     lesson: str = ""
     brief: str = ""
@@ -79,6 +86,12 @@ class Level:
         for gate in sorted(self.board.gates):
             goals.append(f"Get past the locked gate on {square_name(gate)}. A guard keeps it shut.")
         return goals
+
+    def star_goals(self) -> list[str]:
+        """What each of the three stars asks for (runner.score awards them)."""
+        par = self.par.lines
+        within = f"Use {par} line{'' if par == 1 else 's'} of code or fewer (par)." if par else "There's no par here: solving is enough."
+        return ["Solve the level.", within, "Solve it without opening a hint."]
 
     def describe(self) -> dict:
         """Everything the UI needs to draw the level, as JSON-friendly data."""
@@ -103,12 +116,13 @@ class Level:
             "objectives": asdict(self.objectives),
             "api": self.api,
             "constraints": asdict(self.constraints),
-            "par": self.par,
+            "par": asdict(self.par),
             "starter": self.starter,
             # What the Challenge panel shows, in words: the engine owns every
             # player-facing description of its rules.
             "goals": self.goals(),
             "rules": describe_rules(self.constraints),
+            "stars": self.star_goals(),
         }
 
 
@@ -145,7 +159,7 @@ def parse_level(data: dict) -> Level:
         objectives=objectives,
         api=_parse_api(data["api"], piece),
         constraints=_parse_constraints(data.get("constraints") or {}),
-        par=dict(data.get("par") or {}),
+        par=_parse_par(data.get("par") or {}),
         hints=[str(hint) for hint in data.get("hints") or []],
         lesson=_text(data, "lesson"),
         brief=str(data.get("brief", "")),
@@ -272,6 +286,18 @@ def _parse_api(names, piece: str) -> list[str]:
         if name not in known:
             raise LevelError(f"api: the {piece} has no ability {name!r}; it has {', '.join(known)}")
     return list(names)
+
+
+def _parse_par(data: dict) -> Par:
+    if not isinstance(data, dict):
+        raise LevelError("par must be a mapping, e.g. {lines: 3}")
+    unknown = set(data) - {"lines"}
+    if unknown:
+        raise LevelError(f"unknown par key(s): {', '.join(sorted(unknown))}")
+    lines = data.get("lines")
+    if lines is not None and (not isinstance(lines, int) or isinstance(lines, bool) or lines < 1):
+        raise LevelError("par lines must be a whole number of at least 1")
+    return Par(lines=lines)
 
 
 def _parse_constraints(data: dict) -> Constraints:

@@ -6,6 +6,8 @@
   world and the piece, runs the code while recording every step, and then
   decides whether the level was solved.
 - `run_sandbox` is `run_level` on a small open board, for lesson snippets.
+
+A solved run is also scored: up to three stars (see `score`).
 """
 
 import ast
@@ -39,6 +41,13 @@ class SnippetResult:
 
 
 @dataclass
+class Star:
+    kind: str  # "solved", "par" or "no_hints"
+    earned: bool
+    label: str  # what it's for, in words, e.g. "Within par: 3 lines of code or fewer"
+
+
+@dataclass
 class LevelResult:
     # "solved", "incomplete" (ran fine, objectives not met), "finished" (a board
     # with no objectives, e.g. the sandbox), "error", "timeout", or "constraint"
@@ -55,6 +64,7 @@ class LevelResult:
     lines_run: int = 0
     code_lines: int = 0
     truncated: bool = False  # the run had more steps than were recorded
+    stars: list[Star] = field(default_factory=list)  # only for a solved run
     duration_ms: float = 0.0
 
     def to_dict(self) -> dict:
@@ -82,6 +92,7 @@ def run_level(
     *,
     line_budget: int = DEFAULT_LINE_BUDGET,
     enforce_constraints: bool = True,
+    hints_used: int = 0,
 ) -> LevelResult:
     started = time.perf_counter()
     world = World(level)
@@ -127,12 +138,28 @@ def run_level(
     unmet = unmet_objectives(level, world, run.output)
     if unmet:
         return outcome("incomplete", "Your program finished, but " + " Also, ".join(unmet), **recording)
-    return outcome("solved", _solved_summary(level), **recording)
+    return outcome("solved", _solved_summary(level), stars=score(level, counted, hints_used), **recording)
 
 
 def run_sandbox(code: str, api: list[str], piece: str = "pawn") -> LevelResult:
     """Run a lesson snippet on a small open board with the given abilities."""
     return run_level(sandbox_level(api, piece), code, enforce_constraints=False)
+
+
+def score(level: Level, code_lines: int, hints_used: int) -> list[Star]:
+    """The three stars of a solved run: solving it, meeting par, and using no hints."""
+    par = level.par.lines
+    if par is None:
+        par_star = Star("par", True, "Within par (this level doesn't set one)")
+    elif code_lines <= par:
+        par_star = Star("par", True, f"Within par: {_lines(par)} of code or fewer")
+    else:
+        par_star = Star("par", False, f"Par is {_lines(par)} of code; yours has {code_lines}")
+    if hints_used == 0:
+        hints_star = Star("no_hints", True, "No hints opened")
+    else:
+        hints_star = Star("no_hints", False, f"No hints opened (you opened {hints_used})")
+    return [Star("solved", True, "Solved"), par_star, hints_star]
 
 
 def unmet_objectives(level: Level, world: World, output: str) -> list[str]:
@@ -230,6 +257,10 @@ def _solved_summary(level: Level) -> str:
     if level.objectives.reach_goal:
         return "Solved! You reached the goal."
     return "Solved!"
+
+
+def _lines(count: int) -> str:
+    return f"{count} line" if count == 1 else f"{count} lines"
 
 
 def _ms_since(started: float) -> float:

@@ -27,6 +27,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
       vars: [...document.querySelectorAll('.inspector tr')].map((r) => r.innerText.replace(/\\s+/g, ' ')),
       console: document.querySelector('.console').innerText,
       next: document.querySelector('.outcome-host a')?.textContent ?? null,
+      stars: document.querySelectorAll('.outcome-host .stars li.earned').length,
     })`);
   }
   const brief = (r) => `${r.head}: ${r.text.slice(0, 110)}`;
@@ -39,6 +40,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
       const natural = id === "ch01-l05"; // one level plays through at normal speed
       const r = await run({ jump: !natural });
       expect(r.head === "Solved!", brief(r));
+      expect(r.stars === 3, `${r.stars} of 3 stars: ${brief(r)}`); // the reference solution meets par, with no hints
       return `${brief(r)} | next: ${r.next}`;
     });
   }
@@ -46,8 +48,10 @@ export default async function appChecks({ browser: b, base, root, check }) {
   await check("level select marks solved levels", async () => {
     await b.send("Page.navigate", { url: `${base}#/` });
     const solved = await b.waitFor(`document.querySelectorAll('.level-card.solved').length`, 5000, "level cards");
+    const stars = await b.evaluate(`document.querySelectorAll('.level-card .card-stars .icon-star').length`);
     expect(solved === LEVELS.length, `${solved} solved`);
-    return `${solved} solved`;
+    expect(stars === LEVELS.length * 3, `${stars} stars on the level cards`);
+    return `${solved} solved, ${stars} stars`;
   });
 
   // -- M2: saved progress ------------------------------------------------------------------
@@ -271,6 +275,8 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await b.evaluate(`[...document.querySelectorAll('.tab')][1].click()`);
     const text = await b.evaluate(`document.querySelector('.tab-panel:not([hidden])').innerText.replace(/\\s+/g, ' ')`);
     expect(text.includes("Reach the goal on b8") && text.includes("At most 2 lines"), text.slice(0, 160));
+    // Headings are styled in capitals, and innerText returns them that way.
+    expect(/stars solve the level\. use \d+ lines? of code or fewer \(par\)\. solve it without opening a hint\./i.test(text), "the Stars section is missing or worded differently");
     return text.slice(0, 120);
   });
 

@@ -25,7 +25,7 @@ interface Bridge {
   run_snippet(code: string): string;
   load_level(levelJson: string): string;
   load_sandbox(apiJson: string): string;
-  run_level(levelJson: string, code: string): string;
+  run_level(levelJson: string, code: string, hintsUsed: number): string;
   run_sandbox(code: string, apiJson: string): string;
   repl_push(line: string): string;
   repl_reset(): string;
@@ -63,7 +63,7 @@ const handlers: { [K in RequestKind]: (bridge: Bridge, args: Requests[K]["args"]
   runSnippet: (bridge, { code }) => JSON.parse(bridge.run_snippet(code)),
   loadLevel: (bridge, { level }) => JSON.parse(bridge.load_level(JSON.stringify(level))),
   loadSandbox: (bridge, { api }) => JSON.parse(bridge.load_sandbox(JSON.stringify(api))),
-  runLevel: (bridge, { level, code }) => JSON.parse(bridge.run_level(JSON.stringify(level), code)),
+  runLevel: (bridge, { level, code, hintsUsed }) => JSON.parse(bridge.run_level(JSON.stringify(level), code, hintsUsed)),
   runSandbox: (bridge, { code, api }) => JSON.parse(bridge.run_sandbox(code, JSON.stringify(api))),
   replPush: (bridge, { line }) => JSON.parse(bridge.repl_push(line)),
   replReset: (bridge) => JSON.parse(bridge.repl_reset()),

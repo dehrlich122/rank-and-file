@@ -258,7 +258,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     running = true;
     updateControls();
     try {
-      const result = await client.call("runLevel", { level: source.data, code: recordedCode });
+      const result = await client.call("runLevel", { level: source.data, code: recordedCode, hintsUsed: 0 });
       showResult(result, mode);
     } catch (error) {
       outcomeHost.replaceChildren(describeFailure(error));
@@ -322,7 +322,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     }
     const actions: HTMLElement[] = [];
     if (result.status === "solved") {
-      progress.update(source.id, { solved: true });
+      const earned = result.stars.filter((star) => star.earned).length;
+      progress.update(source.id, { solved: true, stars: Math.max(progress.level(source.id).stars, earned) });
       const next = nextLevel(source.id);
       actions.push(
         next
@@ -401,6 +402,7 @@ function describeChallenge(level: LevelInfo): HTMLElement[] {
     parts.push(h("blockquote", { class: "sign-text" }, h("span", { class: "muted small" }, `Signpost on ${squareName(sign.pos)}`), sign.text));
   }
   if (level.rules.length) parts.push(h("h3", {}, "Rules"), list("rules", level.rules));
+  parts.push(h("h3", {}, "Stars"), list("star-goals", level.stars));
 
   parts.push(
     h("h3", {}, `Your ${level.piece} knows`),

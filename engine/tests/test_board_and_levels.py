@@ -43,6 +43,8 @@ def test_describe_is_ready_for_the_ui():
     assert described["goal"] == [1, 1]
     assert described["signs"] == [{"pos": [0, 1], "text": "hi"}]
     assert "hints" not in described
+    assert described["par"] == {"lines": None}
+    assert make_level("P G\n", par={"lines": 2}).describe()["par"] == {"lines": 2}
 
 
 @pytest.mark.parametrize(
@@ -64,6 +66,10 @@ def test_describe_is_ready_for_the_ui():
         ({"legend": {"X": {"tile": "gate"}}}, "needs passphrase"),
         ({"legend": {"X": {"tile": "gate", "passphrase": "hi", "text": "x"}}}, "doesn.t take text"),
         ({"piece": "dragon"}, "unknown piece"),
+        ({"par": {"moves": 3}}, "unknown par"),
+        ({"par": {"lines": 0}}, "par lines"),
+        ({"par": {"lines": "3"}}, "par lines"),
+        ({"par": 3}, "par must be a mapping"),
     ],
 )
 def test_bad_levels_fail_loudly(overrides, message):
@@ -90,6 +96,8 @@ def test_describe_puts_goals_and_rules_into_words():
         "Must use a for loop.",
         "Not allowed: a while loop.",
     ]
+    assert described["stars"] == ["Solve the level.", "There's no par here: solving is enough.", "Solve it without opening a hint."]
+    assert make_level("P G\n", par={"lines": 1}).star_goals()[1] == "Use 1 line of code or fewer (par)."
 
 
 def test_say_goals_point_to_the_sign_when_the_phrase_is_written_there():

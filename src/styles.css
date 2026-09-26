@@ -52,6 +52,7 @@
   --gate-bars: light-dark(#3f3a36, #211d1a);
   --gate-lock: light-dark(#c8961a, #e0b04a);
   --game-message: light-dark(#8a4b00, #e6b555);
+  --star: light-dark(#c8961a, #e0b04a);
 }
 
 :root[data-theme="light"] {
@@ -342,6 +343,50 @@ pre {
 .level-text {
   display: flex;
   flex-direction: column;
+}
+
+/* a solved level's best stars (M2) */
+.card-stars {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 1px;
+  color: var(--star);
+}
+
+.card-stars .icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* the stars on a solved run's outcome card, each with its reason */
+.stars {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.stars li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stars li.earned {
+  color: var(--text);
+}
+
+.stars .icon {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+
+.stars li.earned .icon {
+  color: var(--star);
 }
 
 .home footer {

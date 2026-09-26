@@ -24,6 +24,9 @@ levels.Level.lesson
 runner.SnippetResult.duration_ms
 runner.LevelResult.final
 runner.LevelResult.duration_ms
+runner.LevelResult.stars
+runner.Star.earned
+runner.Star.label
 tracer.Step.scope
 tracer.Step.vars
 

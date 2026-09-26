@@ -181,3 +181,48 @@ def test_bridge_speaks_json():
 
     broken = json.loads(bridge.load_level(json.dumps({**level, "map": "G\n"})))
     assert broken == {"ok": False, "error": "the map needs a start square (P)"}
+
+
+# -- stars (M2) --------------------------------------------------------------------
+
+
+def stars(result) -> list[tuple[str, bool]]:
+    return [(star.kind, star.earned) for star in result.stars]
+
+
+def test_a_solved_run_earns_three_stars_within_par_and_without_hints():
+    level = make_level("# G #\n# . #\n# P #\n", par={"lines": 1})
+    result = run_level(level, "pawn.move(2)\n")
+    assert result.status == "solved"
+    assert stars(result) == [("solved", True), ("par", True), ("no_hints", True)]
+
+
+def test_par_counts_lines_of_code_like_max_lines():
+    level = make_level("# G #\n# . #\n# P #\n", par={"lines": 1})
+    result = run_level(level, "# two steps\npawn.move()\n\npawn.move()\n")
+    assert stars(result)[1] == ("par", False)
+    assert result.stars[1].label == "Par is 1 line of code; yours has 2"
+
+
+def test_opening_hints_gives_up_the_third_star():
+    level = make_level("# G #\n# P #\n", par={"lines": 1})
+    result = run_level(level, "pawn.move()\n", hints_used=2)
+    assert stars(result) == [("solved", True), ("par", True), ("no_hints", False)]
+    assert "you opened 2" in result.stars[2].label
+
+
+def test_a_level_without_par_gives_the_par_star_freely():
+    result = run_level(make_level("# G #\n# P #\n"), "pawn.move()\npawn.turn_left()\npawn.turn_right()\n")
+    assert stars(result)[1] == ("par", True)
+
+
+def test_only_solved_runs_are_scored():
+    result = run_level(make_level("# G #\n# . #\n# P #\n", par={"lines": 1}), "pawn.move()\n")
+    assert result.status == "incomplete"
+    assert result.stars == []
+
+
+def test_the_bridge_passes_hints_used_through():
+    level = {"id": "t", "chapter": 1, "title": "T", "trains": "t", "lesson": "t.md", "api": ["move"], "map": "G\nP\n"}
+    result = json.loads(bridge.run_level(json.dumps(level), "pawn.move()\n", 1))
+    assert [star["earned"] for star in result["stars"]] == [True, True, False]

@@ -67,6 +67,7 @@ def test_level_file_is_valid(level_file):
     level = load(level_file)
     assert level.id == level_file.stem
     assert level.hints, "every level needs hints"
+    assert level.par.lines, "every level needs a line par, for its par star"
 
 
 def test_reference_solution_solves_it(level_file):
@@ -75,6 +76,8 @@ def test_reference_solution_solves_it(level_file):
     result = run_level(level, solution.read_text(encoding="utf-8"))
     # Deliberately not printing the solution: the checker must never spoil it.
     assert result.status == "solved", f"{level.id}: {result.summary}"
+    # ...and it earns every star, so each level's par is reachable.
+    assert all(star.earned for star in result.stars), f"{level.id}: {[star.label for star in result.stars]}"
 
 
 def test_naive_solutions_fail_as_intended(level_file):

@@ -48,10 +48,11 @@ export interface LevelInfo {
   objectives: { reach_goal: boolean; say: string[] };
   api: string[];
   constraints: { max_lines: number | null; min_comments: number; require_nodes: string[]; ban_nodes: string[] };
-  par: Record<string, number>;
+  par: { lines: number | null };
   starter: string;
   goals: string[]; // what to do, in words (never a passphrase)
   rules: string[]; // the level's constraints, in words
+  stars: string[]; // what each of the three stars asks for, in words
 }
 
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };
@@ -85,6 +86,13 @@ interface LintWarning {
 
 type LevelStatus = "solved" | "incomplete" | "finished" | "error" | "timeout" | "constraint";
 
+/** One of a solved run's three stars (runner.Star). */
+export interface Star {
+  kind: "solved" | "par" | "no_hints";
+  earned: boolean;
+  label: string;
+}
+
 export interface LevelResult {
   status: LevelStatus;
   summary: string;
@@ -98,6 +106,7 @@ export interface LevelResult {
   lines_run: number;
   code_lines: number;
   truncated: boolean;
+  stars: Star[]; // only for a solved run
   duration_ms: number;
 }
 
@@ -112,7 +121,7 @@ export interface Requests {
   runSnippet: { args: { code: string }; result: SnippetResult };
   loadLevel: { args: { level: unknown }; result: LoadLevelResult };
   loadSandbox: { args: { api: string[] }; result: LevelInfo };
-  runLevel: { args: { level: unknown; code: string }; result: LevelResult };
+  runLevel: { args: { level: unknown; code: string; hintsUsed: number }; result: LevelResult };
   runSandbox: { args: { code: string; api: string[] }; result: LevelResult };
   replPush: { args: { line: string }; result: ReplResult };
   replReset: { args: Record<string, never>; result: { ok: true } };
