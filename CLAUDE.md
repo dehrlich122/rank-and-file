@@ -64,9 +64,10 @@ npm run e2e -- http://localhost:4173/ --only=app   # against `npm run play`, one
   Add a check for every user-visible fix. Solutions are read from
   `solutions/`, never written into a check. **Never put editor contents
   into a check's message or return value.** Earlier checks type reference
-  solutions, and the app keeps each level's code for the session, so an
-  editor dump can leak a solution. Use `openLevel(id, { fresh: true })` for a
-  clean page.
+  solutions, and the app saves each level's code (`src/progress.ts`), so an
+  editor dump can leak a solution. `openLevel(id, { fresh: true })` gives a
+  clean page with no saved progress (`run.mjs` clears it on `?fresh=` loads;
+  settings are kept). `{ reload: true }` reloads and keeps progress.
 - After a hash navigation, wait for `.level[data-level-id="<id>"]`; the old view
   lingers for a moment. Inside `evaluate` strings, which are JS template
   literals, write regex escapes as `\\s`.
@@ -173,6 +174,10 @@ Constraints are checked with `ast`/`tokenize`, never with string matching.
   `src/ui/icons.ts` (inline SVG). A visual design pass is planned, so keep new
   visuals on these seams (tokens, icons, the tile → draw-function table in
   `board.ts`).
+- Progress (solved levels and each level's code) lives in `src/progress.ts`,
+  saved to localStorage like settings (both use `src/storage.ts`). Settings →
+  Reset progress clears it after a confirm step inside the dialog. Never use
+  browser `confirm()`/`alert()`, which block the page and the e2e checks.
 - Settings (speed, theme, code size, animations, code panel, wrap long lines)
   live in `src/settings.ts`, one store with `get`/`set`/`subscribe` saved to
   localStorage. Screens read it on creation and subscribe to changes. The menu

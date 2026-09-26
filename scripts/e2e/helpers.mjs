@@ -1,9 +1,9 @@
 // Helpers shared by the check suites.
 //
 // NEVER put editor contents into a check's message or return value: earlier
-// checks type reference solutions, and the app keeps each level's code for
-// the session. Use `openLevel(id, { fresh: true })` to start from a newly
-// loaded page.
+// checks type reference solutions, and the app saves each level's code.
+// Use `openLevel(id, { fresh: true })` to start from a newly loaded page with
+// no saved progress, or `{ reload: true }` for a reload that keeps it.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -17,8 +17,9 @@ export function levelHelpers(browser, base, root) {
     /** A wrong attempt's code without its `# expect: ...` first line. */
     withoutExpectLine: (code) => code.split("\n").slice(1).join("\n"),
 
-    async openLevel(id, { fresh = false } = {}) {
-      const url = fresh ? `${base}?fresh=${Date.now()}#/level/${id}` : `${base}#/level/${id}`;
+    async openLevel(id, { fresh = false, reload = false } = {}) {
+      const query = fresh ? `?fresh=${Date.now()}` : reload ? `?reload=${Date.now()}` : "";
+      const url = `${base}${query}#/level/${id}`;
       await browser.send("Page.navigate", { url });
       await browser.waitFor(
         `document.querySelector('.level[data-level-id="${id}"] .board .piece') && !document.querySelector('.level-right .btn-primary').disabled`,

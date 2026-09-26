@@ -6,6 +6,7 @@
 //   #/harness          the raw Python harness from Milestone 0
 import { chapters, findLevel } from "./content";
 import { mountHarness } from "./harness";
+import { progress } from "./progress";
 import { PyClient, startPythonWorker, type ClientStatus } from "./py/client";
 import { applyToDocument, settings } from "./settings";
 import { h } from "./ui/dom";
@@ -19,7 +20,13 @@ export function startApp(root: HTMLElement): void {
   applyToDocument(settings.get());
   settings.subscribe(applyToDocument);
 
-  const dialog = new SettingsDialog(settings);
+  const dialog = new SettingsDialog(settings, {
+    onResetProgress: () => {
+      progress.reset();
+      context.knownCalls.clear();
+      route(); // redraw the screen from the cleared progress
+    },
+  });
   const status = h("span", { class: "status", "data-state": "loading" }, "Loading Python…");
   const settingsButton = h(
     "button",
@@ -53,8 +60,6 @@ export function startApp(root: HTMLElement): void {
     client,
     repl: new ReplPanel(client),
     settingsDialog: dialog,
-    solved: new Set(),
-    drafts: new Map(),
     knownCalls: new Map(),
   };
   let unmount: () => void = () => {};
@@ -81,7 +86,7 @@ export function startApp(root: HTMLElement): void {
       document.title = "Harness · Rank & File";
     } else {
       crumbs.replaceChildren();
-      main.replaceChildren(renderLevelSelect(chapters, context.solved));
+      main.replaceChildren(renderLevelSelect(chapters, progress));
       document.title = "Rank & File";
     }
     window.scrollTo(0, 0);

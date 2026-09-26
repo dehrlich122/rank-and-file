@@ -158,6 +158,12 @@ pre {
   color: var(--accent-text);
 }
 
+/* for actions that can't be undone, e.g. Reset progress */
+.btn-danger {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
 .btn-small {
   padding: 3px 10px;
   font-size: 13px;
@@ -1431,6 +1437,12 @@ pre {
 
 .settings-dialog fieldset p {
   margin: -2px 0 6px;
+}
+
+/* Reset progress sits apart from the everyday settings */
+.settings-dialog .reset-progress {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
 }
 
 .choices {

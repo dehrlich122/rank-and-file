@@ -14,14 +14,13 @@ import { icon, type IconName } from "./icons";
 import { Player, buildFrames, consoleAt, controlStates } from "./playback";
 import type { ReplPanel } from "./repl";
 import type { SettingsDialog } from "./settingsDialog";
+import { progress } from "../progress";
 import { SPEEDS, settings } from "../settings";
 
 export interface LevelContext {
   client: PyClient;
   repl: ReplPanel;
   settingsDialog: SettingsDialog;
-  solved: Set<string>;
-  drafts: Map<string, string>; // code per level, kept while the tab is open
   knownCalls: Map<string, KnownCalls>; // calls typed per level, for autocomplete (QA-003)
 }
 
@@ -213,10 +212,10 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const editor: EditorView = createEditor({
     parent: editorHost,
     extensions: callCompletion({ known, piece: () => level?.piece ?? null, api: () => level?.api ?? [] }),
-    code: context.drafts.get(source.id) ?? String(source.data.starter ?? ""),
+    code: progress.level(source.id).code ?? String(source.data.starter ?? ""),
     onRun: () => void run(),
     onChange: (code) => {
-      context.drafts.set(source.id, code);
+      progress.update(source.id, { code });
       if (player && code !== recordedCode) dropRecording();
     },
     placeholder: `Write your code here, then press Run.\nYour pawn is called ${String(source.data.piece ?? "pawn")}.`,
@@ -323,7 +322,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     }
     const actions: HTMLElement[] = [];
     if (result.status === "solved") {
-      context.solved.add(source.id);
+      progress.update(source.id, { solved: true });
       const next = nextLevel(source.id);
       actions.push(
         next

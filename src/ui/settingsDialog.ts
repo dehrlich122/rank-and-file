@@ -65,13 +65,21 @@ const GROUPS: Array<{ key: keyof Settings; title: string; hint?: string; choices
   },
 ];
 
+interface SettingsDialogOptions {
+  /** Settings → Reset progress, once the player has confirmed it. */
+  onResetProgress?: () => void;
+}
+
 export class SettingsDialog {
   readonly element: HTMLDialogElement;
   private readonly inputs: HTMLInputElement[] = [];
   private readonly openListeners = new Set<() => void>();
   private returnFocus: HTMLElement | null = null;
 
-  constructor(private readonly store: SettingsStore) {
+  constructor(
+    private readonly store: SettingsStore,
+    options: SettingsDialogOptions = {},
+  ) {
     const groups = GROUPS.map((group) =>
       h(
         "fieldset",
@@ -107,6 +115,7 @@ export class SettingsDialog {
         h("button", { class: "btn btn-small", onClick: () => this.element.close() }, "Done"),
       ),
       ...groups,
+      options.onResetProgress ? resetProgress(options.onResetProgress) : null,
       h("p", { class: "muted small" }, "Esc opens and closes this menu. In the code editor, Ctrl+M then Tab moves focus out of the editor."),
     );
     this.element.addEventListener("close", () => this.returnFocus?.focus());
@@ -141,4 +150,44 @@ export class SettingsDialog {
       input.checked = String(settings[key]) === input.value;
     }
   }
+}
+
+/**
+ * Settings → Reset progress. The confirm step is part of the dialog, never a
+ * browser pop-up: those block the page (and the e2e checks).
+ */
+function resetProgress(onReset: () => void): HTMLElement {
+  const done = h("p", { class: "muted small", hidden: true }, "Progress reset.");
+  const confirm = h(
+    "div",
+    { class: "reset-confirm", hidden: true },
+    h("p", {}, "Delete every solved level, star and hint, and the code you wrote? This can't be undone."),
+    h(
+      "div",
+      { class: "choices" },
+      h("button", { class: "btn btn-small btn-danger", onClick: () => finish(true) }, "Yes, reset"),
+      h("button", { class: "btn btn-small", onClick: () => finish(false) }, "Cancel"),
+    ),
+  );
+  const start = h("button", { class: "btn btn-small", onClick: () => show(true) }, "Reset progress…");
+  function show(confirming: boolean): void {
+    confirm.hidden = !confirming;
+    start.hidden = confirming;
+    done.hidden = true;
+    (confirming ? confirm.querySelector("button") : start)?.focus();
+  }
+  function finish(reset: boolean): void {
+    if (reset) onReset();
+    show(false);
+    done.hidden = !reset;
+  }
+  return h(
+    "fieldset",
+    { class: "reset-progress" },
+    h("legend", {}, "Progress"),
+    h("p", { class: "muted small" }, "Solved levels, stars, hints and your code are saved in this browser."),
+    start,
+    confirm,
+    done,
+  );
 }

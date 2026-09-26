@@ -35,6 +35,11 @@ mkdirSync(outDir, { recursive: true });
 const started = Date.now();
 const report = { base, startedAt: new Date().toISOString(), suites: [] };
 const browser = await launch();
+// A `?fresh=` page load starts with no saved progress (so no saved code in the
+// editors), like a first visit. Settings are kept. `?reload=` keeps both.
+await browser.send("Page.addScriptToEvaluateOnNewDocument", {
+  source: `if (location.search.includes("fresh=")) localStorage.removeItem("rank-and-file:progress");`,
+});
 try {
   for (const [name, run] of Object.entries(suites)) {
     if (only && only !== name) continue;

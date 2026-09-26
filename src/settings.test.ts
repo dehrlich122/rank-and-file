@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { applyToDocument, DEFAULTS, sanitize, SettingsStore, type StorageLike } from "./settings";
+import { applyToDocument, DEFAULTS, sanitize, SettingsStore } from "./settings";
+import type { StorageLike } from "./storage";
 
 function memoryStorage(initial: Record<string, string> = {}): StorageLike & { data: Record<string, string> } {
   const data = { ...initial };

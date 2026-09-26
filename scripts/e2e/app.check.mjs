@@ -50,6 +50,28 @@ export default async function appChecks({ browser: b, base, root, check }) {
     return `${solved} solved`;
   });
 
+  // -- M2: saved progress ------------------------------------------------------------------
+  // Compares the editor with the solution file in Node and reports only yes or no.
+  const editorText = () => b.evaluate(`[...document.querySelectorAll('.level-right .cm-line')].map((line) => line.textContent).join('\\n')`);
+  const levelCards = async () => {
+    await b.send("Page.navigate", { url: `${base}#/` });
+    await b.waitFor(`document.querySelector('.level-card')`, 5000, "level cards");
+    return b.evaluate(`document.querySelectorAll('.level-card.solved').length`);
+  };
+
+  await check("M2: solved levels and your code survive a reload; a fresh start has neither", async () => {
+    await openLevel("ch01-l01", { reload: true });
+    const codeKept = (await editorText()).trimEnd() === solution("ch01-l01").trimEnd();
+    const solvedAfterReload = await levelCards();
+    await openLevel("ch01-l01", { fresh: true });
+    const codeAfterFresh = (await editorText()).trimEnd() === solution("ch01-l01").trimEnd();
+    const solvedAfterFresh = await levelCards();
+    expect(codeKept, "level 1's code wasn't kept across a reload");
+    expect(solvedAfterReload === LEVELS.length, `${solvedAfterReload} levels marked solved after a reload`);
+    expect(!codeAfterFresh && solvedAfterFresh === 0, `a fresh start kept the code (${codeAfterFresh}) or ${solvedAfterFresh} solved marks`);
+    return `${solvedAfterReload} solved after a reload, 0 after a fresh start`;
+  });
+
   // -- QA-002: level 4's locked gate --------------------------------------------------------
   await check("QA-002: level 4 starts with the guard's comment, and the panels don't give the passphrase away", async () => {
     await openLevel("ch01-l04", { fresh: true });
