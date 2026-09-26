@@ -147,6 +147,24 @@ export default async function appChecks({ browser: b, base, root, check }) {
     return `next run ${ms} ms`;
   });
 
+  await check("QA-007: selected text stays visible on the step and error lines", async () => {
+    await openLevel("ch01-l01");
+    await setCode("gold = 3\npawn.jump()");
+    await run(); // ends on the error at line 2
+    const errorBg = await b.evaluate(`getComputedStyle(document.querySelector('.level-right .cm-error-line')).backgroundColor`);
+    await b.evaluate(`${button(0)}.click()`);
+    await b.evaluate(`${button(3)}.click()`); // step 1: line 1 is the step line
+    const stepBg = await b.evaluate(`getComputedStyle(document.querySelector('.level-right .cm-step-line')).backgroundColor`);
+    await b.evaluate(`document.querySelector('.level-right .cm-content').focus()`);
+    await b.key("Home", { keyCode: 36, modifiers: 2 }); // Ctrl+Home
+    await b.key("End", { keyCode: 35, modifiers: 8 }); // Shift+End selects line 1
+    const selected = await b.waitFor(`document.querySelector('.level-right .cm-selectionBackground') ? 'yes' : ''`, 3000, "selection drawn");
+    const translucent = (color) => /^rgba\(.+, 0?\.\d+\)$/.test(color);
+    expect(translucent(stepBg) && translucent(errorBg), `step ${stepBg} · error ${errorBg}`);
+    expect(selected === "yes", "no selection drawn");
+    return `step ${stepBg} · error ${errorBg}`;
+  });
+
   // -- Learn panel, Challenge panel, scratch REPL ----------------------------------------
   await check("lesson snippet runs in place with output (level 4)", async () => {
     await openLevel("ch01-l04");

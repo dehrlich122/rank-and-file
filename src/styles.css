@@ -16,11 +16,12 @@
   --bad: #b3261e;
   --bad-bg: #fbeceb;
   --code-bg: #f1ece1;
-  --step-line: #fff1b8;
-  --error-line: #fde0dd;
+  /* translucent, so the text selection drawn underneath stays visible (QA-007) */
+  --step-line: rgb(255 214 0 / 0.28);
+  --error-line: rgb(220 38 38 / 0.15);
   --radius: 8px;
   --active-line: rgb(47 111 79 / 0.06);
-  --selection: rgb(47 111 79 / 0.2);
+  --selection: rgb(47 111 79 / 0.28);
 
   /* syntax colours */
   --syn-keyword: #8f3f9e;
@@ -61,10 +62,10 @@
     --bad: #f08a80;
     --bad-bg: #3a2322;
     --code-bg: #1f1d1b;
-    --step-line: #4a4220;
-    --error-line: #4a2624;
+    --step-line: rgb(240 200 40 / 0.18);
+    --error-line: rgb(240 70 60 / 0.18);
     --active-line: rgb(255 255 255 / 0.04);
-    --selection: rgb(95 174 132 / 0.3);
+    --selection: rgb(95 174 132 / 0.35);
 
     --syn-keyword: #d49be0;
     --syn-string: #e8a37e;
