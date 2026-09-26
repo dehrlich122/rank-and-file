@@ -22,7 +22,7 @@ The game has to be served over http: opening `index.html` directly from disk won
 py -3.14 -m venv .venv                                   # once (macOS/Linux: python3.14 -m venv .venv)
 .venv/Scripts/python -m pip install -r requirements-dev.txt
 
-npm run check      # TypeScript typecheck + Vitest + pytest
+npm run check      # typecheck + redundant-code checks (knip, ruff, vulture, jscpd) + Vitest + pytest
 ```
 
 End-to-end checks drive the real game in headless Chrome (or Edge; set

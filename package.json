@@ -10,10 +10,14 @@
     "build": "vite build",
     "play": "vite build && vite preview --open",
     "typecheck": "tsc --noEmit",
+    "lint": "npm run lint:ts && npm run lint:py && npm run lint:dupes",
+    "lint:ts": "knip",
+    "lint:py": "node scripts/venv.mjs ruff check && node scripts/venv.mjs vulture",
+    "lint:dupes": "jscpd",
     "test": "vitest run",
-    "test:py": "node scripts/pytest.mjs",
+    "test:py": "node scripts/venv.mjs pytest",
     "e2e": "node scripts/e2e/run.mjs",
-    "check": "npm run typecheck && npm run test && npm run test:py"
+    "check": "npm run typecheck && npm run lint && npm run test && npm run test:py"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
@@ -30,6 +34,8 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
+    "jscpd": "^5.3.2",
+    "knip": "^6.38.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.1",
     "vitest": "^5.0.2"

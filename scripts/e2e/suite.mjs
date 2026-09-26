@@ -5,7 +5,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-export class CheckFailed extends Error {}
+class CheckFailed extends Error {}
 
 export function expect(condition, message) {
   if (!condition) throw new CheckFailed(message);

@@ -52,7 +52,7 @@ export interface LevelInfo {
   starter: string;
 }
 
-export type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };
+type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };
 
 export interface GameEvent {
   kind: "move" | "turn" | "bump" | "gate_open" | "guard";
@@ -76,12 +76,12 @@ export interface Step {
   vars: Var[]; // the variables after the line ran
 }
 
-export interface LintWarning {
+interface LintWarning {
   line: number;
   message: string;
 }
 
-export type LevelStatus = "solved" | "incomplete" | "finished" | "error" | "timeout" | "constraint";
+type LevelStatus = "solved" | "incomplete" | "finished" | "error" | "timeout" | "constraint";
 
 export interface LevelResult {
   status: LevelStatus;
@@ -99,7 +99,7 @@ export interface LevelResult {
   duration_ms: number;
 }
 
-export interface ReplResult {
+interface ReplResult {
   more: boolean;
   output: string;
   error: ErrorInfo | null;

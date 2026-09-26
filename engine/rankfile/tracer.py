@@ -74,11 +74,11 @@ class Tracer:
         self._current: Step | None = None
         self._current_frame: types.FrameType | None = None
 
-    def __enter__(self) -> "Tracer":
+    def __enter__(self) -> Tracer:
         sys.settrace(self._on_new_frame)
         return self
 
-    def __exit__(self, *exc_info) -> bool:
+    def __exit__(self, *_exc_info) -> bool:
         sys.settrace(None)
         return False  # never swallow exceptions
 
@@ -98,13 +98,13 @@ class Tracer:
 
     # -- the trace functions -------------------------------------------------
 
-    def _on_new_frame(self, frame, event, arg):
+    def _on_new_frame(self, frame, _event, _arg):
         # Returning None means "don't trace lines in this frame".
         if frame.f_code.co_filename != PLAYER_FILENAME:
             return None
         return self._on_player_event
 
-    def _on_player_event(self, frame, event, arg):
+    def _on_player_event(self, frame, event, _arg):
         if event == "line":
             self.lines_run += 1
             self.line = frame.f_lineno

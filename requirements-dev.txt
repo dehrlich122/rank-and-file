@@ -2,3 +2,5 @@
 # third-party dependencies: it runs unchanged inside Pyodide in the browser.
 pytest>=8
 PyYAML>=6
+ruff>=0.16
+vulture>=2.16

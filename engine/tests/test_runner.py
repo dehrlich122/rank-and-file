@@ -3,7 +3,6 @@ import sys
 import time
 
 from conftest import make_level
-
 from rankfile import bridge
 from rankfile.runner import run_level, run_sandbox, run_snippet
 

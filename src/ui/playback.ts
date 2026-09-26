@@ -98,7 +98,7 @@ export function frameDuration(frame: Frame, speed: number): number {
   return (BASE_STEP_MS * Math.max(1, events * 0.75)) / speed;
 }
 
-export interface RenderOptions {
+interface RenderOptions {
   animate: boolean; // play this frame's events, or jump straight to it
   durationMs: number;
 }

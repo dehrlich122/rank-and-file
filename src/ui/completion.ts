@@ -185,7 +185,7 @@ function tabLabel(): Node {
 }
 
 /** Python's built-in functions (what counts as a "real" plain call). */
-export const PYTHON_BUILTINS = new Set([
+const PYTHON_BUILTINS = new Set([
   "abs", "aiter", "all", "anext", "any", "ascii", "bin", "bool", "breakpoint", "bytearray", "bytes",
   "callable", "chr", "classmethod", "compile", "complex", "delattr", "dict", "dir", "divmod",
   "enumerate", "eval", "exec", "filter", "float", "format", "frozenset", "getattr", "globals",

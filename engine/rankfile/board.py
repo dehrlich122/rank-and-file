@@ -22,10 +22,10 @@ class Direction(Enum):
         """How (x, y) changes when taking one step this way."""
         return _DELTAS[self]
 
-    def turned_left(self) -> "Direction":
+    def turned_left(self) -> Direction:
         return _CLOCKWISE[(_CLOCKWISE.index(self) - 1) % 4]
 
-    def turned_right(self) -> "Direction":
+    def turned_right(self) -> Direction:
         return _CLOCKWISE[(_CLOCKWISE.index(self) + 1) % 4]
 
 

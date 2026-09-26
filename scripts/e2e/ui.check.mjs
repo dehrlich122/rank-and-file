@@ -1,30 +1,12 @@
 // End-to-end checks for UI behaviour around the game: the settings menu,
 // playback controls and autocomplete. Never put editor contents into a check's
-// message (see app.check.mjs).
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+// message (see helpers.mjs).
 import { sleep } from "./cdp.mjs";
+import { BUTTONS, levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
-const BUTTONS = ".playback-buttons button";
-
 export default async function uiChecks({ browser: b, base, root, check }) {
-  const solution = (id) => readFileSync(join(root, "solutions", "ch01", `${id}.py`), "utf8");
-
-  async function openLevel(id, { fresh = false } = {}) {
-    const url = fresh ? `${base}?fresh=${Date.now()}#/level/${id}` : `${base}#/level/${id}`;
-    await b.send("Page.navigate", { url });
-    await b.waitFor(
-      `document.querySelector('.level[data-level-id="${id}"] .board .piece') && !document.querySelector('.level-right .btn-primary').disabled`,
-      60_000,
-      `level ${id} ready`,
-    );
-  }
-  async function setCode(code) {
-    await b.evaluate(`document.querySelector('.level-right .cm-content').focus()`);
-    await b.key("a", { code: "KeyA", modifiers: 2 });
-    await b.send("Input.insertText", { text: code });
-  }
+  const { solution, openLevel, setCode } = levelHelpers(b, base, root);
   const dialogOpen = () => b.evaluate(`document.querySelector('.settings-dialog').open`);
   const choose = (key, value) => b.evaluate(`document.querySelector('input[name="setting-${key}"][value="${value}"]').click()`);
   const closeDialog = () => b.evaluate(`document.querySelector('.settings-dialog').close()`);

@@ -19,7 +19,7 @@ class Piece:
     NAME = "piece"
     ABILITIES: tuple[str, ...] = ()
 
-    def __init__(self, world: "World", unlocked: list[str]):
+    def __init__(self, world: World, unlocked: list[str]):
         # Pieces refuse normal attribute assignment (see __setattr__), so the
         # constructor stores its two private fields the low-level way.
         object.__setattr__(self, "_world", world)

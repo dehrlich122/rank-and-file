@@ -1,36 +1,14 @@
 // End-to-end checks for the game itself: levels, playback, errors, lessons, REPL.
 // Solutions are read from solutions/ and typed into the editor; this file never
 // contains solution code, and nothing here prints it.
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { sleep } from "./cdp.mjs";
+import { BUTTONS, levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const LEVELS = ["ch01-l01", "ch01-l02", "ch01-l03", "ch01-l04", "ch01-l05"];
-const BUTTONS = ".playback-buttons button"; // back to start, step back, play, step forward, jump to end
 
 export default async function appChecks({ browser: b, base, root, check }) {
-  const solution = (id, suffix = "") => readFileSync(join(root, "solutions", "ch01", `${id}${suffix}.py`), "utf8");
-  const withoutExpectLine = (code) => code.split("\n").slice(1).join("\n");
-
-  // NEVER put editor contents into a check's message or return value: earlier
-  // checks type reference solutions, and the app keeps each level's code for
-  // the session. Use `fresh` to start from a newly loaded page.
-  async function openLevel(id, { fresh = false } = {}) {
-    const url = fresh ? `${base}?fresh=${Date.now()}#/level/${id}` : `${base}#/level/${id}`;
-    await b.send("Page.navigate", { url });
-    await b.waitFor(
-      `document.querySelector('.level[data-level-id="${id}"] .board .piece') && !document.querySelector('.level-right .btn-primary').disabled`,
-      60_000,
-      `level ${id} ready`,
-    );
-  }
-
-  async function setCode(code, selector = ".level-right .cm-content") {
-    await b.evaluate(`document.querySelector(${JSON.stringify(selector)}).focus()`);
-    await b.key("a", { code: "KeyA", modifiers: 2 }); // Ctrl+A
-    await b.send("Input.insertText", { text: code });
-  }
+  const { solution, withoutExpectLine, openLevel, setCode } = levelHelpers(b, base, root);
 
   const button = (index) => `document.querySelectorAll('${BUTTONS}')[${index}]`;
 

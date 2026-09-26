@@ -52,7 +52,7 @@ function loadChapters(levels: LevelSource[]): Chapter[] {
   return listed.map((chapter) => ({ ...chapter, levels: levels.filter((level) => level.chapter === chapter.chapter) }));
 }
 
-export const levels = loadLevels();
+const levels = loadLevels();
 export const chapters = loadChapters(levels);
 
 export function findLevel(id: string): LevelSource | undefined {

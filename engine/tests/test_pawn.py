@@ -1,5 +1,4 @@
 from conftest import make_level
-
 from rankfile.runner import run_level
 
 

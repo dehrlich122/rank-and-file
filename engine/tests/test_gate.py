@@ -3,8 +3,8 @@
 import json
 
 import pytest
-from conftest import make_level
 
+from conftest import make_level
 from rankfile.runner import run_level
 from rankfile.world import GUARD_GATE_LOCKED, GUARD_WRONG_PHRASE
 

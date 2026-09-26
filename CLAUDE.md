@@ -29,8 +29,12 @@ The designer is also the target learner.
 npm install          # also runs scripts/copy-pyodide.mjs → public/pyodide/
 npm run dev          # dev server, http://localhost:5173
 npm run play         # production build + preview
-npm run check        # typecheck + vitest + pytest; run before every commit
+npm run check        # typecheck + lint + vitest + pytest; run before every commit
 npm run typecheck    # tsc --noEmit (TypeScript 7)
+npm run lint         # all redundant-code checks below
+npm run lint:ts      # knip: unused files, exports and dependencies (TypeScript)
+npm run lint:py      # ruff (unused imports/variables, tidiness) + vulture (unused functions)
+npm run lint:dupes   # jscpd: copy-pasted blocks across TypeScript, JS and Python
 
 npm run test:py -- engine/tests/test_runner.py::test_endless_loop_is_stopped_quickly
 npm run test:py -- -k budget
@@ -40,10 +44,22 @@ npm run e2e                          # headless-Chrome checks; needs `npm run de
 npm run e2e -- http://localhost:4173/ --only=app   # against `npm run play`, one suite
 ```
 
-- No linter or formatter is configured.
+- Linting is about redundant code, not formatting (no formatter is configured):
+  - knip reads `knip.json`.
+  - ruff and vulture read `pyproject.toml`. Vulture's allowlist is
+    `scripts/vulture_allowlist.py`: names used only from JavaScript, from
+    player code, or through JSON serialisation.
+  - jscpd reads `.jscpd.json` and fails on any clone of 6+ lines.
+  - When a tool flags something used by name (worker-loaded engine files,
+    `bridge.py`), allowlist it; don't delete it.
+  - Python tools run from `.venv` via `node scripts/venv.mjs <module> ...`.
+- At the end of every round of fixes, run `/simplify` before committing
+  (docs/QA.md → Queued work).
 - `npm run e2e` (`scripts/e2e/`) drives the real app over the Chrome DevTools
-  protocol. The suites are `harness.check.mjs` and `app.check.mjs`, and each
-  check is `check(label, fn)`, where `fn` throws via `expect`. It writes
+  protocol. The suites are `harness.check.mjs`, `app.check.mjs` and
+  `ui.check.mjs`, with shared helpers (`openLevel`, `setCode`, `solution`) in
+  `helpers.mjs`. Each check is `check(label, fn)`, where `fn` throws via
+  `expect`. It writes
   `e2e-results/report.json` plus failure screenshots with editors blurred.
   Add a check for every user-visible fix. Solutions are read from
   `solutions/`, never written into a check. **Never put editor contents

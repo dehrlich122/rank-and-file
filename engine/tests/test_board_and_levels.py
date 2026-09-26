@@ -1,6 +1,6 @@
 import pytest
-from conftest import make_level
 
+from conftest import make_level
 from rankfile.board import Direction, Tile, square_name, step
 from rankfile.levels import LevelError, parse_level, sandbox_level
 

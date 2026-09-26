@@ -1,7 +1,6 @@
 import ast
 
 from conftest import make_level
-
 from rankfile.constraints import code_lines, comment_count
 from rankfile.runner import run_level
 

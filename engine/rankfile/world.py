@@ -24,7 +24,7 @@ GUARD_GATE_LOCKED = "Does your father really smell of elderberries? Maybe try th
 
 
 class World:
-    def __init__(self, level: "Level"):
+    def __init__(self, level: Level):
         self.level = level
         self.board = level.board
         self.pos = level.start

@@ -3,10 +3,10 @@
 // allows it; if it doesn't (private mode, blocked storage), the defaults apply
 // and changes last until the tab is closed.
 
-export type Theme = "system" | "light" | "dark";
-export type Motion = "system" | "full" | "reduced";
+type Theme = "system" | "light" | "dark";
+type Motion = "system" | "full" | "reduced";
 export type CodeSize = "small" | "medium" | "large" | "x-large";
-export type CodePanel = "right" | "bottom" | "left";
+type CodePanel = "right" | "bottom" | "left";
 
 export interface Settings {
   speed: number; // playback speed multiplier
