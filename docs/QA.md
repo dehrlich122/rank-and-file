@@ -462,8 +462,10 @@ mechanic, never by solution code.
 
 ## Session 3 — 2026-09-26 · retesting round 1 (`m1-vertical-slice`)
 
-### QA-008 · Level 4: a wrong passphrase shows two messages · Open
+### QA-008 · Level 4: a wrong passphrase shows two messages · Fixed
 
+- **Fixed** in `5127e8b` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - Pointer wording: "The guard didn't accept what line N printed." It sits on its own line under the elderberries line, and points to the most recent wrong phrase said at that gate. The same applies in level 5.
 - **Area:** Gate mechanic (QA-002), so levels 4 and 5
 - **Observed:** A wrong passphrase printed next to the locked gate gets the
   guard's hamster line, and the program carries on. When the pawn then walks
@@ -525,8 +527,11 @@ mechanic, never by solution code.
     since the guard never heard it.
   - Level 5: the same with its gate.
 
-### QA-009 · Settings: code panel on the right, bottom or left · Open
+### QA-009 · Settings: code panel on the right, bottom or left · Fixed
 
+- **Fixed** in `3641cd8` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - Bottom: the code row takes about 40% of the window's height. The editor is on the left, with Variables above Console on the right.
+  - Windows 1180px wide or less ignore the setting and keep today's layout.
 - **Area:** UI, level screen layout + settings menu (feature request, builds
   on QA-006)
 - **Observed:** A level is always three columns: Learn/Challenge on the left,
@@ -574,8 +579,10 @@ mechanic, never by solution code.
     position. The choice carries over to the next level and survives a
     reload.
 
-### QA-010 · Learn panel in steps, with a next page · Open
+### QA-010 · Learn panel in steps, with a next page · Fixed
 
+- **Fixed** in `9559bfd` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - A lesson with one snippet (level 5) has one step. It shows only "Start the challenge →", with no step count and no Back button.
 - **Area:** UI, Learn panel (feature request, goes with QA-009)
 - **Observed:** The whole lesson is one scrolling column in the Learn tab
   (`src/ui/lesson.ts`), with "Start the challenge →" at the end.
@@ -607,8 +614,11 @@ mechanic, never by solution code.
     are still there.
   - Switch to Challenge and back: still on the same step.
 
-### QA-011 · Collapse the Learn/Challenge panel; the board grows · Open
+### QA-011 · Collapse the Learn/Challenge panel; the board grows · Fixed
 
+- **Fixed** in `a6689a7` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - The board lost its old 560px cap in every layout, so on big windows it's larger even with the panel open.
+  - **To check on retest:** in the Bottom layout, the playback controls and outcome sit *beside* the board, and the board already fills its row's height. Height is the limit there (the "whichever comes first" case), so collapsing widens the board's column but doesn't make the board itself bigger. With the code on the right or left, the board grows (e.g. 444 → 530 px in a 1400×860 window).
 - **Area:** UI, level screen layout (feature request, desktop only; goes
   with QA-009)
 - **Observed:** The Learn/Challenge panel is always open, and the board has
@@ -662,7 +672,27 @@ mechanic, never by solution code.
 
 Planned tasks that aren't QA findings, in the order they should happen.
 
-### After the next QA pass: checks for redundant code *(Designer, 2026-09-26)*
+### After the next QA pass: checks for redundant code *(Designer, 2026-09-26)* · Done
+
+- **Done** in `f86163d` (tools) and `3b7cbcd` (first `/simplify` sweep), 2026-09-26.
+  - `npm run check` now runs `npm run lint`:
+    - knip (TypeScript)
+    - ruff and vulture (Python; vulture catches unused functions)
+    - jscpd (copy-pasted blocks)
+    All pass. Config is in `knip.json`, `pyproject.toml` and `.jscpd.json`.
+  - The allowlist `scripts/vulture_allowlist.py` covers names used only from JavaScript, from player code, or through JSON. The glob-loaded engine files needed no allowlisting.
+  - Tool findings fixed:
+    - un-exported names used only in their own file
+    - one copy-pasted block (the e2e suites' shared helpers, now `scripts/e2e/helpers.mjs`)
+    - unused protocol parameters
+    - import order
+  - `/simplify` findings fixed:
+    - The Challenge panel's goal and rule wording now comes from the engine (`Level.describe()`).
+    - The watchdog's timeout isn't hard-coded in messages any more.
+    - Playback frames share one console log instead of copying it per step.
+    - A test-only method was removed.
+  - The four `/simplify` review agents stopped early at the account's session usage limit, so the same four angles (reuse, simplification, efficiency, altitude) were reviewed directly.
+  - Step 4 (`/simplify` at the end of every round) is in `CLAUDE.md`.
 
 - **When:** after the designer's next round of testing is logged and its
   fixes (plus QA-008) are in. Do it before new features, so the first sweep
