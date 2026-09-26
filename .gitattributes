@@ -2,3 +2,5 @@
 *.wasm binary
 *.zip binary
 *.png binary
+# Batch files need Windows line endings to parse reliably.
+*.cmd text eol=crlf

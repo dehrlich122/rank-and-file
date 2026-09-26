@@ -17,6 +17,7 @@
     "test": "vitest run",
     "test:py": "node scripts/venv.mjs pytest",
     "check:bundle": "node scripts/check-bundle.mjs",
+    "demo": "node scripts/package-demo.mjs",
     "e2e": "node scripts/e2e/run.mjs",
     "check": "npm run typecheck && npm run lint && npm run test && npm run test:py && npm run check:bundle"
   },
