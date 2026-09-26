@@ -53,6 +53,7 @@ export interface LevelInfo {
   goals: string[]; // what to do, in words (never a passphrase)
   rules: string[]; // the level's constraints, in words
   stars: string[]; // what each of the three stars asks for, in words
+  hints: string[]; // tiered: nudge, concept reminder, partial example
 }
 
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };

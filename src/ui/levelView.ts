@@ -10,6 +10,7 @@ import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMark
 import { renderLesson, type Lesson } from "./lesson";
 import { Console, Inspector, noticeCard, outcomeCard } from "./panels";
 import { callCompletion, KnownCalls } from "./completion";
+import { HintsPanel } from "./hints";
 import { icon, type IconName } from "./icons";
 import { Player, buildFrames, consoleAt, controlStates } from "./playback";
 import type { ReplPanel } from "./repl";
@@ -32,6 +33,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   let board: BoardView | null = null;
   let player: Player | null = null;
   let lesson: Lesson | null = null;
+  let hints: HintsPanel | null = null;
   let running = false;
   let lastResult: LevelResult | null = null;
   let recordedCode: string | null = null; // the code the current (or last) recording was made from
@@ -235,7 +237,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       level = loaded.level;
       board = new BoardView(level);
       boardHost.replaceChildren(board.element);
-      challengePanel.replaceChildren(...describeChallenge(level));
+      hints = new HintsPanel(level.hints, progress.level(source.id).hints, (opened) => progress.update(source.id, { hints: opened }));
+      challengePanel.replaceChildren(...describeChallenge(level), hints.element);
       updateControls();
     } catch (error) {
       boardHost.replaceChildren(noticeCard("bad", "Python couldn't start", String(error)));
@@ -258,7 +261,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     running = true;
     updateControls();
     try {
-      const result = await client.call("runLevel", { level: source.data, code: recordedCode, hintsUsed: 0 });
+      const hintsUsed = progress.level(source.id).hints;
+      const result = await client.call("runLevel", { level: source.data, code: recordedCode, hintsUsed });
       showResult(result, mode);
     } catch (error) {
       outcomeHost.replaceChildren(describeFailure(error));
@@ -331,8 +335,19 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
           : h("a", { class: "btn btn-primary btn-small", href: "#/" }, "Back to the levels"),
       );
       window.setTimeout(() => board?.setCelebrating(true), afterMs);
+    } else if (hints && !hints.allOpen) {
+      // Points to the hints rather than opening one: the Hints section says
+      // what a hint costs before the player decides.
+      actions.push(h("button", { class: "btn btn-small", onClick: () => showHints() }, "Need a hint?"));
     }
     outcomeHost.replaceChildren(outcomeCard(result, actions));
+  }
+
+  function showHints(): void {
+    if (layout.classList.contains("learn-collapsed")) setCollapsed(false);
+    showTab("challenge");
+    hints?.element.scrollIntoView({ block: "nearest" });
+    hints?.element.querySelector<HTMLElement>(".hint-button")?.focus();
   }
 
   function updateControls(): void {

@@ -42,7 +42,8 @@ def test_describe_is_ready_for_the_ui():
     assert described["start"] == {"pos": [0, 0], "facing": "east", "opened": []}
     assert described["goal"] == [1, 1]
     assert described["signs"] == [{"pos": [0, 1], "text": "hi"}]
-    assert "hints" not in described
+    assert described["hints"] == []
+    assert make_level("P G\n", hints=["a nudge", "a reminder"]).describe()["hints"] == ["a nudge", "a reminder"]
     assert described["par"] == {"lines": None}
     assert make_level("P G\n", par={"lines": 2}).describe()["par"] == {"lines": 2}
 

@@ -695,6 +695,26 @@ pre {
   margin: 6px 0 0;
 }
 
+/* hints (src/ui/hints.ts), opened one at a time */
+.hints .hint-list {
+  margin: 6px 0 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 6px;
+}
+
+.hints .hint-list li:focus {
+  outline: none;
+}
+
+.hints .hint-button {
+  margin-top: 8px;
+}
+
+.hints p {
+  margin: 6px 0 0;
+}
+
 .sign-text {
   margin: 12px 0 0;
   padding: 8px 12px;

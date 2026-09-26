@@ -123,6 +123,9 @@ class Level:
             "goals": self.goals(),
             "rules": describe_rules(self.constraints),
             "stars": self.star_goals(),
+            # Tiered hints (nudge, concept reminder, partial example); the UI
+            # reveals them one at a time, and only when asked.
+            "hints": self.hints,
         }
 
 

@@ -76,6 +76,55 @@ export default async function appChecks({ browser: b, base, root, check }) {
     return `${solvedAfterReload} solved after a reload, 0 after a fresh start`;
   });
 
+  // -- M2: hints ------------------------------------------------------------------------------
+  // Hints are spoilers too: these checks report counts and button labels, never hint text.
+  const challengeTab = () => b.evaluate(`[...document.querySelectorAll('.tab')].find((tab) => tab.textContent === 'Challenge').click()`);
+  const hintState = () =>
+    b.evaluate(`({
+      open: document.querySelectorAll('.hints .hint-list li').length,
+      button: document.querySelector('.hints .hint-button')?.textContent ?? null,
+      costNote: document.querySelector('.hints')?.innerText.includes('gives up') ?? false,
+    })`);
+
+  await check("M2: hints open one at a time, say what they cost first, and stay open after a reload", async () => {
+    await openLevel("ch01-l02", { fresh: true });
+    await challengeTab();
+    const before = await hintState();
+    await b.evaluate(`document.querySelector('.hints .hint-button').click()`);
+    const one = await hintState();
+    await openLevel("ch01-l02", { reload: true });
+    await challengeTab();
+    const reloaded = await hintState();
+    expect(before.open === 0 && before.button === "Show a hint (1 of 3)" && before.costNote, `before: ${JSON.stringify(before)}`);
+    expect(one.open === 1 && one.button === "Show the next hint (2 of 3)" && !one.costNote, `after one: ${JSON.stringify(one)}`);
+    expect(reloaded.open === 1, `after a reload: ${JSON.stringify(reloaded)}`);
+  });
+
+  await check("M2: solving after opening a hint earns two stars; the third says why", async () => {
+    await openLevel("ch01-l02");
+    await setCode(solution("ch01-l02"));
+    const r = await run();
+    const third = await b.evaluate(`document.querySelectorAll('.outcome-host .stars li')[2].textContent`);
+    expect(r.head === "Solved!" && r.stars === 2, `${r.stars} stars: ${brief(r)}`);
+    expect(third.includes("you opened 1"), third);
+    return third;
+  });
+
+  await check("M2: a failed run offers 'Need a hint?', which opens the Challenge panel at the hints", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    await setCode("pawn.fly()\n");
+    const r = await run();
+    const offered = await b.evaluate(`[...document.querySelectorAll('.outcome-host button')].some((e) => e.textContent === 'Need a hint?')`);
+    await b.evaluate(`[...document.querySelectorAll('.outcome-host button')].find((e) => e.textContent === 'Need a hint?')?.click()`);
+    const after = await b.evaluate(`({
+      challenge: !document.querySelector('.tab-panel .hints').closest('.tab-panel').hidden,
+      focused: document.activeElement?.classList.contains('hint-button') ?? false,
+      open: document.querySelectorAll('.hints .hint-list li').length,
+    })`);
+    expect(r.head !== "Solved!" && offered, `${brief(r)} | offered: ${offered}`);
+    expect(after.challenge && after.focused && after.open === 0, `after the click: ${JSON.stringify(after)} (it shows the hints, it doesn't open one)`);
+  });
+
   // -- QA-002: level 4's locked gate --------------------------------------------------------
   await check("QA-002: level 4 starts with the guard's comment, and the panels don't give the passphrase away", async () => {
     await openLevel("ch01-l04", { fresh: true });
