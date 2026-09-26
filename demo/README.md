@@ -101,6 +101,13 @@ Ctrl+C in it, to stop the game.
 (<http://localhost:8000>). A different browser, or a different port, starts fresh.
 Nothing is saved in this folder.
 
+## License
+
+Rank & File is by David Ehrlich. The game's code is under the MIT License
+(`LICENSE`). Its levels, lessons and solutions, which are built into the game,
+are under Creative Commons BY-NC-SA 4.0 (`LICENSE-CONTENT`): free to share and
+adapt for non-commercial use, with credit, under the same license.
+
 ## Removing it
 
 Delete this folder. To also clear what the game saved, clear your browser's site data

@@ -57,8 +57,23 @@ function handle(request, response) {
     response.writeHead(404, { "Content-Type": "text/plain" }).end("Not found");
     return;
   }
-  response.writeHead(200, { "Content-Type": TYPES[extname(file).toLowerCase()] ?? "application/octet-stream" });
-  createReadStream(file).pipe(response);
+  // Like Python's server: the size, and the date so the browser can reuse
+  // files it already has (a "304 Not Modified" answer) instead of downloading
+  // them again, which matters for the 13 MB Python runtime.
+  const stats = statSync(file);
+  const modified = stats.mtime.toUTCString();
+  if (request.headers["if-modified-since"] === modified) {
+    response.writeHead(304).end();
+    return;
+  }
+  response.writeHead(200, {
+    "Content-Type": TYPES[extname(file).toLowerCase()] ?? "application/octet-stream",
+    "Content-Length": stats.size,
+    "Last-Modified": modified,
+  });
+  createReadStream(file)
+    .on("error", () => response.destroy())
+    .pipe(response);
 }
 
 /** Start serving on the first free port from 8000 to 8010; resolves to the port, or null. */
