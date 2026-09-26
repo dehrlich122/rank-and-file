@@ -1,6 +1,6 @@
-// Packages a playable demo: the built game plus demo/ (the install README, the
-// check and start scripts, and the two small servers), as a folder and a zip
-// in release/ (gitignored).
+// Packages a playable demo: the built game, the licenses, and demo/ (the
+// install README, the check and start scripts, and the two small servers), as
+// a folder and a zip in release/ (gitignored).
 //
 //   npm run demo -- <name> --title "M2 demo: feedback depth"
 //   node scripts/package-demo.mjs <name> --title "..." [--root <checkout>] [--no-progress]
@@ -9,7 +9,7 @@
 // demo/ files always come from this one. --no-progress is for builds from
 // before progress was saved (M1).
 import { execFileSync } from "node:child_process";
-import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
@@ -42,6 +42,9 @@ for (const file of readdirSync(join(here, "demo"))) {
   if (file.endsWith(".cmd")) text = text.replace(/\n/g, "\r\n"); // batch files need Windows line endings
   writeFileSync(join(folder, file), text);
 }
+// The licenses travel with every copy: MIT for the code, CC BY-NC-SA for the
+// level content (levels, lessons, solutions), which is built into the game.
+for (const file of ["LICENSE", "LICENSE-CONTENT"]) copyFileSync(join(here, file), join(folder, file));
 
 // bsdtar (built into Windows 10+ and macOS) writes a zip when the name ends in
 // .zip. On Windows, use the system's own: Git Bash's tar can't write zips.
