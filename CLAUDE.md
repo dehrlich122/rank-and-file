@@ -186,10 +186,17 @@ Constraints are checked with `ast`/`tokenize`, never with string matching.
   (`styles.css`). The Code panel setting (QA-009) sets `data-code-panel` on
   `<html>` to rearrange them on wide screens (above 1180px); narrow windows
   always put the code underneath.
-  - Collapsing the Learn panel (QA-011) is the `.learn-collapsed` class on
-    `.level`, and `--learn-col` animates.
+  - The Learn and code columns share one fixed width (`--side-col`), so the
+    board sits in the middle of the screen (QA-013).
+  - Collapsing the Learn panel (`.learn-collapsed` on `.level`) only shrinks
+    the panel inside its own column: the board and the code never move or
+    resize.
+  - With the code at the bottom, `placePlayback()` in `levelView.ts` moves the
+    playback bar and outcome card beside the editor (QA-012). They're moved,
+    never rebuilt.
   - The board fills its column up to `--board-max-height`.
-  - Layout changes must stay CSS-only, so nothing is rebuilt.
+  - Keep layout changes in CSS wherever possible, and never rebuild the
+    editor, board or lesson.
 - The Learn panel pages one step per runnable snippet (`splitIntoSteps` in
   `ui/lesson.ts`, QA-010).
 - Playback buttons follow `controlStates()` in `ui/playback.ts`. Editing code

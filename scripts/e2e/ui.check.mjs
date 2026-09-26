@@ -123,7 +123,8 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     const r = await rects();
     expect(r.learn.right < r.board.left, "Learn/Challenge should stay on the left");
     expect(r.code.top > r.board.bottom && r.code.top > r.learn.bottom, "the code should be underneath");
-    expect(Math.abs(r.code.left - r.learn.left) < 2 && Math.abs(r.code.right - r.board.right) < 2, `full width? ${JSON.stringify(r)}`);
+    const viewportRight = await b.evaluate(`document.documentElement.clientWidth`);
+    expect(Math.abs(r.code.left - r.learn.left) < 2 && viewportRight - r.code.right < 16, `full width? ${JSON.stringify(r)}`);
     const inside = await b.evaluate(`['.level-right .toolbar', '.level-right .editor', '.subpanel-vars', '.subpanel-console'].every((s) => document.querySelector('.level-right').contains(document.querySelector(s)))`);
     expect(inside, "Run/Stop, editor, Variables and Console should all be in the code column");
   });
@@ -238,12 +239,44 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     expect(state.total === 1 && state.count === "" && state.back === "hidden" && state.next === "Start the challenge →", JSON.stringify(state));
   });
 
-  // -- QA-011: collapse the Learn/Challenge panel; the board grows --------------------------------
-  const boardSize = () =>
-    b.evaluate(`(() => { const r = document.querySelector('.level-middle .board').getBoundingClientRect(); return Math.round(Math.min(r.width, r.height)); })()`);
+  // -- QA-012: bottom layout -----------------------------------------------------------------------
+  const boardBox = () =>
+    b.evaluate(`(() => { const r = document.querySelector('.level-middle .board').getBoundingClientRect(); return { left: Math.round(r.left), top: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height), centre: Math.round(r.left + r.width / 2) }; })()`);
+  const where = (selector) =>
+    b.evaluate(`document.querySelector('.level-right').contains(document.querySelector('${selector}')) ? 'code' : 'board'`);
+
+  await check("QA-012: with the code at the bottom, playback and outcome sit beside the editor; the board is centred", async () => {
+    await choose("codePanel", "bottom");
+    await openLevel("ch01-l03", { fresh: true });
+    await setCode("pawn.move()\npawn.turn_right()\npawn.move()");
+    await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
+    await b.waitFor(`document.querySelector('.outcome-host .outcome')`, 20_000, "outcome");
+    const placed = { playback: await where(".playback"), outcome: await where(".outcome-host") };
+    const middleOnly = await b.evaluate(`document.querySelector('.level-middle').children.length === 1`);
+    const box = await boardBox();
+    const centre = Math.round((await b.evaluate(`document.documentElement.clientWidth`)) / 2);
+    expect(placed.playback === "code" && placed.outcome === "code" && middleOnly, JSON.stringify({ placed, middleOnly }));
+    expect(Math.abs(box.centre - centre) <= 3, `board centre ${box.centre}, screen centre ${centre}`);
+    return `board ${box.width}×${box.height}, centre ${box.centre}`;
+  });
+
+  await check("QA-012: switching layouts mid-run brings the playback position and outcome along", async () => {
+    await b.evaluate(`document.querySelectorAll('${BUTTONS}')[1].click()`); // one step back from the end
+    const before = await b.evaluate(`document.querySelector('.step-label').textContent`);
+    await choose("codePanel", "right");
+    const right = { playback: await where(".playback"), label: await b.evaluate(`document.querySelector('.step-label').textContent`) };
+    await b.evaluate(`document.querySelectorAll('${BUTTONS}')[4].click()`);
+    await choose("codePanel", "bottom");
+    const outcome = await b.evaluate(`!!document.querySelector('.level-right .outcome-host .outcome')`);
+    await choose("codePanel", "right");
+    expect(right.playback === "board" && right.label === before, JSON.stringify({ before, right }));
+    expect(outcome, "the outcome card should come along to the bottom layout");
+  });
+
+  // -- QA-013 (reworks QA-011): collapsing the Learn panel moves nothing else --------------------------
   const collapse = async () => {
     await b.evaluate(`document.querySelector('.panel-toggle').click()`);
-    await sleep(400); // the column animates
+    await sleep(400); // the panel's width animates
   };
   const expand = async () => {
     await b.evaluate(`document.querySelector('.expand-strip').click()`);
@@ -257,29 +290,23 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     })`);
 
   for (const panel of ["right", "bottom", "left"]) {
-    await check(`QA-011: collapsing makes room and the board grows; expanding shrinks it back (code panel: ${panel})`, async () => {
+    await check(`QA-013: collapsing hides the lesson; the board and code don't move or resize (code panel: ${panel})`, async () => {
       await choose("codePanel", panel);
       await openLevel("ch01-l03", { fresh: true });
       await sleep(300);
-      const open = await boardSize();
+      const before = { board: await boardBox(), code: (await rects()).code };
       await collapse();
       const state = await collapsedState();
-      const bigger = await boardSize();
+      const after = { board: await boardBox(), code: (await rects()).code };
       const r = await rects();
       await expand();
-      const back = await boardSize();
+      const centre = Math.round((await b.evaluate(`document.documentElement.clientWidth`)) / 2);
       expect(state.collapsed && state.strip && state.tabsHidden, JSON.stringify(state));
-      if (panel === "bottom") {
-        // At the bottom the board is already as tall as its row, so height is the limit:
-        // collapsing widens its column (the controls get the room) but can't make it taller.
-        expect(bigger >= open && Math.abs(back - open) <= 2, `board ${open} → ${bigger} → ${back}`);
-        expect(r.board.right - r.board.left > 300, "the board's column should take the freed width");
-      } else {
-        expect(bigger > open + 20 && Math.abs(back - open) <= 2, `board ${open} → ${bigger} → ${back}`);
-      }
+      expect(JSON.stringify(before) === JSON.stringify(after), `moved: ${JSON.stringify({ before, after })}`);
+      expect(Math.abs(before.board.centre - centre) <= 3, `board centre ${before.board.centre}, screen centre ${centre}`);
       const stripSide = panel === "left" ? r.learn.left > r.board.right : r.learn.right < r.board.left;
       expect(stripSide && r.learn.right - r.learn.left < 60, `strip at the wrong side or too wide: ${JSON.stringify(r.learn)}`);
-      return `board ${open} → ${bigger} → ${back}`;
+      return `board ${before.board.width}×${before.board.height} at centre ${before.board.centre}, unchanged`;
     });
   }
   await choose("codePanel", "right");
@@ -315,12 +342,12 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     expect(kept.step === "Step 2 of 2" && kept.snippet.includes("Finished") && kept.repl, JSON.stringify(kept));
   });
 
-  await check("QA-011: the resize animates, and is instant with reduced animations", async () => {
-    const normal = await b.evaluate(`getComputedStyle(document.querySelector('.level')).transitionProperty`);
+  await check("QA-013: the panel's collapse animates, and is instant with reduced animations", async () => {
+    const normal = await b.evaluate(`getComputedStyle(document.querySelector('.level-left')).transitionProperty`);
     await choose("motion", "reduced");
-    const reduced = await b.evaluate(`getComputedStyle(document.querySelector('.level')).transitionProperty`);
+    const reduced = await b.evaluate(`getComputedStyle(document.querySelector('.level-left')).transitionProperty`);
     await choose("motion", "system");
-    expect(normal.includes("grid-template-columns") && reduced === "none", `normal: ${normal} · reduced: ${reduced}`);
+    expect(normal.includes("width") && reduced === "none", `normal: ${normal} · reduced: ${reduced}`);
   });
 
   // -- QA-005: playback buttons -----------------------------------------------------------

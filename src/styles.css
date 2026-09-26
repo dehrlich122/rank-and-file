@@ -339,15 +339,19 @@ pre {
 /* ---- level screen ---- */
 
 /* A level is a grid of three areas: "learn" (the Learn/Challenge panel), "board"
-   and "code" (Run/Stop, editor, Variables, Console). The Code panel setting
-   (data-code-panel on <html>, QA-009) rearranges them on wide screens; narrow
-   windows always put the code underneath (see the end of this file). Only the
-   grid changes, so switching layouts never rebuilds anything. */
+   and "code" (Run/Stop, editor, Variables, Console). The Learn and code columns
+   have the same fixed width, so the board sits in the middle of the screen and
+   takes whatever the window has left (QA-013). The Code panel setting
+   (data-code-panel on <html>, QA-009, QA-012) rearranges the areas on wide
+   screens; narrow windows always put the code underneath (see the end of this
+   file). Switching layouts never rebuilds anything: only the grid changes, and
+   for "bottom" the playback bar and outcome move beside the editor
+   (placePlayback in levelView.ts). */
 .level {
-  --learn-col: clamp(300px, 26vw, 380px);
+  --side-col: clamp(340px, 29vw, 440px);
   --board-max-height: max(240px, calc(100vh - 330px)); /* leaves room for the controls and outcome */
   display: grid;
-  grid-template-columns: var(--learn-col) minmax(320px, 1fr) minmax(360px, 1.1fr);
+  grid-template-columns: var(--side-col) minmax(0, 1fr) var(--side-col);
   grid-template-areas: "learn board code";
   gap: 12px;
   padding: 12px;
@@ -359,15 +363,38 @@ pre {
   grid-area: learn;
 }
 
-/* Collapsing the Learn/Challenge panel (QA-011): its column shrinks to a strip
-   and the board's column takes the rest. The panel's contents are hidden, not
-   removed. */
-.level {
-  transition: grid-template-columns 250ms ease-in-out;
+.level-middle {
+  grid-area: board;
 }
 
-.level.learn-collapsed {
-  --learn-col: 44px;
+.level-right {
+  grid-area: code;
+}
+
+/* Variables and Console (and, for "bottom", the playback bar and outcome). */
+.code-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.code-info-playback {
+  display: contents;
+}
+
+/* Collapsing the Learn/Challenge panel (QA-011, QA-013): the panel shrinks to a
+   strip against the outer edge of its own column. The grid itself doesn't
+   change, so the board and the code stay exactly where they are. The panel's
+   contents are hidden, not removed. */
+.level-left {
+  justify-self: start;
+  width: 100%;
+  transition: width 250ms ease-in-out;
+}
+
+.level.learn-collapsed .level-left {
+  width: 44px;
 }
 
 .level.learn-collapsed .level-left > :not(.expand-strip) {
@@ -417,76 +444,50 @@ pre {
   color: var(--text);
 }
 
-/* When the panel is on the right, its arrows point the other way. */
-:root[data-code-panel="left"] :is(.panel-toggle, .expand-strip) .icon {
-  transform: scaleX(-1);
-}
-
-.level-middle {
-  grid-area: board;
-}
-
-.level-right {
-  grid-area: code;
-}
-
 @media (min-width: 1181px) {
   :root[data-code-panel="left"] .level {
-    grid-template-columns: minmax(360px, 1.1fr) minmax(320px, 1fr) var(--learn-col);
     grid-template-areas: "code board learn";
   }
 
-  /* Bottom: the code runs full width under the Learn panel and the board, with
-     the editor on the left and Variables and Console beside it. */
-  :root[data-code-panel="bottom"] .level {
-    grid-template-columns: var(--learn-col) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) minmax(260px, 42%);
-    grid-template-areas:
-      "learn board"
-      "code code";
+  /* The Learn panel is on the right: it collapses towards the right edge, and
+     its arrows point the other way. */
+  :root[data-code-panel="left"] .level-left {
+    justify-self: end;
   }
 
-  /* The middle is wide here, so the playback controls and the outcome sit
-     beside the board and the board can use the full height of its row. */
-  :root[data-code-panel="bottom"] .level {
-    --board-max-height: max(200px, calc((100vh - 73px) * 0.58 - 40px));
+  :root[data-code-panel="left"] :is(.panel-toggle, .expand-strip) .icon {
+    transform: scaleX(-1);
   }
 
-  :root[data-code-panel="bottom"] .level-middle {
-    display: grid;
-    grid-template-columns: auto minmax(260px, 1fr);
-    grid-template-rows: auto 1fr;
+  /* Bottom (QA-012): the board has its row to itself, centred on the screen
+     (the empty third column balances the Learn panel), and fills the row's
+     height. The code row runs full width, with the playback bar, the outcome,
+     Variables and Console beside the editor. */
+  :root[data-code-panel="bottom"] .level {
+    grid-template-rows: minmax(0, 1fr) minmax(300px, 45%);
     grid-template-areas:
-      "board controls"
-      "board outcome";
-    align-content: start;
+      "learn board ."
+      "code code code";
   }
 
   :root[data-code-panel="bottom"] .level-middle > .board-host {
-    grid-area: board;
-  }
-
-  :root[data-code-panel="bottom"] .level-middle > .playback {
-    grid-area: controls;
-  }
-
-  :root[data-code-panel="bottom"] .level-middle > .outcome-host {
-    grid-area: outcome;
+    flex: 1;
+    min-height: 0;
   }
 
   :root[data-code-panel="bottom"] .level-middle .board {
-    width: auto;
-    height: var(--board-max-height);
+    width: 100%;
+    height: 100%;
+    max-height: none;
   }
 
   :root[data-code-panel="bottom"] .level-right {
     display: grid;
-    grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.3fr) minmax(380px, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
       "toolbar toolbar"
-      "editor vars"
-      "editor console";
+      "editor info";
   }
 
   :root[data-code-panel="bottom"] .level-right > .toolbar {
@@ -498,11 +499,46 @@ pre {
     min-height: 0;
   }
 
-  :root[data-code-panel="bottom"] .level-right > .subpanel-vars {
+  :root[data-code-panel="bottom"] .code-info {
+    grid-area: info;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "playback playback"
+      "outcome outcome"
+      "vars console";
+    gap: 8px 12px;
+    overflow: auto;
+  }
+
+  :root[data-code-panel="bottom"] .code-info .playback {
+    grid-area: playback;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+
+  :root[data-code-panel="bottom"] .code-info .scrubber {
+    flex: 1;
+    min-width: 60px;
+  }
+
+  :root[data-code-panel="bottom"] .code-info .playback-meta {
+    gap: 8px;
+  }
+
+  :root[data-code-panel="bottom"] .code-info .outcome-host {
+    grid-area: outcome;
+    max-height: 160px;
+    overflow: auto;
+  }
+
+  :root[data-code-panel="bottom"] .subpanel-vars {
     grid-area: vars;
   }
 
-  :root[data-code-panel="bottom"] .level-right > .subpanel-console {
+  :root[data-code-panel="bottom"] .subpanel-console {
     grid-area: console;
   }
 
@@ -1052,7 +1088,7 @@ pre {
 
 /* Animations setting: "Reduced" always stops movement; "Match system" follows
    the OS preference; "Full" ignores it. (Colour flashes stay: they aren't motion.) */
-:root[data-motion="reduced"] :is(.piece, .piece-pointer, .gate-bars, .gate-lock, .level) {
+:root[data-motion="reduced"] :is(.piece, .piece-pointer, .gate-bars, .gate-lock, .level-left) {
   transition: none;
 }
 
@@ -1061,7 +1097,7 @@ pre {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion="full"]) :is(.piece, .piece-pointer, .gate-bars, .gate-lock, .level) {
+  :root:not([data-motion="full"]) :is(.piece, .piece-pointer, .gate-bars, .gate-lock, .level-left) {
     transition: none;
   }
 
@@ -1423,8 +1459,8 @@ pre {
 
 @media (max-width: 1180px) {
   .level {
-    --learn-col: clamp(280px, 30vw, 340px);
-    grid-template-columns: var(--learn-col) minmax(0, 1fr);
+    --side-col: clamp(280px, 30vw, 340px);
+    grid-template-columns: var(--side-col) minmax(0, 1fr);
     grid-template-areas:
       "learn board"
       "code code";

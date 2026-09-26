@@ -111,6 +111,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const stopFollowingSettings = settings.subscribe((next) => {
     speed.value = String(next.speed);
     player?.setSpeed(next.speed);
+    placePlayback();
   });
   // Opening Settings pauses playback, like a game's pause menu.
   const stopPausingOnSettings = context.settingsDialog.onOpen(() => player?.pause());
@@ -122,9 +123,10 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const inspector = new Inspector();
   const consoleView = new Console();
 
-  // The Learn/Challenge panel can collapse to a strip so the board can grow
-  // (QA-011). It's hidden, not rebuilt, so the lesson step, snippet runs and
-  // Scratch Python survive. Collapsed lasts for this level only.
+  // The Learn/Challenge panel can collapse to a strip (QA-011, QA-013). Only the
+  // panel changes: the board and the code stay exactly where they are. It's
+  // hidden, not rebuilt, so the lesson step, snippet runs and Scratch Python
+  // survive. Collapsed lasts for this level only.
   const collapseButton = h(
     "button",
     { class: "btn btn-icon panel-toggle", title: "Hide the lesson panel", "aria-label": "Hide the lesson panel", onClick: () => setCollapsed(true) },
@@ -135,6 +137,22 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     { class: "expand-strip", title: "Show the lesson panel", "aria-label": "Show the lesson panel", onClick: () => setCollapsed(false) },
     icon("expandPanel"),
     h("span", { class: "expand-label" }, "Learn · Challenge"),
+  );
+  const playbackBar = h(
+    "div",
+    { class: "playback" },
+    h("div", { class: "playback-buttons" }, toStart, back, playPause, forward, toEnd),
+    slider,
+    h("div", { class: "playback-meta" }, stepLabel, speed),
+  );
+  const middlePanel = h("section", { class: "panel level-middle" }, boardHost);
+  const playbackSlot = h("div", { class: "code-info-playback" });
+  const codeInfo = h(
+    "div",
+    { class: "code-info" },
+    playbackSlot,
+    h("div", { class: "subpanel subpanel-vars" }, h("h2", {}, "Variables"), inspector.element),
+    h("div", { class: "subpanel subpanel-console" }, h("h2", {}, "Console"), consoleView.element),
   );
   const layout = h(
     "div",
@@ -148,29 +166,29 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       replDrawer,
       expandStrip,
     ),
-      h(
-        "section",
-        { class: "panel level-middle" },
-        boardHost,
-        h(
-          "div",
-          { class: "playback" },
-          h("div", { class: "playback-buttons" }, toStart, back, playPause, forward, toEnd),
-          slider,
-          h("div", { class: "playback-meta" }, stepLabel, speed),
-        ),
-        outcomeHost,
-      ),
+      middlePanel,
       h(
         "section",
         { class: "panel level-right" },
         h("div", { class: "toolbar" }, runButton, stopButton, h("span", { class: "muted small toolbar-hint" }, "Ctrl+Enter runs")),
         editorHost,
-        h("div", { class: "subpanel subpanel-vars" }, h("h2", {}, "Variables"), inspector.element),
-        h("div", { class: "subpanel subpanel-console" }, h("h2", {}, "Console"), consoleView.element),
+        codeInfo,
       ),
   );
   root.replaceChildren(layout);
+
+  // With the code at the bottom, the playback bar and outcome card sit beside
+  // the editor with Variables and Console, so the board has its row to itself
+  // (QA-012). They're moved, not rebuilt, so playback survives the switch.
+  // Narrow windows keep the code-panel layout's default (see styles.css).
+  const wideScreen = window.matchMedia("(min-width: 1181px)");
+  function placePlayback(): void {
+    const besideCode = settings.get().codePanel === "bottom" && wideScreen.matches;
+    const target = besideCode ? playbackSlot : middlePanel;
+    if (playbackBar.parentElement !== target) target.append(playbackBar, outcomeHost); // only move when it changes
+  }
+  placePlayback();
+  wideScreen.addEventListener("change", placePlayback);
 
   function setCollapsed(collapsed: boolean): void {
     layout.classList.toggle("learn-collapsed", collapsed);
@@ -347,6 +365,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
 
   return () => {
     stopFollowingSettings();
+    wideScreen.removeEventListener("change", placePlayback);
     stopPausingOnSettings();
     player?.dispose();
     board?.dispose();
