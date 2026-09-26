@@ -45,3 +45,9 @@ blurred so no level solution is shown.
 - `engine/rankfile/`: the game engine, in plain Python
 - `src/`: the browser UI (TypeScript)
 - `levels/`, `lessons/`, `solutions/`: level content
+
+## License
+
+The code is under the [MIT License](LICENSE). The level and lesson content in
+`levels/` and `lessons/` is under [CC BY-NC-SA 4.0](LICENSE-CONTENT): free to
+share and adapt for non-commercial use, with credit, under the same license.
