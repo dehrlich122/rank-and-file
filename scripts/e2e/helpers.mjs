@@ -39,5 +39,31 @@ export function levelHelpers(browser, base, root) {
       await browser.key("a", { code: "KeyA", modifiers: 2 }); // Ctrl+A
       await browser.send("Input.insertText", { text: code });
     },
+
+    /** An editor's text inside `scope`, line by line. Compare it in Node; never report it. */
+    editorText: (scope = ".level-right") =>
+      browser.evaluate(`[...document.querySelectorAll(${JSON.stringify(`${scope} .cm-line`)})].map((line) => line.textContent).join('\\n')`),
+
+    ...buttonHelpers(browser),
+
+    /** Show the level's Challenge tab. */
+    challengeTab: () => buttonHelpers(browser).clickButton("Challenge", ".tabs"),
+  };
+}
+
+/** Find buttons by their label, within a CSS `scope`. */
+export function buttonHelpers(browser) {
+  const find = (label, scope) =>
+    `[...document.querySelectorAll(${JSON.stringify(`${scope} button`)})].find((e) => e.textContent === ${JSON.stringify(label)})`;
+  return {
+    /** Click the button labelled `label`. Fails if there isn't one. */
+    clickButton: (label, scope = "body") =>
+      browser.evaluate(`(() => {
+        const button = ${find(label, scope)};
+        if (!button) throw new Error(${JSON.stringify(`no "${label}" button in ${scope}`)});
+        button.click();
+      })()`),
+    /** Whether there's a button labelled `label`. */
+    hasButton: (label, scope = "body") => browser.evaluate(`!!${find(label, scope)}`),
   };
 }

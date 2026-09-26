@@ -22,6 +22,7 @@ export interface Chapter {
   title: string;
   tier: string;
   summary: string;
+  curriculum: boolean; // false for the Testing ground: not numbered, never "next"
   levels: LevelSource[];
 }
 
@@ -47,13 +48,17 @@ function loadLevels(): LevelSource[] {
 }
 
 function loadChapters(levels: LevelSource[]): Chapter[] {
-  const listed = (parseYaml(Object.values(chapterFile)[0] ?? "[]") as Omit<Chapter, "levels">[]) ?? [];
-  return listed.map((chapter) => ({ ...chapter, levels: levels.filter((level) => level.chapter === chapter.chapter) }));
+  const listed = (parseYaml(Object.values(chapterFile)[0] ?? "[]") as Array<Omit<Chapter, "levels" | "curriculum"> & { curriculum?: boolean }>) ?? [];
+  return listed.map((chapter) => ({
+    ...chapter,
+    curriculum: chapter.curriculum !== false,
+    levels: levels.filter((level) => level.chapter === chapter.chapter),
+  }));
 }
 
-/** "Chapter 1 · First Moves"; the Testing ground (chapter 0) is just its title. */
-export function chapterName(chapter: Omit<Chapter, "levels">): string {
-  return chapter.chapter > 0 ? `Chapter ${chapter.chapter} · ${chapter.title}` : chapter.title;
+/** "Chapter 1 · First Moves"; a chapter outside the curriculum is just its title. */
+export function chapterName(chapter: Chapter): string {
+  return chapter.curriculum ? `Chapter ${chapter.chapter} · ${chapter.title}` : chapter.title;
 }
 
 const levels = loadLevels();
@@ -83,9 +88,9 @@ export async function loadSolution(id: string): Promise<Solution | null> {
   return code === undefined ? null : { code, note: note ?? "" };
 }
 
-/** The level after `id` in the curriculum. The Testing ground (chapter 0) is never "next". */
+/** The level after `id` in play order (chapters.yaml), within the curriculum only. */
 export function nextLevel(id: string): LevelSource | undefined {
-  const curriculum = levels.filter((level) => level.chapter > 0);
+  const curriculum = chapters.filter((chapter) => chapter.curriculum).flatMap((chapter) => chapter.levels);
   const index = curriculum.findIndex((level) => level.id === id);
   return index >= 0 ? curriculum[index + 1] : undefined;
 }

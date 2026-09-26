@@ -1,11 +1,13 @@
 // End-to-end checks for the raw Python harness (#/harness): the worker, the
 // line budget, the watchdog and error reporting, with no level around them.
 import { sleep } from "./cdp.mjs";
+import { buttonHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 export default async function harnessChecks({ browser: b, base, check }) {
+  const { clickButton } = buttonHelpers(b);
   async function example(label) {
-    await b.evaluate(`[...document.querySelectorAll('.examples button')].find((x) => x.textContent === ${JSON.stringify(label)}).click()`);
+    await clickButton(label, ".examples");
     await sleep(20);
     await b.waitFor(`!document.querySelector('.run-meta').textContent.startsWith('Running')`, 20_000, label);
     return b.evaluate(`({

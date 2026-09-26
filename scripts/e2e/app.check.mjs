@@ -8,7 +8,7 @@ import { expect } from "./suite.mjs";
 const LEVELS = ["ch01-l01", "ch01-l02", "ch01-l03", "ch01-l04", "ch01-l05"];
 
 export default async function appChecks({ browser: b, base, root, check }) {
-  const { solution, withoutExpectLine, openLevel, setCode } = levelHelpers(b, base, root);
+  const { solution, withoutExpectLine, openLevel, setCode, editorText, clickButton, hasButton, challengeTab } = levelHelpers(b, base, root);
 
   const button = (index) => `document.querySelectorAll('${BUTTONS}')[${index}]`;
 
@@ -56,7 +56,6 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   // -- M2: saved progress ------------------------------------------------------------------
   // Compares the editor with the solution file in Node and reports only yes or no.
-  const editorText = () => b.evaluate(`[...document.querySelectorAll('.level-right .cm-line')].map((line) => line.textContent).join('\\n')`);
   const levelCards = async () => {
     await b.send("Page.navigate", { url: `${base}#/` });
     await b.waitFor(`document.querySelector('.level-card')`, 5000, "level cards");
@@ -78,7 +77,6 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   // -- M2: hints ------------------------------------------------------------------------------
   // Hints are spoilers too: these checks report counts and button labels, never hint text.
-  const challengeTab = () => b.evaluate(`[...document.querySelectorAll('.tab')].find((tab) => tab.textContent === 'Challenge').click()`);
   const hintState = () =>
     b.evaluate(`({
       open: document.querySelectorAll('.hints .hint-list li').length,
@@ -114,8 +112,8 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await openLevel("ch01-l01", { fresh: true });
     await setCode("pawn.fly()\n");
     const r = await run();
-    const offered = await b.evaluate(`[...document.querySelectorAll('.outcome-host button')].some((e) => e.textContent === 'Need a hint?')`);
-    await b.evaluate(`[...document.querySelectorAll('.outcome-host button')].find((e) => e.textContent === 'Need a hint?')?.click()`);
+    const offered = await hasButton("Need a hint?", ".outcome-host");
+    if (offered) await clickButton("Need a hint?", ".outcome-host");
     const after = await b.evaluate(`({
       challenge: !document.querySelector('.tab-panel .hints').closest('.tab-panel').hidden,
       focused: document.activeElement?.classList.contains('hint-button') ?? false,
@@ -127,24 +125,23 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   // -- M2: the idiomatic-solution comparison --------------------------------------------------
   // The code in the dialog is compared with the files in Node; only yes/no is reported.
-  const paneText = (pane) => b.evaluate(`[...document.querySelectorAll('.compare-dialog .${pane} .cm-line')].map((line) => line.textContent).join('\\n')`);
+  const paneText = (pane) => editorText(`.compare-dialog .${pane}`);
   const solutionFetches = () => b.evaluate(`performance.getEntriesByType('resource').filter((entry) => entry.name.includes('/solutions/')).length`);
-  const compareButtons = () => b.evaluate(`[...document.querySelectorAll('button')].filter((e) => e.textContent === 'Compare with an idiomatic solution').length`);
 
   await check("M2: before solving, there's no comparison, and no solution has been fetched", async () => {
     await openLevel("ch01-l03", { fresh: true });
     await setCode("pawn.fly()\n");
     await run();
     await challengeTab();
-    const offered = await compareButtons();
+    const offered = await hasButton("Compare with an idiomatic solution");
     const fetched = await solutionFetches();
-    expect(offered === 0 && fetched === 0, `${offered} compare buttons, ${fetched} solution files fetched`);
+    expect(!offered && fetched === 0, `compare button: ${offered}; ${fetched} solution files fetched`);
   });
 
   await check("M2: after solving, the comparison shows your code, the idiomatic solution and its note", async () => {
     await setCode(solution("ch01-l03"));
     const r = await run();
-    await b.evaluate(`[...document.querySelectorAll('.outcome-host button')].find((e) => e.textContent === 'Compare with an idiomatic solution').click()`);
+    await clickButton("Compare with an idiomatic solution", ".outcome-host");
     // A boolean: CodeMirror's elements carry objects that can't be sent back by value.
     await b.waitFor(`!!document.querySelector('.compare-dialog .compare-idiomatic .cm-line')`, 10_000, "the comparison");
     const reference = solution("ch01-l03").trimEnd();
@@ -170,7 +167,21 @@ export default async function appChecks({ browser: b, base, root, check }) {
   });
 
   // -- M2: giving up ------------------------------------------------------------------------
-  const offersSolution = () => b.evaluate(`[...document.querySelectorAll('.outcome-host button')].some((e) => e.textContent === 'Show me a solution…')`);
+  const offersSolution = () => hasButton("Show me a solution…", ".outcome-host");
+
+  await check("M2: replaying a failed run doesn't count it again towards 'Show me a solution'", async () => {
+    await openLevel("ch01-l02", { fresh: true });
+    await challengeTab();
+    for (let i = 0; i < 3; i++) await b.evaluate(`document.querySelector('.hints .hint-button').click()`);
+    await setCode("pawn.fly()\n");
+    await run();
+    for (let i = 0; i < 3; i++) {
+      await b.evaluate(`${button(0)}.click()`); // back to the start
+      await b.evaluate(`${button(4)}.click()`); // and to the outcome again
+    }
+    const note = await b.evaluate(`document.querySelector('.hints p')?.textContent ?? ''`);
+    expect(note.includes("after 2 more runs"), `after one failed run, replayed 3 times: "${note}"`);
+  });
 
   await check("M2: with every hint open, the third failed run offers 'Show me a solution'", async () => {
     await openLevel("ch01-l01", { fresh: true });
@@ -182,29 +193,28 @@ export default async function appChecks({ browser: b, base, root, check }) {
       await run();
       offered.push(await offersSolution());
     }
-    const needHint = await b.evaluate(`[...document.querySelectorAll('.outcome-host button')].some((e) => e.textContent === 'Need a hint?')`);
+    const needHint = await hasButton("Need a hint?", ".outcome-host");
     expect(JSON.stringify(offered) === "[false,false,true]", `offered after runs 1-3: ${JSON.stringify(offered)}`);
     expect(!needHint, "'Need a hint?' is still offered with every hint open");
   });
 
   await check("M2: 'Show me a solution' asks first; 'Show it' opens the comparison and marks the level", async () => {
-    await b.evaluate(`[...document.querySelectorAll('.outcome-host button')].find((e) => e.textContent === 'Show me a solution…').click()`);
+    await clickButton("Show me a solution…", ".outcome-host");
     const focused = await b.evaluate(`document.activeElement?.classList.contains('give-up-button') ?? false`);
     await b.evaluate(`document.querySelector('.give-up-button').click()`);
-    const asked = await b.evaluate(`!!document.querySelector('.give-up-confirm')`);
-    await b.evaluate(`[...document.querySelectorAll('.give-up-confirm button')].find((e) => e.textContent === 'Not yet').click()`);
-    const cancelled = await b.evaluate(`!document.querySelector('.give-up-confirm') && !!document.querySelector('.give-up-button') && !document.querySelector('.compare-dialog')`);
+    const asked = await b.evaluate(`!!document.querySelector('.hints .confirm-step')`);
+    await clickButton("Not yet", ".hints .confirm-step");
+    const cancelled = await b.evaluate(`!document.querySelector('.hints .confirm-step') && !!document.querySelector('.give-up-button') && !document.querySelector('.compare-dialog')`);
     await b.evaluate(`document.querySelector('.give-up-button').click()`);
-    await b.evaluate(`[...document.querySelectorAll('.give-up-confirm button')].find((e) => e.textContent === 'Show it').click()`);
+    await clickButton("Show it", ".hints .confirm-step");
     await b.waitFor(`!!document.querySelector('.compare-dialog .compare-idiomatic .cm-line')`, 10_000, "the comparison");
     const idiomatic = (await paneText("compare-idiomatic")) === solution("ch01-l01").trimEnd();
     await b.key("Escape");
     const tag = await b.evaluate(`!!document.querySelector('.solution-section button')`);
     expect(focused && asked && cancelled, `focused: ${focused}; asked: ${asked}; 'Not yet' cancelled: ${cancelled}`);
     expect(idiomatic && tag, `solution shown: ${idiomatic}; Solution section: ${tag}`);
-    const cards = await b.evaluate(`(async () => {
-      location.hash = '#/';
-      await new Promise((resolve) => setTimeout(resolve, 200));
+    await levelCards();
+    const cards = await b.evaluate(`(() => {
       const card = document.querySelector('a[href="#/level/ch01-l01"]');
       return { tag: card.querySelector('.card-tag')?.textContent ?? null, solved: card.classList.contains('solved') };
     })()`);
@@ -237,7 +247,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await setCode(withoutExpectLine(solution("practice-01", ".naive")));
     const r = await run();
     const banner = await b.evaluate(`document.querySelector('.hidden-banner')?.innerText.replace(/\\s+/g, ' ') ?? null`);
-    await b.evaluate(`[...document.querySelectorAll('.hidden-banner button')].find((e) => e.textContent === 'Back to your board').click()`);
+    await clickButton("Back to your board", ".hidden-banner");
     const back = await b.evaluate(`({ banner: !!document.querySelector('.hidden-banner'), board: !!document.querySelector('.board-host .board') })`);
     expect(r.head === "Not on every board" && r.text.includes("not hidden board 1 of 3"), brief(r));
     expect(banner?.startsWith("Hidden board 1 of 3"), `banner: ${banner}`);
@@ -257,7 +267,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     const starterMatches = await b.evaluate(
       `document.querySelector('.level-right .cm-content').innerText.trim() === "# Tell the guard at the gate that 'Pawns never retreat'"`,
     );
-    await b.evaluate(`[...document.querySelectorAll('.tab')][1].click()`);
+    await challengeTab();
     const panels = await b.evaluate(`document.querySelector('.level-left').innerText`);
     expect(starterMatches, "the editor doesn't start with exactly the guard's comment");
     expect(!/never retreat/i.test(panels), "the Learn/Challenge panels mention the passphrase");
@@ -307,7 +317,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     const starterMatches = await b.evaluate(
       `document.querySelector('.level-right .cm-content').innerText.trim() === "# Tell the guard you are 'Checking out' to get to the next chapter."`,
     );
-    await b.evaluate(`[...document.querySelectorAll('.tab')][1].click()`);
+    await challengeTab();
     const panels = await b.evaluate(`document.querySelector('.level-left').innerText`);
     expect(starterMatches, "the editor doesn't start with exactly the guard's comment");
     expect(!/checking out/i.test(panels), "the Learn/Challenge panels mention the passphrase");
@@ -447,7 +457,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   await check("challenge tab describes the goal and rules (level 2)", async () => {
     await openLevel("ch01-l02");
-    await b.evaluate(`[...document.querySelectorAll('.tab')][1].click()`);
+    await challengeTab();
     const text = await b.evaluate(`document.querySelector('.tab-panel:not([hidden])').innerText.replace(/\\s+/g, ' ')`);
     expect(text.includes("Reach the goal on b8") && text.includes("At most 2 lines"), text.slice(0, 160));
     // Headings are styled in capitals, and innerText returns them that way.

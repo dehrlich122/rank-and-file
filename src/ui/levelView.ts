@@ -9,9 +9,8 @@ import { h } from "./dom";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
 import { Console, Inspector, noticeCard, outcomeCard } from "./panels";
-import { openComparison } from "./compare";
 import { callCompletion, KnownCalls } from "./completion";
-import { HintsPanel } from "./hints";
+import { HelpPanel } from "./help";
 import { icon, type IconName } from "./icons";
 import { Player, buildFrames, consoleAt, controlStates } from "./playback";
 import type { ReplPanel } from "./repl";
@@ -36,7 +35,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const shownBoard = () => hiddenBoard ?? board;
   let player: Player | null = null;
   let lesson: Lesson | null = null;
-  let hints: HintsPanel | null = null;
+  let help: HelpPanel | null = null;
   let running = false;
   let lastResult: LevelResult | null = null;
   let recordedCode: string | null = null; // the code the current (or last) recording was made from
@@ -228,40 +227,6 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   inspector.reset();
   consoleView.show([]);
 
-  // -- the idiomatic solution (M2) ---------------------------------------------------
-  // Offered once the level is solved: on the solving run's outcome card, and in
-  // the Challenge panel from then on.
-  const solutionSection = h("section", { class: "solution-section" });
-  const compareButton = (code: () => string) =>
-    h("button", { class: "btn btn-small", onClick: () => openComparison(source.id, code()) }, "Compare with an idiomatic solution");
-
-  function updateSolutionSection(): void {
-    const { solved, helped } = progress.level(source.id);
-    if (!solved && !helped) {
-      solutionSection.replaceChildren();
-      return;
-    }
-    const why = solved
-      ? "You've solved this level. See your code next to an idiomatic solution, and why it's written that way."
-      : "You've seen a solution. Solve the level yourself to earn its stars.";
-    solutionSection.replaceChildren(h("h3", {}, "Solution"), h("p", { class: "muted small" }, why), compareButton(() => getCode(editor)));
-  }
-
-  /** The player confirmed "Show me a solution" (M2): mark it seen, then show it. */
-  function giveUp(): void {
-    progress.update(source.id, { helped: true });
-    updateSolutionSection();
-    openComparison(source.id, getCode(editor));
-  }
-
-  /** A run that didn't solve the level counts towards "Show me a solution" once every hint is open. */
-  function countFailureAfterHints(): void {
-    const { failedAfterHints, solved, helped } = progress.level(source.id);
-    if (!hints?.allOpen || solved || helped) return;
-    progress.update(source.id, { failedAfterHints: failedAfterHints + 1 });
-    hints.refresh();
-  }
-
   // -- loading the level ------------------------------------------------------------
   void (async () => {
     try {
@@ -274,12 +239,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       level = loaded.level;
       board = new BoardView(level);
       boardHost.replaceChildren(board.element);
-      hints = new HintsPanel(level.hints, () => progress.level(source.id), {
-        open: (opened) => progress.update(source.id, { hints: opened }),
-        giveUp,
-      });
-      challengePanel.replaceChildren(...describeChallenge(level), hints.element, solutionSection);
-      updateSolutionSection();
+      help = new HelpPanel(source.id, level.hints, () => getCode(editor));
+      challengePanel.replaceChildren(...describeChallenge(level), help.element);
       updateControls();
     } catch (error) {
       boardHost.replaceChildren(noticeCard("bad", "Python couldn't start", String(error)));
@@ -290,12 +251,9 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   /** Run the editor's code; then play it, show its first step, or jump to the end. */
   async function run(mode: "play" | "step" | "end" = "play"): Promise<void> {
     if (!level || !board || running) return;
-    player?.dispose();
-    player = null;
     lastResult = null;
     recordedCode = getCode(editor);
-    showVisibleBoard();
-    board.show(level.start);
+    resetStage();
     clearMarks(editor);
     inspector.reset();
     consoleView.show([]);
@@ -305,6 +263,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     try {
       const hintsUsed = progress.level(source.id).hints;
       const result = await client.call("runLevel", { level: source.data, code: recordedCode, hintsUsed });
+      help?.recordRun(result); // once per run, here rather than in playback, which can reach the end many times
       showResult(result, mode);
     } catch (error) {
       outcomeHost.replaceChildren(describeFailure(error));
@@ -333,7 +292,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
 
   function showResult(result: LevelResult, mode: "play" | "step" | "end"): void {
     lastResult = result;
-    if (result.hidden_board) showHiddenBoard(result.hidden_board.level, result.hidden_board.index, result.hidden_board.total);
+    if (result.hidden_board) showHiddenBoard(result.hidden_board);
     const marks: Mark[] = result.warnings.map((warning) => ({ ...warning, severity: "warning" }));
     if (result.error?.line) marks.push({ line: result.error.line, message: result.error.friendly, severity: "error" });
     setMarks(editor, marks);
@@ -368,26 +327,16 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       setErrorLine(editor, result.error.line);
     }
     const actions: HTMLElement[] = [];
+    const offer = help?.outcomeAction(result, recordedCode ?? "", showHelp);
+    if (offer) actions.push(offer);
     if (result.status === "solved") {
-      const earned = result.stars.filter((star) => star.earned).length;
-      progress.update(source.id, { solved: true, stars: Math.max(progress.level(source.id).stars, earned) });
-      updateSolutionSection();
-      hints?.refresh();
-      const solvedWith = recordedCode ?? getCode(editor);
       const next = nextLevel(source.id);
       actions.push(
-        compareButton(() => solvedWith),
         next
           ? h("a", { class: "btn btn-primary btn-small", href: `#/level/${next.id}` }, "Next level →")
           : h("a", { class: "btn btn-primary btn-small", href: "#/" }, "Back to the levels"),
       );
       window.setTimeout(() => board?.setCelebrating(true), afterMs);
-    } else if (hints) {
-      // Both buttons point to the Hints section rather than acting at once:
-      // it says what a hint costs, and asks before showing a solution.
-      countFailureAfterHints();
-      if (!hints.allOpen) actions.push(h("button", { class: "btn btn-small", onClick: () => showHints() }, "Need a hint?"));
-      else if (hints.canGiveUp) actions.push(h("button", { class: "btn btn-small", onClick: () => showHints() }, "Show me a solution…"));
     }
     outcomeHost.replaceChildren(outcomeCard(result, actions));
   }
@@ -396,7 +345,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   // When the code solves the visible board but not a hidden one, the run that
   // comes back is the hidden board's: it's drawn in the board's place, with a
   // way back to the visible board.
-  function showHiddenBoard(hidden: LevelInfo, index: number, total: number): void {
+  function showHiddenBoard({ level: hidden, index, total }: NonNullable<LevelResult["hidden_board"]>): void {
     hiddenBoard?.dispose();
     hiddenBoard = new BoardView(hidden);
     const back = h("button", { class: "btn btn-small", onClick: () => backToVisibleBoard() }, "Back to your board");
@@ -411,21 +360,26 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     boardHost.replaceChildren(board.element);
   }
 
-  /** "Back to your board": the hidden board's recording goes, and the visible board is ready to run again. */
-  function backToVisibleBoard(): void {
+  /** No recording, and the visible board at the start: before a run, and "Back to your board". */
+  function resetStage(): void {
     player?.dispose();
     player = null;
     showVisibleBoard();
     if (level) board?.show(level.start);
+  }
+
+  /** "Back to your board": the hidden board's recording goes, and the visible board is ready to run again. */
+  function backToVisibleBoard(): void {
+    resetStage();
     setActiveLine(editor, null);
     updateControls();
   }
 
-  function showHints(): void {
+  /** Opens the Challenge panel at the help (expanding a collapsed panel). */
+  function showHelp(): void {
     if (layout.classList.contains("learn-collapsed")) setCollapsed(false);
     showTab("challenge");
-    hints?.element.scrollIntoView({ block: "nearest" });
-    hints?.element.querySelector<HTMLElement>(".hint-button, .give-up-button")?.focus();
+    help?.focus();
   }
 
   function updateControls(): void {

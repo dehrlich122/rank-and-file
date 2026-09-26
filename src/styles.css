@@ -357,10 +357,6 @@ pre {
   color: var(--star);
 }
 
-.card-stars .icon {
-  width: 16px;
-  height: 16px;
-}
 
 /* the stars on a solved run's outcome card, each with its reason */
 .stars {
@@ -383,9 +379,13 @@ pre {
   color: var(--text);
 }
 
+.card-stars .icon,
 .stars .icon {
   width: 16px;
   height: 16px;
+}
+
+.stars .icon {
   color: var(--muted);
 }
 
@@ -719,11 +719,12 @@ pre {
   margin: 6px 0 0;
 }
 
-.give-up-confirm {
+/* a confirm step inside the page (src/ui/dialog.ts): giving up, Reset progress */
+.confirm-step {
   margin-top: 8px;
 }
 
-.give-up-confirm p {
+.confirm-step p {
   margin: 0 0 6px;
 }
 

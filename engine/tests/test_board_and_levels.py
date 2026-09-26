@@ -103,16 +103,13 @@ def test_describe_puts_goals_and_rules_into_words():
     ]
     assert described["stars"] == ["Solve the level.", "There's no par here: solving is enough.", "Solve it without opening a hint."]
     assert make_level("P G\n", par={"lines": 1}).star_goals()[1] == "Use 1 line of code or fewer (par)."
-    assert described["hidden_boards"] == 0
 
 
 def test_hidden_boards_share_the_level_but_not_its_map():
     level = make_level("P . G\n", variants=[{"map": "P G .\n"}], api=["move", "at_goal"])
     [hidden] = level.variants
     assert (hidden.goal, hidden.api, hidden.variants) == ((1, 0), ["move", "at_goal"], [])
-    described = level.describe()
-    assert described["hidden_boards"] == 1
-    assert described["goals"][-1] == "Your code must also solve 1 hidden board like this one, each a little different."
+    assert level.describe()["goals"][-1] == "Your code must also solve 1 hidden board like this one, each a little different."
 
 
 def test_say_goals_point_to_the_sign_when_the_phrase_is_written_there():

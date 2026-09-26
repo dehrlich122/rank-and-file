@@ -213,9 +213,10 @@ Alongside each level:
 - `solutions/<chapter>/<id>.md`: the idiomatic-solution note (prose), shown
   beside the reference solution in the comparison after solving.
 - `levels/chapters.yaml` lists the chapters (number, title, tier, summary).
-  Chapter 0 is the **Testing ground** (`levels/practice/`): levels for trying
-  out features before the chapters that use them, outside the curriculum.
-  "Next level" never leads there.
+  The **Testing ground** (`levels/practice/`, chapter 0) is marked
+  `curriculum: false`. It holds levels for trying out features before the
+  chapters that use them, isn't numbered, and "Next level" never leads there.
+  "Next level" follows this file's order.
 
 Each file's folder is `ch01`, `ch02`, … or `practice`.
 `engine/tests/test_levels.py` checks all of these automatically for every level.
@@ -237,7 +238,7 @@ src/content.ts     bundles level YAML and lesson Markdown; loads solutions lazil
 src/settings.ts src/progress.ts src/storage.ts   saved settings and progress (localStorage)
 src/py/            worker, client and protocol
 src/ui/            board, editor, playback, panels, lesson, repl, levelView, levelSelect,
-                   hints, compare (the idiomatic-solution comparison), settingsDialog
+                   help (hints, giving up, the comparison), compare, dialog, settingsDialog
 scripts/           copy-pyodide.mjs (runs after npm install), venv.mjs, check-bundle.mjs, e2e/
 public/pyodide/    Pyodide runtime, copied from node_modules (not committed)
 ```

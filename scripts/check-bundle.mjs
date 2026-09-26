@@ -11,7 +11,8 @@ import { build } from "vite";
 
 const outDir = mkdtempSync(join(tmpdir(), "rank-and-file-bundle-"));
 try {
-  await build({ logLevel: "error", build: { outDir, emptyOutDir: true } });
+  // Only the scripts matter here, so skip copying public/ (the 13 MB Python runtime).
+  await build({ logLevel: "error", build: { outDir, emptyOutDir: true, copyPublicDir: false } });
   const assets = join(outDir, "assets");
   const scripts = readdirSync(assets)
     .filter((file) => file.endsWith(".js"))

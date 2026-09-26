@@ -1,11 +1,11 @@
-// The player's progress, level by level: whether it's solved (or its solution
-// was seen), its best stars, the hints opened, and the code written for it. Saved in localStorage (see storage.ts), so
-// it survives reloads. Settings → Reset progress clears it.
+// The player's progress, level by level: its best stars (any solve earns at
+// least one), the hints opened, whether its solution was seen, and the code
+// written for it. Saved in localStorage (see storage.ts), so it survives
+// reloads. Settings → Reset progress clears it.
 import { asRecord, browserStorage, readJson, writeJson, type StorageLike } from "./storage";
 
 export interface LevelProgress {
-  solved: boolean; // solved by running code
-  stars: number; // the best a solving run has earned, 0 to 3
+  stars: number; // the best a solving run has earned, 0 to 3; more than 0 means solved
   hints: number; // how many hint tiers are open
   failedAfterHints: number; // runs that failed after every hint was open (3 unlock "Show me a solution")
   helped: boolean; // saw a solution before solving it
@@ -13,7 +13,7 @@ export interface LevelProgress {
 }
 
 const STORAGE_KEY = "rank-and-file:progress";
-const UNTOUCHED: LevelProgress = { solved: false, stars: 0, hints: 0, failedAfterHints: 0, helped: false, code: null };
+const UNTOUCHED: LevelProgress = { stars: 0, hints: 0, failedAfterHints: 0, helped: false, code: null };
 
 export class ProgressStore {
   private levels: Record<string, LevelProgress>;
@@ -24,6 +24,11 @@ export class ProgressStore {
 
   level(id: string): LevelProgress {
     return this.levels[id] ?? UNTOUCHED;
+  }
+
+  /** Solved by running code: every solving run earns at least one star. */
+  solved(id: string): boolean {
+    return this.level(id).stars > 0;
   }
 
   update(id: string, changes: Partial<LevelProgress>): void {
@@ -43,7 +48,6 @@ export function sanitize(raw: unknown): Record<string, LevelProgress> {
   for (const [id, value] of Object.entries(asRecord(raw))) {
     const entry = asRecord(value);
     levels[id] = {
-      solved: entry.solved === true,
       stars: count(entry.stars, 3),
       hints: count(entry.hints, 10),
       failedAfterHints: count(entry.failedAfterHints, 99),

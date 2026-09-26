@@ -54,7 +54,6 @@ export interface LevelInfo {
   rules: string[]; // the level's constraints, in words
   stars: string[]; // what each of the three stars asks for, in words
   hints: string[]; // tiered: nudge, concept reminder, partial example
-  hidden_boards: number; // how many hidden boards the code must also solve
 }
 
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };

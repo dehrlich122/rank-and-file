@@ -7,6 +7,7 @@
 import type { EditorView } from "@codemirror/view";
 import { marked } from "marked";
 import { loadSolution } from "../content";
+import { dialogHead, modal } from "./dialog";
 import { h } from "./dom";
 import { createEditor } from "./editor";
 
@@ -18,28 +19,19 @@ export function openComparison(levelId: string, yourCode: string): void {
     return h("section", { class: className }, h("h3", {}, title), host);
   };
   const body = h("div", { class: "compare-body" }, h("p", { class: "muted" }, "Loading the solution…"));
-  const dialog = h(
+  const dialog: HTMLDialogElement = h(
     "dialog",
     { class: "compare-dialog", "aria-labelledby": "compare-title" },
-    h(
-      "div",
-      { class: "dialog-head" },
-      h("h2", { id: "compare-title" }, "Compare with an idiomatic solution"),
-      h("button", { class: "btn btn-small", onClick: () => dialog.close() }, "Close"),
-    ),
+    dialogHead("compare-title", "Compare with an idiomatic solution", "Close", () => dialog.close()),
     body,
   );
-  const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const open = modal(dialog);
   dialog.addEventListener("close", () => {
     for (const editor of editors) editor.destroy();
     dialog.remove();
-    returnFocus?.focus();
-  });
-  dialog.addEventListener("click", (event) => {
-    if (event.target === dialog) dialog.close(); // a click on the backdrop
   });
   document.body.append(dialog);
-  dialog.showModal();
+  open();
 
   void loadSolution(levelId).then(
     (solution) => {

@@ -13,6 +13,7 @@ from dataclasses import asdict, dataclass, field, replace
 from .board import Board, Direction, Pos, Tile, square_name
 from .constraints import describe_rules
 from .pieces import PIECES
+from .words import count
 
 
 class LevelError(ValueError):
@@ -89,15 +90,13 @@ class Level:
         for gate in sorted(self.board.gates):
             goals.append(f"Get past the locked gate on {square_name(gate)}. A guard keeps it shut.")
         if self.variants:
-            count = len(self.variants)
-            boards = "hidden board" if count == 1 else "hidden boards"
-            goals.append(f"Your code must also solve {count} {boards} like this one, each a little different.")
+            goals.append(f"Your code must also solve {count(len(self.variants), 'hidden board')} like this one, each a little different.")
         return goals
 
     def star_goals(self) -> list[str]:
         """What each of the three stars asks for (runner.score awards them)."""
         par = self.par.lines
-        within = f"Use {par} line{'' if par == 1 else 's'} of code or fewer (par)." if par else "There's no par here: solving is enough."
+        within = f"Use {count(par, 'line')} of code or fewer (par)." if par else "There's no par here: solving is enough."
         return ["Solve the level.", within, "Solve it without opening a hint."]
 
     def describe(self) -> dict:
@@ -133,7 +132,6 @@ class Level:
             # Tiered hints (nudge, concept reminder, partial example); the UI
             # reveals them one at a time, and only when asked.
             "hints": self.hints,
-            "hidden_boards": len(self.variants),
         }
 
 
@@ -151,11 +149,10 @@ def parse_level(data: dict) -> Level:
     if piece not in PIECES:
         raise LevelError(f"unknown piece {piece!r}; expected one of {sorted(PIECES)}")
 
-    board, start, goal = parse_map(data["map"], data.get("legend") or {})
-    facing = _parse_facing((data.get("start") or {}).get("facing", "north"))
+    legend = data.get("legend") or {}
     objectives = _parse_objectives(data.get("objectives", ["reach_goal"]))
-    if objectives.reach_goal and goal is None:
-        raise LevelError("objective reach_goal needs a goal square (G) on the map")
+    board, start, goal = _parse_board(data["map"], legend, objectives)
+    facing = _parse_facing((data.get("start") or {}).get("facing", "north"))
 
     level = Level(
         id=_text(data, "id"),
@@ -176,7 +173,7 @@ def parse_level(data: dict) -> Level:
         brief=str(data.get("brief", "")),
         starter=str(data.get("starter", "")),
     )
-    level.variants = _parse_variants(data.get("variants") or [], data.get("legend") or {}, level)
+    level.variants = _parse_variants(data.get("variants") or [], legend, level)
     return level
 
 
@@ -301,6 +298,14 @@ def _parse_api(names, piece: str) -> list[str]:
     return list(names)
 
 
+def _parse_board(text: str, legend: dict, objectives: Objectives) -> tuple[Board, Pos, Pos | None]:
+    """A map, checked against what the level asks for."""
+    board, start, goal = parse_map(text, legend)
+    if objectives.reach_goal and goal is None:
+        raise LevelError("objective reach_goal needs a goal square (G) on the map")
+    return board, start, goal
+
+
 def _parse_variants(items, legend: dict, level: Level) -> list[Level]:
     """Each hidden board is the level on another map: same legend, objectives and abilities."""
     if not isinstance(items, list):
@@ -310,11 +315,9 @@ def _parse_variants(items, legend: dict, level: Level) -> list[Level]:
         if not isinstance(item, dict) or set(item) != {"map"}:
             raise LevelError(f"variant {number} must have a map, and nothing else")
         try:
-            board, start, goal = parse_map(item["map"], legend)
+            board, start, goal = _parse_board(item["map"], legend, level.objectives)
         except LevelError as exc:
             raise LevelError(f"variant {number}: {exc}") from None
-        if level.objectives.reach_goal and goal is None:
-            raise LevelError(f"variant {number}: objective reach_goal needs a goal square (G) on the map")
         variants.append(replace(level, board=board, start=start, goal=goal, variants=[]))
     return variants
 

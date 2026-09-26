@@ -16,6 +16,7 @@ import tokenize
 from dataclasses import dataclass
 
 from .pieces import Piece
+from .words import count
 
 _IGNORED_TOKENS = {
     tokenize.COMMENT, tokenize.NL, tokenize.NEWLINE, tokenize.INDENT,
@@ -65,10 +66,10 @@ def check_constraints(tree: ast.Module, code: str, constraints) -> list[str]:
     """Every way `code` breaks the level's rules, as messages for the player."""
     problems = []
     if constraints.max_lines is not None:
-        count = code_lines(code)
-        if count > constraints.max_lines:
+        used = code_lines(code)
+        if used > constraints.max_lines:
             problems.append(
-                f"This level allows at most {_lines(constraints.max_lines)} of code, and yours has {count}. "
+                f"This level allows at most {count(constraints.max_lines, 'line')} of code, and yours has {used}. "
                 "(Blank lines and comments don't count.)"
             )
     if constraints.min_comments and comment_count(code) < constraints.min_comments:
@@ -113,10 +114,9 @@ def describe_rules(constraints) -> list[str]:
     """The level's rules as the Challenge panel lists them, one sentence each."""
     rules = []
     if constraints.max_lines is not None:
-        rules.append(f"At most {_lines(constraints.max_lines)} of code. Blank lines and comments don't count.")
+        rules.append(f"At most {count(constraints.max_lines, "line")} of code. Blank lines and comments don't count.")
     if constraints.min_comments:
-        count = constraints.min_comments
-        rules.append(f"At least {count} {'comment' if count == 1 else 'comments'} (a note starting with #).")
+        rules.append(f"At least {count(constraints.min_comments, 'comment')} (a note starting with #).")
     rules += [f"Must use {describe_node(name)}." for name in constraints.require_nodes]
     rules += [f"Not allowed: {describe_node(name)}." for name in constraints.ban_nodes]
     return rules
@@ -133,10 +133,6 @@ def _piece_attribute_warning(piece: str, attr: str, piece_type: type) -> str:
         f"This line mentions `{piece}.{attr}` but doesn't call it, so nothing happens. "
         f"Add parentheses to make the {piece} act: {piece}.{attr}()"
     )
-
-
-def _lines(n: int) -> str:
-    return "1 line" if n == 1 else f"{n} lines"
 
 
 def _tokens(code: str):

@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from .exceptions import GameError
 from .pieces import Piece
 from .tracer import PLAYER_FILENAME, StepBudgetExceeded
+from .words import count
 
 
 @dataclass
@@ -177,7 +178,7 @@ def _explain_type(exc: TypeError) -> str:
             least, most, given = least - 1, most - 1, given - 1
         if most == 0:
             return f"`{name}()` doesn't take anything inside its parentheses. Write it with empty parentheses: {name}()"
-        takes = _count(most, "value") if least == most else f"at most {_count(most, 'value')}"
+        takes = count(most, "value") if least == most else f"at most {count(most, 'value')}"
         return f"`{name}()` takes {takes} inside its parentheses, but got {given}."
     if match := re.match(r"([\w.]+)\(\) missing \d+ required positional arguments?: (.+)", msg):
         name = match.group(1).rsplit(".", 1)[-1]
@@ -207,10 +208,6 @@ def closest(word: str | None, options: list[str]) -> str | None:
             return option
     matches = difflib.get_close_matches(word, options, n=1, cutoff=0.75)
     return matches[0] if matches else None
-
-
-def _count(n: int, noun: str) -> str:
-    return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
 
 
 def _keep_player_frames(tb: traceback.TracebackException) -> None:

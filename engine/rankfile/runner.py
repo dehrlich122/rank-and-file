@@ -26,6 +26,7 @@ from .errors import ErrorInfo, explain
 from .levels import Level, sandbox_level
 from .pieces import PIECES
 from .tracer import PLAYER_FILENAME, StepBudgetExceeded, Tracer
+from .words import count
 from .world import World
 
 DEFAULT_LINE_BUDGET = 100_000
@@ -178,9 +179,9 @@ def score(level: Level, code_lines: int, hints_used: int) -> list[Star]:
     if par is None:
         par_star = Star("par", True, "Within par (this level doesn't set one)")
     elif code_lines <= par:
-        par_star = Star("par", True, f"Within par: {_lines(par)} of code or fewer")
+        par_star = Star("par", True, f"Within par: {count(par, "line")} of code or fewer")
     else:
-        par_star = Star("par", False, f"Par is {_lines(par)} of code; yours has {code_lines}")
+        par_star = Star("par", False, f"Par is {count(par, "line")} of code; yours has {code_lines}")
     if hints_used == 0:
         hints_star = Star("no_hints", True, "No hints opened")
     else:
@@ -190,7 +191,7 @@ def score(level: Level, code_lines: int, hints_used: int) -> list[Star]:
 
 def unmet_objectives(level: Level, world: World, output: str) -> list[str]:
     unmet = []
-    if level.objectives.reach_goal and world.pos != level.goal:
+    if level.objectives.reach_goal and not world.at_goal():
         unmet.append(f"your {level.piece} stopped on {square_name(world.pos)}, and the goal is on {square_name(level.goal)}.")
     printed = [line.strip() for line in output.splitlines()]
     for phrase in level.objectives.say:
@@ -283,10 +284,6 @@ def _solved_summary(level: Level) -> str:
     if level.objectives.reach_goal:
         return "Solved! You reached the goal."
     return "Solved!"
-
-
-def _lines(count: int) -> str:
-    return f"{count} line" if count == 1 else f"{count} lines"
 
 
 def _ms_since(started: float) -> float:

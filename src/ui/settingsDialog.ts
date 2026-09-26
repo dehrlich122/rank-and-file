@@ -4,6 +4,7 @@
 // Save button. The browser's <dialog> closes on Esc and keeps keyboard focus
 // inside while it's open; on close, focus goes back to where it was.
 import { CODE_SIZES, SPEEDS, type CodeSize, type Settings, type SettingsStore } from "../settings";
+import { confirmStep, dialogHead, modal } from "./dialog";
 import { h } from "./dom";
 
 interface Choice<T> {
@@ -65,20 +66,16 @@ const GROUPS: Array<{ key: keyof Settings; title: string; hint?: string; choices
   },
 ];
 
-interface SettingsDialogOptions {
-  /** Settings → Reset progress, once the player has confirmed it. */
-  onResetProgress?: () => void;
-}
-
 export class SettingsDialog {
   readonly element: HTMLDialogElement;
   private readonly inputs: HTMLInputElement[] = [];
   private readonly openListeners = new Set<() => void>();
-  private returnFocus: HTMLElement | null = null;
+  private readonly show: () => void;
 
   constructor(
     private readonly store: SettingsStore,
-    options: SettingsDialogOptions = {},
+    /** Settings → Reset progress, once the player has confirmed it. */
+    onResetProgress: () => void,
   ) {
     const groups = GROUPS.map((group) =>
       h(
@@ -108,29 +105,19 @@ export class SettingsDialog {
     this.element = h(
       "dialog",
       { class: "settings-dialog", "aria-labelledby": "settings-title" },
-      h(
-        "div",
-        { class: "dialog-head" },
-        h("h2", { id: "settings-title" }, "Settings"),
-        h("button", { class: "btn btn-small", onClick: () => this.element.close() }, "Done"),
-      ),
+      dialogHead("settings-title", "Settings", "Done", () => this.element.close()),
       ...groups,
-      options.onResetProgress ? resetProgress(options.onResetProgress) : null,
+      resetProgress(onResetProgress),
       h("p", { class: "muted small" }, "Esc opens and closes this menu. In the code editor, Ctrl+M then Tab moves focus out of the editor."),
     );
-    this.element.addEventListener("close", () => this.returnFocus?.focus());
-    // A click on the backdrop (outside the card) closes the dialog too.
-    this.element.addEventListener("click", (event) => {
-      if (event.target === this.element) this.element.close();
-    });
+    this.show = modal(this.element);
     this.sync(store.get());
     store.subscribe((settings) => this.sync(settings));
   }
 
   open(): void {
     if (this.element.open) return;
-    this.returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    this.element.showModal();
+    this.show();
     for (const listener of this.openListeners) listener();
   }
 
@@ -148,42 +135,28 @@ export class SettingsDialog {
   }
 }
 
-/**
- * Settings → Reset progress. The confirm step is part of the dialog, never a
- * browser pop-up: those block the page (and the e2e checks).
- */
+/** Settings → Reset progress, with its confirm step (see dialog.ts). */
 function resetProgress(onReset: () => void): HTMLElement {
-  const done = h("p", { class: "muted small", hidden: true }, "Progress reset.");
-  const confirm = h(
-    "div",
-    { class: "reset-confirm", hidden: true },
-    h("p", {}, "Delete every solved level, star and hint, and the code you wrote? This can't be undone."),
-    h(
-      "div",
-      { class: "choices" },
-      h("button", { class: "btn btn-small btn-danger", onClick: () => finish(true) }, "Yes, reset"),
-      h("button", { class: "btn btn-small", onClick: () => finish(false) }, "Cancel"),
-    ),
-  );
-  const start = h("button", { class: "btn btn-small", onClick: () => show(true) }, "Reset progress…");
-  function show(confirming: boolean): void {
-    confirm.hidden = !confirming;
-    start.hidden = confirming;
-    done.hidden = true;
-    (confirming ? confirm.querySelector("button") : start)?.focus();
+  const slot = h("div", {});
+  const startOver = (note?: string) => {
+    const button = h("button", { class: "btn btn-small", onClick: ask }, "Reset progress…");
+    slot.replaceChildren(button, ...(note ? [h("p", { class: "muted small" }, note)] : []));
+    return button;
+  };
+  function ask(): void {
+    slot.replaceChildren(
+      confirmStep("Delete every solved level, star and hint, and the code you wrote? This can't be undone.", "Yes, reset", "Cancel", (yes) => {
+        if (yes) onReset();
+        startOver(yes ? "Progress reset." : undefined).focus();
+      }),
+    );
   }
-  function finish(reset: boolean): void {
-    if (reset) onReset();
-    show(false);
-    done.hidden = !reset;
-  }
+  startOver();
   return h(
     "fieldset",
     { class: "reset-progress" },
     h("legend", {}, "Progress"),
     h("p", { class: "muted small" }, "Solved levels, stars, hints and your code are saved in this browser."),
-    start,
-    confirm,
-    done,
+    slot,
   );
 }

@@ -20,12 +20,10 @@ export function startApp(root: HTMLElement): void {
   applyToDocument(settings.get());
   settings.subscribe(applyToDocument);
 
-  const dialog = new SettingsDialog(settings, {
-    onResetProgress: () => {
-      progress.reset();
-      context.knownCalls.clear();
-      route(); // redraw the screen from the cleared progress
-    },
+  const dialog = new SettingsDialog(settings, () => {
+    progress.reset();
+    context.knownCalls.clear();
+    route(); // redraw the screen from the cleared progress
   });
   const status = h("span", { class: "status", "data-state": "loading" }, "Loading Python…");
   const settingsButton = h(

@@ -68,8 +68,10 @@ npm run e2e -- http://localhost:4173/ --only=app   # against `npm run play`, one
   into a check's message or return value.** Earlier checks type reference
   solutions, and the app saves each level's code (`src/progress.ts`), so an
   editor dump can leak a solution. `openLevel(id, { fresh: true })` gives a
-  clean page with no saved progress (`run.mjs` clears it on `?fresh=` loads;
-  settings are kept). `{ reload: true }` reloads and keeps progress.
+  clean page with no saved progress (on `?fresh=` loads, `run.mjs` clears
+  every `rank-and-file:` key except settings). `{ reload: true }` reloads and
+  keeps progress. Find buttons by label with `clickButton`/`hasButton`
+  (`helpers.mjs`), and read editors with `editorText` (compare in Node).
 - After a hash navigation, wait for `.level[data-level-id="<id>"]`; the old view
   lingers for a moment. Inside `evaluate` strings, which are JS template
   literals, write regex escapes as `\\s`.
@@ -147,8 +149,8 @@ error translations belong in `errors.py`, with a case in
 `engine/tests/test_errors.py`.
 
 **Levels are data.** YAML in `levels/chNN/`, lesson in `lessons/chNN/`,
-solutions in `solutions/chNN/`. The Testing ground (chapter 0, outside the
-curriculum) uses `practice/` folders instead. The format is documented in
+solutions in `solutions/chNN/`. The Testing ground (outside the curriculum:
+`curriculum: false` in `levels/chapters.yaml`) uses `practice/` folders. The format is documented in
 `docs/ARCHITECTURE.md`. Adding a level must never require engine changes.
 `engine/tests/test_levels.py` checks every level automatically:
 - the reference solution solves it, on every hidden board (`variants`) too,
@@ -186,10 +188,16 @@ names.
   `src/ui/icons.ts` (inline SVG). A visual design pass is planned, so keep new
   visuals on these seams (tokens, icons, the tile → draw-function table in
   `board.ts`).
-- Progress (solved levels and each level's code) lives in `src/progress.ts`,
-  saved to localStorage like settings (both use `src/storage.ts`). Settings →
-  Reset progress clears it after a confirm step inside the dialog. Never use
-  browser `confirm()`/`alert()`, which block the page and the e2e checks.
+- Progress lives in `src/progress.ts`: per level, the best stars (solved
+  means at least one), hints opened, failed runs after the last hint, whether
+  the solution was seen, and the code. It's saved to localStorage like
+  settings; both use `src/storage.ts`. Settings → Reset progress clears it.
+- A level's help (hints, "Show me a solution", the comparison) is
+  `ui/help.ts`. It records each run's result once, from `run()` in
+  `levelView.ts`, never from playback, which can reach the end many times.
+- Dialogs and confirm steps share `ui/dialog.ts` (`modal`, `dialogHead`,
+  `confirmStep`). Confirm steps are always inside the page. Never use browser
+  `confirm()`/`alert()`, which block the page and the e2e checks.
 - Settings (speed, theme, code size, animations, code panel, wrap long lines)
   live in `src/settings.ts`, one store with `get`/`set`/`subscribe` saved to
   localStorage. Screens read it on creation and subscribe to changes. The menu

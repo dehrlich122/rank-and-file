@@ -104,8 +104,8 @@ export function createEditor(options: EditorOptions): EditorView {
     themeFromPage,
     syntaxHighlighting(pythonColors),
   ];
-  if (!options.compact) extensions.push(lintGutter());
   if (options.readOnly) extensions.push(EditorState.readOnly.of(true), EditorView.editable.of(false));
+  else if (!options.compact) extensions.push(lintGutter()); // warnings only appear on code being written
   if (options.placeholder) extensions.push(placeholder(options.placeholder));
   if (options.extensions) extensions.push(...options.extensions);
   return new EditorView({ parent: options.parent, doc: options.code, extensions });

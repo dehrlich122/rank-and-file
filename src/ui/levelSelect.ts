@@ -5,13 +5,24 @@ import { h } from "./dom";
 import { icon } from "./icons";
 
 export function renderLevelSelect(chapters: Chapter[], progress: ProgressStore): HTMLElement {
-  const solved = (id: string) => progress.level(id).solved;
-  const stars = (id: string) => {
-    const earned = progress.level(id).stars;
+  /** A level's card: its number (✓ once solved), what it trains, and its best stars or "Solution seen". */
+  const card = (level: Chapter["levels"][number], number: number) => {
+    const { stars, helped } = progress.level(level.id);
+    const solved = stars > 0;
     return h(
-      "span",
-      { class: "card-stars", title: `${earned} of 3 stars`, "aria-label": `${earned} of 3 stars` },
-      ...[0, 1, 2].map((i) => icon(i < earned ? "star" : "starOutline")),
+      "a",
+      { href: `#/level/${level.id}`, class: solved ? "level-card solved" : "level-card" },
+      h("span", { class: "level-number" }, solved ? "✓" : String(number)),
+      h("span", { class: "level-text" }, h("strong", {}, level.title), h("span", { class: "muted small" }, level.trains)),
+      solved
+        ? h(
+            "span",
+            { class: "card-stars", title: `${stars} of 3 stars`, "aria-label": `${stars} of 3 stars` },
+            ...[0, 1, 2].map((i) => icon(i < stars ? "star" : "starOutline")),
+          )
+        : helped
+          ? h("span", { class: "card-tag muted small" }, "Solution seen")
+          : null,
     );
   };
   return h(
@@ -42,20 +53,7 @@ export function renderLevelSelect(chapters: Chapter[], progress: ProgressStore):
         h(
           "ol",
           { class: "level-list" },
-          ...chapter.levels.map((level, i) =>
-            h(
-              "li",
-              {},
-              h(
-                "a",
-                { href: `#/level/${level.id}`, class: solved(level.id) ? "level-card solved" : "level-card" },
-                h("span", { class: "level-number" }, solved(level.id) ? "✓" : String(i + 1)),
-                h("span", { class: "level-text" }, h("strong", {}, level.title), h("span", { class: "muted small" }, level.trains)),
-                solved(level.id) ? stars(level.id) : null,
-                !solved(level.id) && progress.level(level.id).helped ? h("span", { class: "card-tag muted small" }, "Solution seen") : null,
-              ),
-            ),
-          ),
+          ...chapter.levels.map((level, i) => h("li", {}, card(level, i + 1))),
         ),
       ),
     ),
