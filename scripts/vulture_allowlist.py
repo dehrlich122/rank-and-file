@@ -14,6 +14,8 @@ bridge.repl_reset
 # Called by the player's code, which vulture never sees.
 pieces.Pawn.move
 pieces.Pawn.position
+pieces.Pawn.capture_left
+pieces.Pawn.capture_right
 
 # Level fields read by the level checker (engine/tests/test_levels.py), which
 # vulture doesn't scan.

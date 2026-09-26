@@ -23,6 +23,14 @@ class GateLockedError(BlockedError):
     """The piece tried to walk through a gate that hasn't been opened yet."""
 
 
+class CaptureError(GameError):
+    """The piece tried to capture where there's nothing it can take (M3.1)."""
+
+    def __init__(self, message: str, at: tuple[int, int]):
+        super().__init__(message)
+        self.at = at
+
+
 class LockedAbilityError(GameError, AttributeError):
     """The level hasn't unlocked this ability yet."""
 
@@ -56,5 +64,5 @@ class Lost(BaseException):
 # Tracebacks name an exception by its module, e.g. `rankfile.exceptions.BlockedError`.
 # Claiming the builtins module makes them read like Python's own errors
 # (`BlockedError: ...`), without the engine's internals in the way.
-for _error in (GameError, BlockedError, GateLockedError, LockedAbilityError, GameArgumentError, CantChangePieceError, Lost):
+for _error in (GameError, BlockedError, GateLockedError, CaptureError, LockedAbilityError, GameArgumentError, CantChangePieceError, Lost):
     _error.__module__ = "builtins"

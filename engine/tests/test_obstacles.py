@@ -265,3 +265,174 @@ def test_the_question_is_shown_and_the_answer_is_not(toll):
     assert described["questions"] == [{"pos": [0, 2], "text": "What is two plus two?"}]
     assert 'The guard asks: "What is two plus two?" Print the answer next to the gate.' in described["goals"][1]
     assert '"4"' not in str(described)
+
+
+# -- patrols and chasers ---------------------------------------------------------------------
+
+API_ALL = [*API, "capture_left", "capture_right"]
+
+
+def enemy_level(map_text, *enemies, **overrides):
+    return make_level(map_text, enemies=list(enemies), api=API_ALL, **overrides)
+
+
+def positions(result):
+    return [event["state"]["enemies"] for event in events(result, "tick")]
+
+
+@pytest.fixture
+def sentry():
+    """Pawn on a1 facing north; a patrol walking a2 to c2 and back, starting on c2; the goal on c1."""
+    return enemy_level(". . .\nP . G\n", {"kind": "patrol", "start": "c2", "route": ["a2", "c2"]})
+
+
+def test_a_patrol_walks_its_route_there_and_back(sentry):
+    result = run_level(sentry, "pawn.turn_right()\n" + "pawn.wait()\n" * 4)
+    assert positions(result) == [[[1, 1]], [[0, 1]], [[1, 1]], [[2, 1]], [[1, 1]]]
+    assert sentry.describe()["start"]["enemies"] == [[2, 1]]
+
+
+def test_a_patrol_that_lands_on_the_pawn_catches_it(sentry):
+    result = run_level(sentry, "pawn.move()\npawn.wait()\npawn.turn_right()")
+    assert result.status == "lost"
+    assert result.summary == "Your pawn was caught by the patrol on a2."
+    assert result.final["lost"] == [0, 1]
+    assert result.error.line == 2
+
+
+def test_walking_into_a_patrol_is_being_caught(sentry):
+    result = run_level(sentry, "pawn.turn_right()\npawn.turn_left()\npawn.move()")  # the patrol is on a2 by then
+    assert result.status == "lost"
+    assert result.summary == "Your pawn was caught by the patrol on a2."
+
+
+def test_slipping_past_a_patrol(sentry):
+    assert run_level(sentry, "pawn.turn_right()\npawn.move(2)").status == "solved"
+
+
+def test_a_loop_patrol_goes_round_and_round():
+    level = enemy_level(". . . .\n. . . .\n. . . .\nP . . G\n", {"kind": "patrol", "route": ["b2", "d2", "d4", "b4"], "loop": True})
+    result = run_level(level, "pawn.wait()\n" * 9)
+    walked = [enemies[0] for enemies in positions(result)]
+    assert walked == [[2, 1], [3, 1], [3, 2], [3, 3], [2, 3], [1, 3], [1, 2], [1, 1], [2, 1]]
+    assert level.obstacles()[0] == (
+        "A patrol starts on b2 and walks b2 to d2 to d4 to b4 to b2, round and round, "
+        "one square for each square you move, each turn and each wait."
+    )
+
+
+def test_a_patrol_can_stand_guard():
+    level = enemy_level("G . .\n. . .\nP . .\n", {"kind": "patrol", "start": "b2"})
+    result = run_level(level, "pawn.wait()\npawn.wait()")
+    assert positions(result) == [[[1, 1]], [[1, 1]]]
+    assert level.obstacles()[0] == "A patrol stands guard on b2."
+
+
+def test_a_chaser_steps_toward_the_pawn_along_the_bigger_gap():
+    level = enemy_level(". . . . .\n. . . . .\nP . . . G\n", {"kind": "chaser", "start": "e3"})
+    result = run_level(level, "pawn.wait()\n" * 6)
+    walked = [enemies[0] for enemies in positions(result)]
+    # west (the bigger gap), west, west on a tie, south, west on a tie, then onto the pawn
+    assert walked == [[3, 2], [2, 2], [1, 2], [1, 1], [0, 1], [0, 0]]
+    assert result.status == "lost"
+    assert result.summary == "Your pawn was caught by the chaser on a1."
+
+
+def test_a_blocked_chaser_tries_the_other_way_then_waits():
+    level = make_level(". # .\nP . .\n", api=API_ALL, objectives=[{"say": "hi"}], enemies=[{"kind": "chaser", "start": "c2"}])
+    # From c2, west (b2) is a wall, so it goes south to c1, then west to b1: next to the pawn.
+    result = run_level(level, "pawn.wait()\npawn.wait()")
+    assert [enemies[0] for enemies in positions(result)] == [[2, 0], [1, 0]]
+    walled_in = make_level("P # .\n", api=API_ALL, objectives=[{"say": "hi"}], enemies=[{"kind": "chaser", "start": "c1"}])
+    assert positions(run_level(walled_in, "pawn.wait()")) == [[[2, 0]]]
+
+
+def test_a_clockwork_chaser_moves_on_new_lines_only():
+    level = enemy_level("P . . . . . G\n", {"kind": "chaser", "start": "g1", "clock": "new_line"}, start={"facing": "east"})
+    looped = run_level(level, "for i in range(5):\n    x = i")  # two new lines: two steps
+    assert looped.final["enemies"] == [[4, 0]]
+    copied = run_level(level, "x = 0\nx = 1\nx = 2\nx = 3\nx = 4")  # five new lines: five steps
+    assert copied.final["enemies"] == [[1, 0]]
+    assert "It steps one square toward you for each line of your code that runs for the first time" in level.obstacles()[0]
+
+
+def test_being_caught_stays_lost_even_if_the_code_catches_it(sentry):
+    code = "pawn.move()\ntry:\n    pawn.wait()\nexcept BaseException:\n    pass\npawn.turn_right()\npawn.move()"
+    result = run_level(sentry, code)
+    assert result.status == "lost"
+    assert result.final["pos"] == [0, 1]
+
+
+# -- capturing ---------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def prey():
+    """Pawn on b1 facing north; a patrol standing on a2, an armoured one on c2."""
+    return make_level(
+        ". . .\n. . .\n. P .\n",
+        api=API_ALL,
+        objectives=[{"capture": "all"}],
+        enemies=[{"kind": "patrol", "start": "a2"}, {"kind": "patrol", "start": "c2", "armoured": True}],
+    )
+
+
+def test_capturing_takes_the_enemy_diagonally_forward(prey):
+    result = run_level(prey, "pawn.capture_left()")
+    assert result.status == "solved"
+    assert result.final["pos"] == [0, 1]
+    assert result.final["enemies"] == [None, [2, 1]]
+    assert [event["kind"] for event in events(result)] == ["capture", "tick"]
+    assert result.final["tick"] == 1
+
+
+def test_an_armoured_enemy_cannot_be_captured(prey):
+    result = run_level(prey, "pawn.capture_right()")
+    assert result.error.type == "CaptureError"
+    assert result.error.friendly == "The patrol on c2 is armoured: it can't be captured."
+
+
+def test_capturing_nothing_is_an_error(prey):
+    result = run_level(prey, "pawn.move()\npawn.capture_left()")  # from b2 facing north: a3
+    assert result.error.friendly == "There's nothing to capture on a3."
+    west = run_level(prey, "pawn.turn_left()\npawn.capture_right()")  # facing west from b1: forward-right is a2
+    assert west.status == "solved"
+    off = run_level(prey, "pawn.turn_right()\npawn.capture_right()")  # facing east from b1: forward-right is off the board
+    assert off.error.friendly == "There's no square there to capture on: your pawn is on b1, at the edge of the board."
+
+
+def test_the_capture_objective(prey):
+    assert prey.goals() == ["Capture the enemy that can be taken."]
+    result = run_level(prey, "pawn.wait()")
+    assert result.summary == "Your program finished, but you captured 0 of the 1 enemy that can be taken."
+    assert "It's armoured: it can't be captured." in prey.obstacles()[1]
+
+
+def test_the_ui_gets_each_enemys_route_and_marks(prey):
+    described = prey.describe()
+    assert described["enemies"][1] == {"kind": "patrol", "route": [[2, 1]], "loop": False, "clock": "action", "armoured": True}
+
+
+@pytest.mark.parametrize(
+    ("enemy", "message"),
+    [
+        ({"kind": "knight", "start": "a2"}, "kind must be patrol or chaser"),
+        ({"kind": "patrol", "route": ["a2", "c3"]}, "isn't a straight line"),
+        ({"kind": "patrol", "route": ["b2", "d2"]}, "d2 isn't on the board"),
+        ({"kind": "patrol", "route": ["a3", "c3"]}, "is a wall"),
+        ({"kind": "patrol", "start": "b1"}, "starts on the pawn's square"),
+        ({"kind": "patrol", "start": "c2", "route": ["a2", "b2"]}, "isn't on its route"),
+        ({"kind": "chaser", "start": "a2", "route": ["a2"]}, "a chaser doesn't take route"),
+        ({"kind": "chaser", "start": "a2", "strategy": "cunning"}, "strategy must be one of simple"),
+        ({"kind": "chaser", "start": "a2", "clock": "hourly"}, "clock must be one of"),
+        ({"kind": "patrol", "start": "2a"}, "isn't a square"),
+    ],
+)
+def test_enemies_are_checked(enemy, message):
+    with pytest.raises(LevelError, match=message):
+        make_level("# # #\n. . .\n. P G\n", enemies=[enemy])
+
+
+def test_the_capture_objective_is_checked():
+    with pytest.raises(LevelError, match="isn't armoured"):
+        make_level(". .\nP G\n", objectives=[{"capture": "all"}], enemies=[{"kind": "patrol", "start": "a2", "armoured": True}])

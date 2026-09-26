@@ -54,6 +54,10 @@
   --pit-rim: light-dark(#5b4a3b, #3a2f26);
   --pit-hole: light-dark(#1d1712, #0c0907);
   --waypoint: light-dark(#2c6fb0, #7fb2e8);
+  --enemy: light-dark(#3b2f4a, #2a2233);
+  --enemy-rim: light-dark(#b3261e, #f08a80);
+  --enemy-eye: light-dark(#ffd76a, #ffd76a);
+  --route: light-dark(rgb(179 38 30 / 0.55), rgb(240 138 128 / 0.6));
   --badge-bg: light-dark(#fffaf0, #2a2521);
   --badge-border: light-dark(#8a7658, #c9b48e);
   --badge-text: light-dark(#3f3a36, #f3e2c7);
@@ -1270,6 +1274,38 @@ pre {
   transform: scale(1.4);
 }
 
+.route {
+  fill: none;
+  stroke: var(--route);
+  stroke-width: 3;
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.enemy {
+  transition: transform var(--step-ms, 350ms) ease-in-out, opacity 250ms ease-in-out;
+}
+
+.enemy-body {
+  fill: var(--enemy);
+  stroke: var(--enemy-rim);
+  stroke-width: 3;
+}
+
+.enemy.armoured .enemy-body {
+  stroke-width: 5;
+  stroke-dasharray: 4 2;
+}
+
+.enemy-eye {
+  fill: var(--enemy-eye);
+}
+
+.enemy.captured {
+  opacity: 0;
+}
+
 .lost-mark {
   display: none;
   pointer-events: none;
@@ -1322,7 +1358,7 @@ pre {
 
 /* Animations setting: "Reduced" always stops movement; "Match system" follows
    the OS preference; "Full" ignores it. (Colour flashes stay: they aren't motion.) */
-:root[data-motion="reduced"] :is(.piece, .piece-pointer, .gate-bars, .gate-lock, .gem, .waypoint-tick, .level-left) {
+:root[data-motion="reduced"] :is(.piece, .piece-pointer, .enemy, .gate-bars, .gate-lock, .gem, .waypoint-tick, .level-left) {
   transition: none;
 }
 
@@ -1331,7 +1367,7 @@ pre {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion="full"]) :is(.piece, .piece-pointer, .gate-bars, .gate-lock, .gem, .waypoint-tick, .level-left) {
+  :root:not([data-motion="full"]) :is(.piece, .piece-pointer, .enemy, .gate-bars, .gate-lock, .gem, .waypoint-tick, .level-left) {
     transition: none;
   }
 

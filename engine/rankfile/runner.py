@@ -215,6 +215,10 @@ def unmet_objectives(level: Level, world: World, output: str) -> list[str]:
     missed = names([pos for pos in level.board.squares(Tile.WAYPOINT) if pos not in world.crossed])
     if missed:
         unmet.append(f"you didn't cross the {'waypoint' if len(missed) == 1 else 'waypoints'} on {and_list(missed)}.")
+    captured, capture = sum(foe.captured for foe in world.foes), level.captures_needed()
+    if captured < capture:
+        takeable = sum(not enemy.armoured for enemy in level.enemies)
+        unmet.append(f"you captured {captured} of the {takeable} {'enemy' if takeable == 1 else 'enemies'} that can be taken." if capture == takeable else f"you captured {captured}, and the level needs {capture}.")
     needed, collected, gems = level.gems_needed(), len(world.collected), len(level.board.squares(Tile.GEM))
     if collected < needed:
         if gems == 1:

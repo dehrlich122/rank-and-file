@@ -32,6 +32,7 @@ export interface WorldState {
   opened: Pos[];
   crossed: Pos[]; // waypoints passed over
   collected: Pos[]; // gems picked up
+  enemies: Array<Pos | null>; // where each of the level's enemies is; null once captured
   tick: number; // ticks of the action clock so far (moves, turns and waits)
   lost: Pos | null; // where the run was lost: a pit, or where the piece was caught
 }
@@ -50,6 +51,7 @@ export interface LevelInfo {
   signs: Array<{ pos: Pos; text: string }>;
   questions: Array<{ pos: Pos; text: string }>; // what the guard asks, at gates that ask (never the answer)
   timed_gates: Array<{ pos: Pos; every: number; clock: Clock }>; // open when the clock's ticks are a multiple of `every`
+  enemies: Enemy[]; // patrols and chasers; where they are is in each WorldState
   goal: Pos | null;
   goal_spots: Pos[]; // a hidden goal: the squares it might be on (drawn as ?)
   case_title: string; // the title of the row of cases above the board; "" for a single case
@@ -66,12 +68,21 @@ export interface LevelInfo {
   hints: string[]; // tiered: nudge, concept reminder, partial example
 }
 
+/** A patrol or a chaser (levels.Enemy), as the board draws it. */
+export interface Enemy {
+  kind: "patrol" | "chaser";
+  route: Pos[]; // a patrol's corners (one square if it stands guard)
+  loop: boolean; // a patrol: round and round, instead of there and back
+  clock: Clock;
+  armoured: boolean;
+}
+
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };
 
 export interface GameEvent {
-  kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "tick" | "lost";
+  kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "capture" | "tick" | "lost";
   state: WorldState; // the whole world's state after the event
-  at?: Pos; // bump: the square bumped into; gate_open/guard: the gate; lost: where
+  at?: Pos; // bump: the square bumped into; gate_open/guard: the gate; capture: the enemy's square; lost: where
   message?: string; // guard: what the guard said; lost: what happened
   clock?: Clock; // tick: the clock that ticked
 }

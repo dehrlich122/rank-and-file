@@ -1,5 +1,6 @@
 // The board, drawn as SVG: squares, tiles (walls, signposts, gates, pits,
-// waypoints, gems, timed gates), the goal and the piece.
+// waypoints, gems, timed gates), the goal, the enemies and their routes (M3.1)
+// and the piece.
 //
 // The board never decides anything. It draws the states the engine reported:
 // `show()` jumps straight to a state, `animate()` plays a step's events in order.
@@ -7,7 +8,7 @@
 // Each tile type has its own draw function (TILE_ART below) and CSS classes, and
 // every colour comes from the CSS custom properties in styles.css, so a visual
 // redesign can reskin tiles without touching the logic.
-import type { Clock, Facing, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
+import type { Clock, Enemy, Facing, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
 
 const SVG = "http://www.w3.org/2000/svg";
 const S = 64; // size of one square, in SVG units
@@ -26,6 +27,7 @@ export class BoardView {
   private readonly pointer: SVGGElement; // rotates to show the facing
   private readonly flash: SVGRectElement;
   private readonly lostMark: SVGGElement; // where the run was lost (M3.1)
+  private readonly enemies: SVGGElement[]; // one per level.enemies, moved like the piece
   private readonly art = new Map<TileKind, Map<string, SVGGElement>>(); // tile kind -> "x,y" -> its art
   private angle = 0; // cumulative, so turns always take the short way round
   private timers: number[] = [];
@@ -75,8 +77,12 @@ export class BoardView {
       squares.append(flag(left, top));
     }
 
+    // Enemies (M3.1): every patrol's route, dotted, and the enemies themselves, under the piece.
+    for (const enemy of level.enemies) if (enemy.route.length > 1) squares.append(route(enemy, height));
+    this.enemies = level.enemies.map((enemy) => enemyPiece(enemy));
+
     this.flash = svg("rect", { class: "bump-flash", width: S, height: S, x: 0, y: 0 });
-    this.element.append(this.flash);
+    this.element.append(this.flash, ...this.enemies);
 
     this.piece = svg("g", { class: "piece" });
     this.body = svg("g", { class: "piece-body" });
@@ -95,13 +101,12 @@ export class BoardView {
   /** Jump straight to a state, with no animation. */
   show(state: WorldState): void {
     this.cancel();
-    this.piece.style.transition = "none";
-    this.pointer.style.transition = "none";
+    const moving = [this.piece, this.pointer, ...this.enemies];
+    for (const element of moving) element.style.transition = "none";
     this.angle = FACING_ANGLE[state.facing];
     this.place(state);
     this.element.getBoundingClientRect(); // apply now, before transitions come back
-    this.piece.style.transition = "";
-    this.pointer.style.transition = "";
+    for (const element of moving) element.style.transition = "";
     this.setCelebrating(false);
   }
 
@@ -142,6 +147,15 @@ export class BoardView {
     this.mark("timed_gate", "open", state.opened);
     this.mark("waypoint", "crossed", state.crossed);
     this.mark("gem", "collected", state.collected);
+    (state.enemies ?? []).forEach((pos, i) => {
+      const enemy = this.enemies[i];
+      if (!enemy) return;
+      enemy.classList.toggle("captured", pos === null);
+      if (pos) {
+        const [enemyLeft, enemyTop] = corner(pos, this.level.height);
+        enemy.style.transform = `translate(${enemyLeft + S / 2}px, ${enemyTop + S / 2}px)`;
+      }
+    });
     this.element.classList.toggle("lost", Boolean(state.lost));
     if (state.lost) {
       const [lostLeft, lostTop] = corner(state.lost, this.level.height);
@@ -318,6 +332,39 @@ function gem(left: number, top: number): SVGGElement {
     svg("path", { d: `M ${cx - 13} ${cy - 5} L ${cx - 6} ${cy - 13} L ${cx + 6} ${cy - 13} L ${cx + 13} ${cy - 5} L ${cx} ${cy + 14} Z`, class: "gem-body" }),
     svg("path", { d: `M ${cx - 13} ${cy - 5} H ${cx + 13} M ${cx - 6} ${cy - 13} L ${cx - 3} ${cy - 5} L ${cx} ${cy + 14} M ${cx + 6} ${cy - 13} L ${cx + 3} ${cy - 5}`, class: "gem-facets" }),
   );
+  return group;
+}
+
+/** A patrol's route (M3.1): a dotted line through its corners, closed for a loop. */
+function route(enemy: Enemy, height: number): SVGPathElement {
+  const points = enemy.route.map((pos) => corner(pos, height).map((n) => n + S / 2).join(" "));
+  return svg("path", { d: `M ${points.join(" L ")}${enemy.loop ? " Z" : ""}`, class: "route" });
+}
+
+/**
+ * An enemy (M3.1), centred on (0, 0) and moved by `place()`. Its badges: a
+ * chaser's "chases", a gear for clockwork (it keeps time with the code), and a
+ * shield when it's armoured.
+ */
+function enemyPiece(enemy: Enemy): SVGGElement {
+  const group = svg("g", { class: `enemy enemy-${enemy.kind}${enemy.armoured ? " armoured" : ""}` });
+  const title = svg("title", {});
+  const clock = clockwork(enemy.clock) ? ", keeping time with your code" : "";
+  title.textContent = `A ${enemy.kind}${clock}${enemy.armoured ? ". It's armoured" : ""}.`;
+  group.append(
+    title,
+    svg("circle", { cx: 0, cy: 2, r: S * 0.3, class: "enemy-body" }),
+    svg("circle", { cx: -6, cy: -2, r: 3.2, class: "enemy-eye" }),
+    svg("circle", { cx: 6, cy: -2, r: 3.2, class: "enemy-eye" }),
+  );
+  const badges = [enemy.kind === "chaser" ? "chases" : "", clockwork(enemy.clock) ? "⚙" : "", enemy.armoured ? "🛡" : ""].filter(Boolean);
+  if (badges.length) {
+    const text = badges.join(" ");
+    const width = text.length * 6 + 10;
+    const label = svg("text", { x: 0, y: -S * 0.3 - 1.5, "text-anchor": "middle", class: "badge-text" });
+    label.textContent = text;
+    group.append(svg("rect", { x: -width / 2, y: -S * 0.3 - 12, width, height: 14, rx: 7, class: "badge" }), label);
+  }
   return group;
 }
 
