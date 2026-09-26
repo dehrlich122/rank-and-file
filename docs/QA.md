@@ -767,7 +767,7 @@ mechanic, never by solution code.
 
 ### QA-015 · Wrap long lines in the code editor · Fixed
 
-- **Fixed** in `<commit>` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+- **Fixed** in `987abfa` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - A new setting, **Wrap long lines** (On or Off), is On by default.
   - A **Wrap** button at the right end of the code toolbar switches the same setting. It's highlighted while wrapping is on.
   - It applies to the level's code editor and the lesson examples. Scratch Python's input is a single line, so it's unchanged.
