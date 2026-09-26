@@ -22,8 +22,21 @@ The game has to be served over http: opening `index.html` directly from disk won
 py -3.14 -m venv .venv                                   # once (macOS/Linux: python3.14 -m venv .venv)
 .venv/Scripts/python -m pip install -r requirements-dev.txt
 
-npm run check      # TypeScript typecheck + Vitest + pytest
+npm run check      # typecheck + redundant-code checks (knip, ruff, vulture, jscpd) + Vitest + pytest
 ```
+
+End-to-end checks drive the real game in headless Chrome (or Edge; set
+`CHROME_PATH` if it isn't found). Start the game first, then run them:
+
+```sh
+npm run dev                                   # in one terminal
+npm run e2e                                   # in another: all checks against http://localhost:5173/
+npm run e2e -- http://localhost:4173/ --only=app   # e.g. against `npm run play`, one suite only
+```
+
+Results go to `e2e-results/report.json`: every check with its timing and the
+browser console output. Each failure also saves a screenshot there, with code
+blurred so no level solution is shown.
 
 ## Where things are
 

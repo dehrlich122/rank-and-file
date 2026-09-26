@@ -1,44 +1,74 @@
+/* Colour tokens. Each is light-dark(<light>, <dark>): the browser picks one from
+   the element's color-scheme, which follows the system unless the Theme setting
+   forces it (data-theme on <html>, set by src/settings.ts). Never hard-code
+   colours elsewhere; the visual design pass will retune these. */
 :root {
+  color-scheme: light dark;
   --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-code: "Cascadia Code", "JetBrains Mono", Consolas, ui-monospace, monospace;
-
-  --bg: #f4f1ea;
-  --panel: #fffdf8;
-  --border: #ddd5c4;
-  --text: #2a2622;
-  --muted: #7a7166;
-  --accent: #2f6f4f;
-  --accent-text: #ffffff;
-  --ok: #2f6f4f;
-  --warn: #9a6a00;
-  --error: #b3261e;
-  --error-bg: #fbeceb;
-  --code-bg: #f1ece1;
+  --code-size: 15px; /* the Code text size setting */
   --radius: 8px;
 
+  --bg: light-dark(#f4f1ea, #1c1a18);
+  --panel: light-dark(#fffdf8, #252220);
+  --border: light-dark(#ddd5c4, #3a3531);
+  --text: light-dark(#2a2622, #ece6dc);
+  --muted: light-dark(#7a7166, #a39a8e);
+  --accent: light-dark(#2f6f4f, #5fae84);
+  --accent-text: light-dark(#ffffff, #0f1a14);
+  --good: light-dark(#2f6f4f, #7cc79c);
+  --good-bg: light-dark(#e7f3ec, #1f3228);
+  --warn: light-dark(#8a5d00, #e6b555);
+  --warn-bg: light-dark(#fbf1dc, #3a3020);
+  --bad: light-dark(#b3261e, #f08a80);
+  --bad-bg: light-dark(#fbeceb, #3a2322);
+  --code-bg: light-dark(#f1ece1, #1f1d1b);
+  /* translucent, so the text selection drawn underneath stays visible (QA-007) */
+  --step-line: light-dark(rgb(255 214 0 / 0.28), rgb(240 200 40 / 0.18));
+  --error-line: light-dark(rgb(220 38 38 / 0.15), rgb(240 70 60 / 0.18));
+  --active-line: light-dark(rgb(47 111 79 / 0.06), rgb(255 255 255 / 0.04));
+  --selection: light-dark(rgb(47 111 79 / 0.28), rgb(95 174 132 / 0.35));
+
+  /* syntax colours */
+  --syn-keyword: light-dark(#8f3f9e, #d49be0);
+  --syn-string: light-dark(#a3431f, #e8a37e);
+  --syn-number: light-dark(#1f6a8f, #7cc4e8);
+  --syn-comment: light-dark(#857a6c, #8f877b);
+  --syn-function: light-dark(#2c5d9e, #8fb8f0);
+  --syn-definition: light-dark(#1d6b4a, #7cc79c);
+  --syn-class: light-dark(#8a5d00, #e6b555);
+
+  /* board */
+  --sq-light: light-dark(#eeeed2, #c9c9ad);
+  --sq-dark: light-dark(#b5c99a, #7f9868);
+  --wall: light-dark(#6b625a, #3d3833);
+  --wall-inner: light-dark(#7d746b, #4a443e);
+  --goal: #d4a017;
+  --pawn: #fdfbf6;
+  --pawn-stroke: #2a2622;
+  --pointer: light-dark(#2f6f4f, #245a3f);
+  --coords: light-dark(#8a8175, #8f877b);
+  --gate-frame: light-dark(#c9b48e, #8a7658);
+  --gate-bars: light-dark(#3f3a36, #211d1a);
+  --gate-lock: light-dark(#c8961a, #e0b04a);
+  --game-message: light-dark(#8a4b00, #e6b555);
+}
+
+:root[data-theme="light"] {
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1c1a18;
-    --panel: #252220;
-    --border: #3a3531;
-    --text: #ece6dc;
-    --muted: #a39a8e;
-    --accent: #5fae84;
-    --accent-text: #0f1a14;
-    --ok: #5fae84;
-    --warn: #e0b04a;
-    --error: #f08a80;
-    --error-bg: #3a2322;
-    --code-bg: #1f1d1b;
-    color-scheme: dark;
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 * {
   box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
 }
 
 body {
@@ -48,27 +78,37 @@ body {
   font: 15px/1.5 var(--font-ui);
 }
 
+a {
+  color: var(--accent);
+}
+
 h1,
-h2 {
+h2,
+h3 {
   margin: 0;
   font-weight: 650;
+  line-height: 1.25;
 }
 
 h1 {
-  font-size: 18px;
+  font-size: 22px;
 }
 
-h2 {
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
+pre,
+code {
+  font-family: var(--font-code);
+}
+
+code {
+  font-size: 0.92em;
+  background: var(--code-bg);
+  padding: 1px 5px;
+  border-radius: 4px;
 }
 
 pre {
   margin: 0;
-  font-family: var(--font-code);
-  font-size: 14px;
+  font-size: calc(var(--code-size) - 1px);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -77,9 +117,20 @@ pre {
   color: var(--muted);
 }
 
+.small {
+  font-size: 13px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
 /* ---- buttons ---- */
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font: inherit;
   font-weight: 550;
   padding: 6px 14px;
@@ -88,6 +139,8 @@ pre {
   background: var(--panel);
   color: var(--text);
   cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 .btn:hover:not(:disabled) {
@@ -95,7 +148,7 @@ pre {
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
 }
 
@@ -110,30 +163,21 @@ pre {
   font-size: 13px;
 }
 
-/* ---- status pill ---- */
-
-.status {
-  margin-left: auto;
-  font-size: 13px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  color: var(--muted);
+.btn-icon {
+  padding: 4px 9px;
+  min-width: 34px;
+  justify-content: center;
 }
 
-.status[data-state="ready"] {
-  color: var(--ok);
-  border-color: var(--ok);
+/* an on/off button (aria-pressed), e.g. Wrap above the editor */
+.btn-toggle[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
-.status[data-state="failed"] {
-  color: var(--error);
-  border-color: var(--error);
-}
+/* ---- app shell ---- */
 
-/* ---- M0 harness layout ---- */
-
-.harness {
+.app {
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -142,10 +186,1138 @@ pre {
 .topbar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.crumbs {
+  display: flex;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.crumbs a {
+  color: var(--muted);
+}
+
+.crumbs span:last-child {
+  color: var(--text);
+  font-weight: 550;
+}
+
+.status {
+  margin-left: auto;
+  font-size: 13px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.status[data-state="ready"] {
+  color: var(--good);
+  border-color: var(--good);
+}
+
+.status[data-state="failed"] {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
+.screen {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-hint {
+  margin-left: auto;
+}
+
+/* ---- level select ---- */
+
+.home {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 16px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.intro p {
+  color: var(--muted);
+  font-size: 16px;
+  margin: 8px 0 0;
+}
+
+.chapter header {
+  margin-bottom: 12px;
+}
+
+.chapter header p {
+  margin: 4px 0 0;
+}
+
+.tier {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+
+.level-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.level-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.level-card:hover {
+  border-color: var(--accent);
+}
+
+.level-number {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--code-bg);
+  font-weight: 650;
+}
+
+.level-card.solved .level-number {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.level-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.home footer {
+  text-align: center;
+}
+
+/* ---- level screen ---- */
+
+/* A level is a grid of three areas: "learn" (the Learn/Challenge panel), "board"
+   and "code" (Run/Stop, editor, Variables, Console). The Learn and code columns
+   have fixed widths (the code a quarter wider, QA-014) and the board takes
+   whatever the window has left, so it never moves or resizes when the Learn
+   panel collapses (QA-013). The Code panel setting
+   (data-code-panel on <html>, QA-009, QA-012) rearranges the areas on wide
+   screens; narrow windows always put the code underneath (see the end of this
+   file). Switching layouts never rebuilds anything: only the grid changes, and
+   for "bottom" the playback bar and outcome move beside the editor
+   (placePlayback in levelView.ts). */
+.level {
+  --side-col: clamp(340px, 29vw, 440px); /* the Learn panel */
+  --code-col: calc(var(--side-col) * 1.25); /* the code panel, when it's beside the board */
+  --board-max-height: max(240px, calc(100vh - 330px)); /* leaves room for the controls and outcome */
+  display: grid;
+  grid-template-columns: var(--side-col) minmax(0, 1fr) var(--code-col);
+  grid-template-areas: "learn board code";
+  gap: 12px;
+  padding: 12px;
+  height: 100%;
+  min-height: 620px;
+}
+
+.level-left {
+  grid-area: learn;
+}
+
+.level-middle {
+  grid-area: board;
+}
+
+.level-right {
+  grid-area: code;
+}
+
+/* Variables and Console (and, for "bottom", the playback bar and outcome). */
+.code-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.code-info-playback {
+  display: contents;
+}
+
+/* Collapsing the Learn/Challenge panel (QA-011, QA-013): the panel shrinks to a
+   strip against the outer edge of its own column. The grid itself doesn't
+   change, so the board and the code stay exactly where they are. The panel's
+   contents are hidden, not removed. */
+.level-left {
+  justify-self: start;
+  width: 100%;
+  transition: width 250ms ease-in-out;
+}
+
+.level.learn-collapsed .level-left {
+  width: 44px;
+}
+
+.level.learn-collapsed .level-left > :not(.expand-strip) {
+  display: none;
+}
+
+.expand-strip {
+  display: none;
+}
+
+.level.learn-collapsed .expand-strip {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.expand-strip:hover {
+  color: var(--text);
+  background: var(--code-bg);
+}
+
+.expand-label {
+  writing-mode: vertical-rl;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.panel-toggle {
+  margin: 6px 0 6px auto;
+  align-self: center;
+  border: none;
+  background: none;
+  color: var(--muted);
+}
+
+.panel-toggle:hover:not(:disabled) {
+  color: var(--text);
+}
+
+@media (min-width: 1181px) {
+  :root[data-code-panel="left"] .level {
+    grid-template-columns: var(--code-col) minmax(0, 1fr) var(--side-col);
+    grid-template-areas: "code board learn";
+  }
+
+  /* The Learn panel is on the right: it collapses towards the right edge, and
+     its arrows point the other way. */
+  :root[data-code-panel="left"] .level-left {
+    justify-self: end;
+  }
+
+  :root[data-code-panel="left"] :is(.panel-toggle, .expand-strip) .icon {
+    transform: scaleX(-1);
+  }
+
+  /* Bottom (QA-012): the board has its row to itself, centred on the screen
+     (the empty third column balances the Learn panel), and fills the row's
+     height. The code row runs full width, with the playback bar, the outcome,
+     Variables and Console beside the editor. */
+  :root[data-code-panel="bottom"] .level {
+    grid-template-columns: var(--side-col) minmax(0, 1fr) var(--side-col);
+    grid-template-rows: minmax(0, 1fr) minmax(300px, 45%);
+    grid-template-areas:
+      "learn board ."
+      "code code code";
+  }
+
+  :root[data-code-panel="bottom"] .level-middle > .board-host {
+    flex: 1;
+    min-height: 0;
+  }
+
+  :root[data-code-panel="bottom"] .level-middle .board {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+  }
+
+  :root[data-code-panel="bottom"] .level-right {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(380px, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      "toolbar toolbar"
+      "editor info";
+  }
+
+  :root[data-code-panel="bottom"] .level-right > .toolbar {
+    grid-area: toolbar;
+  }
+
+  :root[data-code-panel="bottom"] .level-right > .editor {
+    grid-area: editor;
+    min-height: 0;
+  }
+
+  :root[data-code-panel="bottom"] .code-info {
+    grid-area: info;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "playback playback"
+      "outcome outcome"
+      "vars console";
+    gap: 8px 12px;
+    overflow: auto;
+  }
+
+  :root[data-code-panel="bottom"] .code-info .playback {
+    grid-area: playback;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+
+  :root[data-code-panel="bottom"] .code-info .scrubber {
+    flex: 1;
+    min-width: 60px;
+  }
+
+  :root[data-code-panel="bottom"] .code-info .playback-meta {
+    gap: 8px;
+  }
+
+  :root[data-code-panel="bottom"] .code-info .outcome-host {
+    grid-area: outcome;
+    max-height: 160px;
+    overflow: auto;
+  }
+
+  :root[data-code-panel="bottom"] .subpanel-vars {
+    grid-area: vars;
+  }
+
+  :root[data-code-panel="bottom"] .subpanel-console {
+    grid-area: console;
+  }
+
+  :root[data-code-panel="bottom"] :is(.inspector, .console) {
+    flex: 1;
+    max-height: none;
+  }
+}
+
+.level > .panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.level-left {
+  overflow: hidden;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 8px;
+}
+
+.tab {
+  font: inherit;
+  font-weight: 600;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--muted);
+  padding: 10px 12px 7px;
+  cursor: pointer;
+}
+
+.tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.tab-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 14px 16px 18px;
+}
+
+.tab-panel > * + * {
+  margin-top: 12px;
+}
+
+.trains {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-weight: 550;
+}
+
+.trains-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-text);
+  background: var(--accent);
+  padding: 1px 7px;
+  border-radius: 4px;
+}
+
+.challenge-title {
+  font-size: 20px;
+}
+
+.tab-panel h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-top: 18px;
+}
+
+.tab-panel ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.abilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 0;
+}
+
+.sign-text {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border-left: 4px solid var(--goal);
+  background: var(--code-bg);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  font-weight: 550;
+}
+
+.level-middle {
+  padding: 12px;
+  gap: 10px;
+  overflow: auto;
+}
+
+.board-host {
+  display: flex;
+  justify-content: center;
+  min-height: 200px;
+}
+
+.level-right {
+  padding: 12px;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.level-right .editor {
+  flex: 1 1 45%;
+  min-height: 180px;
+}
+
+.subpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  flex: 0 1 auto;
+}
+
+.subpanel h2,
+.harness h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+/* ---- editor ---- */
+
+.editor {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.cm-editor .cm-step-line {
+  background: var(--step-line);
+}
+
+.cm-editor .cm-error-line {
+  background: var(--error-line);
+}
+
+.cm-editor .cm-placeholder {
+  color: var(--muted);
+}
+
+/* ---- playback ---- */
+
+.playback {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.playback-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.scrubber {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.playback-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 26px;
+}
+
+.speed {
+  font: inherit;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+
+/* ---- outcome and errors ---- */
+
+.outcome {
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border-left: 5px solid;
+}
+
+.outcome p {
+  margin: 6px 0 0;
+}
+
+/* The code changed after this run, so the card describes an older version. */
+.outcome.stale > :not(.stale-note) {
+  opacity: 0.55;
+}
+
+.stale-note {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.outcome-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 16px;
+}
+
+.outcome-good {
+  background: var(--good-bg);
+  border-color: var(--good);
+}
+
+.outcome-good .outcome-head strong {
+  color: var(--good);
+}
+
+.outcome-warn {
+  background: var(--warn-bg);
+  border-color: var(--warn);
+}
+
+.outcome-warn .outcome-head strong {
+  color: var(--warn);
+}
+
+.outcome-bad {
+  background: var(--bad-bg);
+  border-color: var(--bad);
+}
+
+.outcome-bad .outcome-head strong {
+  color: var(--bad);
+}
+
+.problems {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.line-tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 6px;
+  margin-right: 6px;
+  border-radius: 4px;
+  background: var(--bad);
+  color: var(--panel);
+}
+
+.error-detail p {
+  margin: 6px 0 0;
+  white-space: pre-line; /* friendly messages can have a second line (QA-008) */
+}
+
+.error-detail summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.traceback {
+  margin-top: 6px;
+  padding: 8px;
+  font-size: calc(var(--code-size) - 2px);
+  background: var(--code-bg);
+  border-radius: 6px;
+}
+
+/* ---- variables and console ---- */
+
+.inspector {
+  max-height: 170px;
+  overflow: auto;
+}
+
+.inspector table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-code);
+  font-size: calc(var(--code-size) - 1.5px);
+}
+
+.inspector td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.var-name {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.var-value {
+  word-break: break-word;
+}
+
+.var-type {
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.inspector tr.changed td {
+  animation: changed 1s ease-out;
+}
+
+@keyframes changed {
+  from {
+    background: var(--step-line);
+  }
+}
+
+.console {
+  min-height: 60px;
+  max-height: 160px;
+  overflow: auto;
+  padding: 8px 10px;
+  background: var(--code-bg);
+  border-radius: 6px;
+}
+
+.console.empty {
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+/* What the game says (e.g. the guard at a gate), as opposed to what the program printed. */
+.console .game-message {
+  display: block;
+  margin: 2px 0;
+  padding-left: 8px;
+  border-left: 3px solid var(--game-message);
+  color: var(--game-message);
+  font-family: var(--font-ui);
+  font-style: italic;
+}
+
+/* ---- board ---- */
+
+/* The board fills its column and keeps its shape (the SVG's viewBox), up to
+   the height the layout leaves for it (QA-011). */
+.board {
+  width: 100%;
+  height: auto;
+  max-height: var(--board-max-height, 60vh);
+  user-select: none;
+}
+
+.board-mini {
+  width: 124px;
+  max-height: none;
+}
+
+.board-mini .coords {
+  display: none;
+}
+
+.sq-light {
+  fill: var(--sq-light);
+}
+
+.sq-dark {
+  fill: var(--sq-dark);
+}
+
+.coords text {
+  fill: var(--coords);
+  font: 600 13px var(--font-ui);
+}
+
+.wall-outer {
+  fill: var(--wall);
+}
+
+.wall-inner {
+  fill: var(--wall-inner);
+}
+
+.sign-post,
+.sign-board {
+  fill: #a0703f;
+}
+
+.sign-lines {
+  stroke: #f3e2c7;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.goal-ring {
+  fill: none;
+  stroke: var(--goal);
+  stroke-width: 3;
+  stroke-dasharray: 6 5;
+}
+
+.goal-pole {
+  fill: #5a4a3a;
+}
+
+.goal-flag {
+  fill: var(--goal);
+}
+
+.celebrate .goal-ring {
+  stroke-dasharray: none;
+  animation: glow 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  to {
+    stroke-width: 7;
+    opacity: 0.6;
+  }
+}
+
+.piece {
+  transition: transform var(--step-ms, 350ms) ease-in-out;
+}
+
+.piece-pointer {
+  transition: transform var(--step-ms, 350ms) ease-in-out;
+  fill: var(--pointer);
+}
+
+.pawn-fill {
+  fill: var(--pawn);
+  stroke: var(--pawn-stroke);
+  stroke-width: 2.2;
+}
+
+.pawn-shadow {
+  fill: rgb(0 0 0 / 0.18);
+}
+
+.piece-body.bumping {
+  animation: bump 380ms ease-out;
+}
+
+@keyframes bump {
+  30% {
+    transform: translate(var(--bx), var(--by));
+  }
+  60% {
+    transform: translate(calc(var(--bx) * -0.3), calc(var(--by) * -0.3));
+  }
+}
+
+.gate-frame {
+  fill: var(--gate-frame);
+}
+
+.gate-bars {
+  fill: var(--gate-bars);
+  transform-box: fill-box;
+  transform-origin: top;
+  transition: transform 450ms ease-in-out, opacity 450ms ease-in-out;
+}
+
+.gate-padlock {
+  fill: var(--gate-lock);
+}
+
+.gate-shackle {
+  fill: none;
+  stroke: var(--gate-lock);
+  stroke-width: 3;
+}
+
+.gate-lock {
+  transition: opacity 300ms ease-in-out;
+}
+
+.gate.open .gate-bars {
+  transform: scaleY(0.12);
+  opacity: 0.55;
+}
+
+.gate.open .gate-lock {
+  opacity: 0;
+}
+
+.gate.refusing .gate-frame {
+  animation: refuse 650ms ease-out;
+}
+
+@keyframes refuse {
+  25% {
+    fill: var(--bad);
+  }
+}
+
+.bump-flash {
+  fill: var(--bad);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bump-flash.flashing {
+  animation: flash 700ms ease-out;
+}
+
+@keyframes flash {
+  20% {
+    opacity: 0.45;
+  }
+}
+
+.celebrate .piece-body {
+  animation: hop 600ms ease-in-out 2;
+}
+
+@keyframes hop {
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Animations setting: "Reduced" always stops movement; "Match system" follows
+   the OS preference; "Full" ignores it. (Colour flashes stay: they aren't motion.) */
+:root[data-motion="reduced"] :is(.piece, .piece-pointer, .gate-bars, .gate-lock, .level-left) {
+  transition: none;
+}
+
+:root[data-motion="reduced"] :is(.celebrate .piece-body, .celebrate .goal-ring, .piece-body.bumping) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) :is(.piece, .piece-pointer, .gate-bars, .gate-lock, .level-left) {
+    transition: none;
+  }
+
+  :root:not([data-motion="full"]) :is(.celebrate .piece-body, .celebrate .goal-ring, .piece-body.bumping) {
+    animation: none;
+  }
+}
+
+/* ---- lesson ---- */
+
+.lesson h1 {
+  font-size: 20px;
+  margin-top: 4px;
+}
+
+.lesson p {
+  margin: 10px 0 0;
+}
+
+.snippet {
+  margin: 14px 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.snippet-editor {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.snippet-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.snippet-bar {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.snippet-bar > .snippet-output,
+.snippet-bar > div {
+  flex-basis: 100%;
+}
+
+.snippet-bar > div:empty {
+  display: none;
+}
+
+.snippet-board {
+  flex: none;
+  width: 124px;
+}
+
+.snippet-output {
+  padding: 6px 8px;
+  background: var(--code-bg);
+  border-radius: 6px;
+  font-size: calc(var(--code-size) - 2px);
+}
+
+.snippet .error-detail {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-left: 4px solid var(--bad);
+  background: var(--bad-bg);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.snippet .error-detail p {
+  margin: 0;
+}
+
+/* ---- lesson steps (QA-010) ---- */
+
+.lesson-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+}
+
+.lesson-pager > .btn-primary {
+  margin-left: auto; /* stays on the right even when Back and the count are hidden */
+}
+
+/* ---- scratch REPL ---- */
+
+.repl-drawer {
+  border-top: 1px solid var(--border);
+  padding: 8px 14px 12px;
+}
+
+.repl-drawer summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.repl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.repl p {
+  margin: 0;
+}
+
+.repl-log {
+  max-height: 180px;
+  overflow: auto;
+  padding: 6px 8px;
+  background: var(--code-bg);
+  border-radius: 6px;
+  font-size: calc(var(--code-size) - 2px);
+  min-height: 40px;
+}
+
+.repl-log pre {
+  font-size: calc(var(--code-size) - 2px);
+}
+
+.repl-echo {
+  color: var(--muted);
+}
+
+.repl-note {
+  color: var(--warn);
+  font-family: var(--font-ui);
+}
+
+.repl-log .error-detail {
+  font-size: 13px;
+  color: var(--bad);
+}
+
+.repl-log .error-detail p {
+  margin: 2px 0;
+}
+
+.repl-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-code);
+  font-size: calc(var(--code-size) - 1px);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  background: var(--panel);
+}
+
+.repl-prompt {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.repl-editor {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+.repl-line:focus-within {
+  border-color: var(--accent);
+}
+
+/* ---- autocomplete (src/ui/completion.ts) ---- */
+
+.cm-tab-hint {
+  display: none;
+  margin-left: 14px;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.cm-tooltip-autocomplete li[aria-selected] .cm-tab-hint {
+  display: inline-block;
+}
+
+.repl-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---- M0 harness ---- */
+
+.harness {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .harness-main {
@@ -157,31 +1329,24 @@ pre {
   min-height: 0;
 }
 
-.panel {
+.harness .panel {
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-height: 0;
   padding: 12px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
 }
 
-.toolbar,
+.harness .editor {
+  flex: 1;
+  min-height: 200px;
+}
+
 .examples {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-}
-
-.editor {
-  flex: 1;
-  min-height: 200px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
 }
 
 .run-meta {
@@ -199,27 +1364,134 @@ pre {
 
 .error-card {
   padding: 10px 12px;
-  border-left: 4px solid var(--error);
-  background: var(--error-bg);
+  border-left: 4px solid var(--bad);
+  background: var(--bad-bg);
   border-radius: 4px;
 }
 
-.error-card p {
-  margin: 0 0 6px;
+.error-card > p {
+  margin: 0;
 }
 
-.error-card summary {
+/* ---- icons (src/ui/icons.ts) ---- */
+
+.icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.btn-small .icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---- settings menu (src/ui/settingsDialog.ts) ---- */
+
+.settings-button {
+  gap: 6px;
+}
+
+.settings-dialog {
+  width: min(460px, 92vw);
+  padding: 18px 22px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
+}
+
+.settings-dialog::backdrop {
+  background: rgb(0 0 0 / 0.35);
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.settings-head h2 {
+  font-size: 18px;
+}
+
+.settings-dialog fieldset {
+  border: none;
+  margin: 0 0 14px;
+  padding: 0;
+}
+
+.settings-dialog legend {
+  font-weight: 650;
+  margin-bottom: 6px;
+  padding: 0;
+}
+
+.settings-dialog fieldset p {
+  margin: -2px 0 6px;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.choice span {
+  display: inline-block;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
   cursor: pointer;
-  color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
-.traceback {
-  margin-top: 6px;
-  font-size: 13px;
+.choice input:checked + span {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.choice input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- narrower screens (desktop-first; phones are out of scope for now) ---- */
+
+@media (max-width: 1180px) {
+  .level {
+    --side-col: clamp(280px, 30vw, 340px);
+    grid-template-columns: var(--side-col) minmax(0, 1fr);
+    grid-template-areas:
+      "learn board"
+      "code code";
+    height: auto;
+  }
+  .level-right {
+    min-height: 520px;
+  }
 }
 
 @media (max-width: 800px) {
+  .panel-toggle {
+    display: none; /* collapsing is a desktop feature (QA-011) */
+  }
+  .level {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "learn"
+      "board"
+      "code";
+  }
   .harness-main {
     grid-template-columns: 1fr;
   }

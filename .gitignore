@@ -1,5 +1,6 @@
 node_modules/
 dist/
+e2e-results/
 public/pyodide/
 .venv/
 __pycache__/

@@ -1,4 +1,4 @@
 import "./styles.css";
-import { mountHarness } from "./harness";
+import { startApp } from "./app";
 
-mountHarness(document.querySelector<HTMLElement>("#app")!);
+startApp(document.querySelector<HTMLElement>("#app")!);

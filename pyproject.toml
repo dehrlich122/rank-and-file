@@ -8,3 +8,29 @@ requires-python = ">=3.14"
 testpaths = ["engine/tests"]
 pythonpath = ["engine"]
 addopts = "-q"
+
+# ruff: unused imports and variables, likely bugs, and tidiness. Development only.
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+include = ["engine/**/*.py", "scripts/**/*.py"]
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, bugbear, pyupgrade, simplify, import order
+select = ["E", "F", "W", "B", "UP", "SIM", "I"]
+# Long lines are left to judgment: many are player-facing messages that read
+# better as one string. No formatter is configured.
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["rankfile", "conftest"]
+
+[tool.ruff.lint.per-file-ignores]
+# The allowlist is a list of bare names on purpose (see its docstring).
+"scripts/vulture_allowlist.py" = ["B018"]
+
+# vulture: unused functions, classes and variables. Things only used from
+# JavaScript, from player code or through serialisation are in the allowlist.
+[tool.vulture]
+paths = ["engine/rankfile", "scripts/gen_solutions.py", "scripts/vulture_allowlist.py"]
+min_confidence = 60

@@ -1,0 +1,25 @@
+id: ch01-l02
+chapter: 1
+title: The Long Hall
+trains: "Arguments: passing information into a function call"
+brief: The hall is long, and there's only room for 2 lines of code.
+piece: pawn
+map: |
+  # G #
+  # . #
+  # . #
+  # . #
+  # . #
+  # . #
+  # . #
+  # P #
+start: {facing: north}
+objectives: [reach_goal]
+api: [move]
+constraints: {max_lines: 2}
+par: {lines: 1}
+hints:
+  - A separate call for every square won't fit. Is there a way to tell move() how far to go?
+  - A value inside a function's parentheses is called an argument. The lesson showed move() taking one.
+  - "pawn.move( ? ) with a number where the ? is. Count the squares carefully."
+lesson: ch01/ch01-l02.md

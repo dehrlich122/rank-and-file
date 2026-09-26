@@ -1,0 +1,21 @@
+id: ch01-l01
+chapter: 1
+title: First Steps
+trains: "Calling a function: its name, then parentheses"
+brief: Walk your pawn to the goal square.
+piece: pawn
+map: |
+  . . . . .
+  . . G . .
+  . . . . .
+  . . . . .
+  . . P . .
+start: {facing: north}
+objectives: [reach_goal]
+api: [move]
+par: {lines: 3}
+hints:
+  - Your pawn is on c1 and the goal is on c4. How many squares away is that?
+  - Each call to pawn.move() takes exactly one step. You're allowed to call it more than once.
+  - Put each call on its own line. Python runs them from top to bottom, one after another.
+lesson: ch01/ch01-l01.md

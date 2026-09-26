@@ -1,0 +1,11 @@
+{
+  "path": ["src", "engine", "scripts"],
+  "format": ["typescript", "javascript", "python"],
+  "ignore": ["**/node_modules/**", "**/__pycache__/**"],
+  "minLines": 6,
+  "minTokens": 60,
+  "threshold": 0,
+  "exitCode": 1,
+  "reporters": ["console"],
+  "silent": false
+}

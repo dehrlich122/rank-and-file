@@ -1,0 +1,899 @@
+# QA log
+
+Manual QA feedback from the designer while play-testing. Each item records what
+was observed, what's wanted, and anything still open. New findings go at the
+bottom with the next ID. When an item is fixed, note the commit and the retest
+steps, then mark it **Verified** once the designer has re-checked it.
+
+Status: **Open** → **Fixed** (awaiting retest) → **Verified**
+
+Every fix also gets automated browser checks in `npm run e2e`, named after the
+QA id (e.g. "QA-005: …"). If one ever fails, `e2e-results/report.json` shows
+which step broke, with a screenshot.
+
+No spoilers here either (see `CLAUDE.md`): describe levels by concept and
+mechanic, never by solution code.
+
+---
+
+## Session 1 — 2026-09-26 · M1 vertical slice (`m1-vertical-slice`)
+
+### QA-001 · Playback speed resets on every level · Verified
+
+- **Verified** by the designer, 2026-09-26.
+- **Fixed** in `8d9687a` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - Speed is now a field of the shared settings store (`src/settings.ts`, together with QA-006). It's saved in localStorage, so it also survives a reload.
+- **Area:** UI, playback controls
+- **Observed:** The speed selector goes back to 1× whenever a new level opens.
+  The select is rebuilt per level with 1× preselected
+  (`src/ui/levelView.ts`, speed `<select>`), and `Player.speed` starts at 1
+  (`src/ui/playback.ts`).
+- **Wanted:** The speed the player picks stays in effect from level to level.
+- **Notes:** Keep it as an app-wide setting that each new level view and
+  `Player` read on creation. Remembering it across reloads too (localStorage,
+  wrapped in try/catch) seems natural; confirm with the designer. Speed will
+  likely also appear in the settings menu (QA-006), so build it as a field of
+  that shared settings store rather than a one-off.
+- **Retest:** Set 2× on level 1, go to level 2 via Next and via the level
+  select: selector shows 2× and playback runs at 2×.
+
+### QA-002 · Level 4 (`ch01-l04`, "The Password") redesign · Verified
+
+- **Verified** by the designer, 2026-09-26.
+- **Fixed** in `bc8320d` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - "Exact match" means nothing is trimmed. A trailing space, a different capital or the quote marks all get the hamster line.
+  - Every line printed next to a *still locked* gate gets the guard's reply, not just near misses. Once the gate is open, it stops listening.
+  - The guard's reply appears in the console as a game message, set apart from printed output. The gate also flashes.
+  - New brief and hints (no passphrase), plus one lesson line about reading the code you start with. The solution note was rewritten.
+  - Retest feedback: a wrong phrase followed by walking into the gate shows two messages. See QA-008.
+- **Area:** Level content + one new board mechanic
+- **Observed:** The passphrase sits on a signpost off to the side, printing it
+  anywhere in the program counts, and a comment is required
+  (`min_comments: 1`). It feels odd, and it lets go of the ordering idea that
+  level 3 builds up.
+- **Wanted:**
+  1. **Locked gate replaces the sign.** The gate is the obstacle and the goal
+     is behind it. **Gate on b3** *(Designer, 2026-09-26)*: the square
+     between the goal and the rest of the path. The old sign square (b4)
+     becomes wall for now *(Designer, 2026-09-26)*. A visual design pass on
+     the level can come in a later build.
+  2. **Passphrase:** `Pawns never retreat`. It must be an **exact match**:
+     same case, same punctuation, nothing extra. The printed line has to
+     equal the passphrase, so printing it with the quote marks fails.
+     *(Designer, 2026-09-26)*
+  3. **Only works from 1 space away.** That means **adjacent (orthogonally),
+     not necessarily facing** the gate *(Designer, 2026-09-26)*. Saying it
+     anywhere else doesn't open the gate, so *when* you print matters as
+     much as *what* you print. This keeps level 3's ordering lesson in play.
+  4. **Guard lines** *(Designer, 2026-09-26)*:
+     - **Wrong phrase:**
+       `The guard called your mother a hamster! The gate remains locked.`
+       Shown when anything other than the exact passphrase is printed while
+       the pawn is adjacent to the locked gate. The gate stays locked and the
+       run carries on.
+     - **Walking into the locked gate:**
+       `Does your father really smell of elderberries? Maybe try the passphrase first.`
+       This is an error. The run stops there, the same as walking into a
+       wall.
+  5. **Passphrase arrives as a comment in the editor** (the level's `starter`
+     code), not in the brief or instructions panel. Exact wording
+     *(Designer, 2026-09-26)*:
+     `# Tell the guard at the gate that 'Pawns never retreat'`
+  6. **The lesson panel mentions comments.** It already covers them; make sure
+     it still ties in.
+  7. **No required comment.** Drop `min_comments`. The level shows why
+     comments are useful by design and example instead of forcing one.
+  8. **Keep the basic layout** otherwise.
+- **Implementation notes:**
+  - New tile: a gate that blocks movement until it's opened. That's an engine
+    change: `board.py` / `world.py`, the board renderer (locked and open
+    states), and the tile list in `docs/ARCHITECTURE.md`. `DESIGN.md` §3
+    already lists "locked door". Put the passphrase in the level data (e.g.
+    `legend: X: {tile: gate, passphrase: ...}`) so later levels can reuse the
+    gate without engine changes.
+  - Today's `say` objective means "printed at some point". The gate needs a
+    positional check instead: each printed line is compared with the
+    passphrase while the pawn is orthogonally adjacent to a locked gate.
+    Facing doesn't matter. The wrong-phrase line is a game message, not an
+    error. The walking-into-it line is a game error with its own
+    player-facing text, like the wall error in `exceptions.py`. Keep both
+    strings with the gate mechanic (engine, one place) so levels 4 and 5
+    share them.
+  - Rewrite the brief (drop the sign and password text) and the hints (hint 2
+    refers to "the sign").
+  - The comment's wording brings in a **guard** at the gate, and the wrong
+    phrase response speaks as the guard. The art could show one too, but
+    that's optional.
+  - The comment marks the passphrase with single quotes, so
+    `'Pawns never retreat'` is already a valid Python string. Copying it
+    straight into `print()` works. Printing the quote marks themselves is the
+    likely near miss. With exact matching, that gets the wrong-phrase line.
+  - Tests: regenerate the reference solution by script without echoing it.
+    Add naive solutions that should fail: printing before reaching the gate,
+    walking up without printing, and a near-miss phrase (wrong case, or with
+    the quote marks). `test_levels.py` covers the rest. Add engine tests for
+    the gate itself (adjacent but facing away works, 2 squares away doesn't,
+    a wrong phrase gives the hamster line and the run continues, walking into
+    it gives the elderberries error and the run stops).
+- **Open questions:** none.
+- **Retest:**
+  - The gate is on b3. It stays locked if the phrase is printed too early or
+    from a square that isn't adjacent. It opens (visibly) when printed from an
+    adjacent square, including while facing away from it. The goal can be
+    reached only through it.
+  - Printing a near miss (different case, missing word, with quote marks)
+    next to the gate gives "The guard called your mother a hamster! The gate
+    remains locked." and the gate stays shut.
+  - Walking into the locked gate stops the run with "Does your father really
+    smell of elderberries? Maybe try the passphrase first."
+  - No comment is required. The brief and instructions panel don't show the
+    passphrase. The starter code shows the comment above word for word.
+
+### QA-003 · Autocomplete for calls you've already written · Verified
+
+- **Verified** by the designer, 2026-09-26.
+- **Fixed** in `1f12e64` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - A call counts as typed once its opening `(` is typed. Pasting counts as typing, since it's the player's own action. Known calls last for the level until the tab is closed; they aren't saved across reloads.
+  - Noticed while testing: pressing Enter after an unfinished line like `pawn.` gives the new line Python's continuation indent. That's CodeMirror's normal Python indentation.
+- **Area:** UI, code editor + scratch REPL (feature request)
+- **Observed:** Every call has to be typed out in full, every time. Real
+  editors and REPLs rarely make you do that. The editor also already pops up
+  CodeMirror's standard Python suggestions (every builtin, keywords, snippets
+  like `def`, and local names), and Enter accepts them. That goes against the
+  rules below and has to be replaced.
+- **Rule:** A suggestion appears only if you've **already typed that call**
+  *and* it's **real**. You type it in full the first time, and after that the
+  editor offers it.
+- **Wanted — methods (`pawn.`):**
+  1. After typing `pawn.`, a dropdown lists the methods already used on `pawn`
+     in this code. If `pawn.move()` and `pawn.turn_left()` are both in the
+     code, both appear.
+  2. **Only real API methods appear:** they must be in the level's `api`
+     list, so a typo like `pawn.mvoe()` is never offered. *(Designer,
+     2026-09-26)*
+  3. **Chapter 1: no untyped methods.** Methods the level unlocks but you
+     haven't typed yet are never offered. The designer may revisit this for
+     later chapters. *(Designer, 2026-09-26)*
+  4. Up and Down arrows move through the list. More letters narrow it:
+     `pawn.t` leaves only `turn_left()`.
+- **Wanted — accepting:**
+  5. **Tab only** accepts. Enter, Space and typing straight through never pick
+     from the list. *(Designer, 2026-09-26)*
+  6. A faint **Tab** key label sits after the highlighted suggestion so it's
+     clear what to press. *(Designer, 2026-09-26)*
+- **Wanted — scratch REPL:**
+  7. Same logic, but scoped to the scratch session: only calls already made
+     in the scratch REPL are offered. Expect it to come up rarely.
+     *(Designer, 2026-09-26)*
+- **Wanted — only what the player typed:**
+  8. **Chapter 1: only code the player typed themselves counts.** No
+     autocomplete in the Learn-panel snippets. Calls that come pre-written in
+     a snippet or in a level's starter code don't make that call "known".
+     The designer may revisit this for later chapters, with more options.
+     *(Designer, 2026-09-26)*
+- **Plain calls (`print()` etc.) — approved *(Designer, 2026-09-26)*:**
+  - Use the same two rules as methods. A name is offered only if it's
+    **already been called** in this code (or this scratch session) and it's
+    **real**: a Python builtin now, or later a function the player defined
+    with `def`. A typo like `prnit()` is never offered.
+  - The list opens from the first letter of a name that isn't after a `.`, and
+    each letter narrows it. `p` offers `print()`, and at `pa` it's ruled out,
+    so the list closes. *(The designer's own idea; this just writes it down.)*
+  - Tab-only accepting is what makes this safe. The list will pop up often
+    while you type other names (like `pawn`), but typing straight through
+    never picks from it.
+  - No suggestions inside comments or strings. This matters in level 4, where
+    you type the passphrase comment and then print the passphrase string.
+  - Calls only. Plain names that aren't being called (like `pawn` itself, or
+    variables) aren't offered for now. Revisit in Chapter 2 when variables
+    arrive.
+- **Notes:**
+  - Switch off the standard Python sources with
+    `autocompletion({ override: [ourSource] })` in `src/ui/editor.ts`. Also
+    drop Enter from the completion keymap and put `acceptCompletion` on Tab
+    ahead of `indentWithTab`, so Tab still indents when the list is closed.
+  - Find the calls already written from the syntax tree (`CallExpression` /
+    `MemberExpression`), never with regexes. Record only calls inside ranges
+    the player changed (transactions with an `input` user event), so
+    pre-written starter code doesn't count. Suggested default: once typed, a
+    call stays known for that level even if the line is later deleted. Filter methods against
+    `LevelInfo.api` (`src/py/protocol.ts`, from `Level.describe()`), so the
+    engine doesn't need to change. For plain calls, check the builtins list
+    (and later, the `def`s in the code).
+  - Write it generally (any `<object>.`, not just `pawn`) so it keeps working
+    for later pieces and the player's own classes.
+  - Insert `move()` with the cursor between the parentheses.
+  - Tab label: CodeMirror's `addToOptions` renders one extra element per
+    option. Show it only on the selected row (`[aria-selected]`), in the muted
+    text color.
+  - Scratch REPL: the input is a plain `<input>` today (`src/ui/repl.ts`).
+    The simplest way to share this code is to switch it to a one-line
+    CodeMirror editor. Arrow keys there already step through REPL history, so
+    they should move through the list only while it's open. The set of known
+    calls follows the session, so "Reset session" clears it.
+  - If untyped methods are ever offered in later chapters, make that a data
+    flag (e.g. in `levels/chapters.yaml`), not a code change.
+- **Open questions:** none. The spec is settled for Chapter 1.
+- **Retest:**
+  - The standard Python suggestions no longer appear. On a fresh level,
+    typing `pawn.` offers nothing.
+  - After one `pawn.move()`, `pawn.` offers `move()`. After adding
+    `pawn.turn_left()`, both appear and arrows switch between them.
+    `pawn.t` narrows to `turn_left()`.
+  - Tab inserts the suggestion with the cursor inside `()`. Enter makes a new
+    line even with the list open. Tab still indents when the list is closed.
+    The faint Tab label shows on the highlighted row only.
+  - A misspelled call already in the code (e.g. `pawn.mvoe()`) is never
+    offered.
+  - Scratch: nothing is offered until a call has been made in that session.
+    After "Reset session", nothing is offered again.
+  - Learn-panel snippets never show suggestions. A call that comes with a
+    level's starter code isn't offered until the player types it themselves.
+  - Plain calls: after one `print(...)`, `p` offers `print()`
+    and `pa` closes the list. Nothing pops up inside a comment or a string.
+
+### QA-004 · Level 5 (`ch01-l05`, "The Winding Path") rework · Verified
+
+- **Verified** by the designer, 2026-09-26.
+- **Fixed** in `bdf8755` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - The script found a minimum of 11 lines with the gate, so `par` is 11 and `max_lines` is 13. One move per line needs 19.
+- **Area:** Level content (reuses QA-002's gate)
+- **Depends on:** QA-002. The locked gate mechanic has to exist first. Its
+  rules carry over unchanged: an exact passphrase match, said from an
+  adjacent square (facing doesn't matter), the hamster line for a wrong
+  phrase, and the elderberries error for walking into the locked gate.
+- **Observed:** The level is a pure route-planning review: calls, arguments
+  and sequencing. `print()` and comments from level 4 don't come back.
+  `max_lines` equals par, so the limit is exactly the minimum with no slack.
+- **Wanted:**
+  1. **Bring `print()` back** through the same locked gate from level 4.
+     Passphrase: `Checking out`, exact match.
+  2. **The gate sits in the middle of the run**, not at the end just before
+     the goal. **Gate on b5** *(Designer, 2026-09-26; moved from b4 for an
+     extra planning step)*: on the b-file stretch, partway along the route.
+  3. **The starter code already has a comment** carrying useful information,
+     as a reminder that comments are worth reading. As in level 4, the
+     passphrase isn't in the brief or the instructions panel. Exact wording
+     *(Designer, 2026-09-26)*:
+     `# Tell the guard you are 'Checking out' to get to the next chapter.`
+  4. **Line limit = minimum + 2.** Adding the gate raises the minimum, so
+     `max_lines` becomes the new minimum plus 2.
+  5. Keep the winding layout otherwise.
+- **Implementation notes:**
+  - Work out the new minimum with the solution-search script after the gate
+    is placed, never by hand, and without echoing solutions. Keep `par` at
+    that minimum and set `max_lines` to par + 2. Line counting ignores
+    comment-only lines, so the starter comment doesn't eat into the limit.
+  - Update `trains:` (it now reviews `print()` and comments too) and the
+    brief, which currently says "exactly enough lines". Rewrite the hints so
+    they mention the gate and the comment in the code. Check that the lesson
+    still fits within 150 words; it could briefly note that comments can
+    carry useful information.
+  - Tests: regenerate the reference solution by script. The existing naive
+    solution (expects `constraint`) needs rechecking against the new limit.
+    Add naive solutions that should fail: the old route with no passphrase
+    (blocked at the gate), the passphrase printed from a square that isn't
+    adjacent (gate stays locked), and a near-miss phrase.
+- **Open questions:** none.
+- **Retest:**
+  - The gate is on b5, mid-route and not next to the goal.
+  - It opens only when exactly `Checking out` is printed from an adjacent
+    square. A near miss gets the hamster line. Walking into the locked gate
+    stops the run with the elderberries error.
+  - The starter code shows the comment above word for word. The brief and
+    instructions panel don't show the passphrase.
+  - A shortest solution fits with 2 lines to spare, and the limit still
+    rejects a solution that moves one square per line.
+
+---
+
+## Session 2 — 2026-09-26 · M1 vertical slice (`m1-vertical-slice`)
+
+### QA-005 · Playback buttons: new scheme, Play doubles as Run · Verified
+
+- **Verified** by the designer, 2026-09-26.
+- **Fixed** in `a0ac8e7` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - **Choice to check on retest:** after an edit, the board stays where the last run left it, and the outcome card dims with "Your code has changed since this run". The label under the buttons says "Code changed since the last run." The next run starts from the beginning.
+- **Area:** UI, playback controls
+- **Observed:** The five buttons under the board are ⏮ (back to the start),
+  ◀ (step back), ▶/⏸ (play/pause), ▶| (step forward) and ⏭ (jump to the
+  end), made by the `control(...)` calls in `src/ui/levelView.ts`. Step back
+  and step forward don't match (◀ vs ▶|), and step back looks almost like
+  Play. All five stay disabled until the code has been run with the Run
+  button.
+- **Wanted** *(Designer, 2026-09-26)*, left to right:
+  1. **Double left arrow:** rewind to the beginning, before any line has run.
+  2. **Single left arrow:** back one step.
+  3. **Play:** plays through all the steps. It **can double as Run**.
+  4. **Single right arrow:** forward one step.
+  5. **Double right arrow:** jump to the outcome, or to the error if the run
+     failed.
+- **Decided** *(Designer, 2026-09-26)*:
+  6. **Edited code runs fresh.** If the code has changed since the last run,
+     Play runs the new code instead of replaying the old run.
+  7. **The Run button stays** next to the editor, and Ctrl+Enter still runs.
+  8. **The right arrows run too** when there's no run of the current code
+     (on a fresh level, or after an edit). The single right arrow runs the
+     code and shows step 1. The double right arrow runs it and jumps to the
+     outcome or error. The left arrows stay disabled at the start.
+- **Notes:**
+  - The behavior behind 1, 2, 4 and 5 already exists (`seek(0)`,
+    `previous()`, `next()`, `seek(last)` on `Player` in
+    `src/ui/playback.ts`), and the last frame is already where the outcome or
+    error appears. The work is the icons, the tooltips, and running from
+    Play and the right arrows.
+  - Tooltips and aria-labels: "Back to the start", "Step back",
+    "Play" / "Pause" / "Replay", "Step forward", and "Jump to the outcome"
+    (or "Jump to the error" when the run failed).
+  - The single right arrow must not look like Play. Glyphs like ⏮ ⏭ ⏸ can
+    also turn into color emoji on Windows, depending on the font. Draw the
+    icons as inline SVG (or plain text arrows) from one place, so the visual
+    pass can reskin them.
+  - Running from the controls: when there's no recording of the current
+    code, Play, single right and double right call the same path as `run()`
+    first, then play, step once or jump to the end. They're enabled as soon
+    as the level has loaded. Play still turns into Pause while playing.
+  - Knowing when the recording is out of date: remember the code each
+    recording was made from and compare it with the editor's code. The
+    editor's `onChange` already fires on every edit, and edits already clear
+    the step and error highlights. Suggested default: once the code changes,
+    drop the old recording, so the left arrows disable just as they do at the
+    start.
+  - Keep Stop. It's the only way to halt a program that's still running in
+    Python (it restarts the worker), which Pause can't do.
+- **Open questions:** none.
+- **Retest:**
+  - Left to right: double left, single left, Play, single right, double
+    right. The hover text matches each one.
+  - On a fresh level, Play runs the code and plays it, single right runs it
+    and shows step 1, and double right runs it and jumps to the end. The
+    left arrows are disabled until there's a run. Pause works while playing.
+  - After a run, edit the code and press Play: the new code runs, not the
+    old recording. The same goes for either right arrow.
+  - Double right lands on the outcome card, or on the error with its line
+    marked. Double left goes back to before the first line.
+  - The Run button and Ctrl+Enter still work.
+
+### QA-006 · Settings menu on every screen · Verified
+
+- **Verified** by the designer, 2026-09-26.
+- **Fixed** in `8d9687a` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - Animations offers **Match system / Full / Reduced** (default: Match system).
+  - Code text sizes are Small 13, Medium 15, Large 17 and Extra large 20 px.
+  - Clicking outside the menu also closes it.
+  - The Settings button sits at the right of the top bar.
+  - Colour tokens now use `light-dark()`, so forcing a theme just switches `color-scheme`.
+- **Area:** UI, app shell (feature request)
+- **Observed:** There's no settings menu. The only preference in the game,
+  playback speed, is a dropdown under the board, and it resets on every level
+  (QA-001).
+- **Wanted** *(Designer, 2026-09-26)*:
+  1. An **obvious way to open settings on every screen**: a menu you can
+     click in the UI.
+  2. **Esc** opens it too.
+  3. It holds **settings for the UI**.
+- **Decided** *(Designer, 2026-09-26)*:
+  4. **First version has four settings:** playback speed, theme (light, dark
+     or follow the system), code text size, and animations (full or reduced).
+  5. **Esc opens settings from inside the code editor too.** Ctrl+M
+     (CodeMirror's switch that makes Tab move focus) stays the keyboard way
+     out of the editor, since Esc-then-Tab no longer does that.
+  6. **The speed dropdown under the board stays** as a shortcut. It and the
+     setting are the same value, so changing one changes the other.
+- **Notes:**
+  - The top bar (`src/app.ts`) is shared by every screen, so one Settings
+    button there covers the level select, every level and the harness.
+  - A `<dialog>` opened with `showModal()` closes on Esc and keeps focus
+    inside while it's open. Make sure focus goes back where it was on close,
+    and restore it by hand if the browser doesn't.
+  - **Esc already has jobs in the code editor.** CodeMirror uses it to close
+    the autocomplete list (QA-003 adds that list), close the search panel
+    (Ctrl+F) and collapse multiple cursors. Rule: an Esc that closes or
+    cancels something does only that, and an Esc that nothing used opens
+    settings. To wire it, listen on `document` and skip events that are
+    already `defaultPrevented` (CodeMirror sets that on keys it handles).
+  - Opening settings pauses playback, like a game's pause menu. A program
+    still running in Python can't be paused, only stopped.
+  - One small settings store (e.g. `src/settings.ts`) that screens read on
+    creation and that notifies them on change, saved in localStorage (wrapped
+    in try/catch, with defaults if it's unavailable). QA-001's speed becomes
+    one field of it.
+  - Plain styling for now (visual pass deferred). Colors come from the CSS
+    custom properties.
+  - **Per setting:**
+    - **Playback speed:** the same values as today's dropdown (0.5×–4×).
+      This is QA-001's setting, so fixing one fixes the other.
+    - **Theme:** today dark mode only follows the system
+      (`@media (prefers-color-scheme: dark)` in `src/styles.css`). Add a
+      `data-theme` attribute on `<html>`: the dark tokens apply under
+      `:root[data-theme="dark"]`, and under the media query only when the
+      theme isn't forced to light. The board and CodeMirror already read the
+      CSS variables, so they follow.
+    - **Code text size:** a few fixed sizes. The editor's size is set in
+      `EditorView.theme` in `src/ui/editor.ts` (15px, 14px for snippets).
+      Move it to a CSS variable so one setting covers the editor, lesson
+      snippets, console and scratch REPL.
+    - **Animations:** today they're reduced only by the OS
+      (`@media (prefers-reduced-motion: reduce)` in `src/styles.css`). The
+      setting follows the OS by default. "Reduced" applies the same rules
+      through a `data-motion` attribute.
+- **Open questions:** none.
+- **Retest:**
+  - The level select, a level and the harness all show the Settings button
+    in the same place.
+  - Esc opens settings from the board, the Learn panel, the scratch REPL and
+    the code editor. With the autocomplete list or the search panel open, Esc
+    only closes that. Ctrl+M then Tab moves focus out of the editor.
+  - Esc or the close button closes settings, and focus goes back where it
+    was. Playback that was running is paused.
+  - Each of the four settings takes effect right away, carries over to the
+    next level, and survives a reload.
+  - Changing speed in the dropdown under the board shows up in settings, and
+    the other way round. The theme can be forced light or dark
+    whatever the system says, and set back to follow the system.
+
+### QA-007 · Selected text doesn't show on highlighted lines · Verified
+
+- **Verified** by the designer, 2026-09-26.
+- **Fixed** in `7366901` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+- **Area:** UI, code editor (bug)
+- **Observed:** Highlighting text on line 1 to copy and paste it doesn't
+  work. Line 1 had the yellow playback highlight (the step line) at the time
+  *(Designer, 2026-09-26)*.
+- **Reproduced (2026-09-26):** In a fresh editor, selecting on line 1 works.
+  It fails on any line the last run marked: the yellow step line, or the red
+  line for an error. After a run that ended with an error on line 1, dragging
+  across line 1 does select the text (copying would work), but no highlight
+  is drawn, so it looks like nothing happened.
+- **Cause:** CodeMirror draws the selection in a layer behind the text. The
+  step-line and error-line backgrounds (`--step-line` and `--error-line` in
+  `src/styles.css`, used by `.cm-step-line` and `.cm-error-line`) are solid
+  colors, so they paint over it. The cursor-line tint (`--active-line`) is
+  see-through, which is why unmarked lines are fine.
+- **Wanted:** Selected text is visibly highlighted on every line, marked or
+  not, and can be copied.
+- **Notes:**
+  - Fix: make `--step-line` and `--error-line` translucent (a color with
+    alpha) in both the light and dark blocks, close to how they look now.
+    The lesson snippets and the harness use the same editor setup and tokens,
+    so they're covered too.
+- **Open questions:** none. The designer's case (yellow line 1) matches the
+  cause above.
+- **Retest:**
+  - Step a run to step 1 so line 1 is yellow, then drag across line 1: the
+    selection is visible, and Ctrl+C then Ctrl+V pastes it.
+  - The same on a line marked red by an error.
+  - Both again in dark mode.
+
+---
+
+## Session 3 — 2026-09-26 · retesting round 1 (`m1-vertical-slice`)
+
+### QA-008 · Level 4: a wrong passphrase shows two messages · Verified
+
+- **Verified** by the designer, 2026-09-26.
+- **Fixed** in `5127e8b` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - Pointer wording: "The guard didn't accept what line N printed." It sits on its own line under the elderberries line, and points to the most recent wrong phrase said at that gate. The same applies in level 5.
+- **Area:** Gate mechanic (QA-002), so levels 4 and 5
+- **Observed:** A wrong passphrase printed next to the locked gate gets the
+  guard's hamster line, and the program carries on. When the pawn then walks
+  into the gate, the run stops with the elderberries error. One mistake shows
+  two messages. This is what QA-002 specified.
+- **Designer's question:** Thinking like a Python programmer, would the error
+  usually be caught at the wrong `print()`, or when the pawn tries to move
+  into the locked square?
+- **Answer:**
+  - **At the move.** `print()` can't fail because of *what* it prints. It
+    writes the text and returns. Nothing goes wrong until the program tries
+    something that can't be done, here walking into a locked square, and
+    that's the line the error points to.
+  - It's one of the most common patterns in real code: the mistake is on one
+    line, and the crash comes later on another. Working back from the crash
+    to the cause is a core debugging skill. In this level, the guard's reply
+    in the console is the clue that leads back to the `print()`.
+  - Stopping the run at the `print()` would teach something that isn't true
+    of Python. A wrong value stops a program on the spot only when it's
+    passed to something that checks it and raises an error (like `int("abc")`).
+    A later piece of the API could work like that (a method that takes the
+    phrase), but `print()` never does.
+  - The guard's reply isn't an error. It works like a warning or a log line:
+    the program notices, says so, and keeps going.
+- **Recommendation:** Keep the behavior. One wrinkle: the elderberries line
+  ends "Maybe try the passphrase first", which reads oddly when the player
+  *did* try, just with the wrong words. Option: when a wrong phrase was said
+  at that gate earlier in the run, the error card adds a line under the
+  elderberries text pointing back to it (e.g. "The guard didn't accept what
+  line N printed."). The elderberries line itself stays word for word.
+- **Decided** *(Designer, 2026-09-26)*:
+  1. **Keep both messages.** A wrong phrase gets the hamster line and the run
+     carries on. Walking into the locked gate stops the run with the
+     elderberries error, as QA-002 specifies.
+  2. **Add the pointer line.** When a wrong phrase was said at that gate
+     earlier in the run, the error adds a line under the elderberries text
+     pointing back to the line that printed it. The elderberries line stays
+     word for word. Walking in without having said anything shows the
+     elderberries line alone.
+- **Notes:**
+  - The guard event is already attached to the step of the `print()` that
+    caused it, so its line number is in the recording. The pointer can come
+    from the engine (add it to the friendly text when raising
+    `GateLockedError`, which keeps it in one place) rather than the UI working
+    it out.
+  - Tests: an engine case in `engine/tests/test_errors.py` or the gate tests
+    for "wrong phrase, then walk in" (pointer present) and "walk in without
+    saying anything" (no pointer).
+  - If more than one wrong phrase was said at the gate, point to the most
+    recent one.
+- **Open questions:** none.
+- **Retest:**
+  - Level 4: print a near miss next to the gate, then walk into it. The
+    console shows the hamster line, and the run stops with the elderberries
+    error plus a line naming the line that printed the near miss.
+  - Walk into the gate without printing anything: the elderberries error
+    alone, with no pointer line.
+  - Print the right phrase from too far away, then walk in: no pointer line,
+    since the guard never heard it.
+  - Level 5: the same with its gate.
+
+### QA-009 · Settings: code panel on the right, bottom or left · Verified (right, left) · bottom → QA-012
+
+- **Retest** *(Designer, 2026-09-26)*: right and left look good. Bottom is off by a fair margin; continued in QA-012.
+- **Fixed** in `3641cd8` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - Bottom: the code row takes about 40% of the window's height. The editor is on the left, with Variables above Console on the right.
+  - Windows 1180px wide or less ignore the setting and keep today's layout.
+- **Area:** UI, level screen layout + settings menu (feature request, builds
+  on QA-006)
+- **Observed:** A level is always three columns: Learn/Challenge on the left,
+  the board in the middle, and the code on the right (the `.level` grid in
+  `src/styles.css`). The only exception is below 1180px wide, where the code
+  already drops to a full-width row under the other two.
+- **Wanted** *(Designer, 2026-09-26)*:
+  1. A new setting in the menu moves the code panel: **right** (today's
+     layout, the default), **bottom** or **left**.
+  2. **Bottom:** the Learn/Challenge panel stays as it is, on the left.
+  3. **Left:** the Learn/Challenge panel swaps to the right side, so it's code
+     | board | Learn/Challenge.
+- **Decided** *(Designer, 2026-09-26)*:
+  4. **The whole code column moves:** the Run/Stop bar, editor, Variables and
+     Console, not just the editor.
+  5. **Bottom is full width,** under both the Learn panel and the board, like
+     today's narrow layout.
+- **Notes:**
+  - Settings: a new field in `Settings` (`src/settings.ts`, with `DEFAULTS`,
+    `sanitize` and `settings.test.ts`) and a new group in
+    `src/ui/settingsDialog.ts`.
+  - Do the layout in CSS only: a `data-` attribute on `<html>` set by
+    `applyToDocument` (the same pattern as theme and animations) that
+    switches the `.level` grid's `grid-template-areas`. Nothing gets rebuilt,
+    so switching while a level is open keeps the code, its undo history and
+    the playback position.
+  - Bottom already exists as the layout below 1180px, so it can reuse those
+    rules. With the code full width, the editor can sit on the left with
+    Variables and Console beside it instead of stacked under it.
+  - The Scratch Python drawer lives in the Learn/Challenge panel, so it moves
+    with it.
+  - Narrow screens: three columns don't fit below 1180px, which is why the
+    code goes to the bottom there today. **Right and left apply on wide
+    screens only, and narrower screens keep today's layouts** *(Designer,
+    2026-09-26)*.
+- **Open questions:** none.
+- **Retest:**
+  - Settings shows the new option, with right selected by default.
+  - Bottom: the whole code column (Run/Stop, editor, Variables, Console)
+    runs full width under both the Learn panel and the board, and
+    Learn/Challenge stays on the left.
+  - Left: code | board | Learn/Challenge, and Scratch Python moves with
+    Learn/Challenge.
+  - Switching layouts mid-level keeps the code, undo history and playback
+    position. The choice carries over to the next level and survives a
+    reload.
+
+### QA-010 · Learn panel in steps, with a next page · Verified
+
+- **Retest** *(Designer, 2026-09-26)*: okay. A design-pass idea is under Revisit later: make it more obvious that there are more steps.
+- **Fixed** in `9559bfd` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - A lesson with one snippet (level 5) has one step. It shows only "Start the challenge →", with no step count and no Back button.
+- **Area:** UI, Learn panel (feature request, goes with QA-009)
+- **Observed:** The whole lesson is one scrolling column in the Learn tab
+  (`src/ui/lesson.ts`), with "Start the challenge →" at the end.
+- **Wanted** *(Designer, 2026-09-26)*: the Learn panel is **chunked into
+  steps**, and past the page limit there's a **next page** instead of a
+  longer scroll. The lesson text itself stays the same.
+- **Decided** *(Designer, 2026-09-26)*:
+  1. **Every layout,** not only with the code at the bottom.
+  2. **One step per runnable snippet.** The lesson sets the page breaks, not
+     the panel's height. A step that's still too tall for the panel scrolls
+     inside it.
+- **Notes:**
+  - Each lesson is a heading and short paragraphs around 1–3 runnable
+    snippets (≤150 words, enforced by `test_levels.py`). Ending a step after
+    each snippet gives 2–3 pages per lesson with no changes to the lesson
+    files. Text after the last snippet joins the last step.
+  - Build every step once and show one at a time (`hidden`), so a snippet's
+    code, mini board and output survive flipping pages.
+  - Back and Next buttons with "Step 2 of 3" at the bottom of the panel. On
+    the last step, Next becomes "Start the challenge →". A level opens on
+    step 1. Going to the Challenge tab and back keeps the step you were on.
+  - The Challenge tab stays one page. It's short.
+- **Open questions:** none.
+- **Retest:**
+  - In each of the three layouts (QA-009), level 1's lesson shows step 1 of
+    N, with one step per runnable snippet. Next and Back move between steps,
+    and the last step ends with "Start the challenge →".
+  - Run a snippet, go to the next step and back: its code, board and output
+    are still there.
+  - Switch to Challenge and back: still on the same step.
+
+### QA-011 · Collapse the Learn/Challenge panel; the board grows · Reworked → QA-013
+
+- **Retest** *(Designer, 2026-09-26)*: not happy with it in any layout, and especially with the code at the bottom. Collapsing should make the board easier to see and work with, but it made it harder. Continued in QA-013.
+- **Fixed** in `a6689a7` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - The board lost its old 560px cap in every layout, so on big windows it's larger even with the panel open.
+  - **To check on retest:** in the Bottom layout, the playback controls and outcome sit *beside* the board, and the board already fills its row's height. Height is the limit there (the "whichever comes first" case), so collapsing widens the board's column but doesn't make the board itself bigger. With the code on the right or left, the board grows (e.g. 444 → 530 px in a 1400×860 window).
+- **Area:** UI, level screen layout (feature request, desktop only; goes
+  with QA-009)
+- **Observed:** The Learn/Challenge panel is always open, and the board has
+  a fixed cap: at most 560px wide and 60% of the window's height (`.board`
+  in `src/styles.css`). Extra room in its column goes unused.
+- **Wanted** *(Designer, 2026-09-26)*:
+  1. The Learn/Challenge panel can be **collapsed and expanded**.
+  2. The **board grows** into the room that frees up, and shrinks back when
+     the panel expands.
+  3. **Desktop only.** Mobile needs its own UI (see "Revisit later").
+- **Decided** *(Designer, 2026-09-26)*:
+  4. **Collapsed lasts for the level.** It stays as you left it while you're
+     on a level, including when switching tabs or layouts. Each new level
+     opens with the panel expanded, because every level starts with its
+     lesson. It isn't a saved setting.
+- **Is it possible?** Yes. The board is an SVG that scales cleanly to any
+  size. Swap the fixed caps for "fill the middle column, keep the board's
+  shape", and it grows and shrinks with whatever room the layout gives it.
+  Height is the real limit on laptop screens, since the board shares its
+  column with the playback controls and the outcome card, so it grows until
+  it runs out of height or width, whichever comes first. The same change
+  also helps QA-009's layouts.
+- **Notes:**
+  - Collapsed, the panel becomes a narrow strip with an expand button, not
+    nothing at all, so it's always clear how to get it back. The collapse
+    button sits in the panel's tab bar.
+  - It works in every QA-009 layout: the strip is on the left when the code
+    is on the right or at the bottom, and on the right when the code is on
+    the left.
+  - Hide the panel, don't rebuild it, so the lesson step (QA-010), snippet
+    runs and Scratch Python session survive collapsing. Scratch Python lives
+    in this panel, so it's out of sight while collapsed.
+  - The grid column shrinks to the strip's width, and the board's column
+    takes the rest. The resize follows the animations setting (instant when
+    reduced).
+  - Only the board needs to grow. The code column keeps its width.
+- **Open questions:** none.
+- **Retest:**
+  - Collapse the panel: it becomes a strip with an expand button, and the
+    board grows into the space. Expand it: the board shrinks back.
+  - Collapse it, then change the code-panel layout in Settings: it stays
+    collapsed. Go to the next level: it opens expanded.
+  - Collapse and expand keep the lesson step, snippet results and Scratch
+    Python history.
+  - Works with the code on the right, at the bottom and on the left.
+  - With reduced animations, the change is instant.
+
+### QA-012 · Bottom layout: controls and outcome too wide · Verified
+
+- **Verified** *(Designer, 2026-09-26)*: approved. The error/success card will change in the design pass (see Revisit later); fine for testing functionality now.
+- **Retest** *(Designer, 2026-09-26)*: the empty space to the right of the board stays for now; an idea for it is under Revisit later (design pass).
+- **Fixed** in `1b1f9b2` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - Beside the editor, from top to bottom: the playback bar (buttons, slider, step, speed on one line), then the outcome or error card (scrolls if it's long), then Variables and Console side by side.
+  - The board's row keeps an empty space on the right, the same width as the Learn panel, so the board is centred on the screen.
+- **Area:** UI, level layout (continues QA-009)
+- **Observed** *(Designer, 2026-09-26)*: with the code at the bottom, the
+  whole playback line (buttons, slider, speed) and the outcome/error card are
+  far too wide. They stretch across the board's row, beside the board.
+- **Wanted** *(Designer, 2026-09-26)*: preferably fit them into the area next
+  to the editor, where Variables and Console are. Otherwise, at least make
+  them narrower so the board is larger and more central.
+- **Decided:** the preferred option.
+  - In the Bottom layout, the playback bar and the outcome card move into
+    the code row, beside the editor, with Variables and Console.
+  - The board then has its row to itself, fills that row's height, and sits
+    in the middle of the screen (see QA-013).
+- **Notes:**
+  - The playback bar and outcome card are *moved* between the board panel
+    and the code row when the layout changes (not rebuilt), so the playback
+    position and the outcome survive a switch.
+  - Narrow windows (1180px and below) keep today's layout, as QA-009 decided.
+- **Retest:**
+  - Bottom: the playback buttons, slider and speed, and the outcome or error
+    card, sit beside the editor, together with Variables and Console. Nothing
+    of theirs is left in the board's row.
+  - The board fills the height of its row and is centred on the screen.
+  - Switch between Bottom and Right mid-run: the playback position and the
+    outcome card come along. Right and left are unchanged.
+
+### QA-013 · Collapsing the Learn panel: the board stays put · Verified
+
+- **Verified** *(Designer, 2026-09-26)*: approved.
+- **Retest** *(Designer, 2026-09-26)*: with the code on the left or right, the code area is now a little too narrow. Continued in QA-014.
+- **Fixed** in `1b1f9b2` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - The Learn and code panels are both 29% of the window width, kept between 340 and 440px. In a 1400px window, the code panel is now 406px wide (it was about 510) and the board is 514px.
+  - Collapsed, the panel becomes a strip at the outer edge of its column. The rest of that column is left empty, so nothing else moves.
+- **Area:** UI, level layout (reworks QA-011)
+- **Observed** *(Designer, 2026-09-26)*: collapsing made things worse in
+  every layout, and most of all with the code at the bottom. The board
+  shifted sideways, and the code area grew too, although it never needs to.
+- **Wanted** *(Designer, 2026-09-26)*: keep the board in the centre of the
+  screen in most cases, and don't have it shift. The code area doesn't need
+  to enlarge.
+- **The trade-off:** collapsing frees space on one side of the board only,
+  so the board can either stay put or grow into that space, not both.
+- **Decided** *(Designer, 2026-09-26, "Board stays put")*:
+  - The Learn and code panels have **equal fixed widths**, so the board sits
+    in the middle of the screen and is as large as the window allows.
+  - **Collapsing only hides the lesson.** The panel shrinks to its strip
+    against the outer edge, and nothing else moves or resizes.
+  - The code panel never enlarges.
+  - With the code at the bottom, the board is centred in its row (QA-012).
+- **Retest:**
+  - With the code on the right or left, the board is in the middle of the
+    screen. Collapse and expand the Learn panel: the board and the code
+    panel don't move or change size; only the lesson panel shrinks to its
+    strip and back.
+  - The same with the code at the bottom.
+  - Collapsed still lasts for the level, and still keeps the lesson step,
+    snippet results and Scratch Python (as in QA-011).
+  - With reduced animations, the change is instant.
+
+### QA-014 · Code panel a little too narrow on the left or right · Verified · wrapping → QA-015
+
+- **Verified** *(Designer, 2026-09-26)*: the width looks good. The panel should behave a little differently, though: long lines should wrap instead of running off the side. Continued in QA-015.
+- **Fixed** in `0d81b06` (2026-09-26); awaiting the designer's retest.
+- **Observed** *(Designer, 2026-09-26)*: after QA-013, the code area is a
+  little too narrow when it's on the left or right.
+- **Wanted** *(Designer, 2026-09-26)*: about 25% wider.
+- **Done:**
+  - With the code on the left or right, the code column is now 1.25× the
+    Learn column. In a 1400px window, it's 508px instead of 406px. Bottom is
+    unchanged.
+  - **Trade-off:** the board keeps QA-013's promise of never moving or
+    resizing when the Learn panel collapses, and it's centred in its own
+    column. But with a wider panel on one side, it now sits about 50px off
+    the exact screen centre (towards the Learn panel), and it's 413px in a
+    1400×860 window instead of 514px. Keeping it exactly centred would mean
+    widening the Learn panel too, which would shrink the board to about
+    340px. The Bottom layout keeps it exactly centred.
+- **Retest:**
+  - With the code on the right, and on the left, the editor has noticeably
+    more room. Collapsing the Learn panel still moves nothing else.
+  - Judge whether the board's size and position still feel right.
+
+### QA-015 · Wrap long lines in the code editor · Fixed
+
+- **Fixed** in `987abfa` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - A new setting, **Wrap long lines** (On or Off), is On by default.
+  - A **Wrap** button at the right end of the code toolbar switches the same setting. It's highlighted while wrapping is on.
+  - It applies to the level's code editor and the lesson examples. Scratch Python's input is a single line, so it's unchanged.
+  - **Added:** when a line wraps, its extra rows start two columns past the line's own indentation. Otherwise a wrapped line inside a loop would start at the left edge and look dedented, and in Python indentation means something. The line numbers also show which rows belong to one line: only the first row gets a number.
+- **Area:** UI, code editor + settings menu (continues QA-014)
+- **Observed** *(Designer, 2026-09-26)*: long lines of code run off the side
+  of the code panel.
+- **Wanted** *(Designer, 2026-09-26)*:
+  - Long lines wrap by default, so code doesn't continue off the screen.
+  - A text wrapping option in the Settings menu.
+  - A toggle on the code area to turn wrapping on or off.
+- **Decided:** one setting, with two ways to change it. The Settings menu and
+  the toggle in the code toolbar are two views of the same setting (like the
+  playback speed, QA-001), so they always agree. The choice carries over to
+  other levels and survives a reload.
+- **Retest:**
+  - Type a long line in a level's editor (a long comment will do). It wraps
+    onto more rows instead of running off the side, and there's no sideways
+    scrollbar.
+  - Indent a long line: its wrapped rows start a little to the right of the
+    line's own text, never at the left edge.
+  - Press **Wrap** above the editor: long lines run off the side again and
+    the button is no longer highlighted. Settings → Wrap long lines now says
+    Off. Switch it back On in Settings: the editor wraps again straight away,
+    and the button lights up.
+  - The lesson examples in the Learn panel follow the same setting.
+  - The choice carries over to other levels and survives a reload.
+  - Playback's line highlight and the error line still cover the whole
+    wrapped line.
+
+---
+
+## Queued work
+
+Planned tasks that aren't QA findings, in the order they should happen.
+
+### After the next QA pass: checks for redundant code *(Designer, 2026-09-26)* · Done
+
+- **Done** in `f86163d` (tools) and `3b7cbcd` (first `/simplify` sweep), 2026-09-26.
+  - `npm run check` now runs `npm run lint`:
+    - knip (TypeScript)
+    - ruff and vulture (Python; vulture catches unused functions)
+    - jscpd (copy-pasted blocks)
+    All pass. Config is in `knip.json`, `pyproject.toml` and `.jscpd.json`.
+  - The allowlist `scripts/vulture_allowlist.py` covers names used only from JavaScript, from player code, or through JSON. The glob-loaded engine files needed no allowlisting.
+  - Tool findings fixed:
+    - un-exported names used only in their own file
+    - one copy-pasted block (the e2e suites' shared helpers, now `scripts/e2e/helpers.mjs`)
+    - unused protocol parameters
+    - import order
+  - `/simplify` findings fixed:
+    - The Challenge panel's goal and rule wording now comes from the engine (`Level.describe()`).
+    - The watchdog's timeout isn't hard-coded in messages any more.
+    - Playback frames share one console log instead of copying it per step.
+    - A test-only method was removed.
+  - The four `/simplify` review agents stopped early at the account's session usage limit, so the same four angles (reuse, simplification, efficiency, altitude) were reviewed directly.
+  - Step 4 (`/simplify` at the end of every round) is in `CLAUDE.md`.
+
+- **When:** after the designer's next round of testing is logged and its
+  fixes (plus QA-008) are in. Do it before new features, so the first sweep
+  covers everything built so far.
+- **Why:** nothing checks for redundant code today. The TypeScript compiler
+  catches unused variables, parameters and imports (`noUnusedLocals`,
+  `noUnusedParameters` in `tsconfig.json`), but nothing covers the Python
+  engine, files or exports nobody uses, or copy-pasted logic.
+- **Steps:**
+  1. Add three development-only tools and run them in `npm run check`:
+     - `knip` (TypeScript): unused files, exports and dependencies.
+     - `ruff` (Python, via `requirements-dev.txt`): unused imports and
+       variables, and general tidiness. Add `vulture` too if unused functions
+       should be caught.
+     - `jscpd`: copy-pasted blocks across TypeScript and Python.
+
+     The engine itself stays free of third-party imports. These only run
+     during development.
+  2. Run them over the whole codebase once and fix what they find. Expect
+     false positives from code that's loaded by name rather than imported:
+     the engine files pulled in by `import.meta.glob` in `src/py/worker.ts`,
+     and the `bridge.py` functions the worker calls. Allowlist those in the
+     tools' config, don't delete them.
+  3. Run `/simplify` on that cleanup, for the things tools can't judge:
+     near-duplicate functions, code more general than it needs to be, or
+     something rebuilt where an existing helper would do.
+  4. From then on, run `/simplify` at the end of every round of fixes,
+     before committing.
+- **Done when:** `npm run check` runs all three tools and passes, and
+  `CLAUDE.md` lists them under Commands. Its line "No linter or formatter is
+  configured" gets updated too.
+
+---
+
+## Revisit later
+
+Deferred on purpose. Not bugs, but don't lose them.
+
+- **Game-wide visual design pass, after the vertical slice.** This covers
+  the whole game, not just Level 4 (whose old sign square is plain wall for
+  now, QA-002). *(Designer, 2026-09-26)* Until then, keep new visuals on the
+  seams that already exist so the pass is a reskin, not a rewrite:
+  - Colors go in the CSS custom properties in `src/styles.css`, with dark
+    mode. Never hard-code colors in TS.
+  - Each tile type gets its own draw function and CSS classes in
+    `src/ui/board.ts`. When the gate is added, turn the per-tile `if` chain
+    into a tile-type → draw-function table.
+  - Level files name tile types only, never colors or art.
+  - UI icons (playback buttons, the Settings button) are drawn from one
+    place, so the pass can swap them. (QA-005, QA-006)
+- **Autocomplete in later chapters:** whether to offer methods that are
+  unlocked but not typed yet, and whether to suggest in Learn-panel snippets
+  and starter code. Chapter 1 counts only what the player typed. (QA-003)
+- **Variable names in autocomplete:** revisit in Chapter 2 when variables
+  arrive. (QA-003)
+- **Guard art at the gate:** optional. (QA-002)
+- **Bottom layout, the empty space right of the board** (design pass). One idea: Variables move there, and Console takes the whole area under the playback slider beside the editor. *(Designer, 2026-09-26; QA-012)*
+- **The outcome/error card, reworked in the design pass.** It works for testing functionality now. *(Designer, 2026-09-26; QA-012)*
+- **Make it obvious a lesson has more steps** (design pass). For example, the Next button could name what's coming ("Step 2 →", "Step 3 →") instead of a plain "Next →". *(Designer, 2026-09-26; QA-010)*
+- **Mobile UI.** Phones need a different UI entirely, not a squeezed
+  desktop layout. Not in this milestone, and it may become a phase 2 build.
+  `DESIGN.md` §7 already lists mobile layout as out of scope for now.
+  Everything in QA-009 to QA-011 is desktop only. *(Designer, 2026-09-26)*
+- **Moving obstacles and a finish-line objective, for later levels.** Obstacles
+  that move on conditions. One example: an obstacle that moves each time a line
+  runs *for the first time*, so a loop body only triggers it on its first pass,
+  which rewards loops. That pairs naturally with a **finish line** objective
+  (pass through it) as an alternative to the **set target** (end the program on
+  the goal square). Early levels keep the set target. *(Designer, 2026-09-26)*
+  Engine note: events already carry the full world state (the piece, and from
+  QA-002 the opened gates), so moving obstacles would add their positions to
+  that state.

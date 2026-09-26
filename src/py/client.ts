@@ -30,7 +30,7 @@ export class PythonHungError extends Error {
 }
 
 /** The worker couldn't start, or crashed. */
-export class WorkerFailedError extends Error {
+class WorkerFailedError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "WorkerFailedError";
