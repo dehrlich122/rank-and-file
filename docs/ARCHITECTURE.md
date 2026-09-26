@@ -210,3 +210,7 @@ public/pyodide/    Pyodide runtime, copied from node_modules (not committed)
   consider splitting it.
 - Concepts not yet placed: `break`/`continue`, `in`, truthiness and `None`, nested
   loops, and `match` (a natural fit for tile types in Chapter 8 or 10).
+- Objectives: early levels use a **set target**, where the program must end on
+  the goal square (decided 2026-09-26). A **finish line** you pass through,
+  together with obstacles that move on conditions (e.g. when a line runs for
+  the first time), is planned for later levels. See `docs/QA.md` → Revisit later.
