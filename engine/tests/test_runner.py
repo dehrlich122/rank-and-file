@@ -2,7 +2,7 @@ import json
 import sys
 import time
 
-from conftest import make_level
+from conftest import basics, make_level
 from rankfile import bridge
 from rankfile.runner import run_level, run_sandbox, run_snippet
 
@@ -80,7 +80,7 @@ def test_solved(corridor):
     result = run_level(corridor, "pawn.move(3)")
     assert result.status == "solved"
     assert result.summary == "Solved! You reached the goal."
-    assert result.start == {"pos": [1, 0], "facing": "north", "opened": []}
+    assert basics(result.start) == {"pos": [1, 0], "facing": "north", "opened": []}
 
 
 def test_incomplete_says_where_the_pawn_stopped(corridor):
@@ -156,7 +156,7 @@ def test_error_step_is_the_last_step(corridor):
 def test_sandbox_runs_finish_without_objectives():
     result = run_sandbox("pawn.move()\npawn.turn_right()", ["move", "turn_right"])
     assert result.status == "finished"
-    assert result.final == {"pos": [2, 1], "facing": "east", "opened": []}
+    assert basics(result.final) == {"pos": [2, 1], "facing": "east", "opened": []}
 
 
 def test_sandbox_respects_the_api():
@@ -176,7 +176,7 @@ def test_bridge_speaks_json():
     assert described["ok"] and described["level"]["goal"] == [0, 1]
     assert json.loads(bridge.run_level(json.dumps(level), "pawn.move()"))["status"] == "solved"
     assert json.loads(bridge.run_sandbox("pawn.move()", '["move"]'))["status"] == "finished"
-    assert json.loads(bridge.load_sandbox('["move"]'))["start"] == {"pos": [2, 0], "facing": "north", "opened": []}
+    assert basics(json.loads(bridge.load_sandbox('["move"]'))["start"]) == {"pos": [2, 0], "facing": "north", "opened": []}
     assert json.loads(bridge.run_snippet("print(1)"))["output"] == "1\n"
 
     broken = json.loads(bridge.load_level(json.dumps({**level, "map": "G\n"})))

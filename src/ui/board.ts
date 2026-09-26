@@ -1,5 +1,5 @@
-// The board, drawn as SVG: squares, tiles (walls, signposts, gates), the goal
-// and the piece.
+// The board, drawn as SVG: squares, tiles (walls, signposts, gates, pits), the
+// goal and the piece.
 //
 // The board never decides anything. It draws the states the engine reported:
 // `show()` jumps straight to a state, `animate()` plays a step's events in order.
@@ -25,6 +25,7 @@ export class BoardView {
   private readonly body: SVGGElement; // shakes on a bump
   private readonly pointer: SVGGElement; // rotates to show the facing
   private readonly flash: SVGRectElement;
+  private readonly lostMark: SVGGElement; // where the run was lost (M3.1)
   private readonly gates = new Map<string, SVGGElement>(); // "x,y" -> gate art
   private angle = 0; // cumulative, so turns always take the short way round
   private timers: number[] = [];
@@ -81,6 +82,9 @@ export class BoardView {
     this.piece.append(this.body);
     this.element.append(this.piece);
 
+    this.lostMark = lostMark();
+    this.element.append(this.lostMark);
+
     this.show(level.start);
   }
 
@@ -132,6 +136,11 @@ export class BoardView {
     this.pointer.style.transform = `rotate(${this.angle}deg)`;
     const opened = new Set((state.opened ?? []).map(([x, y]) => `${x},${y}`));
     for (const [key, gate] of this.gates) gate.classList.toggle("open", opened.has(key));
+    this.element.classList.toggle("lost", Boolean(state.lost));
+    if (state.lost) {
+      const [lostLeft, lostTop] = corner(state.lost, this.level.height);
+      this.lostMark.setAttribute("transform", `translate(${lostLeft} ${lostTop})`);
+    }
   }
 
   private bump(from: Pos, at: Pos): void {
@@ -186,6 +195,7 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
   sign: (left, top, level, [x, y]) =>
     signpost(left, top, level.signs.find((sign) => sign.pos[0] === x && sign.pos[1] === y)?.text ?? ""),
   gate: (left, top) => gate(left, top),
+  pit: (left, top) => pit(left, top),
 };
 
 function wall(left: number, top: number): SVGGElement {
@@ -227,6 +237,28 @@ function gate(left: number, top: number): SVGGElement {
     svg("rect", { x: left + S / 2 - 9, y: top + S / 2 - 2, width: 18, height: 14, rx: 2.5, class: "gate-padlock" }),
   );
   group.append(title, svg("rect", { x: left + 2, y: top + 2, width: S - 4, height: S - 4, rx: 3, class: "gate-frame" }), bars, lock);
+  return group;
+}
+
+/** A pit (M3.1): stepping in loses the run. */
+function pit(left: number, top: number): SVGGElement {
+  const group = svg("g", { class: "pit" });
+  const title = svg("title", {});
+  title.textContent = "A pit. Step in and the run is lost.";
+  group.append(
+    title,
+    svg("ellipse", { cx: left + S / 2, cy: top + S / 2, rx: S * 0.42, ry: S * 0.38, class: "pit-rim" }),
+    svg("ellipse", { cx: left + S / 2, cy: top + S / 2 + 3, rx: S * 0.33, ry: S * 0.28, class: "pit-hole" }),
+  );
+  return group;
+}
+
+/** The ring that marks where a run was lost, moved onto that square (M3.1). */
+function lostMark(): SVGGElement {
+  const group = svg("g", { class: "lost-mark", "aria-hidden": "true" });
+  const cross = svg("text", { x: S - 10, y: 18, "text-anchor": "middle", class: "lost-cross" });
+  cross.textContent = "✗";
+  group.append(svg("rect", { x: 2, y: 2, width: S - 4, height: S - 4, rx: 6, class: "lost-ring" }), cross);
   return group;
 }
 

@@ -14,6 +14,7 @@ from .board import Board, Direction, Pos, Tile, square_name
 from .constraints import describe_rules
 from .pieces import PIECES
 from .words import count
+from .world import World
 
 
 class LevelError(ValueError):
@@ -144,7 +145,7 @@ class Level:
             "goal_spots": [list(spot) for spot in self.goal_spots],
             "case_title": self.case_words[0] if self.goal_spots or self.variants else "",
             # Gates appear in `tiles`; their passphrases are deliberately left out.
-            "start": {"pos": list(self.start), "facing": self.facing.value, "opened": []},
+            "start": World(self).state(),
             "objectives": asdict(self.objectives),
             "api": self.api,
             "constraints": asdict(self.constraints),

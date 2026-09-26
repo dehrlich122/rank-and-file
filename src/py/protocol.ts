@@ -22,13 +22,15 @@ export interface SnippetResult {
 
 export type Facing = "north" | "east" | "south" | "west";
 export type Pos = [number, number];
-export type TileKind = "floor" | "wall" | "sign" | "gate";
+export type TileKind = "floor" | "wall" | "sign" | "gate" | "pit";
 
-/** The world at one moment: where the piece is, and which gates are open. */
+/** The world at one moment: where the piece is, which gates are open, and the obstacles (M3.1). */
 export interface WorldState {
   pos: Pos;
   facing: Facing;
   opened: Pos[];
+  tick: number; // ticks of the action clock so far (moves, turns and waits)
+  lost: Pos | null; // where the run was lost: a pit, or where the piece was caught
 }
 
 /** A level as the engine describes it (levels.Level.describe). */
@@ -61,10 +63,10 @@ export interface LevelInfo {
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };
 
 export interface GameEvent {
-  kind: "move" | "turn" | "bump" | "gate_open" | "guard";
+  kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "lost";
   state: WorldState; // the whole world's state after the event
-  at?: Pos; // bump: the square bumped into; gate_open/guard: the gate
-  message?: string; // guard: what the guard said
+  at?: Pos; // bump: the square bumped into; gate_open/guard: the gate; lost: where
+  message?: string; // guard: what the guard said; lost: what happened
 }
 
 export interface Var {
@@ -87,7 +89,7 @@ interface LintWarning {
   message: string;
 }
 
-type LevelStatus = "solved" | "incomplete" | "finished" | "error" | "timeout" | "constraint";
+type LevelStatus = "solved" | "incomplete" | "finished" | "lost" | "error" | "timeout" | "constraint";
 
 /** One of a solved run's three stars (runner.Star). */
 export interface Star {

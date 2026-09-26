@@ -54,8 +54,9 @@ class Star:
 @dataclass
 class LevelResult:
     # "solved", "incomplete" (ran fine, objectives not met), "finished" (a board
-    # with no objectives, e.g. the sandbox), "error", "timeout", or "constraint"
-    # (the code breaks the level's rules, so it wasn't run).
+    # with no objectives, e.g. the sandbox), "lost" (fell into a pit or was
+    # caught), "error", "timeout", or "constraint" (the code breaks the level's
+    # rules, so it wasn't run).
     status: str
     summary: str  # one or two sentences for the player
     start: dict  # the piece's state before the run
@@ -170,7 +171,10 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
         "truncated": run.tracer.truncated,
     }
 
-    # 3. Decide how it went.
+    # 3. Decide how it went. A loss counts even if the player's code caught it.
+    if world.lost is not None:
+        info = replace(explain(world.lost), traceback="")  # the game ended it, not Python
+        return outcome("lost", info.friendly, error=info, **recording)
     if run.error is not None:
         info = explain(run.error, namespace)
         status = "timeout" if isinstance(run.error, StepBudgetExceeded) else "error"

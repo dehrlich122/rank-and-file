@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from conftest import make_level
+from conftest import basics, make_level
 from rankfile.runner import run_level
 from rankfile.world import GUARD_GATE_LOCKED, GUARD_WRONG_PHRASE
 
@@ -29,7 +29,7 @@ def test_the_passphrase_from_next_to_the_gate_opens_it(gated):
     assert result.status == "solved"
     assert result.final["opened"] == [[1, 2]]
     opened = events(result, "gate_open")
-    assert opened == [{"kind": "gate_open", "state": {"pos": [1, 1], "facing": "north", "opened": [[1, 2]]}, "at": [1, 2]}]
+    assert [(event["at"], basics(event["state"])) for event in opened] == [([1, 2], {"pos": [1, 1], "facing": "north", "opened": [[1, 2]]})]
     assert result.steps[1]["events"] == opened  # attached to the line that printed it
 
 

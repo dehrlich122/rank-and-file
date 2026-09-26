@@ -54,6 +54,7 @@ class Tile(Enum):
     WALL = "wall"
     SIGN = "sign"  # a signpost: blocks movement and holds some text
     GATE = "gate"  # locked until its passphrase is said next to it (see World.hear)
+    PIT = "pit"  # stepping in loses the run (M3.1)
 
     @property
     def blocks(self) -> bool:

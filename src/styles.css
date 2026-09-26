@@ -51,6 +51,8 @@
   --gate-frame: light-dark(#c9b48e, #8a7658);
   --gate-bars: light-dark(#3f3a36, #211d1a);
   --gate-lock: light-dark(#c8961a, #e0b04a);
+  --pit-rim: light-dark(#5b4a3b, #3a2f26);
+  --pit-hole: light-dark(#1d1712, #0c0907);
   --game-message: light-dark(#8a4b00, #e6b555);
   --star: light-dark(#c8961a, #e0b04a);
 }
@@ -1195,6 +1197,39 @@ pre {
   25% {
     fill: var(--bad);
   }
+}
+
+/* obstacles (M3.1, src/ui/board.ts) */
+.pit-rim {
+  fill: var(--pit-rim);
+}
+
+.pit-hole {
+  fill: var(--pit-hole);
+}
+
+.lost-mark {
+  display: none;
+  pointer-events: none;
+}
+
+.board.lost .lost-mark {
+  display: inline;
+}
+
+.lost-ring {
+  fill: none;
+  stroke: var(--bad);
+  stroke-width: 4;
+}
+
+.lost-cross {
+  font: 700 18px var(--font-ui);
+  fill: var(--bad);
+}
+
+.board.lost .pawn {
+  opacity: 0.45;
 }
 
 .bump-flash {

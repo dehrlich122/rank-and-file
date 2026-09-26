@@ -75,6 +75,7 @@ const TONE: Record<LevelResult["status"], string> = {
   finished: "good",
   incomplete: "warn",
   constraint: "warn",
+  lost: "bad",
   error: "bad",
   timeout: "bad",
 };
@@ -84,6 +85,7 @@ const HEADLINE: Record<LevelResult["status"], string> = {
   finished: "Finished",
   incomplete: "Not there yet",
   constraint: "Check the rules",
+  lost: "Lost",
   error: "Python stopped",
   timeout: "Endless loop",
 };

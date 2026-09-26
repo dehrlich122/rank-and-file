@@ -1,6 +1,6 @@
 import pytest
 
-from conftest import make_level
+from conftest import basics, make_level
 from rankfile.board import Direction, Tile, square_name, step
 from rankfile.levels import LevelError, parse_level, sandbox_level
 
@@ -39,7 +39,7 @@ def test_describe_is_ready_for_the_ui():
     level = make_level("S G\nP .\n", legend={"S": {"tile": "sign", "text": "hi"}}, start={"facing": "east"})
     described = level.describe()
     assert described["tiles"] == [["floor", "floor"], ["sign", "floor"]]  # tiles[y][x]
-    assert described["start"] == {"pos": [0, 0], "facing": "east", "opened": []}
+    assert basics(described["start"]) == {"pos": [0, 0], "facing": "east", "opened": []}
     assert described["goal"] == [1, 1]
     assert described["signs"] == [{"pos": [0, 1], "text": "hi"}]
     assert described["hints"] == []

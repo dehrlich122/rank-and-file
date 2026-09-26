@@ -40,8 +40,21 @@ class CantChangePieceError(GameError, AttributeError):
     """Player code tried to set an attribute on a piece, e.g. pawn.position = (0, 7)."""
 
 
+class Lost(BaseException):
+    """The run is over and lost: the piece fell into a pit or was caught (M3.1).
+
+    Like the line budget's StepBudgetExceeded, it derives from BaseException, so
+    a player's `except Exception:` can't swallow it. The World also remembers
+    the loss (`World.lost`), so even a bare `except:` can't undo it.
+    """
+
+    def __init__(self, message: str, at: tuple[int, int]):
+        super().__init__(message)
+        self.at = at
+
+
 # Tracebacks name an exception by its module, e.g. `rankfile.exceptions.BlockedError`.
 # Claiming the builtins module makes them read like Python's own errors
 # (`BlockedError: ...`), without the engine's internals in the way.
-for _error in (GameError, BlockedError, GateLockedError, LockedAbilityError, GameArgumentError, CantChangePieceError):
+for _error in (GameError, BlockedError, GateLockedError, LockedAbilityError, GameArgumentError, CantChangePieceError, Lost):
     _error.__module__ = "builtins"

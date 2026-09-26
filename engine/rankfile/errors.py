@@ -16,7 +16,7 @@ import re
 import traceback
 from dataclasses import dataclass
 
-from .exceptions import GameError
+from .exceptions import GameError, Lost
 from .pieces import Piece
 from .tracer import PLAYER_FILENAME, StepBudgetExceeded
 from .words import count
@@ -45,8 +45,8 @@ def explain(exc: BaseException, namespace: dict | None = None) -> ErrorInfo:
 
 
 def friendly_message(exc: BaseException, namespace: dict) -> str:
-    if isinstance(exc, GameError):
-        return str(exc)  # game errors are written for the player already
+    if isinstance(exc, (GameError, Lost)):
+        return str(exc)  # the game's own messages are written for the player already
     if isinstance(exc, StepBudgetExceeded):
         return (
             f"Your program never finished. It ran more than {exc.budget:,} lines, "
