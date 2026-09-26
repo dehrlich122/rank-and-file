@@ -108,9 +108,22 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   slider.addEventListener("input", () => player?.seek(Number(slider.value)));
   // The dropdown and the Settings menu are two views of one setting (QA-001, QA-006).
   speed.addEventListener("change", () => settings.set({ speed: Number(speed.value) }));
+  // So are the Wrap button above the editor and Wrap long lines (QA-015).
+  const wrapToggle = h(
+    "button",
+    {
+      class: "btn btn-small btn-toggle",
+      title: "Wrap long lines",
+      "aria-pressed": String(settings.get().wrapLines),
+      onClick: () => settings.set({ wrapLines: !settings.get().wrapLines }),
+    },
+    icon("wrap"),
+    "Wrap",
+  );
   const stopFollowingSettings = settings.subscribe((next) => {
     speed.value = String(next.speed);
     player?.setSpeed(next.speed);
+    wrapToggle.setAttribute("aria-pressed", String(next.wrapLines));
     placePlayback();
   });
   // Opening Settings pauses playback, like a game's pause menu.
@@ -170,7 +183,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       h(
         "section",
         { class: "panel level-right" },
-        h("div", { class: "toolbar" }, runButton, stopButton, h("span", { class: "muted small toolbar-hint" }, "Ctrl+Enter runs")),
+        h("div", { class: "toolbar" }, runButton, stopButton, h("span", { class: "muted small toolbar-hint" }, "Ctrl+Enter runs"), wrapToggle),
         editorHost,
         codeInfo,
       ),

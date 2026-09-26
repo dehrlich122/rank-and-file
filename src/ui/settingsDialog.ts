@@ -11,7 +11,7 @@ interface Choice<T> {
   label: string;
 }
 
-const GROUPS: Array<{ key: keyof Settings; title: string; hint?: string; choices: Choice<string | number>[] }> = [
+const GROUPS: Array<{ key: keyof Settings; title: string; hint?: string; choices: Choice<string | number | boolean>[] }> = [
   {
     key: "speed",
     title: "Playback speed",
@@ -44,6 +44,15 @@ const GROUPS: Array<{ key: keyof Settings; title: string; hint?: string; choices
       value: size,
       label: { small: "Small", medium: "Medium", large: "Large", "x-large": "Extra large" }[size],
     })),
+  },
+  {
+    key: "wrapLines",
+    title: "Wrap long lines",
+    hint: "In the code editor and lesson examples. The Wrap button above the editor switches it too.",
+    choices: [
+      { value: true, label: "On" },
+      { value: false, label: "Off" },
+    ],
   },
   {
     key: "motion",
@@ -80,7 +89,7 @@ export class SettingsDialog {
               "data-key": group.key,
             });
             input.addEventListener("change", () => {
-              if (input.checked) this.store.set({ [group.key]: typeof choice.value === "number" ? choice.value : input.value });
+              if (input.checked) this.store.set({ [group.key]: choice.value });
             });
             this.inputs.push(input);
             return h("label", { class: "choice" }, input, h("span", {}, choice.label));

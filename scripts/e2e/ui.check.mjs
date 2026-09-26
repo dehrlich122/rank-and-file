@@ -358,6 +358,77 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     expect(normal.includes("width") && reduced === "none", `normal: ${normal} · reduced: ${reduced}`);
   });
 
+  // -- QA-015: wrap long lines ------------------------------------------------------------
+  // A long comment line then a short one; only layout facts come back, never the code.
+  const longLines = `# ${"wrap ".repeat(60)}\n# two`;
+  const wrapState = (scope = ".level-right") =>
+    b.evaluate(`(() => {
+      const editor = document.querySelector('${scope} .cm-editor');
+      const scroller = editor.querySelector('.cm-scroller');
+      const lines = [...editor.querySelectorAll('.cm-line')];
+      const number2 = [...editor.querySelectorAll('.cm-lineNumbers .cm-gutterElement')].find((e) => e.textContent === '2');
+      return {
+        wrapping: editor.querySelector('.cm-content').classList.contains('cm-lineWrapping'),
+        overflows: scroller.scrollWidth > scroller.clientWidth + 1,
+        rows: Math.round(lines[0].getBoundingClientRect().height / parseFloat(getComputedStyle(lines[0]).lineHeight)),
+        numberAligned: number2 ? Math.abs(number2.getBoundingClientRect().top - lines[1].getBoundingClientRect().top) < 2 : null,
+        button: document.querySelector('.level-right .btn-toggle')?.getAttribute('aria-pressed'),
+        menu: document.querySelector('input[name="setting-wrapLines"]:checked')?.value,
+      };
+    })()`);
+
+  await check("QA-015: long lines wrap by default; the Wrap button and Settings both say On", async () => {
+    await b.evaluate(`localStorage.clear()`);
+    await openLevel("ch01-l01", { fresh: true });
+    await setCode(longLines);
+    const s = await wrapState();
+    expect(s.wrapping && !s.overflows && s.rows > 1 && s.numberAligned && s.button === "true" && s.menu === "true", JSON.stringify(s));
+    return `first line on ${s.rows} rows, line 2's number beside line 2`;
+  });
+
+  await check("QA-015: a wrapped line's extra rows start past its indentation, so they never look dedented", async () => {
+    await setCode(`    # ${"wrap ".repeat(60)}`);
+    const r = await b.evaluate(`(() => {
+      const line = document.querySelector('.level-right .cm-line');
+      const range = document.createRange();
+      range.selectNodeContents(line);
+      const rects = [...range.getClientRects()].filter((rect) => rect.width > 0);
+      const top = Math.min(...rects.map((rect) => rect.top));
+      const lineLeft = line.getBoundingClientRect().left;
+      return {
+        firstRow: Math.round(Math.min(...rects.filter((rect) => rect.top < top + 2).map((rect) => rect.left)) - lineLeft),
+        text: Math.round(line.querySelector('span').getBoundingClientRect().left - lineLeft),
+        laterRows: Math.round(Math.min(...rects.filter((rect) => rect.top >= top + 2).map((rect) => rect.left)) - lineLeft),
+      };
+    })()`);
+    expect(r.firstRow === 6 && r.laterRows > r.text + 8, JSON.stringify(r));
+    return `first row at ${r.firstRow}px, text at ${r.text}px, wrapped rows at ${r.laterRows}px`;
+  });
+
+  await check("QA-015: the Wrap button and the Settings menu switch the same setting, straight away", async () => {
+    await setCode(longLines);
+    await b.evaluate(`document.querySelector('.level-right .btn-toggle').click()`);
+    const off = await wrapState();
+    const lessonOff = await wrapState(".level-left");
+    await choose("wrapLines", "true");
+    const on = await wrapState();
+    const lessonOn = await wrapState(".level-left");
+    expect(!off.wrapping && off.overflows && off.rows === 1 && off.button === "false" && off.menu === "false", `off: ${JSON.stringify(off)}`);
+    expect(on.wrapping && !on.overflows && on.rows > 1 && on.numberAligned && on.button === "true", `on: ${JSON.stringify(on)}`);
+    expect(!lessonOff.wrapping && lessonOn.wrapping, "the lesson's example editor should follow the setting too");
+  });
+
+  await check("QA-015: the choice carries over to the next level and survives a reload", async () => {
+    await choose("wrapLines", "false");
+    await openLevel("ch01-l02");
+    const nextLevel = await wrapState();
+    await openLevel("ch01-l03", { fresh: true });
+    const afterReload = await wrapState();
+    await choose("wrapLines", "true");
+    const off = (s) => !s.wrapping && s.button === "false" && s.menu === "false";
+    expect(off(nextLevel) && off(afterReload), JSON.stringify({ nextLevel, afterReload }));
+  });
+
   // -- QA-005: playback buttons -----------------------------------------------------------
   const buttons = () =>
     b.evaluate(`[...document.querySelectorAll('${BUTTONS}')].map((e) => ({ title: e.title, disabled: e.disabled, icon: !!e.querySelector('svg'), text: e.textContent.trim() }))`);

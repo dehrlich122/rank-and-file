@@ -56,6 +56,13 @@ describe("SettingsStore", () => {
     expect(sanitize({ codePanel: "top" }).codePanel).toBe("right");
   });
 
+  it("wraps long lines by default; off is kept, and anything but a boolean is rejected", () => {
+    const storage = memoryStorage();
+    new SettingsStore(storage).set({ wrapLines: false });
+    expect(new SettingsStore(storage).get().wrapLines).toBe(false);
+    expect(sanitize({ wrapLines: "false" }).wrapLines).toBe(true);
+  });
+
   it("puts the layout, theme and animation choices on the page as data attributes", () => {
     const root = { dataset: {} as Record<string, string>, style: { setProperty: () => {} } };
     applyToDocument({ ...DEFAULTS, codePanel: "bottom", theme: "dark" }, root as unknown as HTMLElement);

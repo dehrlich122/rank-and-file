@@ -173,10 +173,15 @@ Constraints are checked with `ast`/`tokenize`, never with string matching.
   `src/ui/icons.ts` (inline SVG). A visual design pass is planned, so keep new
   visuals on these seams (tokens, icons, the tile → draw-function table in
   `board.ts`).
-- Settings (speed, theme, code size, animations) live in `src/settings.ts`, one
-  store with `get`/`set`/`subscribe` saved to localStorage. Screens read it
-  on creation and subscribe to changes. The menu is `ui/settingsDialog.ts`.
-  Esc opens it unless CodeMirror used that Esc (`defaultPrevented`).
+- Settings (speed, theme, code size, animations, code panel, wrap long lines)
+  live in `src/settings.ts`, one store with `get`/`set`/`subscribe` saved to
+  localStorage. Screens read it on creation and subscribe to changes. The menu
+  is `ui/settingsDialog.ts`. Esc opens it unless CodeMirror used that Esc
+  (`defaultPrevented`).
+  - Some settings also have a control on the level screen: the speed dropdown
+    and the Wrap button. Both are just other views of the same setting.
+  - Code editors follow Wrap long lines themselves (`followWrapSetting` in
+    `editor.ts`), and stop listening when they're destroyed.
 - Editors don't use `basicSetup`: `editor.ts` assembles the same extensions
   minus CodeMirror's autocompletion. Autocomplete is `ui/completion.ts`
   (QA-003). It offers only calls the player typed that are also real (level

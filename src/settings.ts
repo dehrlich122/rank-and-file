@@ -14,11 +14,12 @@ export interface Settings {
   codeSize: CodeSize;
   motion: Motion; // animations
   codePanel: CodePanel; // where a level's code column sits (wide screens only)
+  wrapLines: boolean; // long lines of code wrap instead of running off the side
 }
 
 export const SPEEDS = [0.5, 1, 2, 4] as const;
 export const CODE_SIZES: Record<CodeSize, number> = { small: 13, medium: 15, large: 17, "x-large": 20 };
-export const DEFAULTS: Settings = { speed: 1, theme: "system", codeSize: "medium", motion: "system", codePanel: "right" };
+export const DEFAULTS: Settings = { speed: 1, theme: "system", codeSize: "medium", motion: "system", codePanel: "right", wrapLines: true };
 
 const STORAGE_KEY = "rank-and-file:settings";
 const THEMES: readonly Theme[] = ["system", "light", "dark"];
@@ -83,6 +84,7 @@ export function sanitize(raw: unknown): Settings {
     codeSize: pick(input.codeSize, Object.keys(CODE_SIZES) as CodeSize[], DEFAULTS.codeSize),
     motion: pick(input.motion, MOTIONS, DEFAULTS.motion),
     codePanel: pick(input.codePanel, CODE_PANELS, DEFAULTS.codePanel),
+    wrapLines: pick(input.wrapLines, [true, false], DEFAULTS.wrapLines),
   };
 }
 

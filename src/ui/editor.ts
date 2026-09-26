@@ -9,13 +9,14 @@ import {
   foldGutter,
   foldKeymap,
   HighlightStyle,
+  IndentContext,
   indentOnInput,
   indentUnit,
   syntaxHighlighting,
 } from "@codemirror/language";
 import { lintGutter, lintKeymap, setDiagnostics, type Diagnostic } from "@codemirror/lint";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
-import { EditorState, Prec, StateEffect, StateField, type Extension } from "@codemirror/state";
+import { Compartment, EditorState, Prec, RangeSetBuilder, StateEffect, StateField, type Extension } from "@codemirror/state";
 import {
   crosshairCursor,
   Decoration,
@@ -29,9 +30,12 @@ import {
   lineNumbers,
   placeholder,
   rectangularSelection,
+  ViewPlugin,
   type DecorationSet,
+  type ViewUpdate,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
+import { settings } from "../settings";
 
 /**
  * CodeMirror's usual "basic setup", minus its autocompletion: the game offers
@@ -88,6 +92,7 @@ export function createEditor(options: EditorOptions): EditorView {
       ]),
     ),
     lineMarks,
+    followWrapSetting(),
     EditorView.updateListener.of((update) => {
       if (update.docChanged) options.onChange?.(update.state.doc.toString());
     }),
@@ -209,6 +214,62 @@ export function clearMarks(view: EditorView): void {
   setActiveLine(view, null);
   setErrorLine(view, null);
   setMarks(view, []);
+}
+
+// -- wrapping long lines (QA-015) ------------------------------------------------
+
+/**
+ * A wrapped line's extra rows start two columns past the line's own
+ * indentation. Starting at the left edge, they'd look dedented, and in Python
+ * indentation means something.
+ */
+const hangingIndent = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = indentRows(view);
+    }
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged) this.decorations = indentRows(update.view);
+    }
+  },
+  { decorations: (plugin) => plugin.decorations },
+);
+
+function indentRows(view: EditorView): DecorationSet {
+  const { doc } = view.state;
+  const indent = new IndentContext(view.state);
+  const builder = new RangeSetBuilder<Decoration>();
+  const last = doc.lineAt(view.viewport.to).number;
+  for (let n = doc.lineAt(view.viewport.from).number; n <= last; n++) {
+    const line = doc.line(n);
+    // Empty lines never wrap; leaving them alone keeps the placeholder text in place.
+    if (!line.length) continue;
+    const hang = `--hang: ${indent.lineIndent(line.from) + 2}ch`;
+    builder.add(line.from, line.from, Decoration.line({ class: "cm-hang", attributes: { style: hang } }));
+  }
+  return builder.finish();
+}
+
+const wrapped: Extension = [
+  EditorView.lineWrapping,
+  hangingIndent,
+  // The first row keeps CodeMirror's usual 6px; the rows after it start --hang further in.
+  EditorView.theme({ ".cm-line.cm-hang": { paddingLeft: "calc(6px + var(--hang))", textIndent: "calc(-1 * var(--hang))" } }),
+];
+
+const wrapping = new Compartment();
+
+/** Keeps an editor's wrapping in step with the setting; stops listening when the editor is destroyed. */
+const followSetting = ViewPlugin.define((view) => ({
+  destroy: settings.subscribe(({ wrapLines }) => {
+    if ((wrapping.get(view.state) === wrapped) !== wrapLines) view.dispatch({ effects: wrapping.reconfigure(wrapLines ? wrapped : []) });
+  }),
+}));
+
+/** Wrap long lines when the Wrap long lines setting is on, and follow it when it changes. */
+function followWrapSetting(): Extension {
+  return [wrapping.of(settings.get().wrapLines ? wrapped : []), followSetting];
 }
 
 // -- line decorations -----------------------------------------------------------

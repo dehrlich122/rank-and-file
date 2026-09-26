@@ -677,8 +677,9 @@ mechanic, never by solution code.
   - Works with the code on the right, at the bottom and on the left.
   - With reduced animations, the change is instant.
 
-### QA-012 · Bottom layout: controls and outcome too wide · Fixed
+### QA-012 · Bottom layout: controls and outcome too wide · Verified
 
+- **Verified** *(Designer, 2026-09-26)*: approved. The error/success card will change in the design pass (see Revisit later); fine for testing functionality now.
 - **Retest** *(Designer, 2026-09-26)*: the empty space to the right of the board stays for now; an idea for it is under Revisit later (design pass).
 - **Fixed** in `1b1f9b2` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - Beside the editor, from top to bottom: the playback bar (buttons, slider, step, speed on one line), then the outcome or error card (scrolls if it's long), then Variables and Console side by side.
@@ -708,8 +709,9 @@ mechanic, never by solution code.
   - Switch between Bottom and Right mid-run: the playback position and the
     outcome card come along. Right and left are unchanged.
 
-### QA-013 · Collapsing the Learn panel: the board stays put · Fixed
+### QA-013 · Collapsing the Learn panel: the board stays put · Verified
 
+- **Verified** *(Designer, 2026-09-26)*: approved.
 - **Retest** *(Designer, 2026-09-26)*: with the code on the left or right, the code area is now a little too narrow. Continued in QA-014.
 - **Fixed** in `1b1f9b2` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - The Learn and code panels are both 29% of the window width, kept between 340 and 440px. In a 1400px window, the code panel is now 406px wide (it was about 510) and the board is 514px.
@@ -740,8 +742,9 @@ mechanic, never by solution code.
     snippet results and Scratch Python (as in QA-011).
   - With reduced animations, the change is instant.
 
-### QA-014 · Code panel a little too narrow on the left or right · Fixed
+### QA-014 · Code panel a little too narrow on the left or right · Verified · wrapping → QA-015
 
+- **Verified** *(Designer, 2026-09-26)*: the width looks good. The panel should behave a little differently, though: long lines should wrap instead of running off the side. Continued in QA-015.
 - **Fixed** in `0d81b06` (2026-09-26); awaiting the designer's retest.
 - **Observed** *(Designer, 2026-09-26)*: after QA-013, the code area is a
   little too narrow when it's on the left or right.
@@ -761,6 +764,39 @@ mechanic, never by solution code.
   - With the code on the right, and on the left, the editor has noticeably
     more room. Collapsing the Learn panel still moves nothing else.
   - Judge whether the board's size and position still feel right.
+
+### QA-015 · Wrap long lines in the code editor · Fixed
+
+- **Fixed** in `<commit>` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - A new setting, **Wrap long lines** (On or Off), is On by default.
+  - A **Wrap** button at the right end of the code toolbar switches the same setting. It's highlighted while wrapping is on.
+  - It applies to the level's code editor and the lesson examples. Scratch Python's input is a single line, so it's unchanged.
+  - **Added:** when a line wraps, its extra rows start two columns past the line's own indentation. Otherwise a wrapped line inside a loop would start at the left edge and look dedented, and in Python indentation means something. The line numbers also show which rows belong to one line: only the first row gets a number.
+- **Area:** UI, code editor + settings menu (continues QA-014)
+- **Observed** *(Designer, 2026-09-26)*: long lines of code run off the side
+  of the code panel.
+- **Wanted** *(Designer, 2026-09-26)*:
+  - Long lines wrap by default, so code doesn't continue off the screen.
+  - A text wrapping option in the Settings menu.
+  - A toggle on the code area to turn wrapping on or off.
+- **Decided:** one setting, with two ways to change it. The Settings menu and
+  the toggle in the code toolbar are two views of the same setting (like the
+  playback speed, QA-001), so they always agree. The choice carries over to
+  other levels and survives a reload.
+- **Retest:**
+  - Type a long line in a level's editor (a long comment will do). It wraps
+    onto more rows instead of running off the side, and there's no sideways
+    scrollbar.
+  - Indent a long line: its wrapped rows start a little to the right of the
+    line's own text, never at the left edge.
+  - Press **Wrap** above the editor: long lines run off the side again and
+    the button is no longer highlighted. Settings → Wrap long lines now says
+    Off. Switch it back On in Settings: the editor wraps again straight away,
+    and the button lights up.
+  - The lesson examples in the Learn panel follow the same setting.
+  - The choice carries over to other levels and survives a reload.
+  - Playback's line highlight and the error line still cover the whole
+    wrapped line.
 
 ---
 
@@ -846,6 +882,7 @@ Deferred on purpose. Not bugs, but don't lose them.
   arrive. (QA-003)
 - **Guard art at the gate:** optional. (QA-002)
 - **Bottom layout, the empty space right of the board** (design pass). One idea: Variables move there, and Console takes the whole area under the playback slider beside the editor. *(Designer, 2026-09-26; QA-012)*
+- **The outcome/error card, reworked in the design pass.** It works for testing functionality now. *(Designer, 2026-09-26; QA-012)*
 - **Make it obvious a lesson has more steps** (design pass). For example, the Next button could name what's coming ("Step 2 →", "Step 3 →") instead of a plain "Next →". *(Designer, 2026-09-26; QA-010)*
 - **Mobile UI.** Phones need a different UI entirely, not a squeezed
   desktop layout. Not in this milestone, and it may become a phase 2 build.

@@ -169,6 +169,12 @@ pre {
   justify-content: center;
 }
 
+/* an on/off button (aria-pressed), e.g. Wrap above the editor */
+.btn-toggle[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ---- app shell ---- */
 
 .app {
