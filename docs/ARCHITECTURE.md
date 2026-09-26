@@ -267,11 +267,15 @@ public/pyodide/    Pyodide runtime, copied from node_modules (not committed)
 
 - Movement API for knight, bishop, rook and queen (e.g. `knight.jump(...)`?), and
   whether promoted pieces keep pawn abilities. Decide before M5.
-- Chapter 4 covers booleans, comparisons, `if/elif/else` and `while` at once;
-  consider splitting it.
-- Concepts not yet placed: `break`/`continue`, `in`, truthiness and `None`, nested
-  loops, and `match` (a natural fit for tile types in Chapter 8 or 10).
-- Objectives: early levels use a **set target**, where the program must end on
-  the goal square (decided 2026-09-26). A **finish line** you pass through,
-  together with obstacles that move on conditions (e.g. when a line runs for
-  the first time), is planned for later levels. See `docs/QA.md` → Revisit later.
+- `match` isn't placed yet. It's a natural fit for tile types, in Chapter 9
+  or 11 (the brief's Chapters 8 and 10, which move up by one after the split
+  below).
+- Settled for M3 in `docs/M3.md`:
+  - Chapter 4 is split in two (conditions, then `while`), so every later
+    chapter moves up by one.
+  - Where `break`/`continue`, `in`, truthiness and `None` and nested loops
+    go.
+  - The obstacle toolkit: a clock set per obstacle, patrols, chasers, pits,
+    waypoints, a "lost" outcome, and enemy chess pieces from Chapter 4.
+  - Early levels still use a **set target** (end the program on the goal
+    square). Waypoints are the pass-through squares.
