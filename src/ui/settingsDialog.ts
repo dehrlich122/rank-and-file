@@ -27,6 +27,16 @@ const GROUPS: Array<{ key: keyof Settings; title: string; hint?: string; choices
     ],
   },
   {
+    key: "codePanel",
+    title: "Code panel",
+    hint: "Where the code, Variables and Console sit on a level. Narrow windows always put it at the bottom.",
+    choices: [
+      { value: "right", label: "Right" },
+      { value: "bottom", label: "Bottom" },
+      { value: "left", label: "Left" },
+    ],
+  },
+  {
     key: "codeSize",
     title: "Code text size",
     hint: "The editor, lesson examples, console and scratch Python.",

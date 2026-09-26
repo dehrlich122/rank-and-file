@@ -338,13 +338,81 @@ pre {
 
 /* ---- level screen ---- */
 
+/* A level is a grid of three areas: "learn" (the Learn/Challenge panel), "board"
+   and "code" (Run/Stop, editor, Variables, Console). The Code panel setting
+   (data-code-panel on <html>, QA-009) rearranges them on wide screens; narrow
+   windows always put the code underneath (see the end of this file). Only the
+   grid changes, so switching layouts never rebuilds anything. */
 .level {
+  --learn-col: minmax(300px, 380px);
   display: grid;
-  grid-template-columns: minmax(300px, 380px) minmax(320px, 1fr) minmax(360px, 1.1fr);
+  grid-template-columns: var(--learn-col) minmax(320px, 1fr) minmax(360px, 1.1fr);
+  grid-template-areas: "learn board code";
   gap: 12px;
   padding: 12px;
   height: 100%;
   min-height: 620px;
+}
+
+.level-left {
+  grid-area: learn;
+}
+
+.level-middle {
+  grid-area: board;
+}
+
+.level-right {
+  grid-area: code;
+}
+
+@media (min-width: 1181px) {
+  :root[data-code-panel="left"] .level {
+    grid-template-columns: minmax(360px, 1.1fr) minmax(320px, 1fr) var(--learn-col);
+    grid-template-areas: "code board learn";
+  }
+
+  /* Bottom: the code runs full width under the Learn panel and the board, with
+     the editor on the left and Variables and Console beside it. */
+  :root[data-code-panel="bottom"] .level {
+    grid-template-columns: var(--learn-col) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(260px, 42%);
+    grid-template-areas:
+      "learn board"
+      "code code";
+  }
+
+  :root[data-code-panel="bottom"] .level-right {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "toolbar toolbar"
+      "editor vars"
+      "editor console";
+  }
+
+  :root[data-code-panel="bottom"] .level-right > .toolbar {
+    grid-area: toolbar;
+  }
+
+  :root[data-code-panel="bottom"] .level-right > .editor {
+    grid-area: editor;
+    min-height: 0;
+  }
+
+  :root[data-code-panel="bottom"] .level-right > .subpanel-vars {
+    grid-area: vars;
+  }
+
+  :root[data-code-panel="bottom"] .level-right > .subpanel-console {
+    grid-area: console;
+  }
+
+  :root[data-code-panel="bottom"] :is(.inspector, .console) {
+    flex: 1;
+    max-height: none;
+  }
 }
 
 .level > .panel {
@@ -1247,17 +1315,26 @@ pre {
 
 @media (max-width: 1180px) {
   .level {
-    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+    --learn-col: minmax(280px, 340px);
+    grid-template-columns: var(--learn-col) minmax(0, 1fr);
+    grid-template-areas:
+      "learn board"
+      "code code";
     height: auto;
   }
   .level-right {
-    grid-column: 1 / -1;
     min-height: 520px;
   }
 }
 
 @media (max-width: 800px) {
-  .level,
+  .level {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "learn"
+      "board"
+      "code";
+  }
   .harness-main {
     grid-template-columns: 1fr;
   }

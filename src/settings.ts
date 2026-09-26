@@ -6,21 +6,24 @@
 export type Theme = "system" | "light" | "dark";
 export type Motion = "system" | "full" | "reduced";
 export type CodeSize = "small" | "medium" | "large" | "x-large";
+export type CodePanel = "right" | "bottom" | "left";
 
 export interface Settings {
   speed: number; // playback speed multiplier
   theme: Theme;
   codeSize: CodeSize;
   motion: Motion; // animations
+  codePanel: CodePanel; // where a level's code column sits (wide screens only)
 }
 
 export const SPEEDS = [0.5, 1, 2, 4] as const;
 export const CODE_SIZES: Record<CodeSize, number> = { small: 13, medium: 15, large: 17, "x-large": 20 };
-export const DEFAULTS: Settings = { speed: 1, theme: "system", codeSize: "medium", motion: "system" };
+export const DEFAULTS: Settings = { speed: 1, theme: "system", codeSize: "medium", motion: "system", codePanel: "right" };
 
 const STORAGE_KEY = "rank-and-file:settings";
 const THEMES: readonly Theme[] = ["system", "light", "dark"];
 const MOTIONS: readonly Motion[] = ["system", "full", "reduced"];
+const CODE_PANELS: readonly CodePanel[] = ["right", "bottom", "left"];
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -58,12 +61,14 @@ export class SettingsStore {
   }
 }
 
-/** Apply the settings that live in CSS: theme, animations and code text size. */
+/** Apply the settings that live in CSS: theme, animations, code text size and layout. */
 export function applyToDocument(settings: Settings, root: HTMLElement = document.documentElement): void {
   if (settings.theme === "system") delete root.dataset.theme;
   else root.dataset.theme = settings.theme;
   if (settings.motion === "system") delete root.dataset.motion;
   else root.dataset.motion = settings.motion;
+  if (settings.codePanel === "right") delete root.dataset.codePanel;
+  else root.dataset.codePanel = settings.codePanel;
   root.style.setProperty("--code-size", `${CODE_SIZES[settings.codeSize]}px`);
 }
 
@@ -77,6 +82,7 @@ export function sanitize(raw: unknown): Settings {
     theme: pick(input.theme, THEMES, DEFAULTS.theme),
     codeSize: pick(input.codeSize, Object.keys(CODE_SIZES) as CodeSize[], DEFAULTS.codeSize),
     motion: pick(input.motion, MOTIONS, DEFAULTS.motion),
+    codePanel: pick(input.codePanel, CODE_PANELS, DEFAULTS.codePanel),
   };
 }
 

@@ -124,8 +124,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         { class: "panel level-right" },
         h("div", { class: "toolbar" }, runButton, stopButton, h("span", { class: "muted small toolbar-hint" }, "Ctrl+Enter runs")),
         editorHost,
-        h("div", { class: "subpanel" }, h("h2", {}, "Variables"), inspector.element),
-        h("div", { class: "subpanel" }, h("h2", {}, "Console"), consoleView.element),
+        h("div", { class: "subpanel subpanel-vars" }, h("h2", {}, "Variables"), inspector.element),
+        h("div", { class: "subpanel subpanel-console" }, h("h2", {}, "Console"), consoleView.element),
       ),
     ),
   );

@@ -120,6 +120,78 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     return `font ${size} · piece transition ${transition}`;
   });
 
+  // -- QA-009: code panel on the right, bottom or left ----------------------------------------
+  const rects = () =>
+    b.evaluate(`(() => {
+      const r = (s) => { const e = document.querySelector(s).getBoundingClientRect(); return { left: Math.round(e.left), right: Math.round(e.right), top: Math.round(e.top), bottom: Math.round(e.bottom) }; };
+      return { learn: r('.level-left'), board: r('.level-middle'), code: r('.level-right'), scratch: r('.repl-drawer') };
+    })()`);
+
+  await check("QA-009: Settings has a Code panel option, Right by default", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    await b.evaluate(`localStorage.clear()`);
+    await openLevel("ch01-l01", { fresh: true });
+    const checked = await b.evaluate(`document.querySelector('input[name="setting-codePanel"]:checked')?.value`);
+    const r = await rects();
+    expect(checked === "right" && r.learn.right < r.board.left && r.board.right < r.code.left, `${checked} ${JSON.stringify(r)}`);
+  });
+
+  await check("QA-009: Bottom puts the whole code column under the Learn panel and the board", async () => {
+    await choose("codePanel", "bottom");
+    const r = await rects();
+    expect(r.learn.right < r.board.left, "Learn/Challenge should stay on the left");
+    expect(r.code.top > r.board.bottom && r.code.top > r.learn.bottom, "the code should be underneath");
+    expect(Math.abs(r.code.left - r.learn.left) < 2 && Math.abs(r.code.right - r.board.right) < 2, `full width? ${JSON.stringify(r)}`);
+    const inside = await b.evaluate(`['.level-right .toolbar', '.level-right .editor', '.subpanel-vars', '.subpanel-console'].every((s) => document.querySelector('.level-right').contains(document.querySelector(s)))`);
+    expect(inside, "Run/Stop, editor, Variables and Console should all be in the code column");
+  });
+
+  await check("QA-009: Left gives code | board | Learn, with Scratch Python moving with Learn", async () => {
+    await choose("codePanel", "left");
+    const r = await rects();
+    expect(r.code.right < r.board.left && r.board.right < r.learn.left, JSON.stringify(r));
+    expect(r.scratch.left >= r.learn.left && r.scratch.right <= r.learn.right, "Scratch Python should sit in the Learn panel");
+  });
+
+  await check("QA-009: switching layouts keeps the code, its undo history and the playback position", async () => {
+    await openLevel("ch01-l02", { fresh: true });
+    await setCode("pawn.move()");
+    await sleep(700); // CodeMirror merges edits made within 500 ms into one undo step
+    await b.send("Input.insertText", { text: "\npawn.move()" });
+    await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
+    await b.waitFor(`document.querySelector('.outcome-host .outcome')`, 20_000, "run finished");
+    await b.evaluate(`document.querySelectorAll('${BUTTONS}')[0].click()`);
+    await b.evaluate(`document.querySelectorAll('${BUTTONS}')[3].click()`);
+    const before = await b.evaluate(`({ label: document.querySelector('.step-label').textContent, code: document.querySelector('.level-right .cm-content').innerText })`);
+    await choose("codePanel", "bottom");
+    await choose("codePanel", "right");
+    const after = await b.evaluate(`({ label: document.querySelector('.step-label').textContent, code: document.querySelector('.level-right .cm-content').innerText })`);
+    await b.evaluate(`document.querySelector('.level-right .cm-content').focus()`);
+    await b.key("z", { code: "KeyZ", modifiers: 2 }); // Ctrl+Z undoes the last typed line
+    const undone = await b.evaluate(`document.querySelector('.level-right .cm-content').innerText.trim() === 'pawn.move()'`);
+    expect(before.label === after.label && before.code === after.code, `step ${before.label} → ${after.label}; code kept: ${before.code === after.code}`);
+    expect(undone, "undo history was lost");
+    return after.label;
+  });
+
+  await check("QA-009: the choice carries over to the next level and survives a reload", async () => {
+    await choose("codePanel", "left");
+    await openLevel("ch01-l03");
+    const next = await rects();
+    await openLevel("ch01-l03", { fresh: true });
+    const reloaded = await rects();
+    expect(next.code.right < next.board.left && reloaded.code.right < reloaded.board.left, JSON.stringify({ next, reloaded }));
+  });
+
+  await check("QA-009: narrow windows keep today's layout (code underneath)", async () => {
+    await b.send("Emulation.setDeviceMetricsOverride", { width: 1100, height: 860, deviceScaleFactor: 1, mobile: false });
+    await sleep(200);
+    const r = await rects();
+    await b.send("Emulation.setDeviceMetricsOverride", { width: 1400, height: 860, deviceScaleFactor: 1, mobile: false });
+    await choose("codePanel", "right");
+    expect(r.learn.right < r.board.left && r.code.top > r.board.bottom, JSON.stringify(r));
+  });
+
   // -- QA-005: playback buttons -----------------------------------------------------------
   const buttons = () =>
     b.evaluate(`[...document.querySelectorAll('${BUTTONS}')].map((e) => ({ title: e.title, disabled: e.disabled, icon: !!e.querySelector('svg'), text: e.textContent.trim() }))`);

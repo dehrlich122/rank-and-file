@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULTS, sanitize, SettingsStore, type StorageLike } from "./settings";
+import { applyToDocument, DEFAULTS, sanitize, SettingsStore, type StorageLike } from "./settings";
 
 function memoryStorage(initial: Record<string, string> = {}): StorageLike & { data: Record<string, string> } {
   const data = { ...initial };
@@ -47,6 +47,21 @@ describe("SettingsStore", () => {
     expect(fragile.get()).toEqual(DEFAULTS);
     fragile.set({ motion: "reduced" });
     expect(fragile.get().motion).toBe("reduced");
+  });
+
+  it("keeps the code panel's position, and rejects unknown ones", () => {
+    const storage = memoryStorage();
+    new SettingsStore(storage).set({ codePanel: "left" });
+    expect(new SettingsStore(storage).get().codePanel).toBe("left");
+    expect(sanitize({ codePanel: "top" }).codePanel).toBe("right");
+  });
+
+  it("puts the layout, theme and animation choices on the page as data attributes", () => {
+    const root = { dataset: {} as Record<string, string>, style: { setProperty: () => {} } };
+    applyToDocument({ ...DEFAULTS, codePanel: "bottom", theme: "dark" }, root as unknown as HTMLElement);
+    expect(root.dataset).toEqual({ codePanel: "bottom", theme: "dark" });
+    applyToDocument(DEFAULTS, root as unknown as HTMLElement);
+    expect(root.dataset).toEqual({}); // defaults leave no attributes behind
   });
 
   it("ignores corrupted or unknown saved values", () => {
