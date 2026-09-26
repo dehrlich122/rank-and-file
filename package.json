@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "description": "A browser puzzle game that teaches Python by writing real code to move a chess piece.",
+  "license": "MIT AND CC-BY-NC-SA-4.0",
   "type": "module",
   "scripts": {
     "postinstall": "node scripts/copy-pyodide.mjs",
