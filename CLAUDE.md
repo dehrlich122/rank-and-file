@@ -166,6 +166,16 @@ Constraints are checked with `ast`/`tokenize`, never with string matching.
   (QA-003). It offers only calls the player typed that are also real (level
   API / builtins / their own `def`s), and only Tab accepts. The level editor
   and the REPL use it; lesson snippets don't.
+- The level screen is a CSS grid with named areas `learn` / `board` / `code`
+  (`styles.css`). The Code panel setting (QA-009) sets `data-code-panel` on
+  `<html>` to rearrange them on wide screens (above 1180px); narrow windows
+  always put the code underneath.
+  - Collapsing the Learn panel (QA-011) is the `.learn-collapsed` class on
+    `.level`, and `--learn-col` animates.
+  - The board fills its column up to `--board-max-height`.
+  - Layout changes must stay CSS-only, so nothing is rebuilt.
+- The Learn panel pages one step per runnable snippet (`splitIntoSteps` in
+  `ui/lesson.ts`, QA-010).
 - Playback buttons follow `controlStates()` in `ui/playback.ts`. Editing code
   drops the current recording, and Play or the right arrows then run the new
   code.

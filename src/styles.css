@@ -344,7 +344,8 @@ pre {
    windows always put the code underneath (see the end of this file). Only the
    grid changes, so switching layouts never rebuilds anything. */
 .level {
-  --learn-col: minmax(300px, 380px);
+  --learn-col: clamp(300px, 26vw, 380px);
+  --board-max-height: max(240px, calc(100vh - 330px)); /* leaves room for the controls and outcome */
   display: grid;
   grid-template-columns: var(--learn-col) minmax(320px, 1fr) minmax(360px, 1.1fr);
   grid-template-areas: "learn board code";
@@ -356,6 +357,69 @@ pre {
 
 .level-left {
   grid-area: learn;
+}
+
+/* Collapsing the Learn/Challenge panel (QA-011): its column shrinks to a strip
+   and the board's column takes the rest. The panel's contents are hidden, not
+   removed. */
+.level {
+  transition: grid-template-columns 250ms ease-in-out;
+}
+
+.level.learn-collapsed {
+  --learn-col: 44px;
+}
+
+.level.learn-collapsed .level-left > :not(.expand-strip) {
+  display: none;
+}
+
+.expand-strip {
+  display: none;
+}
+
+.level.learn-collapsed .expand-strip {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.expand-strip:hover {
+  color: var(--text);
+  background: var(--code-bg);
+}
+
+.expand-label {
+  writing-mode: vertical-rl;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.panel-toggle {
+  margin: 6px 0 6px auto;
+  align-self: center;
+  border: none;
+  background: none;
+  color: var(--muted);
+}
+
+.panel-toggle:hover:not(:disabled) {
+  color: var(--text);
+}
+
+/* When the panel is on the right, its arrows point the other way. */
+:root[data-code-panel="left"] :is(.panel-toggle, .expand-strip) .icon {
+  transform: scaleX(-1);
 }
 
 .level-middle {
@@ -380,6 +444,39 @@ pre {
     grid-template-areas:
       "learn board"
       "code code";
+  }
+
+  /* The middle is wide here, so the playback controls and the outcome sit
+     beside the board and the board can use the full height of its row. */
+  :root[data-code-panel="bottom"] .level {
+    --board-max-height: max(200px, calc((100vh - 73px) * 0.58 - 40px));
+  }
+
+  :root[data-code-panel="bottom"] .level-middle {
+    display: grid;
+    grid-template-columns: auto minmax(260px, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "board controls"
+      "board outcome";
+    align-content: start;
+  }
+
+  :root[data-code-panel="bottom"] .level-middle > .board-host {
+    grid-area: board;
+  }
+
+  :root[data-code-panel="bottom"] .level-middle > .playback {
+    grid-area: controls;
+  }
+
+  :root[data-code-panel="bottom"] .level-middle > .outcome-host {
+    grid-area: outcome;
+  }
+
+  :root[data-code-panel="bottom"] .level-middle .board {
+    width: auto;
+    height: var(--board-max-height);
   }
 
   :root[data-code-panel="bottom"] .level-right {
@@ -774,15 +871,17 @@ pre {
 
 /* ---- board ---- */
 
+/* The board fills its column and keeps its shape (the SVG's viewBox), up to
+   the height the layout leaves for it (QA-011). */
 .board {
   width: 100%;
-  max-width: 560px;
-  max-height: 60vh;
+  height: auto;
+  max-height: var(--board-max-height, 60vh);
   user-select: none;
 }
 
 .board-mini {
-  max-width: 124px;
+  width: 124px;
   max-height: none;
 }
 
@@ -953,7 +1052,7 @@ pre {
 
 /* Animations setting: "Reduced" always stops movement; "Match system" follows
    the OS preference; "Full" ignores it. (Colour flashes stay: they aren't motion.) */
-:root[data-motion="reduced"] :is(.piece, .piece-pointer, .gate-bars, .gate-lock) {
+:root[data-motion="reduced"] :is(.piece, .piece-pointer, .gate-bars, .gate-lock, .level) {
   transition: none;
 }
 
@@ -962,7 +1061,7 @@ pre {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion="full"]) :is(.piece, .piece-pointer, .gate-bars, .gate-lock) {
+  :root:not([data-motion="full"]) :is(.piece, .piece-pointer, .gate-bars, .gate-lock, .level) {
     transition: none;
   }
 
@@ -1330,7 +1429,7 @@ pre {
 
 @media (max-width: 1180px) {
   .level {
-    --learn-col: minmax(280px, 340px);
+    --learn-col: clamp(280px, 30vw, 340px);
     grid-template-columns: var(--learn-col) minmax(0, 1fr);
     grid-template-areas:
       "learn board"
@@ -1343,6 +1442,9 @@ pre {
 }
 
 @media (max-width: 800px) {
+  .panel-toggle {
+    display: none; /* collapsing is a desktop feature (QA-011) */
+  }
   .level {
     grid-template-columns: 1fr;
     grid-template-areas:

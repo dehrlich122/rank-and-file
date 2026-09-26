@@ -122,18 +122,32 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const inspector = new Inspector();
   const consoleView = new Console();
 
-  root.replaceChildren(
+  // The Learn/Challenge panel can collapse to a strip so the board can grow
+  // (QA-011). It's hidden, not rebuilt, so the lesson step, snippet runs and
+  // Scratch Python survive. Collapsed lasts for this level only.
+  const collapseButton = h(
+    "button",
+    { class: "btn btn-icon panel-toggle", title: "Hide the lesson panel", "aria-label": "Hide the lesson panel", onClick: () => setCollapsed(true) },
+    icon("collapsePanel"),
+  );
+  const expandStrip = h(
+    "button",
+    { class: "expand-strip", title: "Show the lesson panel", "aria-label": "Show the lesson panel", onClick: () => setCollapsed(false) },
+    icon("expandPanel"),
+    h("span", { class: "expand-label" }, "Learn · Challenge"),
+  );
+  const layout = h(
+    "div",
+    { class: "level", "data-level-id": source.id },
     h(
-      "div",
-      { class: "level", "data-level-id": source.id },
-      h(
-        "aside",
-        { class: "panel level-left" },
-        h("div", { class: "tabs", role: "tablist" }, learnTab, challengeTab),
-        tabScroll,
-        pager,
-        replDrawer,
-      ),
+      "aside",
+      { class: "panel level-left" },
+      h("div", { class: "tabs", role: "tablist" }, learnTab, challengeTab, collapseButton),
+      tabScroll,
+      pager,
+      replDrawer,
+      expandStrip,
+    ),
       h(
         "section",
         { class: "panel level-middle" },
@@ -155,8 +169,13 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         h("div", { class: "subpanel subpanel-vars" }, h("h2", {}, "Variables"), inspector.element),
         h("div", { class: "subpanel subpanel-console" }, h("h2", {}, "Console"), consoleView.element),
       ),
-    ),
   );
+  root.replaceChildren(layout);
+
+  function setCollapsed(collapsed: boolean): void {
+    layout.classList.toggle("learn-collapsed", collapsed);
+    (collapsed ? expandStrip : collapseButton).focus();
+  }
 
   const known = context.knownCalls.get(source.id) ?? new KnownCalls();
   context.knownCalls.set(source.id, known);

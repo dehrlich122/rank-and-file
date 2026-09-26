@@ -256,6 +256,91 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     expect(state.total === 1 && state.count === "" && state.back === "hidden" && state.next === "Start the challenge →", JSON.stringify(state));
   });
 
+  // -- QA-011: collapse the Learn/Challenge panel; the board grows --------------------------------
+  const boardSize = () =>
+    b.evaluate(`(() => { const r = document.querySelector('.level-middle .board').getBoundingClientRect(); return Math.round(Math.min(r.width, r.height)); })()`);
+  const collapse = async () => {
+    await b.evaluate(`document.querySelector('.panel-toggle').click()`);
+    await sleep(400); // the column animates
+  };
+  const expand = async () => {
+    await b.evaluate(`document.querySelector('.expand-strip').click()`);
+    await sleep(400);
+  };
+  const collapsedState = () =>
+    b.evaluate(`({
+      collapsed: document.querySelector('.level').classList.contains('learn-collapsed'),
+      strip: getComputedStyle(document.querySelector('.expand-strip')).display !== 'none',
+      tabsHidden: getComputedStyle(document.querySelector('.level-left .tabs')).display === 'none',
+    })`);
+
+  for (const panel of ["right", "bottom", "left"]) {
+    await check(`QA-011: collapsing makes room and the board grows; expanding shrinks it back (code panel: ${panel})`, async () => {
+      await choose("codePanel", panel);
+      await openLevel("ch01-l03", { fresh: true });
+      await sleep(300);
+      const open = await boardSize();
+      await collapse();
+      const state = await collapsedState();
+      const bigger = await boardSize();
+      const r = await rects();
+      await expand();
+      const back = await boardSize();
+      expect(state.collapsed && state.strip && state.tabsHidden, JSON.stringify(state));
+      if (panel === "bottom") {
+        // At the bottom the board is already as tall as its row, so height is the limit:
+        // collapsing widens its column (the controls get the room) but can't make it taller.
+        expect(bigger >= open && Math.abs(back - open) <= 2, `board ${open} → ${bigger} → ${back}`);
+        expect(r.board.right - r.board.left > 300, "the board's column should take the freed width");
+      } else {
+        expect(bigger > open + 20 && Math.abs(back - open) <= 2, `board ${open} → ${bigger} → ${back}`);
+      }
+      const stripSide = panel === "left" ? r.learn.left > r.board.right : r.learn.right < r.board.left;
+      expect(stripSide && r.learn.right - r.learn.left < 60, `strip at the wrong side or too wide: ${JSON.stringify(r.learn)}`);
+      return `board ${open} → ${bigger} → ${back}`;
+    });
+  }
+  await choose("codePanel", "right");
+
+  await check("QA-011: collapsed survives a layout change; the next level opens expanded", async () => {
+    await openLevel("ch01-l02", { fresh: true });
+    await collapse();
+    await choose("codePanel", "bottom");
+    const afterLayout = await collapsedState();
+    await choose("codePanel", "right");
+    await openLevel("ch01-l03");
+    const nextLevel = await collapsedState();
+    expect(afterLayout.collapsed && !nextLevel.collapsed, JSON.stringify({ afterLayout, nextLevel }));
+  });
+
+  await check("QA-011: collapse and expand keep the lesson step, snippet results and Scratch Python", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    await b.evaluate(`document.querySelector('.repl-drawer').open = true`);
+    await b.evaluate(`document.querySelector('.repl-editor .cm-content').focus()`);
+    await b.send("Input.insertText", { text: "6 * 7" });
+    await b.key("Enter");
+    await sleep(300);
+    await pagerNext();
+    await b.evaluate(`document.querySelector('.lesson-step:not([hidden]) .snippet .btn').click()`);
+    await b.waitFor(`document.querySelector('.lesson-step:not([hidden]) .snippet-status').textContent.includes('Finished')`, 20_000, "snippet ran");
+    await collapse();
+    await expand();
+    const kept = await b.evaluate(`({
+      step: document.querySelector('.lesson-pager .muted').textContent,
+      snippet: document.querySelector('.lesson-step:not([hidden]) .snippet-status').textContent,
+      repl: document.querySelector('.repl-log').innerText.includes('42'),
+    })`);
+    expect(kept.step === "Step 2 of 2" && kept.snippet.includes("Finished") && kept.repl, JSON.stringify(kept));
+  });
+
+  await check("QA-011: the resize animates, and is instant with reduced animations", async () => {
+    const normal = await b.evaluate(`getComputedStyle(document.querySelector('.level')).transitionProperty`);
+    await choose("motion", "reduced");
+    const reduced = await b.evaluate(`getComputedStyle(document.querySelector('.level')).transitionProperty`);
+    await choose("motion", "system");
+    expect(normal.includes("grid-template-columns") && reduced === "none", `normal: ${normal} · reduced: ${reduced}`);
+  });
+
   // -- QA-005: playback buttons -----------------------------------------------------------
   const buttons = () =>
     b.evaluate(`[...document.querySelectorAll('${BUTTONS}')].map((e) => ({ title: e.title, disabled: e.disabled, icon: !!e.querySelector('svg'), text: e.textContent.trim() }))`);
