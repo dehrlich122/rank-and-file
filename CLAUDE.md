@@ -147,16 +147,23 @@ error translations belong in `errors.py`, with a case in
 `engine/tests/test_errors.py`.
 
 **Levels are data.** YAML in `levels/chNN/`, lesson in `lessons/chNN/`,
-solutions in `solutions/chNN/`. The format is documented in
+solutions in `solutions/chNN/`. The Testing ground (chapter 0, outside the
+curriculum) uses `practice/` folders instead. The format is documented in
 `docs/ARCHITECTURE.md`. Adding a level must never require engine changes.
 `engine/tests/test_levels.py` checks every level automatically:
-- the reference solution solves it
+- the reference solution solves it, on every hidden board (`variants`) too,
+  and earns all three stars, so the level's `par` is reachable
 - each `<id>.naive*.py` fails with the outcome named on its first line
   (`# expect: constraint`)
 - lessons have ≤150 words of prose and 1–3 runnable snippets, and every snippet
   runs (```` ```python run error ```` marks one that must fail)
 
 Constraints are checked with `ast`/`tokenize`, never with string matching.
+
+Hints, solutions and their notes are all spoilers. Write new ones without
+their text appearing in the conversation. The practice level's generator
+stored code as character codes and prose as ROT13, and printed only file
+names.
 
 ## UI conventions
 

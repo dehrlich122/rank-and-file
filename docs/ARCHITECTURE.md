@@ -14,6 +14,10 @@ This document records how the game is built and why. The design brief is
 | Python runtime | Pyodide (CPython 3.14 in WebAssembly) in a Web Worker, self-hosted | Real CPython; the UI never freezes; works offline. |
 | Game rules | Written once, in Python | The UI renders whatever the engine reports and never re-implements rules. The same code is unit-tested with pytest. |
 | Levels | YAML files with an ASCII map, plus a Markdown lesson | Easy to hand-author and diff; adding a level never needs engine changes. |
+| Scoring (M2) | The engine awards up to three stars: solved, within the line par, no hints opened | Scoring is a game rule, so it lives in Python with the rest. The UI passes how many hints were opened and draws the stars. |
+| Hidden boards (M2) | A level lists extra maps (`variants`); a solution must solve them all | Hard-coding the visible board fails, which forces the general idea. Explicit maps keep runs deterministic and levels hand-authored. |
+| Progress (M2) | Saved in `localStorage`: solved levels, best stars, hints opened, each level's code | No backend; survives reloads. Settings → Reset progress clears it. |
+| Solutions in the app (M2) | Loaded lazily, one small file per level, only when the comparison opens | Nothing in the main bundle can spoil a level; `npm run check:bundle` guards it. |
 
 ## The big picture
 
@@ -59,10 +63,18 @@ what makes step, pause and rewind easy: nothing is re-executed.
 5. **Classify** the outcome and translate any error into plain language
    (`errors.py`), keeping the real traceback (trimmed to the player's frames)
    for the "show traceback" panel.
+6. **Hidden boards** *(M2)*: if the visible board is solved and the level has
+   `variants`, the same code runs on each hidden board (constraints were
+   already checked). The first one it fails on is returned instead, as that
+   board's own recording, with `hidden_board: {index, total, note, level}`
+   so the UI can draw that board in place of the visible one.
+7. **Score** a solved run *(M2)*: `stars` holds three `{kind, earned, label}`
+   entries. They are solved, within `par.lines`, and no hints opened; the
+   last uses the `hintsUsed` count the UI sends with every run.
 
 | Outcome | Meaning |
 |---|---|
-| `solved` | Ran to the end with every objective met |
+| `solved` | Ran to the end with every objective met, on the visible board and every hidden one |
 | `incomplete` | Ran to the end, but an objective wasn't met (the summary says which) |
 | `finished` | Ran to the end on a board with no objectives (lesson snippets) |
 | `error` | Python or the game raised an error (syntax errors never start running) |
@@ -118,7 +130,7 @@ bridge function takes strings and returns a JSON string.
 | Request | Does |
 |---|---|
 | `loadLevel` | Validate a level (the parsed YAML) and describe it for drawing |
-| `runLevel` | Run code against a level; returns the full recording |
+| `runLevel` | Run code against a level (with the number of hints opened, for scoring); returns the full recording |
 | `loadSandbox` / `runSandbox` | The small open board lesson snippets run on |
 | `replPush` / `replReset` | The scratch REPL (a session that lives in the worker) |
 | `runSnippet` | Plain Python with no board (the `#/harness` page) |
@@ -152,10 +164,13 @@ start: {facing: north}
 objectives:                  # default [reach_goal]
   - reach_goal               # end the program on the goal square
   - say: open sesame         # print this exact line at some point
-api: [move, turn_left, turn_right]      # abilities the piece has in this level
+api: [move, turn_left, turn_right]      # abilities the piece has in this level (also at_goal)
 constraints: {max_lines: 4, min_comments: 1, require_nodes: [For], ban_nodes: []}
-par: {lines: 3}              # used by M2's stars
-hints: ["nudge", "concept reminder", "partial example"]   # shown in M2
+par: {lines: 3}              # the par star: this many lines of code or fewer
+hints: ["nudge", "concept reminder", "partial example"]   # opened one at a time, on request
+variants:                    # optional hidden boards: the same level on other maps
+  - map: |
+      ...
 lesson: ch01/ch01-l03.md
 starter: ""                  # optional initial editor contents
 ```
@@ -191,12 +206,18 @@ Alongside each level:
   the text leading up to a snippet plus the snippet; text after the last
   snippet joins the last step. So where the snippets go decides where the
   pages break (QA-010).
-- `solutions/<chapter>/<id>.py`: the reference solution.
+- `solutions/<chapter>/<id>.py`: the reference solution. It must solve every
+  hidden board too, and earn all three stars (so every par is reachable).
 - `solutions/<chapter>/<id>.naive*.py`: approaches that must fail. The first line
   is `# expect: <outcome>` (e.g. `constraint`); the checker strips it before running.
-- `solutions/<chapter>/<id>.md`: the idiomatic-solution note (prose) shown after solving (M2).
+- `solutions/<chapter>/<id>.md`: the idiomatic-solution note (prose), shown
+  beside the reference solution in the comparison after solving.
 - `levels/chapters.yaml` lists the chapters (number, title, tier, summary).
+  Chapter 0 is the **Testing ground** (`levels/practice/`): levels for trying
+  out features before the chapters that use them, outside the curriculum.
+  "Next level" never leads there.
 
+Each file's folder is `ch01`, `ch02`, … or `practice`.
 `engine/tests/test_levels.py` checks all of these automatically for every level.
 
 ## Repository layout
@@ -210,12 +231,14 @@ engine/rankfile/   the Python game engine (no third-party dependencies)
   constraints.py repl.py      ast rules and lint warnings; the scratch REPL
   bridge.py                   JSON functions the worker calls
 engine/tests/      pytest suite, including the level checker (test_levels.py)
-levels/ lessons/ solutions/   level content
+levels/ lessons/ solutions/   level content (chNN/ folders, plus practice/)
 src/app.ts         shell and routes (#/, #/level/<id>, #/harness)
-src/content.ts     bundles level YAML and lesson Markdown
+src/content.ts     bundles level YAML and lesson Markdown; loads solutions lazily
+src/settings.ts src/progress.ts src/storage.ts   saved settings and progress (localStorage)
 src/py/            worker, client and protocol
-src/ui/            board, editor, playback, panels, lesson, repl, levelView, levelSelect
-scripts/           copy-pyodide.mjs (runs after npm install), pytest.mjs
+src/ui/            board, editor, playback, panels, lesson, repl, levelView, levelSelect,
+                   hints, compare (the idiomatic-solution comparison), settingsDialog
+scripts/           copy-pyodide.mjs (runs after npm install), venv.mjs, check-bundle.mjs, e2e/
 public/pyodide/    Pyodide runtime, copied from node_modules (not committed)
 ```
 
