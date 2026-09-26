@@ -228,51 +228,50 @@ def test_the_bridge_passes_hints_used_through():
     assert [star["earned"] for star in result["stars"]] == [True, True, False]
 
 
-# -- hidden boards (M2) ------------------------------------------------------------
+# -- several cases: a hidden goal, other maps (M2) -------------------------------------
 
-CORRIDOR = "# . #\n# . #\n# . #\n# . #\n# P #\n"
-
-
-def corridor_with_goal(distance: int) -> str:
-    """A corridor 4 squares long with the goal `distance` squares ahead of the pawn."""
-    rows = CORRIDOR.splitlines()
-    row = len(rows) - 1 - distance
-    rows[row] = "# G #"
-    return "\n".join(rows) + "\n"
+# A corridor where the goal is hidden on b2, b3 or b5 (a ? on each).
+HIDDEN = "# ? #\n# . #\n# ? #\n# ? #\n# P #\n"
+# Walks until it finds the goal, or gives up after 9 squares.
+SEARCH = "for _ in range(9):\n    if pawn.at_goal():\n        break\n    pawn.move()\n"
 
 
-def hidden_level(**overrides):
-    return make_level(
-        corridor_with_goal(2),
-        api=["move", "at_goal"],
-        variants=[{"map": corridor_with_goal(1)}, {"map": corridor_with_goal(4)}],
-        **overrides,
-    )
-
-
-def test_code_that_only_fits_the_visible_board_fails_on_a_hidden_one():
-    result = run_level(hidden_level(), "pawn.move(2)\n")
+def test_counting_to_one_hiding_place_fails_the_others():
+    result = run_level(make_level(HIDDEN, api=["move", "at_goal"]), "pawn.move(2)\n")
     assert result.status == "incomplete"
-    assert result.hidden_board["index"] == 1
-    assert result.hidden_board["total"] == 2
-    assert "not hidden board 1 of 2" in result.hidden_board["note"]
-    # The run returned is the hidden board's, with that board to draw.
-    assert result.hidden_board["level"]["goal"] == [1, 1]
-    assert result.final["pos"] == [1, 2]
+    assert [(case["label"], case["status"]) for case in result.cases] == [("b2", "incomplete"), ("b3", "solved"), ("b5", "incomplete")]
+    # The verdict is the first failing case's; each case keeps its own recording and board.
+    assert result.case == 0
+    assert result.case_note == "It worked for 1 of the 3 places the goal could be."
+    assert result.steps == [] and result.cases[0]["steps"]
+    assert result.cases[0]["level"]["goal"] == [1, 1]
+    assert result.cases[0]["final"]["pos"] == [1, 2]
+    assert result.cases[1]["case_note"] == "This run is the one with the goal on b3."
     assert result.stars == []
 
 
-def test_code_that_generalises_solves_every_board():
-    result = run_level(hidden_level(par={"lines": 2}), "while not pawn.at_goal():\n    pawn.move()\n")
+def test_code_that_searches_finds_the_goal_everywhere():
+    result = run_level(make_level(HIDDEN, api=["move", "at_goal"], par={"lines": 4}), SEARCH)
     assert result.status == "solved"
-    assert result.hidden_board is None
-    assert result.summary.endswith("It solved all 2 hidden boards too.")
+    assert result.case_note == "It worked for all 3 places the goal could be."
+    assert [case["status"] for case in result.cases] == ["solved"] * 3
     assert [star.earned for star in result.stars] == [True, True, True]
-    # The recording is the visible board's run.
-    assert result.final["pos"] == [1, 2]
 
 
-def test_hidden_boards_only_run_once_the_visible_board_is_solved():
-    result = run_level(hidden_level(), "pawn.move()\n")
-    assert result.status == "incomplete"
-    assert result.hidden_board is None
+def test_code_that_never_runs_is_reported_once():
+    level = make_level(HIDDEN, api=["move", "at_goal"], constraints={"max_lines": 1})
+    syntax_error = run_level(level, "pawn.move(\n")
+    broken_rule = run_level(level, "pawn.move()\npawn.move()\n")
+    endless = run_level(make_level(HIDDEN, api=["move", "at_goal"]), "while True:\n    pass\n", line_budget=1000)
+    assert (syntax_error.status, syntax_error.cases) == ("error", [])
+    assert (broken_rule.status, broken_rule.cases) == ("constraint", [])
+    assert (endless.status, endless.cases) == ("timeout", [])
+
+
+def test_other_maps_are_boards():
+    level = make_level("# G #\n# . #\n# P #\n", variants=[{"map": "# . #\n# G #\n# P #\n"}])
+    result = run_level(level, "pawn.move(2)\n")
+    assert [case["label"] for case in result.cases] == ["your board", "board 2"]
+    assert result.case == 1
+    assert result.case_note == "It worked for 1 of the 2 boards."
+    assert result.cases[1]["case_note"] == "This run is the one on board 2."

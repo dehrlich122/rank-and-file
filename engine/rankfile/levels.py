@@ -21,8 +21,9 @@ class LevelError(ValueError):
 
 
 # Map symbols every level understands. A level's `legend` can add more.
-START, GOAL = "P", "G"
-BUILTIN_SYMBOLS = {".": Tile.FLOOR, "#": Tile.WALL, START: Tile.FLOOR, GOAL: Tile.FLOOR}
+# SPOT marks a square the goal might be on, when the goal is hidden (M2).
+START, GOAL, SPOT = "P", "G", "?"
+BUILTIN_SYMBOLS = {".": Tile.FLOOR, "#": Tile.WALL, START: Tile.FLOOR, GOAL: Tile.FLOOR, SPOT: Tile.FLOOR}
 # Legend tiles that need one extra detail, e.g. `S: {tile: sign, text: "..."}`.
 TILE_DETAILS = {Tile.SIGN: "text", Tile.GATE: "passphrase"}
 
@@ -73,15 +74,38 @@ class Level:
     lesson: str = ""
     brief: str = ""
     starter: str = ""
-    # Hidden boards (M2): the same level on other maps. A solution must solve
-    # every one of them too, so hard-coding the visible board fails.
+    # A hidden goal (M2): the squares it might be on (? on the map), when the
+    # map has no G. A solution must reach it on every one of them.
+    goal_spots: list[Pos] = field(default_factory=list)
+    # Other maps (M2): the same level on other boards, which a solution must
+    # solve too. For levels whose layout varies, e.g. randomized walls.
     variants: list[Level] = field(default_factory=list)
+
+    def cases(self) -> list[Case]:
+        """Every situation a solution must handle: one per square a hidden goal
+        could be on, or this board and then each other map. (A level has one
+        kind or the other, never both.)"""
+        if self.goal_spots:
+            return [Case(square_name(spot), f"with the goal on {square_name(spot)}", replace(self, goal=spot)) for spot in self.goal_spots]
+        boards = [Case(f"board {number}", f"on board {number}", variant) for number, variant in enumerate(self.variants, start=2)]
+        return [Case("your board", "on your board", replace(self, variants=[])), *boards]
+
+    @property
+    def case_words(self) -> tuple[str, str]:
+        """How the player reads about this level's cases: the title of the row
+        of cases above the board, and the noun for counting them."""
+        return ("Where the goal was", "places the goal could be") if self.goal_spots else ("Boards", "boards")
 
     def goals(self) -> list[str]:
         """What the player has to do, one sentence each. Never gives away a passphrase."""
         goals = []
         if self.objectives.reach_goal and self.goal:
             goals.append(f"Reach the goal on {square_name(self.goal)}.")
+        elif self.objectives.reach_goal and self.goal_spots:
+            goals.append(
+                f"Reach the goal. It's hidden on one of the {count(len(self.goal_spots), 'square')} marked ?. "
+                "Your code runs once for each of them, and has to reach the goal every time."
+            )
         for phrase in self.objectives.say:
             if any(phrase in text for text in self.board.signs.values()):
                 goals.append("Say the phrase from the signpost: print it, exactly as written.")
@@ -90,7 +114,7 @@ class Level:
         for gate in sorted(self.board.gates):
             goals.append(f"Get past the locked gate on {square_name(gate)}. A guard keeps it shut.")
         if self.variants:
-            goals.append(f"Your code must also solve {count(len(self.variants), 'hidden board')} like this one, each a little different.")
+            goals.append(f"Your code is also checked on {count(len(self.variants), 'other board')}.")
         return goals
 
     def star_goals(self) -> list[str]:
@@ -117,6 +141,8 @@ class Level:
             ],
             "signs": [{"pos": list(pos), "text": text} for pos, text in self.board.signs.items()],
             "goal": list(self.goal) if self.goal else None,
+            "goal_spots": [list(spot) for spot in self.goal_spots],
+            "case_title": self.case_words[0] if self.goal_spots or self.variants else "",
             # Gates appear in `tiles`; their passphrases are deliberately left out.
             "start": {"pos": list(self.start), "facing": self.facing.value, "opened": []},
             "objectives": asdict(self.objectives),
@@ -151,7 +177,7 @@ def parse_level(data: dict) -> Level:
 
     legend = data.get("legend") or {}
     objectives = _parse_objectives(data.get("objectives", ["reach_goal"]))
-    board, start, goal = _parse_board(data["map"], legend, objectives)
+    board, start, goal, spots = _parse_board(data["map"], legend, objectives)
     facing = _parse_facing((data.get("start") or {}).get("facing", "north"))
 
     level = Level(
@@ -164,6 +190,7 @@ def parse_level(data: dict) -> Level:
         start=start,
         facing=facing,
         goal=goal,
+        goal_spots=spots,
         objectives=objectives,
         api=_parse_api(data["api"], piece),
         constraints=_parse_constraints(data.get("constraints") or {}),
@@ -174,11 +201,14 @@ def parse_level(data: dict) -> Level:
         starter=str(data.get("starter", "")),
     )
     level.variants = _parse_variants(data.get("variants") or [], legend, level)
+    if level.variants and level.goal_spots:
+        raise LevelError("a level has ? squares for a hidden goal or other maps (variants), not both")
     return level
 
 
-def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None]:
-    """Read an ASCII map. The first line is the top rank; symbols are separated by spaces."""
+def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos]]:
+    """Read an ASCII map: its board, start, goal and hidden-goal squares (?).
+    The first line is the top rank; symbols are separated by spaces."""
     if not isinstance(text, str) or not text.strip():
         raise LevelError("map must be a non-empty block of text")
     rows = [line.split() for line in text.strip("\n").splitlines() if line.strip()]
@@ -209,6 +239,7 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None]:
     board = Board(width, height)
     start: Pos | None = None
     goal: Pos | None = None
+    spots: list[Pos] = []
     for row_index, row in enumerate(rows):
         y = height - 1 - row_index
         for x, symbol in enumerate(row):
@@ -229,9 +260,22 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None]:
                 if goal is not None:
                     raise LevelError("the map has more than one goal square (G)")
                 goal = (x, y)
+            if symbol == SPOT:
+                spots.append((x, y))
     if start is None:
         raise LevelError("the map needs a start square (P)")
-    return board, start, goal
+    if goal is not None and spots:
+        raise LevelError("a map has a goal (G) or squares a hidden goal might be on (?), not both")
+    return board, start, goal, sorted(spots)
+
+
+@dataclass
+class Case:
+    """One situation a solution must handle (see Level.cases)."""
+
+    label: str  # "b3" (where a hidden goal is), "your board" or "board 2"
+    where: str  # for sentences: "with the goal on b3", "on board 2"
+    level: Level  # the level as it is in this case
 
 
 def sandbox_level(api: list[str], piece: str = "pawn") -> Level:
@@ -298,16 +342,16 @@ def _parse_api(names, piece: str) -> list[str]:
     return list(names)
 
 
-def _parse_board(text: str, legend: dict, objectives: Objectives) -> tuple[Board, Pos, Pos | None]:
+def _parse_board(text: str, legend: dict, objectives: Objectives) -> tuple[Board, Pos, Pos | None, list[Pos]]:
     """A map, checked against what the level asks for."""
-    board, start, goal = parse_map(text, legend)
-    if objectives.reach_goal and goal is None:
-        raise LevelError("objective reach_goal needs a goal square (G) on the map")
-    return board, start, goal
+    board, start, goal, spots = parse_map(text, legend)
+    if objectives.reach_goal and goal is None and not spots:
+        raise LevelError("objective reach_goal needs a goal square (G), or ? squares for a hidden goal, on the map")
+    return board, start, goal, spots
 
 
 def _parse_variants(items, legend: dict, level: Level) -> list[Level]:
-    """Each hidden board is the level on another map: same legend, objectives and abilities."""
+    """Each other map is the level on another board: same legend, objectives and abilities."""
     if not isinstance(items, list):
         raise LevelError("variants must be a list of {map: ...} entries")
     variants = []
@@ -315,9 +359,11 @@ def _parse_variants(items, legend: dict, level: Level) -> list[Level]:
         if not isinstance(item, dict) or set(item) != {"map"}:
             raise LevelError(f"variant {number} must have a map, and nothing else")
         try:
-            board, start, goal = _parse_board(item["map"], legend, level.objectives)
+            board, start, goal, spots = _parse_board(item["map"], legend, level.objectives)
         except LevelError as exc:
             raise LevelError(f"variant {number}: {exc}") from None
+        if spots:
+            raise LevelError(f"variant {number}: ? squares are only for the level's own map")
         variants.append(replace(level, board=board, start=start, goal=goal, variants=[]))
     return variants
 

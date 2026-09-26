@@ -16,10 +16,18 @@ export default async function appChecks({ browser: b, base, root, check }) {
   async function run({ jump = true } = {}) {
     await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
     await b.waitFor(`!document.querySelector('.outcome-host').textContent.includes('Running')`, 20_000, "run finished");
+    return outcome({ jump });
+  }
+
+  /** Once a recording is playing: optionally jump to its end, then describe the outcome card. */
+  async function outcome({ jump = true } = {}) {
     if (jump) await b.evaluate(`(() => { const e = ${button(4)}; if (!e.disabled) e.click(); })()`);
     await b.waitFor(`document.querySelector('.outcome-host .outcome')`, 30_000, "outcome card");
     return b.evaluate(`({
       head: document.querySelector('.outcome-head strong').textContent,
+      tone: document.querySelector('.outcome-host .outcome').className,
+      buttons: [...document.querySelectorAll('.outcome-host .outcome-head a, .outcome-host .outcome-head button')].map((e) => e.textContent),
+      note: document.querySelector('.outcome-host .case-note')?.textContent ?? null,
       text: document.querySelector('.outcome-host .outcome').innerText.replace(/\\s+/g, ' '),
       errorLine: !!document.querySelector('.level-right .cm-error-line'),
       warnMarks: document.querySelectorAll('.level-right .cm-lint-marker-warning').length,
@@ -232,32 +240,60 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(!card.tag && card.stars === 2, `level card: ${JSON.stringify(card)}`);
   });
 
-  // -- M2: hidden boards (the practice level) ---------------------------------------------
-  await check("M2: the practice level is in the Testing ground and says how many hidden boards it has", async () => {
+  // -- QA-016: a hidden goal (the practice level) --------------------------------------------
+  // Labels, marks and counts only: never code.
+  const caseRow = () => b.evaluate(`[...document.querySelectorAll('.case-row button')].map((e) => (e.getAttribute('aria-pressed') === 'true' ? '*' : '') + e.textContent)`);
+  const spotMarks = () => b.evaluate(`[...document.querySelectorAll('.board-host .spot-mark')].map((e) => e.textContent).join('')`);
+
+  await check("QA-016: the practice level shows ? where the goal might be, and says the code runs once for each", async () => {
     await levelCards();
     const heading = await b.evaluate(`[...document.querySelectorAll('.chapter h2')].map((e) => e.textContent).find((t) => t.includes('Testing ground'))`);
     await openLevel("practice-01", { fresh: true });
     await challengeTab();
     const goals = await b.evaluate(`document.querySelector('.objectives').innerText`);
+    const board = await b.evaluate(`({ spots: document.querySelectorAll('.board-host .spot').length, flags: document.querySelectorAll('.board-host .goal').length })`);
+    const text = await b.evaluate(`document.body.innerText`);
     expect(heading === "Testing ground", `heading: ${heading}`);
-    expect(goals.includes("also solve 3 hidden boards"), goals);
+    expect(goals.includes("hidden on one of the 4 squares marked ?") && goals.includes("runs once for each"), goals);
+    expect(board.spots === 4 && board.flags === 0 && (await spotMarks()) === "????", `board: ${JSON.stringify(board)}`);
+    expect(!/hidden board/i.test(text), "the page still says 'hidden board'");
   });
 
-  await check("M2: code that only fits the visible board fails on a hidden one, which replaces the board", async () => {
+  await check("QA-016: code that counts to one ? square works there only; each square shows how it went", async () => {
     await setCode(withoutExpectLine(solution("practice-01", ".naive")));
     const r = await run();
-    const banner = await b.evaluate(`document.querySelector('.hidden-banner')?.innerText.replace(/\\s+/g, ' ') ?? null`);
-    await clickButton("Back to your board", ".hidden-banner");
-    const back = await b.evaluate(`({ banner: !!document.querySelector('.hidden-banner'), board: !!document.querySelector('.board-host .board') })`);
-    expect(r.head === "Not on every board" && r.text.includes("not hidden board 1 of 3"), brief(r));
-    expect(banner?.startsWith("Hidden board 1 of 3"), `banner: ${banner}`);
-    expect(!back.banner && back.board, `after 'Back to your board': ${JSON.stringify(back)}`);
+    const row = await caseRow();
+    const marks = await spotMarks();
+    expect(r.head === "Not there yet" && r.note === "It worked for 1 of the 4 places the goal could be. This run is the one with the goal on b3.", brief(r));
+    expect(JSON.stringify(row) === JSON.stringify(["*b3 ✗", "b5 ✗", "b6 ✓", "b8 ✗"]), `case row: ${JSON.stringify(row)}`);
+    expect(marks === "✗✓✗", `marks on the other ? squares: ${marks}`); // b3 has the flag in this case
+    return row.join(" ");
   });
 
-  await check("M2: the reference solution solves the visible board and every hidden one, for three stars", async () => {
+  await check("QA-016: replaying the case that worked still reads as a failed run, with no way on", async () => {
+    await clickButton("b6 ✓", ".case-row");
+    const r = await outcome();
+    const row = await caseRow();
+    expect(r.head === "Not there yet" && r.tone.includes("outcome-warn"), JSON.stringify(r));
+    expect(!r.buttons.some((label) => /Next level|Compare/.test(label)), `offers: ${JSON.stringify(r.buttons)}`);
+    expect(r.note?.endsWith("This run is the one with the goal on b6.") && row[2] === "*b6 ✓", `${r.note} | ${JSON.stringify(row)}`);
+  });
+
+  await check("QA-016: picking another case while one replays stops the first", async () => {
+    await clickButton("b8 ✗", ".case-row");
+    await clickButton("b5 ✗", ".case-row"); // straight away, while b8's replay is still playing
+    const r = await outcome({ jump: false });
+    await sleep(1500); // long enough for a leftover replay of b8 to have reached its end
+    const later = await outcome({ jump: false });
+    expect(r.note?.endsWith("goal on b5.") && later.note === r.note, `${r.note} | later: ${later.note}`);
+  });
+
+  await check("QA-016: the reference solution finds the goal on every ? square, for three stars", async () => {
     await setCode(solution("practice-01"));
     const r = await run();
-    expect(r.head === "Solved!" && r.text.includes("It solved all 3 hidden boards too.") && r.stars === 3, `${r.stars} stars: ${brief(r)}`);
+    const row = await caseRow();
+    expect(r.head === "Solved!" && r.text.includes("It worked for all 4 places the goal could be.") && r.stars === 3, `${r.stars} stars: ${brief(r)}`);
+    expect(row.every((label) => label.endsWith("✓")), `case row: ${JSON.stringify(row)}`);
     return brief(r);
   });
 

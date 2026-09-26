@@ -29,7 +29,14 @@ export class BoardView {
   private angle = 0; // cumulative, so turns always take the short way round
   private timers: number[] = [];
 
-  constructor(private readonly level: LevelInfo, options: { mini?: boolean } = {}) {
+  /**
+   * `spots`: after a run with a hidden goal, whether the code reached it with
+   * the goal on each ? square, by square name ("b3"). Without it they show ?.
+   */
+  constructor(
+    private readonly level: LevelInfo,
+    options: { mini?: boolean; spots?: ReadonlyMap<string, boolean> } = {},
+  ) {
     const { width, height } = level;
     this.element = svg("svg", {
       class: options.mini ? "board board-mini" : "board",
@@ -51,6 +58,13 @@ export class BoardView {
     }
     this.element.append(squares, labels(width, height));
 
+    // A hidden goal (M2): a mark on every square it might be on, except the
+    // one where it is in the case being shown (that one gets the flag).
+    for (const pos of level.goal_spots) {
+      if (level.goal && squareName(pos) === squareName(level.goal)) continue;
+      const [left, top] = corner(pos, height);
+      squares.append(spot(left, top, options.spots?.get(squareName(pos))));
+    }
     if (level.goal) {
       const [left, top] = corner(level.goal, height);
       squares.append(flag(left, top));
@@ -226,6 +240,17 @@ function flag(left: number, top: number): SVGGElement {
       class: "goal-flag",
     }),
   );
+  return group;
+}
+
+/** A square a hidden goal might be on: a dashed ring with ?, or after a run ✓ or ✗ (`passed`). */
+function spot(left: number, top: number, passed?: boolean): SVGGElement {
+  const group = svg("g", { class: passed === undefined ? "spot" : passed ? "spot spot-pass" : "spot spot-fail" });
+  const title = svg("title", {});
+  title.textContent = passed === undefined ? "The goal might be here." : passed ? "Your code reached the goal here." : "Your code missed the goal here.";
+  const mark = svg("text", { x: left + S / 2, y: top + S / 2 + 9, "text-anchor": "middle", class: "spot-mark" });
+  mark.textContent = passed === undefined ? "?" : passed ? "✓" : "✗";
+  group.append(title, svg("circle", { cx: left + S / 2, cy: top + S / 2, r: S * 0.36, class: "spot-ring" }), mark);
   return group;
 }
 

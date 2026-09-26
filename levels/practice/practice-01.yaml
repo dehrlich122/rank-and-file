@@ -1,17 +1,16 @@
 id: practice-01
 chapter: 0
-title: Hidden Corridors
+title: Blindfold
 trains: A while loop that stops when a condition is met
-brief: The goal is somewhere up this corridor. Your code is also tested on hidden corridors where the goal is nearer or further
-  away.
+brief: 'Like a game of blindfold chess: you can''t see what you''re aiming for. The goal is on one of the squares marked ?.'
 piece: pawn
 map: |
+  # ? #
   # . #
+  # ? #
+  # ? #
   # . #
-  # G #
-  # . #
-  # . #
-  # . #
+  # ? #
   # . #
   # P #
 start:
@@ -22,35 +21,7 @@ api:
 par:
   lines: 2
 hints:
-- Your code also runs on hidden corridors of other lengths, so a fixed number of steps can't be right for all of them.
+- The goal could be on any ? square, so a fixed number of steps can only ever be right for one of them.
 - A while loop repeats while its condition is true. Which question can your pawn ask that tells it when to stop walking?
 - '`while not pawn.at_goal():` then one indented line that takes a step.'
 lesson: practice/practice-01.md
-variants:
-- map: |
-    # . #
-    # . #
-    # . #
-    # . #
-    # . #
-    # G #
-    # . #
-    # P #
-- map: |
-    # G #
-    # . #
-    # . #
-    # . #
-    # . #
-    # . #
-    # . #
-    # P #
-- map: |
-    # . #
-    # . #
-    # . #
-    # G #
-    # . #
-    # . #
-    # . #
-    # P #

@@ -1,8 +1,8 @@
-# Hidden boards
+# A hidden goal
 
-Some levels test your code on **hidden boards** as well as the one you can see: the same kind of place, a little different each time. Code that only fits the visible board won't pass.
+Sometimes you can't see the goal. It's hidden on one of the squares marked **?**, and your code runs once for each of them. It has to reach the goal every time.
 
-Your pawn can now ask whether it's standing on the goal. This little practice board has no goal, so the answer is `False`:
+Your pawn can ask whether it's standing on the goal. This little practice board has no goal, so the answer is `False`:
 
 ```python run
 print(pawn.at_goal())

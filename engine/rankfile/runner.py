@@ -7,10 +7,10 @@
   decides whether the level was solved.
 - `run_sandbox` is `run_level` on a small open board, for lesson snippets.
 
-A level can have hidden boards (`Level.variants`). Once the visible board is
-solved, the same code runs on each hidden one, and the level only counts as
-solved if every board is. A solved run is then scored: up to three stars
-(see `score`).
+A level can have several cases (`Level.cases`): each square a hidden goal
+might be on, and each other map. The code runs once for every case, and the
+level only counts as solved if it solves them all. A solved run is then
+scored: up to three stars (see `score`).
 """
 
 import ast
@@ -18,12 +18,12 @@ import contextlib
 import io
 import linecache
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 
 from .board import square_name
 from .constraints import check_constraints, code_lines, lint
 from .errors import ErrorInfo, explain
-from .levels import Level, sandbox_level
+from .levels import Case, Level, sandbox_level
 from .pieces import PIECES
 from .tracer import PLAYER_FILENAME, StepBudgetExceeded, Tracer
 from .words import count
@@ -69,9 +69,13 @@ class LevelResult:
     code_lines: int = 0
     truncated: bool = False  # the run had more steps than were recorded
     stars: list[Star] = field(default_factory=list)  # only for a solved run
-    # Set when the visible board was solved but a hidden one wasn't: this
-    # result is that board's run. {index, total, note, level: Level.describe()}
-    hidden_board: dict | None = None
+    # A level with several cases (Level.cases): this result is the verdict on
+    # the whole run, and `cases` holds each case's own result and recording,
+    # with its `label` and board (`level`, a Level.describe()). `case` is the
+    # one to show first: the first that failed, or the first if none did.
+    cases: list[dict] = field(default_factory=list)
+    case: int = 0
+    case_note: str = ""  # the run: how many cases it worked for; a case: which one it is
     duration_ms: float = 0.0
 
     def to_dict(self) -> dict:
@@ -101,22 +105,33 @@ def run_level(
     enforce_constraints: bool = True,
     hints_used: int = 0,
 ) -> LevelResult:
-    result = _run_board(level, code, line_budget=line_budget, enforce_constraints=enforce_constraints)
-    if result.status != "solved":
-        return result
-    total = len(level.variants)
-    for index, hidden in enumerate(level.variants, start=1):
-        # The code already passed the constraints on the visible board.
-        attempt = _run_board(hidden, code, line_budget=line_budget, enforce_constraints=False)
-        if attempt.status != "solved":
-            note = f"Your code solved the board you can see, but not hidden board {index} of {total}. This is its run."
-            attempt.hidden_board = {"index": index, "total": total, "note": note, "level": hidden.describe()}
-            return attempt
-    if total:
-        boards = "the hidden board" if total == 1 else f"all {total} hidden boards"
-        result.summary += f" It solved {boards} too."
-    result.stars = score(level, result.code_lines, hints_used)
+    cases = level.cases()
+    result = _run_board(cases[0].level, code, line_budget=line_budget, enforce_constraints=enforce_constraints)
+    # Code that never ran (it broke a rule, or has a syntax error) or never
+    # ended would do the same in every case, so it's reported once.
+    never_ran = result.status in ("constraint", "error") and result.lines_run == 0
+    if len(cases) > 1 and not never_ran and result.status != "timeout":
+        # The constraints were checked on the first case; they don't change between cases.
+        others = [_run_board(case.level, code, line_budget=line_budget, enforce_constraints=False) for case in cases[1:]]
+        result = _whole_run(level, cases, [result, *others])
+    if result.status == "solved":
+        result.stars = score(level, result.code_lines, hints_used)
     return result
+
+
+def _whole_run(level: Level, cases: list[Case], results: list[LevelResult]) -> LevelResult:
+    """The verdict on a run over several cases. Each case's recording goes in
+    `cases`; the verdict is the first failing case's (or the first's), without
+    its recording, so nothing is sent twice."""
+    recorded = []
+    for case, result in zip(cases, results, strict=True):
+        result.case_note = f"This run is the one {case.where}."
+        recorded.append({**result.to_dict(), "label": case.label, "level": case.level.describe()})
+    shown = next((index for index, result in enumerate(results) if result.status != "solved"), 0)
+    passed = sum(result.status == "solved" for result in results)
+    noun = level.case_words[1]
+    note = f"It worked for all {len(cases)} {noun}." if passed == len(cases) else f"It worked for {passed} of the {len(cases)} {noun}."
+    return replace(results[shown], steps=[], output="", cases=recorded, case=shown, case_note=note)
 
 
 def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints: bool) -> LevelResult:

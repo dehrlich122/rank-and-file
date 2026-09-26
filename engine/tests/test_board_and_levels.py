@@ -54,7 +54,8 @@ def test_describe_is_ready_for_the_ui():
         ({"map": ". .\n. .\n"}, "start square"),
         ({"map": "P P G\n"}, "more than one start"),
         ({"map": "P G\n. . .\n"}, "same number of squares"),
-        ({"map": "P G ?\n"}, "'?'"),
+        ({"map": "P G @\n"}, "'@'"),
+        ({"map": "P G ?\n"}, "not both"),
         ({"map": "P .\n"}, "goal square"),
         ({"api": ["fly"]}, "no ability 'fly'"),
         ({"surprise": 1}, "unknown key"),
@@ -105,11 +106,27 @@ def test_describe_puts_goals_and_rules_into_words():
     assert make_level("P G\n", par={"lines": 1}).star_goals()[1] == "Use 1 line of code or fewer (par)."
 
 
-def test_hidden_boards_share_the_level_but_not_its_map():
+def test_a_hidden_goal_is_one_case_per_question_mark():
+    level = make_level("? . ?\nP . .\n", start={"facing": "east"})
+    assert level.goal is None
+    assert level.goal_spots == [(0, 1), (2, 1)]
+    assert [(case.label, case.level.goal) for case in level.cases()] == [("a2", (0, 1)), ("c2", (2, 1))]
+    described = level.describe()
+    assert (described["goal"], described["goal_spots"], described["case_title"]) == (None, [[0, 1], [2, 1]], "Where the goal was")
+    assert described["goals"][0].startswith("Reach the goal. It's hidden on one of the 2 squares marked ?.")
+    assert make_level("P G\n").describe()["case_title"] == ""  # one case: no row of cases
+    with pytest.raises(LevelError, match="not both"):
+        make_level("P ?\n", variants=[{"map": "P G\n"}])
+
+
+def test_other_maps_share_the_level_but_not_its_map():
     level = make_level("P . G\n", variants=[{"map": "P G .\n"}], api=["move", "at_goal"])
-    [hidden] = level.variants
-    assert (hidden.goal, hidden.api, hidden.variants) == ((1, 0), ["move", "at_goal"], [])
-    assert level.describe()["goals"][-1] == "Your code must also solve 1 hidden board like this one, each a little different."
+    [other] = level.variants
+    assert (other.goal, other.api, other.variants) == ((1, 0), ["move", "at_goal"], [])
+    assert [case.label for case in level.cases()] == ["your board", "board 2"]
+    assert level.describe()["goals"][-1] == "Your code is also checked on 1 other board."
+    with pytest.raises(LevelError, match="only for the level's own map"):
+        make_level("P . G\n", variants=[{"map": "P ? .\n"}])
 
 
 def test_say_goals_point_to_the_sign_when_the_phrase_is_written_there():

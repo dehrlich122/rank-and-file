@@ -801,8 +801,30 @@ mechanic, never by solution code.
 
 ## Session 4 — 2026-09-26 · M2 play-test (`m2-feedback-depth`)
 
-### QA-016 · "Hidden boards": the name, and a goal that seems to move · Open
+The rest of PR #3's manual test list passed *(Designer, 2026-09-26)*:
+- saved progress and Reset progress
+- stars and par
+- hints
+- the solution comparison
+- giving up
+- "Next level" after Chapter 1
 
+Item 6 (hidden boards) became QA-016.
+
+### QA-016 · "Hidden boards": the name, and a goal that seems to move · Fixed
+
+- **Fixed** in `<commit>` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - The practice level is now **Blindfold**. It has one map, with no flag and four **?** squares (b3, b5, b6, b8). The Challenge panel says the goal is hidden on one of them and the code runs once for each.
+  - After a run, each ? square shows ✓ or ✗. Above the board, a row of buttons names every case ("b3 ✗", "b6 ✓", …) and replays that case's run, with the flag where the goal was.
+  - The outcome card follows the whole run: its headline (e.g. "Not there yet"), its colour, and "It worked for 1 of the 4 places the goal could be. This run is the one with the goal on b3." Replaying a case that worked still offers no "Next level" or comparison.
+  - "Hidden board" is gone from everything the player reads. The engine calls these **cases**. Other whole maps (`variants`) still work, shown as "board 2", …, for later levels whose layout varies.
+  - The lesson, brief, first hint and solution note are rewritten, the spoiler parts blind again.
+- **Retest:**
+  - Testing ground → Blindfold. Before running, the board shows four ? squares and no flag. The Challenge panel says the goal is on one of them and your code runs once for each.
+  - Run code that counts its way to one ? square. The card says how many places it worked for. Each ? shows ✓ or ✗, and the row above the board names the cases.
+  - Click a case in the row. Its run replays, with the flag where the goal was in that case. A case that worked still doesn't offer "Next level".
+  - Solve it properly. The card says it worked for all 4 places, with three stars, and every case in the row is ✓.
+  - Nothing on the page says "hidden board".
 - **Area:** hidden boards (M2 step 6), the practice level "Hidden Corridors"
 - **Observed** *(Designer, 2026-09-26)*:
   - The flag (goal) looks reachable with an ordinary move.

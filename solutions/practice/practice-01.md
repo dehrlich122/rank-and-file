@@ -1,1 +1,1 @@
-Ask, don't count. `pawn.at_goal()` tells you when you've arrived, so a loop that walks until it's true fits a corridor of any length. The same two lines solve every hidden board, which is the point: code that asks the board questions keeps working when the board changes.
+Ask, don't count. `pawn.at_goal()` tells you when you've arrived, so a loop that walks until it's true finds the goal on whichever square it's hiding. The same two lines work for every spot, which is the point: code that asks the board questions keeps working when the board changes.

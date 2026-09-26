@@ -15,7 +15,7 @@ This document records how the game is built and why. The design brief is
 | Game rules | Written once, in Python | The UI renders whatever the engine reports and never re-implements rules. The same code is unit-tested with pytest. |
 | Levels | YAML files with an ASCII map, plus a Markdown lesson | Easy to hand-author and diff; adding a level never needs engine changes. |
 | Scoring (M2) | The engine awards up to three stars: solved, within the line par, no hints opened | Scoring is a game rule, so it lives in Python with the rest. The UI passes how many hints were opened and draws the stars. |
-| Hidden boards (M2) | A level lists extra maps (`variants`); a solution must solve them all | Hard-coding the visible board fails, which forces the general idea. Explicit maps keep runs deterministic and levels hand-authored. |
+| Several cases (M2, QA-016) | A goal can be hidden on one of several squares marked `?`, and a level can list other maps (`variants`). The code runs once per case and must handle them all. | Hard-coding one case fails, which forces the general idea. The `?` squares are shown, so the player knows up front why counting won't do (QA-016 replaced an earlier "hidden boards" design that felt like a bait-and-switch). Explicit squares and maps keep runs deterministic and levels hand-authored. |
 | Progress (M2) | Saved in `localStorage`: solved levels, best stars, hints opened, each level's code | No backend; survives reloads. Settings → Reset progress clears it. |
 | Solutions in the app (M2) | Loaded lazily, one small file per level, only when the comparison opens | Nothing in the main bundle can spoil a level; `npm run check:bundle` guards it. |
 
@@ -63,18 +63,27 @@ what makes step, pause and rewind easy: nothing is re-executed.
 5. **Classify** the outcome and translate any error into plain language
    (`errors.py`), keeping the real traceback (trimmed to the player's frames)
    for the "show traceback" panel.
-6. **Hidden boards** *(M2)*: if the visible board is solved and the level has
-   `variants`, the same code runs on each hidden board (constraints were
-   already checked). The first one it fails on is returned instead, as that
-   board's own recording, with `hidden_board: {index, total, note, level}`
-   so the UI can draw that board in place of the visible one.
+6. **Cases** *(M2, QA-016)*: a level with several cases (`Level.cases()`:
+   one per `?` square a hidden goal might be on, plus one per other map) runs
+   the code once for each. The constraints are checked on the first only.
+   Code that never ran (a syntax error or a broken rule) is reported once.
+   - A run that never ends is also reported once.
+   - A level has `?` squares or other maps, never both.
+   - The result is the **verdict** on the whole run: the first failing case's
+     status (or the first case's), with stars when every case passed, and
+     `case_note` ("It worked for 3 of the 4 places the goal could be").
+   - It has no recording of its own. `cases` holds each case's result and
+     recording, with its `label` and board `level`. `case` is the one to show
+     first.
+   - The UI shows a row of cases above the board, with ✓ or ✗ on each `?`
+     square, and replays any case's run on its board.
 7. **Score** a solved run *(M2)*: `stars` holds three `{kind, earned, label}`
    entries. They are solved, within `par.lines`, and no hints opened; the
    last uses the `hintsUsed` count the UI sends with every run.
 
 | Outcome | Meaning |
 |---|---|
-| `solved` | Ran to the end with every objective met, on the visible board and every hidden one |
+| `solved` | Ran to the end with every objective met, in every case (see step 6) |
 | `incomplete` | Ran to the end, but an objective wasn't met (the summary says which) |
 | `finished` | Ran to the end on a board with no objectives (lesson snippets) |
 | `error` | Python or the game raised an error (syntax errors never start running) |
@@ -168,14 +177,16 @@ api: [move, turn_left, turn_right]      # abilities the piece has in this level 
 constraints: {max_lines: 4, min_comments: 1, require_nodes: [For], ban_nodes: []}
 par: {lines: 3}              # the par star: this many lines of code or fewer
 hints: ["nudge", "concept reminder", "partial example"]   # opened one at a time, on request
-variants:                    # optional hidden boards: the same level on other maps
+variants:                    # optional: the same level on other maps, which it must also solve
   - map: |
       ...
 lesson: ch01/ch01-l03.md
 starter: ""                  # optional initial editor contents
 ```
 
-Built-in map symbols: `.` floor, `#` wall, `P` start, `G` goal. Legend tiles:
+Built-in map symbols: `.` floor, `#` wall, `P` start, `G` goal, `?` a square
+a hidden goal might be on (a map has a `G` or `?` squares, not both; the code
+must reach the goal whichever `?` it's on). Legend tiles:
 - `floor`, `wall`
 - `sign`: blocks movement; needs `text`
 - `gate`: needs a `passphrase`, and blocks movement until opened.
@@ -207,7 +218,7 @@ Alongside each level:
   snippet joins the last step. So where the snippets go decides where the
   pages break (QA-010).
 - `solutions/<chapter>/<id>.py`: the reference solution. It must solve every
-  hidden board too, and earn all three stars (so every par is reachable).
+  case too, and earn all three stars (so every par is reachable).
 - `solutions/<chapter>/<id>.naive*.py`: approaches that must fail. The first line
   is `# expect: <outcome>` (e.g. `constraint`); the checker strips it before running.
 - `solutions/<chapter>/<id>.md`: the idiomatic-solution note (prose), shown

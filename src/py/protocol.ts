@@ -44,6 +44,8 @@ export interface LevelInfo {
   tiles: TileKind[][]; // tiles[y][x]; y = 0 is the bottom rank
   signs: Array<{ pos: Pos; text: string }>;
   goal: Pos | null;
+  goal_spots: Pos[]; // a hidden goal: the squares it might be on (drawn as ?)
+  case_title: string; // the title of the row of cases above the board; "" for a single case
   start: WorldState;
   objectives: { reach_goal: boolean; say: string[] };
   api: string[];
@@ -108,9 +110,21 @@ export interface LevelResult {
   code_lines: number;
   truncated: boolean;
   stars: Star[]; // only for a solved run
-  // The visible board was solved but this hidden one wasn't; the recording is this board's run.
-  hidden_board: { index: number; total: number; note: string; level: LevelInfo } | null;
+  // A level with several cases (a hidden goal's ? squares, other maps): this
+  // result is the verdict on the whole run, with no recording of its own;
+  // `cases` holds each case's result and recording. `case` is the one to show
+  // first (the first that failed). case_note: the run, how many cases it
+  // worked for; a case, which one it is.
+  cases: CaseResult[];
+  case: number;
+  case_note: string;
   duration_ms: number;
+}
+
+/** One case of a level (runner.run_level): its result, what to call it ("b3", "board 2") and its board. */
+interface CaseResult extends LevelResult {
+  label: string;
+  level: LevelInfo;
 }
 
 interface ReplResult {

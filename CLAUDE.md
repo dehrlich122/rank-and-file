@@ -153,8 +153,9 @@ solutions in `solutions/chNN/`. The Testing ground (outside the curriculum:
 `curriculum: false` in `levels/chapters.yaml`) uses `practice/` folders. The format is documented in
 `docs/ARCHITECTURE.md`. Adding a level must never require engine changes.
 `engine/tests/test_levels.py` checks every level automatically:
-- the reference solution solves it, on every hidden board (`variants`) too,
-  and earns all three stars, so the level's `par` is reachable
+- the reference solution solves it in every case (each `?` square a hidden
+  goal might be on, each other map) and earns all three stars, so the level's
+  `par` is reachable
 - each `<id>.naive*.py` fails with the outcome named on its first line
   (`# expect: constraint`)
 - lessons have ≤150 words of prose and 1–3 runnable snippets, and every snippet

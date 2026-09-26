@@ -88,10 +88,16 @@ const HEADLINE: Record<LevelResult["status"], string> = {
   timeout: "Endless loop",
 };
 
-/** The banner shown when playback reaches the end of a run. */
-export function outcomeCard(result: LevelResult, actions: HTMLElement[] = []): HTMLElement {
+/**
+ * The banner shown when playback reaches the end of a run. `run` is the whole
+ * run: its headline, colour and stars. `shown` is the recording being played:
+ * the run itself, or one of its cases (M2), which supplies the details.
+ */
+export function outcomeCard(run: LevelResult, shown: LevelResult, actions: HTMLElement[] = []): HTMLElement {
+  const result = shown;
   const body: HTMLElement[] = [];
-  if (result.hidden_board) body.push(h("p", { class: "hidden-note" }, result.hidden_board.note));
+  const note = [run.case_note, shown === run ? "" : shown.case_note].filter(Boolean).join(" ");
+  if (note) body.push(h("p", { class: "case-note" }, note));
   if (result.error) {
     body.push(errorCard(result.error));
   } else if (result.problems.length > 0) {
@@ -100,14 +106,14 @@ export function outcomeCard(result: LevelResult, actions: HTMLElement[] = []): H
     const summary = result.status === "solved" ? result.summary.replace(/^Solved! /, "") : result.summary;
     body.push(h("p", {}, summary));
   }
-  if (result.stars.length) body.push(starList(result.stars));
+  if (run.stars.length) body.push(starList(run.stars));
   if (result.truncated) {
     body.push(h("p", { class: "muted small" }, "This run was very long, so only its beginning was recorded for playback."));
   }
   return h(
     "div",
-    { class: `outcome outcome-${TONE[result.status]}`, role: "status" },
-    h("div", { class: "outcome-head" }, h("strong", {}, result.hidden_board ? "Not on every board" : HEADLINE[result.status]), ...actions),
+    { class: `outcome outcome-${TONE[run.status]}`, role: "status" },
+    h("div", { class: "outcome-head" }, h("strong", {}, HEADLINE[run.status]), ...actions),
     ...body,
   );
 }
