@@ -22,11 +22,13 @@ export interface SnippetResult {
 
 export type Facing = "north" | "east" | "south" | "west";
 export type Pos = [number, number];
-export type TileKind = "floor" | "wall" | "sign";
+export type TileKind = "floor" | "wall" | "sign" | "gate";
 
-export interface PieceState {
+/** The world at one moment: where the piece is, and which gates are open. */
+export interface WorldState {
   pos: Pos;
   facing: Facing;
+  opened: Pos[];
 }
 
 /** A level as the engine describes it (levels.Level.describe). */
@@ -42,7 +44,7 @@ export interface LevelInfo {
   tiles: TileKind[][]; // tiles[y][x]; y = 0 is the bottom rank
   signs: Array<{ pos: Pos; text: string }>;
   goal: Pos | null;
-  start: PieceState;
+  start: WorldState;
   objectives: { reach_goal: boolean; say: string[] };
   api: string[];
   constraints: { max_lines: number | null; min_comments: number; require_nodes: string[]; ban_nodes: string[] };
@@ -53,9 +55,10 @@ export interface LevelInfo {
 export type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };
 
 export interface GameEvent {
-  kind: "move" | "turn" | "bump";
-  state: PieceState; // the piece's state after the event
-  at?: Pos; // for bumps: the square it bumped into
+  kind: "move" | "turn" | "bump" | "gate_open" | "guard";
+  state: WorldState; // the whole world's state after the event
+  at?: Pos; // bump: the square bumped into; gate_open/guard: the gate
+  message?: string; // guard: what the guard said
 }
 
 export interface Var {
@@ -83,8 +86,8 @@ export type LevelStatus = "solved" | "incomplete" | "finished" | "error" | "time
 export interface LevelResult {
   status: LevelStatus;
   summary: string;
-  start: PieceState;
-  final: PieceState;
+  start: WorldState;
+  final: WorldState;
   steps: Step[];
   output: string;
   error: ErrorInfo | null;

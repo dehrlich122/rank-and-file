@@ -79,8 +79,10 @@ later, and they report their module as `builtins` so tracebacks read
 
 The UI replays the recording (`src/ui/playback.ts`). Frame 0 is the moment
 before the program starts; frame *k* is the moment after step *k*. Every event
-carries the piece's full state, so any frame can be drawn directly, which makes
-stepping back and scrubbing free. Stepping forward animates the frame's events.
+carries the whole world's state after it (`{pos, facing, opened}`: the piece,
+and which gates are open), so any frame can be drawn directly, which makes
+stepping back and scrubbing free. Moving obstacles would add their positions to
+that same state. Stepping forward animates the frame's events.
 The outcome card appears when playback reaches the last frame. Runs with more
 than 150 steps, and timeouts, open at the last frame instead of autoplaying.
 
@@ -141,6 +143,7 @@ map: |                       # top row is the highest rank; symbols separated by
   P . # #
 legend:                      # optional: extra symbols beyond the built-ins
   S: {tile: sign, text: "Words written on the signpost"}
+  X: {tile: gate, passphrase: Open sesame}
 start: {facing: north}
 objectives:                  # default [reach_goal]
   - reach_goal               # end the program on the goal square
@@ -154,7 +157,19 @@ starter: ""                  # optional initial editor contents
 ```
 
 Built-in map symbols: `.` floor, `#` wall, `P` start, `G` goal. Legend tiles:
-`floor`, `wall`, `sign` (blocks movement; needs `text`). Unknown keys, symbols,
+- `floor`, `wall`
+- `sign`: blocks movement; needs `text`
+- `gate`: needs a `passphrase`, and blocks movement until opened.
+  - Printing exactly the passphrase from a square orthogonally next to it opens
+    it, whichever way the piece faces. The runner feeds every printed line to
+    `World.hear`.
+  - Any other line printed there gets the guard's reply. That's a `guard` event
+    with a message shown in the console; it isn't an error.
+  - Walking into it while locked raises `GateLockedError`.
+  - Both guard lines live in `world.py`.
+  - `describe()` never includes the passphrase.
+
+Unknown keys, symbols,
 abilities or `ast` node names are errors, so typos fail in the level checker.
 `max_lines` counts lines containing code (blank and comment-only lines don't
 count); `require_nodes`/`ban_nodes` name `ast` node classes.

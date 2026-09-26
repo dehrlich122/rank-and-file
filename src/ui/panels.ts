@@ -2,6 +2,7 @@
 // and the outcome of a run.
 import type { ErrorInfo, LevelResult, Var } from "../py/protocol";
 import { h } from "./dom";
+import type { LogEntry } from "./playback";
 
 /** Shows the player's variables at the current moment of playback. */
 export class Inspector {
@@ -38,13 +39,15 @@ export class Inspector {
   }
 }
 
-/** Everything the program printed, up to the current moment of playback. */
+/** Everything printed up to the current moment of playback, plus what the game said. */
 export class Console {
   readonly element = h("pre", { class: "console" });
 
-  show(output: string): void {
-    if (output) {
-      this.element.textContent = output;
+  show(log: LogEntry[]): void {
+    if (log.length) {
+      this.element.replaceChildren(
+        ...log.map((entry) => (entry.kind === "game" ? h("span", { class: "game-message" }, entry.text) : entry.text)),
+      );
       this.element.classList.remove("empty");
     } else {
       this.element.textContent = "Nothing printed yet.";

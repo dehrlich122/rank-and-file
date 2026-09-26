@@ -53,9 +53,11 @@ class Tile(Enum):
     FLOOR = "floor"
     WALL = "wall"
     SIGN = "sign"  # a signpost: blocks movement and holds some text
+    GATE = "gate"  # locked until its passphrase is said next to it (see World.hear)
 
     @property
     def blocks(self) -> bool:
+        """Always in the way. (Gates block only while locked, which the World tracks.)"""
         return self in (Tile.WALL, Tile.SIGN)
 
 
@@ -65,6 +67,7 @@ class Board:
     height: int
     tiles: dict[Pos, Tile] = field(default_factory=dict)  # squares not listed are floor
     signs: dict[Pos, str] = field(default_factory=dict)  # text written on sign tiles
+    gates: dict[Pos, str] = field(default_factory=dict)  # the passphrase for each gate
 
     def contains(self, pos: Pos) -> bool:
         x, y = pos
@@ -75,3 +78,7 @@ class Board:
 
     def blocked(self, pos: Pos) -> bool:
         return not self.contains(pos) or self.tile(pos).blocks
+
+    def neighbours(self, pos: Pos) -> list[Pos]:
+        """The squares directly north, east, south and west of `pos` that are on the board."""
+        return [near for near in (step(pos, direction) for direction in Direction) if self.contains(near)]

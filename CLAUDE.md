@@ -46,7 +46,11 @@ npm run e2e -- http://localhost:4173/ --only=app   # against `npm run play`, one
   check is `check(label, fn)`, where `fn` throws via `expect`. It writes
   `e2e-results/report.json` plus failure screenshots with editors blurred.
   Add a check for every user-visible fix. Solutions are read from
-  `solutions/`, never written into a check.
+  `solutions/`, never written into a check. **Never put editor contents
+  into a check's message or return value.** Earlier checks type reference
+  solutions, and the app keeps each level's code for the session, so an
+  editor dump can leak a solution. Use `openLevel(id, { fresh: true })` for a
+  clean page.
 - After a hash navigation, wait for `.level[data-level-id="<id>"]`; the old view
   lingers for a moment. Inside `evaluate` strings, which are JS template
   literals, write regex escapes as `\\s`.

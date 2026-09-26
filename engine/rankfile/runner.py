@@ -172,7 +172,7 @@ def execute(
     """Run compiled player code under the tracer, capturing everything it prints."""
     remember_source(source)
     tracer = Tracer(line_budget, record=record)
-    output = _StepOutput(tracer)
+    output = _StepOutput(tracer, world)
     if world is not None:
         world.listeners.append(tracer.add_event)
     error = None
@@ -184,6 +184,7 @@ def execute(
     except BaseException as exc:
         error = exc
     finally:
+        output.finish_line()
         tracer.finish()
     return Execution(error, output.getvalue(), tracer)
 
@@ -198,15 +199,29 @@ def remember_source(code: str) -> None:
 
 
 class _StepOutput(io.StringIO):
-    """Collects everything printed, and tells the tracer which step printed it."""
+    """Collects everything printed, tells the tracer which step printed it, and
+    lets the world hear each finished line (that's how gates listen)."""
 
-    def __init__(self, tracer: Tracer):
+    def __init__(self, tracer: Tracer, world: World | None = None):
         super().__init__()
         self._tracer = tracer
+        self._world = world
+        self._line = ""  # the line being printed, until its newline arrives
 
     def write(self, text: str) -> int:
         self._tracer.add_output(text)
-        return super().write(text)
+        written = super().write(text)
+        if self._world is not None:
+            *finished, self._line = (self._line + text).split("\n")
+            for line in finished:
+                self._world.hear(line)
+        return written
+
+    def finish_line(self) -> None:
+        """The program stopped: a last line printed without a newline still counts."""
+        if self._world is not None and self._line:
+            self._world.hear(self._line)
+        self._line = ""
 
 
 def _solved_summary(level: Level) -> str:

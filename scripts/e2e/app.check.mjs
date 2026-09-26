@@ -13,8 +13,12 @@ export default async function appChecks({ browser: b, base, root, check }) {
   const solution = (id, suffix = "") => readFileSync(join(root, "solutions", "ch01", `${id}${suffix}.py`), "utf8");
   const withoutExpectLine = (code) => code.split("\n").slice(1).join("\n");
 
-  async function openLevel(id) {
-    await b.send("Page.navigate", { url: `${base}#/level/${id}` });
+  // NEVER put editor contents into a check's message or return value: earlier
+  // checks type reference solutions, and the app keeps each level's code for
+  // the session. Use `fresh` to start from a newly loaded page.
+  async function openLevel(id, { fresh = false } = {}) {
+    const url = fresh ? `${base}?fresh=${Date.now()}#/level/${id}` : `${base}#/level/${id}`;
+    await b.send("Page.navigate", { url });
     await b.waitFor(
       `document.querySelector('.level[data-level-id="${id}"] .board .piece') && !document.querySelector('.level-right .btn-primary').disabled`,
       60_000,
@@ -61,8 +65,60 @@ export default async function appChecks({ browser: b, base, root, check }) {
     });
   }
 
+  await check("level select marks solved levels", async () => {
+    await b.send("Page.navigate", { url: `${base}#/` });
+    const solved = await b.waitFor(`document.querySelectorAll('.level-card.solved').length`, 5000, "level cards");
+    expect(solved === LEVELS.length, `${solved} solved`);
+    return `${solved} solved`;
+  });
+
+  // -- QA-002: level 4's locked gate --------------------------------------------------------
+  await check("QA-002: level 4 starts with the guard's comment, and the panels don't give the passphrase away", async () => {
+    await openLevel("ch01-l04", { fresh: true });
+    const starterMatches = await b.evaluate(
+      `document.querySelector('.level-right .cm-content').innerText.trim() === "# Tell the guard at the gate that 'Pawns never retreat'"`,
+    );
+    await b.evaluate(`[...document.querySelectorAll('.tab')][1].click()`);
+    const panels = await b.evaluate(`document.querySelector('.level-left').innerText`);
+    expect(starterMatches, "the editor doesn't start with exactly the guard's comment");
+    expect(!/never retreat/i.test(panels), "the Learn/Challenge panels mention the passphrase");
+    expect(panels.includes("locked gate on b3"), "the Challenge panel doesn't mention the gate");
+    const gate = await b.evaluate(`!!document.querySelector('.board .gate') && !document.querySelector('.board .gate.open')`);
+    expect(gate, "no locked gate drawn");
+  });
+
+  await check("QA-002: solving level 4 opens the gate on the board", async () => {
+    await openLevel("ch01-l04");
+    await setCode(solution("ch01-l04"));
+    const r = await run();
+    const open = await b.evaluate(`!!document.querySelector('.board .gate.open')`);
+    expect(r.head === "Solved!" && open, `${brief(r)} | gate open: ${open}`);
+  });
+
+  await check("QA-002: a near miss next to the gate gets the guard's reply, then the gate stops the pawn", async () => {
+    await openLevel("ch01-l04");
+    await setCode(withoutExpectLine(solution("ch01-l04", ".naive3"))); // passphrase printed with its quote marks
+    const r = await run();
+    const guard = await b.evaluate(`[...document.querySelectorAll('.console .game-message')].map((e) => e.textContent)`);
+    const open = await b.evaluate(`!!document.querySelector('.board .gate.open')`);
+    expect(guard.join() === "The guard called your mother a hamster! The gate remains locked.", `guard said: ${JSON.stringify(guard)}`);
+    expect(!open, "the gate opened");
+    expect(r.text.includes("Does your father really smell of elderberries? Maybe try the passphrase first."), brief(r));
+    return brief(r);
+  });
+
+  await check("QA-002: saying it too early does nothing; the gate stays shut", async () => {
+    await openLevel("ch01-l04");
+    await setCode(withoutExpectLine(solution("ch01-l04", ".naive"))); // passphrase said far from the gate
+    const r = await run();
+    const guard = await b.evaluate(`document.querySelectorAll('.console .game-message').length`);
+    expect(guard === 0 && r.text.includes("elderberries"), `${brief(r)} | guard lines: ${guard}`);
+  });
+
   await check("step controls: rewind to the start, then step forward twice", async () => {
-    // continues from the solved level 5 above
+    await openLevel("ch01-l05");
+    await setCode(solution("ch01-l05"));
+    await run();
     await b.evaluate(`${button(0)}.click()`);
     const start = await b.evaluate(`document.querySelector('.step-label').textContent`);
     await b.evaluate(`${button(3)}.click()`);
@@ -75,13 +131,6 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(start.startsWith("Step 0 of"), `start label: ${start}`);
     expect(after.label.startsWith("Step 2 of") && after.highlighted && !after.outcome, JSON.stringify(after));
     return `${start} → ${after.label}`;
-  });
-
-  await check("level select marks solved levels", async () => {
-    await b.send("Page.navigate", { url: `${base}#/` });
-    const solved = await b.waitFor(`document.querySelectorAll('.level-card.solved').length`, 5000, "level cards");
-    expect(solved === LEVELS.length, `${solved} solved`);
-    return `${solved} solved`;
   });
 
   // -- mistakes get plain-language explanations (all deliberately wrong code) ----------

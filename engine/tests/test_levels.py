@@ -4,7 +4,8 @@ For each level (levels/chNN/<id>.yaml) it checks that:
 - the level file is valid and its id matches its file name;
 - the reference solution (solutions/chNN/<id>.py) solves it;
 - every naive solution (solutions/chNN/<id>.naive*.py) fails the way its
-  first line says it should (`# expect: <status>`);
+  first line says it should (`# expect: <status>`, optionally followed by the
+  error type, e.g. `# expect: error GateLockedError`);
 - the idiomatic-solution note (solutions/chNN/<id>.md) exists;
 - the lesson has at most 150 words of prose and 1-3 runnable snippets, each of
   which runs as expected (``` python run ``` must not fail; ``` python run error ```
@@ -35,11 +36,12 @@ def solutions_dir(path: Path) -> Path:
     return ROOT / "solutions" / path.parent.name
 
 
-def without_expect_line(code: str) -> tuple[str, str]:
+def without_expect_line(code: str) -> tuple[str, str | None, str]:
+    """Split off `# expect: <status> [ErrorType]`; returns (status, error type or None, code)."""
     first, _, rest = code.partition("\n")
-    match = re.fullmatch(r"# expect: (\w+)", first.strip())
-    assert match, "naive solutions must start with '# expect: <status>'"
-    return match.group(1), rest
+    match = re.fullmatch(r"# expect: (\w+)(?: (\w+))?", first.strip())
+    assert match, "naive solutions must start with '# expect: <status> [ErrorType]'"
+    return match.group(1), match.group(2), rest
 
 
 @pytest.fixture(params=LEVEL_FILES, ids=[path.stem for path in LEVEL_FILES])
@@ -80,10 +82,12 @@ def test_naive_solutions_fail_as_intended(level_file):
     naive_files = sorted(solutions_dir(level_file).glob(f"{level.id}.naive*.py"))
     assert naive_files, f"{level.id} needs at least one naive solution that must fail"
     for path in naive_files:
-        expected, code = without_expect_line(path.read_text(encoding="utf-8"))
+        expected, error_type, code = without_expect_line(path.read_text(encoding="utf-8"))
         assert expected != "solved"
         result = run_level(level, code)
         assert result.status == expected, f"{path.name}: expected {expected}, got {result.status}: {result.summary}"
+        if error_type:
+            assert result.error and result.error.type == error_type, f"{path.name}: expected {error_type}: {result.summary}"
 
 
 def test_idiomatic_note_exists(level_file):

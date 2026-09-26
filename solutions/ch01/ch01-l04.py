@@ -1,5 +1,5 @@
-# Walk to the gate, then say the password from the sign.
+# Tell the guard at the gate that 'Pawns never retreat'
 pawn.move(2)
 pawn.turn_left()
-pawn.move(2)
 print("Pawns never retreat")
+pawn.move(2)

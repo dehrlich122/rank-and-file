@@ -21,6 +21,8 @@ class LevelError(ValueError):
 # Map symbols every level understands. A level's `legend` can add more.
 START, GOAL = "P", "G"
 BUILTIN_SYMBOLS = {".": Tile.FLOOR, "#": Tile.WALL, START: Tile.FLOOR, GOAL: Tile.FLOOR}
+# Legend tiles that need one extra detail, e.g. `S: {tile: sign, text: "..."}`.
+TILE_DETAILS = {Tile.SIGN: "text", Tile.GATE: "passphrase"}
 
 ALLOWED_KEYS = {
     "id", "chapter", "title", "trains", "brief", "piece", "map", "legend", "start",
@@ -81,7 +83,8 @@ class Level:
             ],
             "signs": [{"pos": list(pos), "text": text} for pos, text in self.board.signs.items()],
             "goal": list(self.goal) if self.goal else None,
-            "start": {"pos": list(self.start), "facing": self.facing.value},
+            # Gates appear in `tiles`; their passphrases are deliberately left out.
+            "start": {"pos": list(self.start), "facing": self.facing.value, "opened": []},
             "objectives": asdict(self.objectives),
             "api": self.api,
             "constraints": asdict(self.constraints),
@@ -141,20 +144,24 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None]:
         raise LevelError("every map row must have the same number of squares")
 
     symbols = dict(BUILTIN_SYMBOLS)
-    sign_texts: dict[str, str] = {}
+    details: dict[str, str] = {}  # symbol -> its sign text or gate passphrase
     for symbol, meaning in legend.items():
         symbol = str(symbol)
         if symbol in BUILTIN_SYMBOLS:
             raise LevelError(f"legend can't redefine the built-in symbol {symbol!r}")
-        tile_name, text_on_sign = (meaning.get("tile"), meaning.get("text")) if isinstance(meaning, dict) else (meaning, None)
+        meaning = meaning if isinstance(meaning, dict) else {"tile": meaning}
         try:
-            symbols[symbol] = Tile(tile_name)
+            tile = symbols[symbol] = Tile(meaning.get("tile"))
         except ValueError:
-            raise LevelError(f"legend {symbol!r}: unknown tile {tile_name!r}") from None
-        if symbols[symbol] is Tile.SIGN:
-            if not text_on_sign:
-                raise LevelError(f"legend {symbol!r}: a sign needs text")
-            sign_texts[symbol] = str(text_on_sign)
+            raise LevelError(f"legend {symbol!r}: unknown tile {meaning.get('tile')!r}") from None
+        needs = TILE_DETAILS.get(tile)
+        unknown = set(meaning) - {"tile"} - ({needs} if needs else set())
+        if unknown:
+            raise LevelError(f"legend {symbol!r}: a {tile.value} doesn't take {', '.join(sorted(unknown))}")
+        if needs:
+            if not isinstance(meaning.get(needs), str) or not meaning[needs]:
+                raise LevelError(f"legend {symbol!r}: a {tile.value} needs {needs}")
+            details[symbol] = meaning[needs]
 
     board = Board(width, height)
     start: Pos | None = None
@@ -167,8 +174,10 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None]:
             tile = symbols[symbol]
             if tile is not Tile.FLOOR:
                 board.tiles[(x, y)] = tile
-            if symbol in sign_texts:
-                board.signs[(x, y)] = sign_texts[symbol]
+            if tile is Tile.SIGN:
+                board.signs[(x, y)] = details[symbol]
+            if tile is Tile.GATE:
+                board.gates[(x, y)] = details[symbol]
             if symbol == START:
                 if start is not None:
                     raise LevelError("the map has more than one start square (P)")

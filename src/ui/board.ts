@@ -1,8 +1,13 @@
-// The board, drawn as SVG: squares, walls, signposts, the goal and the piece.
+// The board, drawn as SVG: squares, tiles (walls, signposts, gates), the goal
+// and the piece.
 //
 // The board never decides anything. It draws the states the engine reported:
 // `show()` jumps straight to a state, `animate()` plays a step's events in order.
-import type { Facing, GameEvent, LevelInfo, PieceState, Pos } from "../py/protocol";
+//
+// Each tile type has its own draw function (TILE_ART below) and CSS classes, and
+// every colour comes from the CSS custom properties in styles.css, so a visual
+// redesign can reskin tiles without touching the logic.
+import type { Facing, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
 
 const SVG = "http://www.w3.org/2000/svg";
 const S = 64; // size of one square, in SVG units
@@ -20,6 +25,7 @@ export class BoardView {
   private readonly body: SVGGElement; // shakes on a bump
   private readonly pointer: SVGGElement; // rotates to show the facing
   private readonly flash: SVGRectElement;
+  private readonly gates = new Map<string, SVGGElement>(); // "x,y" -> gate art
   private angle = 0; // cumulative, so turns always take the short way round
   private timers: number[] = [];
 
@@ -38,12 +44,9 @@ export class BoardView {
         const [left, top] = corner([x, y], height);
         const light = (x + y) % 2 === 1;
         squares.append(svg("rect", { x: left, y: top, width: S, height: S, class: light ? "sq-light" : "sq-dark" }));
-        const tile = level.tiles[y]?.[x] ?? "floor";
-        if (tile === "wall") squares.append(wall(left, top));
-        if (tile === "sign") {
-          const text = level.signs.find((sign) => sign.pos[0] === x && sign.pos[1] === y)?.text ?? "";
-          squares.append(signpost(left, top, text));
-        }
+        const art = TILE_ART[level.tiles[y]?.[x] ?? "floor"]?.(left, top, level, [x, y]);
+        if (art) squares.append(art);
+        if (art?.classList.contains("gate")) this.gates.set(`${x},${y}`, art);
       }
     }
     this.element.append(squares, labels(width, height));
@@ -68,7 +71,7 @@ export class BoardView {
   }
 
   /** Jump straight to a state, with no animation. */
-  show(state: PieceState): void {
+  show(state: WorldState): void {
     this.cancel();
     this.piece.style.transition = "none";
     this.pointer.style.transition = "none";
@@ -103,12 +106,18 @@ export class BoardView {
     }
     this.place(event.state);
     if (event.kind === "bump" && event.at) this.bump(event.state.pos, event.at);
+    if (event.kind === "guard" && event.at) {
+      const gate = this.gates.get(`${event.at[0]},${event.at[1]}`);
+      if (gate) restartAnimation(gate, "refusing");
+    }
   }
 
-  private place(state: PieceState): void {
+  private place(state: WorldState): void {
     const [left, top] = corner(state.pos, this.level.height);
     this.piece.style.transform = `translate(${left + S / 2}px, ${top + S / 2}px)`;
     this.pointer.style.transform = `rotate(${this.angle}deg)`;
+    const opened = new Set((state.opened ?? []).map(([x, y]) => `${x},${y}`));
+    for (const [key, gate] of this.gates) gate.classList.toggle("open", opened.has(key));
   }
 
   private bump(from: Pos, at: Pos): void {
@@ -153,6 +162,18 @@ function labels(width: number, height: number): SVGGElement {
   return group;
 }
 
+// -- tile art -------------------------------------------------------------------
+
+type TileArt = (left: number, top: number, level: LevelInfo, pos: Pos) => SVGGElement;
+
+const TILE_ART: Record<TileKind, TileArt | null> = {
+  floor: null,
+  wall: (left, top) => wall(left, top),
+  sign: (left, top, level, [x, y]) =>
+    signpost(left, top, level.signs.find((sign) => sign.pos[0] === x && sign.pos[1] === y)?.text ?? ""),
+  gate: (left, top) => gate(left, top),
+};
+
 function wall(left: number, top: number): SVGGElement {
   const group = svg("g", { class: "wall" });
   group.append(
@@ -172,6 +193,26 @@ function signpost(left: number, top: number, text: string): SVGGElement {
     svg("rect", { x: left + 8, y: top + 10, width: S - 16, height: S * 0.34, rx: 3, class: "sign-board" }),
     svg("path", { d: `M ${left + 14} ${top + 18} h ${S - 28} M ${left + 14} ${top + 25} h ${S - 36}`, class: "sign-lines" }),
   );
+  return group;
+}
+
+/** A barred gate with a padlock. The `open` class lifts the bars (see styles.css). */
+function gate(left: number, top: number): SVGGElement {
+  const group = svg("g", { class: "gate" });
+  const title = svg("title", {});
+  title.textContent = "A locked gate. A guard keeps it shut.";
+  const bars = svg("g", { class: "gate-bars" });
+  for (let i = 0; i < 5; i++) {
+    bars.append(svg("rect", { x: left + 9 + i * 10.5, y: top + 6, width: 4, height: S - 12, rx: 1.5 }));
+  }
+  bars.append(svg("rect", { x: left + 6, y: top + 16, width: S - 12, height: 4, rx: 1.5 }));
+  bars.append(svg("rect", { x: left + 6, y: top + S - 20, width: S - 12, height: 4, rx: 1.5 }));
+  const lock = svg("g", { class: "gate-lock" });
+  lock.append(
+    svg("path", { d: `M ${left + S / 2 - 6} ${top + S / 2 - 2} v -5 a 6 6 0 0 1 12 0 v 5`, class: "gate-shackle" }),
+    svg("rect", { x: left + S / 2 - 9, y: top + S / 2 - 2, width: 18, height: 14, rx: 2.5, class: "gate-padlock" }),
+  );
+  group.append(title, svg("rect", { x: left + 2, y: top + 2, width: S - 4, height: S - 4, rx: 3, class: "gate-frame" }), bars, lock);
   return group;
 }
 

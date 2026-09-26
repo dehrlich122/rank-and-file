@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PieceState, Step } from "../py/protocol";
+import type { Step, WorldState } from "../py/protocol";
 import { BASE_STEP_MS, buildFrames, frameDuration, Player, type Frame } from "./playback";
 
-const start: PieceState = { pos: [0, 0], facing: "north" };
+const start: WorldState = { pos: [0, 0], facing: "north", opened: [] };
 
 function step(line: number, pos: [number, number] | null, output = ""): Step {
   return {
     line,
     scope: "<module>",
-    events: pos ? [{ kind: "move", state: { pos, facing: "north" } }] : [],
+    events: pos ? [{ kind: "move", state: { pos, facing: "north", opened: [] } }] : [],
     output,
     vars: [],
   };
@@ -20,7 +20,7 @@ describe("buildFrames", () => {
   it("starts before the first line and carries state and output forward", () => {
     const frames = buildFrames({ start, steps });
     expect(frames).toHaveLength(4);
-    expect(frames[0]).toEqual({ step: null, state: start, output: "" });
+    expect(frames[0]).toEqual({ step: null, state: start, output: "", log: [] });
     expect(frames[1]!.state.pos).toEqual([0, 1]);
     expect(frames[2]!.state.pos).toEqual([0, 1]); // printing doesn't move the pawn
     expect(frames[2]!.output).toBe("hi\n");
@@ -32,11 +32,34 @@ describe("buildFrames", () => {
     const multi: Step = {
       ...step(1, null),
       events: [
-        { kind: "move", state: { pos: [0, 1], facing: "north" } },
-        { kind: "turn", state: { pos: [0, 1], facing: "east" } },
+        { kind: "move", state: { pos: [0, 1], facing: "north", opened: [] } },
+        { kind: "turn", state: { pos: [0, 1], facing: "east", opened: [] } },
       ],
     };
-    expect(buildFrames({ start, steps: [multi] })[1]!.state).toEqual({ pos: [0, 1], facing: "east" });
+    expect(buildFrames({ start, steps: [multi] })[1]!.state).toEqual({ pos: [0, 1], facing: "east", opened: [] });
+  });
+
+  it("puts a guard's reply in the console right after the line that caused it", () => {
+    const said: Step = {
+      ...step(2, null, "hello\n"),
+      events: [{ kind: "guard", state: start, at: [0, 1], message: "The guard is not amused." }],
+    };
+    const frames = buildFrames({ start, steps: [step(1, null, "first\n"), said] });
+    expect(frames[2]!.log).toEqual([
+      { kind: "out", text: "first\n" },
+      { kind: "out", text: "hello\n" },
+      { kind: "game", text: "The guard is not amused." },
+    ]);
+    expect(frames[2]!.output).toBe("first\nhello\n"); // the program's own output stays separate
+  });
+
+  it("keeps opened gates in the state", () => {
+    const opened: Step = {
+      ...step(1, null),
+      events: [{ kind: "gate_open", state: { ...start, opened: [[1, 2]] }, at: [1, 2] }],
+    };
+    const frames = buildFrames({ start, steps: [opened, step(2, [0, 1])] });
+    expect(frames[1]!.state.opened).toEqual([[1, 2]]);
   });
 });
 

@@ -3,22 +3,36 @@
 // A run is recorded once (by the engine) and then replayed here, so moving
 // backwards never re-runs any code. Frame 0 is the moment before the program
 // starts; frame k is the moment after step k (the k-th line that ran).
-import type { GameEvent, LevelResult, PieceState, Step } from "../py/protocol";
+import type { GameEvent, LevelResult, Step, WorldState } from "../py/protocol";
 
 export interface Frame {
   step: Step | null; // null for frame 0
-  state: PieceState; // where the piece is after this frame
+  state: WorldState; // the world after this frame
   output: string; // everything printed up to and including this frame
+  log: LogEntry[]; // the console: printed output and game messages, in order
+}
+
+/** One console entry: something the program printed, or something the game said. */
+export interface LogEntry {
+  kind: "out" | "game";
+  text: string;
 }
 
 export function buildFrames(result: Pick<LevelResult, "start" | "steps">): Frame[] {
-  const frames: Frame[] = [{ step: null, state: result.start, output: "" }];
+  const frames: Frame[] = [{ step: null, state: result.start, output: "", log: [] }];
   let state = result.start;
   let output = "";
+  let log: LogEntry[] = [];
   for (const step of result.steps) {
     for (const event of step.events) state = event.state;
     output += step.output;
-    frames.push({ step, state, output });
+    // A guard's reply is caused by the line just printed, so it comes after it.
+    const added: LogEntry[] = step.output ? [{ kind: "out", text: step.output }] : [];
+    for (const event of step.events) {
+      if (event.message) added.push({ kind: "game", text: event.message });
+    }
+    if (added.length) log = [...log, ...added];
+    frames.push({ step, state, output, log });
   }
   return frames;
 }

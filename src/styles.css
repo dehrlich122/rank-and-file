@@ -42,6 +42,10 @@
   --pawn-stroke: #2a2622;
   --pointer: #2f6f4f;
   --coords: #8a8175;
+  --gate-frame: #c9b48e;
+  --gate-bars: #3f3a36;
+  --gate-lock: #c8961a;
+  --game-message: #8a4b00;
 
   color-scheme: light;
 }
@@ -82,6 +86,10 @@
     --pawn: #fdfbf6;
     --pointer: #245a3f;
     --coords: #8f877b;
+    --gate-frame: #8a7658;
+    --gate-bars: #211d1a;
+    --gate-lock: #e0b04a;
+    --game-message: #e6b555;
     color-scheme: dark;
   }
 }
@@ -706,6 +714,17 @@ pre {
   font-size: 13px;
 }
 
+/* What the game says (e.g. the guard at a gate), as opposed to what the program printed. */
+.console .game-message {
+  display: block;
+  margin: 2px 0;
+  padding-left: 8px;
+  border-left: 3px solid var(--game-message);
+  color: var(--game-message);
+  font-family: var(--font-ui);
+  font-style: italic;
+}
+
 /* ---- board ---- */
 
 .board {
@@ -812,6 +831,50 @@ pre {
   }
   60% {
     transform: translate(calc(var(--bx) * -0.3), calc(var(--by) * -0.3));
+  }
+}
+
+.gate-frame {
+  fill: var(--gate-frame);
+}
+
+.gate-bars {
+  fill: var(--gate-bars);
+  transform-box: fill-box;
+  transform-origin: top;
+  transition: transform 450ms ease-in-out, opacity 450ms ease-in-out;
+}
+
+.gate-padlock {
+  fill: var(--gate-lock);
+}
+
+.gate-shackle {
+  fill: none;
+  stroke: var(--gate-lock);
+  stroke-width: 3;
+}
+
+.gate-lock {
+  transition: opacity 300ms ease-in-out;
+}
+
+.gate.open .gate-bars {
+  transform: scaleY(0.12);
+  opacity: 0.55;
+}
+
+.gate.open .gate-lock {
+  opacity: 0;
+}
+
+.gate.refusing .gate-frame {
+  animation: refuse 650ms ease-out;
+}
+
+@keyframes refuse {
+  25% {
+    fill: var(--bad);
   }
 }
 

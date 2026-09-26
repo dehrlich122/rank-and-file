@@ -3,26 +3,26 @@ chapter: 1
 title: The Password
 trains: "print() and comments"
 brief: >-
-  Walk to the gate and say the password written on the signpost.
-  Leave a comment in your code for the next pawn, too.
+  A guard keeps the gate in front of the goal locked. Say the right words from
+  a square right next to the gate and it opens. The code you start with has
+  something to tell you.
 piece: pawn
 map: |
   # # # # #
-  # S # # #
-  G . . # #
+  # # # # #
+  G X . # #
   # # . # #
   # # P # #
 legend:
-  S: {tile: sign, text: "The password is: Pawns never retreat"}
+  X: {tile: gate, passphrase: Pawns never retreat}
 start: {facing: north}
-objectives:
-  - reach_goal
-  - say: Pawns never retreat
+objectives: [reach_goal]
 api: [move, turn_left, turn_right]
-constraints: {min_comments: 1}
+starter: |
+  # Tell the guard at the gate that 'Pawns never retreat'
 par: {lines: 4}
 hints:
-  - Two jobs here. Getting to the gate is like the last level; saying something is new.
-  - print() shows text in the console. Text goes inside quote marks, exactly as written on the sign.
-  - A comment is any line (or end of a line) starting with #. Python skips it.
+  - Read the code you start with. A comment is a note for humans, and this one is for you.
+  - print() is how your pawn speaks, but the guard only hears it from a square right next to the gate. When you print matters as much as what you print.
+  - Walk up beside the gate first, then print the passphrase exactly as the comment gives it. The quote marks in the comment already make it a Python string.
 lesson: ch01/ch01-l04.md

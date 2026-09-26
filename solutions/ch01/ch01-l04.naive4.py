@@ -1,5 +1,6 @@
 # expect: error GateLockedError
-# walks up to the gate without saying anything
+# the passphrase in the wrong case
 pawn.move(2)
 pawn.turn_left()
+print("pawns never retreat")
 pawn.move(2)

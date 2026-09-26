@@ -19,6 +19,10 @@ class BlockedError(GameError):
         self.at = at
 
 
+class GateLockedError(BlockedError):
+    """The piece tried to walk through a gate that hasn't been opened yet."""
+
+
 class LockedAbilityError(GameError, AttributeError):
     """The level hasn't unlocked this ability yet."""
 
@@ -39,5 +43,5 @@ class CantChangePieceError(GameError, AttributeError):
 # Tracebacks name an exception by its module, e.g. `rankfile.exceptions.BlockedError`.
 # Claiming the builtins module makes them read like Python's own errors
 # (`BlockedError: ...`), without the engine's internals in the way.
-for _error in (GameError, BlockedError, LockedAbilityError, GameArgumentError, CantChangePieceError):
+for _error in (GameError, BlockedError, GateLockedError, LockedAbilityError, GameArgumentError, CantChangePieceError):
     _error.__module__ = "builtins"

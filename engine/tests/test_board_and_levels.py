@@ -39,7 +39,7 @@ def test_describe_is_ready_for_the_ui():
     level = make_level("S G\nP .\n", legend={"S": {"tile": "sign", "text": "hi"}}, start={"facing": "east"})
     described = level.describe()
     assert described["tiles"] == [["floor", "floor"], ["sign", "floor"]]  # tiles[y][x]
-    assert described["start"] == {"pos": [0, 0], "facing": "east"}
+    assert described["start"] == {"pos": [0, 0], "facing": "east", "opened": []}
     assert described["goal"] == [1, 1]
     assert described["signs"] == [{"pos": [0, 1], "text": "hi"}]
     assert "hints" not in described
@@ -61,6 +61,8 @@ def test_describe_is_ready_for_the_ui():
         ({"start": {"facing": "up"}}, "facing"),
         ({"legend": {"#": "floor"}}, "built-in"),
         ({"legend": {"S": {"tile": "sign"}}}, "needs text"),
+        ({"legend": {"X": {"tile": "gate"}}}, "needs passphrase"),
+        ({"legend": {"X": {"tile": "gate", "passphrase": "hi", "text": "x"}}}, "doesn.t take text"),
         ({"piece": "dragon"}, "unknown piece"),
     ],
 )

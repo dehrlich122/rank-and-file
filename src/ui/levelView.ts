@@ -120,7 +120,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     placeholder: `Write your code here, then press Run.\nYour pawn is called ${String(source.data.piece ?? "pawn")}.`,
   });
   inspector.reset();
-  consoleView.show("");
+  consoleView.show([]);
 
   // -- loading the level ------------------------------------------------------------
   void (async () => {
@@ -149,7 +149,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     board.show(level.start);
     clearMarks(editor);
     inspector.reset();
-    consoleView.show("");
+    consoleView.show([]);
     outcomeHost.replaceChildren(h("p", { class: "muted" }, "Running…"));
     running = true;
     updateControls();
@@ -185,7 +185,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         setActiveLine(editor, frame.step?.line ?? null);
         setErrorLine(editor, null);
         inspector.show(frame.step?.vars ?? null);
-        consoleView.show(frame.output);
+        consoleView.show(frame.log);
         if (index === last) finish(result, animate ? durationMs : 0);
         else outcomeHost.replaceChildren();
       },
@@ -256,6 +256,11 @@ function describeChallenge(level: LevelInfo): HTMLElement[] {
     const fromSign = level.signs.some((sign) => sign.text.includes(phrase));
     goals.push(h("li", {}, fromSign ? "Say the phrase from the signpost: print it, exactly as written." : `Say "${phrase}" (print it).`));
   }
+  level.tiles.forEach((row, y) =>
+    row.forEach((tile, x) => {
+      if (tile === "gate") goals.push(h("li", {}, `Get past the locked gate on ${squareName([x, y])}. A guard keeps it shut.`));
+    }),
+  );
   if (goals.length) parts.push(h("h3", {}, "Goal"), h("ul", { class: "objectives" }, ...goals));
 
   for (const sign of level.signs) {
