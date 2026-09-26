@@ -669,8 +669,11 @@ mechanic, never by solution code.
   - Works with the code on the right, at the bottom and on the left.
   - With reduced animations, the change is instant.
 
-### QA-012 · Bottom layout: controls and outcome too wide · Open
+### QA-012 · Bottom layout: controls and outcome too wide · Fixed
 
+- **Fixed** in `1b1f9b2` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - Beside the editor, from top to bottom: the playback bar (buttons, slider, step, speed on one line), then the outcome or error card (scrolls if it's long), then Variables and Console side by side.
+  - The board's row keeps an empty space on the right, the same width as the Learn panel, so the board is centred on the screen.
 - **Area:** UI, level layout (continues QA-009)
 - **Observed** *(Designer, 2026-09-26)*: with the code at the bottom, the
   whole playback line (buttons, slider, speed) and the outcome/error card are
@@ -696,8 +699,11 @@ mechanic, never by solution code.
   - Switch between Bottom and Right mid-run: the playback position and the
     outcome card come along. Right and left are unchanged.
 
-### QA-013 · Collapsing the Learn panel: the board stays put · Open
+### QA-013 · Collapsing the Learn panel: the board stays put · Fixed
 
+- **Fixed** in `1b1f9b2` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - The Learn and code panels are both 29% of the window width, kept between 340 and 440px. In a 1400px window, the code panel is now 406px wide (it was about 510) and the board is 514px.
+  - Collapsed, the panel becomes a strip at the outer edge of its column. The rest of that column is left empty, so nothing else moves.
 - **Area:** UI, level layout (reworks QA-011)
 - **Observed** *(Designer, 2026-09-26)*: collapsing made things worse in
   every layout, and most of all with the code at the bottom. The board
