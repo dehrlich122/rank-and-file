@@ -115,6 +115,34 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(guard === 0 && r.text.includes("elderberries"), `${brief(r)} | guard lines: ${guard}`);
   });
 
+  // -- QA-004: level 5's gate mid-route ------------------------------------------------------
+  await check("QA-004: level 5 has the gate on b5 and the guard's comment, with no passphrase in the panels", async () => {
+    await openLevel("ch01-l05", { fresh: true });
+    const starterMatches = await b.evaluate(
+      `document.querySelector('.level-right .cm-content').innerText.trim() === "# Tell the guard you are 'Checking out' to get to the next chapter."`,
+    );
+    await b.evaluate(`[...document.querySelectorAll('.tab')][1].click()`);
+    const panels = await b.evaluate(`document.querySelector('.level-left').innerText`);
+    expect(starterMatches, "the editor doesn't start with exactly the guard's comment");
+    expect(!/checking out/i.test(panels), "the Learn/Challenge panels mention the passphrase");
+    expect(panels.includes("locked gate on b5") && panels.includes("At most 13 lines"), "Challenge panel: gate on b5 / 13-line limit");
+  });
+
+  await check("QA-004: the line limit still rejects one move per line", async () => {
+    await openLevel("ch01-l05");
+    await setCode(withoutExpectLine(solution("ch01-l05", ".naive")));
+    const r = await run();
+    expect(r.head === "Check the rules" && r.text.includes("at most 13 lines"), brief(r));
+    return brief(r);
+  });
+
+  await check("QA-004: the old route with nothing said is stopped at the gate", async () => {
+    await openLevel("ch01-l05");
+    await setCode(withoutExpectLine(solution("ch01-l05", ".naive2")));
+    const r = await run();
+    expect(r.text.includes("elderberries"), brief(r));
+  });
+
   await check("step controls: rewind to the start, then step forward twice", async () => {
     await openLevel("ch01-l05");
     await setCode(solution("ch01-l05"));

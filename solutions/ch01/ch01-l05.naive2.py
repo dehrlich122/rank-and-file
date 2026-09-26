@@ -1,12 +1,11 @@
-# Tell the guard you are 'Checking out' to get to the next chapter.
+# expect: error GateLockedError
+# the old route, with nothing said at the gate
 pawn.move(3)
 pawn.turn_left()
 pawn.move(2)
 pawn.turn_left()
 pawn.move(2)
 pawn.turn_right()
-pawn.move()
-print("Checking out")
-pawn.move(2)
+pawn.move(3)
 pawn.turn_right()
 pawn.move(4)

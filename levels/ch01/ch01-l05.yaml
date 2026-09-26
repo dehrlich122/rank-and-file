@@ -1,23 +1,29 @@
 id: ch01-l05
 chapter: 1
 title: The Winding Path
-trains: "Chapter review: calls, arguments and sequencing together"
-brief: A long, winding path, and exactly enough lines to walk it if you plan well.
+trains: "Chapter review: calls, arguments, order, print() and comments"
+brief: >-
+  A long, winding path with a guarded gate partway along. Plan the route before
+  you write it, and read the code you're given.
 piece: pawn
 map: |
   # . . . . G
-  # . # # # #
+  # X # # # #
   # . # # # #
   # . . . # #
   # # # . # #
   P . . . # #
+legend:
+  X: {tile: gate, passphrase: Checking out}
 start: {facing: east}
 objectives: [reach_goal]
 api: [move, turn_left, turn_right]
-constraints: {max_lines: 9}
-par: {lines: 9}
+starter: |
+  # Tell the guard you are 'Checking out' to get to the next chapter.
+constraints: {max_lines: 13}  # par + 2 (QA-004); par comes from scripts/gen_solutions.py
+par: {lines: 11}
 hints:
-  - Break the path into straight pieces. How many straights and how many corners are there?
-  - Each straight piece can be a single line if you give move() an argument.
-  - "Write the plan as comments first (# east 3, # turn ...), then turn each comment into code. Comments don't count as lines."
+  - Break the path into straight pieces. How many straights and corners are there, and where along the way is the gate?
+  - Each straight can be a single line if you give move() an argument. Read the comment in your code before you reach the gate.
+  - "The guard only listens from the square right next to the gate, so one straight has to stop short of it. Plan with comments first (# east 3, # turn ...); comments don't count as lines."
 lesson: ch01/ch01-l05.md
