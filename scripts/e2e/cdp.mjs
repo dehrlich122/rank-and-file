@@ -65,22 +65,41 @@ export async function launch({ width = 1400, height = 860 } = {}) {
   let nextId = 1;
   const waiting = new Map();
   const listeners = [];
+  // A crashed page never answers, so once it crashes (or the connection drops)
+  // every waiting and future call fails straight away instead of stalling the run.
+  let dead = null;
+  const failAll = (reason) => {
+    dead ??= reason;
+    for (const { reject, timer } of waiting.values()) {
+      clearTimeout(timer);
+      reject(new Error(dead));
+    }
+    waiting.clear();
+  };
   ws.onmessage = ({ data }) => {
     const message = JSON.parse(data);
     if (message.id && waiting.has(message.id)) {
-      const { resolve, reject } = waiting.get(message.id);
+      const { resolve, reject, timer } = waiting.get(message.id);
+      clearTimeout(timer);
       waiting.delete(message.id);
       if (message.error) reject(new Error(message.error.message));
       else resolve(message.result);
     } else if (message.method) {
+      if (message.method === "Inspector.targetCrashed") failAll("the page crashed (Chrome's renderer died)");
       for (const listener of listeners) listener(message);
     }
   };
+  ws.onclose = () => failAll("the connection to Chrome closed");
 
-  const send = (method, params = {}) =>
+  const send = (method, params = {}, timeoutMs = 60_000) =>
     new Promise((resolve, reject) => {
+      if (dead) return reject(new Error(dead));
       const id = nextId++;
-      waiting.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        waiting.delete(id);
+        reject(new Error(`no reply to ${method} after ${timeoutMs / 1000} s`));
+      }, timeoutMs);
+      waiting.set(id, { resolve, reject, timer });
       ws.send(JSON.stringify({ id, method, params }));
     });
 
@@ -115,6 +134,7 @@ export async function launch({ width = 1400, height = 860 } = {}) {
       logs.push(`[log.${message.params.entry.level}] ${message.params.entry.text}`);
     }
   });
+  await send("Inspector.enable");
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Log.enable");
