@@ -7,6 +7,10 @@ steps, then mark it **Verified** once the designer has re-checked it.
 
 Status: **Open** → **Fixed** (awaiting retest) → **Verified**
 
+Every fix also gets automated browser checks in `npm run e2e`, named after the
+QA id (e.g. "QA-005: …"). If one ever fails, `e2e-results/report.json` shows
+which step broke, with a screenshot.
+
 No spoilers here either (see `CLAUDE.md`): describe levels by concept and
 mechanic, never by solution code.
 
@@ -14,8 +18,10 @@ mechanic, never by solution code.
 
 ## Session 1 — 2026-09-26 · M1 vertical slice (`m1-vertical-slice`)
 
-### QA-001 · Playback speed resets on every level · Open
+### QA-001 · Playback speed resets on every level · Fixed
 
+- **Fixed** in `8d9687a` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - Speed is now a field of the shared settings store (`src/settings.ts`, together with QA-006). It's saved in localStorage, so it also survives a reload.
 - **Area:** UI, playback controls
 - **Observed:** The speed selector goes back to 1× whenever a new level opens.
   The select is rebuilt per level with 1× preselected
@@ -30,8 +36,13 @@ mechanic, never by solution code.
 - **Retest:** Set 2× on level 1, go to level 2 via Next and via the level
   select: selector shows 2× and playback runs at 2×.
 
-### QA-002 · Level 4 (`ch01-l04`, "The Password") redesign · Open
+### QA-002 · Level 4 (`ch01-l04`, "The Password") redesign · Fixed
 
+- **Fixed** in `bc8320d` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - "Exact match" means nothing is trimmed. A trailing space, a different capital or the quote marks all get the hamster line.
+  - Every line printed next to a *still locked* gate gets the guard's reply, not just near misses. Once the gate is open, it stops listening.
+  - The guard's reply appears in the console as a game message, set apart from printed output. The gate also flashes.
+  - New brief and hints (no passphrase), plus one lesson line about reading the code you start with. The solution note was rewritten.
 - **Area:** Level content + one new board mechanic
 - **Observed:** The passphrase sits on a signpost off to the side, printing it
   anywhere in the program counts, and a comment is required
@@ -115,8 +126,11 @@ mechanic, never by solution code.
   - No comment is required. The brief and instructions panel don't show the
     passphrase. The starter code shows the comment above word for word.
 
-### QA-003 · Autocomplete for calls you've already written · Open
+### QA-003 · Autocomplete for calls you've already written · Fixed
 
+- **Fixed** in `1f12e64` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - A call counts as typed once its opening `(` is typed. Pasting counts as typing, since it's the player's own action. Known calls last for the level until the tab is closed; they aren't saved across reloads.
+  - Noticed while testing: pressing Enter after an unfinished line like `pawn.` gives the new line Python's continuation indent. That's CodeMirror's normal Python indentation.
 - **Area:** UI, code editor + scratch REPL (feature request)
 - **Observed:** Every call has to be typed out in full, every time. Real
   editors and REPLs rarely make you do that. The editor also already pops up
@@ -214,8 +228,10 @@ mechanic, never by solution code.
   - Plain calls: after one `print(...)`, `p` offers `print()`
     and `pa` closes the list. Nothing pops up inside a comment or a string.
 
-### QA-004 · Level 5 (`ch01-l05`, "The Winding Path") rework · Open
+### QA-004 · Level 5 (`ch01-l05`, "The Winding Path") rework · Fixed
 
+- **Fixed** in `bdf8755` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - The script found a minimum of 11 lines with the gate, so `par` is 11 and `max_lines` is 13. One move per line needs 19.
 - **Area:** Level content (reuses QA-002's gate)
 - **Depends on:** QA-002. The locked gate mechanic has to exist first. Its
   rules carry over unchanged: an exact passphrase match, said from an
@@ -268,8 +284,10 @@ mechanic, never by solution code.
 
 ## Session 2 — 2026-09-26 · M1 vertical slice (`m1-vertical-slice`)
 
-### QA-005 · Playback buttons: new scheme, Play doubles as Run · Open
+### QA-005 · Playback buttons: new scheme, Play doubles as Run · Fixed
 
+- **Fixed** in `a0ac8e7` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - **Choice to check on retest:** after an edit, the board stays where the last run left it, and the outcome card dims with "Your code has changed since this run". The label under the buttons says "Code changed since the last run." The next run starts from the beginning.
 - **Area:** UI, playback controls
 - **Observed:** The five buttons under the board are ⏮ (back to the start),
   ◀ (step back), ▶/⏸ (play/pause), ▶| (step forward) and ⏭ (jump to the
@@ -330,8 +348,14 @@ mechanic, never by solution code.
     marked. Double left goes back to before the first line.
   - The Run button and Ctrl+Enter still work.
 
-### QA-006 · Settings menu on every screen · Open
+### QA-006 · Settings menu on every screen · Fixed
 
+- **Fixed** in `8d9687a` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - Animations offers **Match system / Full / Reduced** (default: Match system).
+  - Code text sizes are Small 13, Medium 15, Large 17 and Extra large 20 px.
+  - Clicking outside the menu also closes it.
+  - The Settings button sits at the right of the top bar.
+  - Colour tokens now use `light-dark()`, so forcing a theme just switches `color-scheme`.
 - **Area:** UI, app shell (feature request)
 - **Observed:** There's no settings menu. The only preference in the game,
   playback speed, is a dropdown under the board, and it resets on every level
@@ -401,8 +425,9 @@ mechanic, never by solution code.
     the other way round. The theme can be forced light or dark
     whatever the system says, and set back to follow the system.
 
-### QA-007 · Selected text doesn't show on highlighted lines · Open
+### QA-007 · Selected text doesn't show on highlighted lines · Fixed
 
+- **Fixed** in `7366901` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
 - **Area:** UI, code editor (bug)
 - **Observed:** Highlighting text on line 1 to copy and paste it doesn't
   work. Line 1 had the yellow playback highlight (the step line) at the time
