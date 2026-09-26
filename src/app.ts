@@ -4,8 +4,9 @@
 //   #/                 level select
 //   #/level/<id>       a level
 //   #/harness          the raw Python harness from Milestone 0
-import { chapters, findLevel } from "./content";
+import { chapterName, chapters, findLevel } from "./content";
 import { mountHarness } from "./harness";
+import { progress } from "./progress";
 import { PyClient, startPythonWorker, type ClientStatus } from "./py/client";
 import { applyToDocument, settings } from "./settings";
 import { h } from "./ui/dom";
@@ -19,7 +20,11 @@ export function startApp(root: HTMLElement): void {
   applyToDocument(settings.get());
   settings.subscribe(applyToDocument);
 
-  const dialog = new SettingsDialog(settings);
+  const dialog = new SettingsDialog(settings, () => {
+    progress.reset();
+    context.knownCalls.clear();
+    route(); // redraw the screen from the cleared progress
+  });
   const status = h("span", { class: "status", "data-state": "loading" }, "Loading Python…");
   const settingsButton = h(
     "button",
@@ -41,9 +46,10 @@ export function startApp(root: HTMLElement): void {
 
   // Esc opens settings from anywhere, unless something else used that Esc
   // first (closing the autocomplete list or the search panel in the editor):
-  // CodeMirror marks the keys it handles with preventDefault().
+  // CodeMirror marks the keys it handles with preventDefault(). With a dialog
+  // open (Settings, or the solution comparison), Esc closes that instead.
   document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape" || event.defaultPrevented || dialog.isOpen) return;
+    if (event.key !== "Escape" || event.defaultPrevented || document.querySelector("dialog[open]")) return;
     event.preventDefault();
     dialog.open();
   });
@@ -53,8 +59,6 @@ export function startApp(root: HTMLElement): void {
     client,
     repl: new ReplPanel(client),
     settingsDialog: dialog,
-    solved: new Set(),
-    drafts: new Map(),
     knownCalls: new Map(),
   };
   let unmount: () => void = () => {};
@@ -69,7 +73,7 @@ export function startApp(root: HTMLElement): void {
       const chapter = chapters.find((c) => c.chapter === source.chapter);
       const number = (chapter?.levels.indexOf(source) ?? -1) + 1;
       crumbs.replaceChildren(
-        h("a", { href: "#/" }, chapter ? `Chapter ${chapter.chapter} · ${chapter.title}` : "Levels"),
+        h("a", { href: "#/" }, chapter ? chapterName(chapter) : "Levels"),
         h("span", { class: "crumb-sep" }, "/"),
         h("span", {}, `${number}. ${source.title}`),
       );
@@ -81,7 +85,7 @@ export function startApp(root: HTMLElement): void {
       document.title = "Harness · Rank & File";
     } else {
       crumbs.replaceChildren();
-      main.replaceChildren(renderLevelSelect(chapters, context.solved));
+      main.replaceChildren(renderLevelSelect(chapters, progress));
       document.title = "Rank & File";
     }
     window.scrollTo(0, 0);

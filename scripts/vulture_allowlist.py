@@ -17,13 +17,17 @@ pieces.Pawn.position
 
 # Level fields read by the level checker (engine/tests/test_levels.py), which
 # vulture doesn't scan.
-levels.Level.hints
 levels.Level.lesson
 
 # Dataclass fields that are serialised to JSON (asdict) for the UI.
 runner.SnippetResult.duration_ms
 runner.LevelResult.final
 runner.LevelResult.duration_ms
+runner.LevelResult.stars
+runner.LevelResult.case
+runner.LevelResult.case_note
+runner.Star.earned
+runner.Star.label
 tracer.Step.scope
 tracer.Step.vars
 

@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { applyToDocument, DEFAULTS, sanitize, SettingsStore, type StorageLike } from "./settings";
-
-function memoryStorage(initial: Record<string, string> = {}): StorageLike & { data: Record<string, string> } {
-  const data = { ...initial };
-  return { data, getItem: (key) => data[key] ?? null, setItem: (key, value) => void (data[key] = value) };
-}
+import { applyToDocument, DEFAULTS, sanitize, SettingsStore } from "./settings";
+import type { StorageLike } from "./storage";
+import { memoryStorage } from "./storage.fake";
 
 describe("SettingsStore", () => {
   it("starts from the defaults", () => {

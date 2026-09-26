@@ -52,6 +52,7 @@
   --gate-bars: light-dark(#3f3a36, #211d1a);
   --gate-lock: light-dark(#c8961a, #e0b04a);
   --game-message: light-dark(#8a4b00, #e6b555);
+  --star: light-dark(#c8961a, #e0b04a);
 }
 
 :root[data-theme="light"] {
@@ -156,6 +157,12 @@ pre {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-text);
+}
+
+/* for actions that can't be undone, e.g. Reset progress */
+.btn-danger {
+  border-color: var(--bad);
+  color: var(--bad);
 }
 
 .btn-small {
@@ -336,6 +343,54 @@ pre {
 .level-text {
   display: flex;
   flex-direction: column;
+}
+
+/* a solved level's best stars (M2), or a note that its solution was seen */
+.card-stars,
+.card-tag {
+  margin-left: auto;
+}
+
+.card-stars {
+  display: inline-flex;
+  gap: 1px;
+  color: var(--star);
+}
+
+
+/* the stars on a solved run's outcome card, each with its reason */
+.stars {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.stars li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stars li.earned {
+  color: var(--text);
+}
+
+.card-stars .icon,
+.stars .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.stars .icon {
+  color: var(--muted);
+}
+
+.stars li.earned .icon {
+  color: var(--star);
 }
 
 .home footer {
@@ -644,6 +699,35 @@ pre {
   margin: 6px 0 0;
 }
 
+/* hints (src/ui/hints.ts), opened one at a time */
+.hints .hint-list {
+  margin: 6px 0 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 6px;
+}
+
+.hints .hint-list li:focus {
+  outline: none;
+}
+
+.hints .hint-button {
+  margin-top: 8px;
+}
+
+.hints p {
+  margin: 6px 0 0;
+}
+
+/* a confirm step inside the page (src/ui/dialog.ts): giving up, Reset progress */
+.confirm-step {
+  margin-top: 8px;
+}
+
+.confirm-step p {
+  margin: 0 0 6px;
+}
+
 .sign-text {
   margin: 12px 0 0;
   padding: 8px 12px;
@@ -665,6 +749,25 @@ pre {
   display: flex;
   justify-content: center;
   min-height: 200px;
+}
+
+/* above the board after a run with several cases (M2): one button per case */
+.board-host:has(.case-row) {
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.case-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 8px;
+}
+
+.case-note {
+  font-weight: 550;
 }
 
 .level-right {
@@ -967,7 +1070,8 @@ pre {
   stroke-linecap: round;
 }
 
-.goal-ring {
+.goal-ring,
+.spot-ring {
   fill: none;
   stroke: var(--goal);
   stroke-width: 3;
@@ -985,6 +1089,29 @@ pre {
 .celebrate .goal-ring {
   stroke-dasharray: none;
   animation: glow 1.2s ease-in-out infinite alternate;
+}
+
+/* a square a hidden goal might be on (M2, src/ui/board.ts): ? before a run, then ✓ or ✗ */
+.spot {
+  --spot: var(--goal);
+}
+
+.spot-pass {
+  --spot: var(--good);
+}
+
+.spot-fail {
+  --spot: var(--bad);
+}
+
+.spot-ring {
+  stroke: var(--spot);
+  opacity: 0.8;
+}
+
+.spot-mark {
+  font: 700 26px var(--font-ui);
+  fill: var(--spot);
 }
 
 @keyframes glow {
@@ -1392,7 +1519,8 @@ pre {
   gap: 6px;
 }
 
-.settings-dialog {
+.settings-dialog,
+.compare-dialog {
   width: min(460px, 92vw);
   padding: 18px 22px 16px;
   border: 1px solid var(--border);
@@ -1402,18 +1530,48 @@ pre {
   box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
 }
 
-.settings-dialog::backdrop {
+.settings-dialog::backdrop,
+.compare-dialog::backdrop {
   background: rgb(0 0 0 / 0.35);
 }
 
-.settings-head {
+/* the idiomatic-solution comparison (src/ui/compare.ts) */
+.compare-dialog {
+  width: min(1040px, 94vw);
+}
+
+.compare-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.compare-columns h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+
+.compare-code {
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.compare-note {
+  margin-top: 14px;
+  line-height: 1.55;
+}
+
+.dialog-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
 }
 
-.settings-head h2 {
+.dialog-head h2 {
   font-size: 18px;
 }
 
@@ -1431,6 +1589,12 @@ pre {
 
 .settings-dialog fieldset p {
   margin: -2px 0 6px;
+}
+
+/* Reset progress sits apart from the everyday settings */
+.settings-dialog .reset-progress {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
 }
 
 .choices {

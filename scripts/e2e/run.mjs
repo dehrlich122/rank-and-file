@@ -35,6 +35,15 @@ mkdirSync(outDir, { recursive: true });
 const started = Date.now();
 const report = { base, startedAt: new Date().toISOString(), suites: [] };
 const browser = await launch();
+// A `?fresh=` page load is like a first visit: everything the game saved is
+// cleared except the settings, so no editor holds code saved by an earlier
+// check. (Clearing every other key, rather than naming the progress key,
+// keeps that true if a key is renamed.) `?reload=` keeps everything.
+await browser.send("Page.addScriptToEvaluateOnNewDocument", {
+  source: `if (location.search.includes("fresh=")) {
+    for (const key of Object.keys(localStorage)) if (key.startsWith("rank-and-file:") && key !== "rank-and-file:settings") localStorage.removeItem(key);
+  }`,
+});
 try {
   for (const [name, run] of Object.entries(suites)) {
     if (only && only !== name) continue;

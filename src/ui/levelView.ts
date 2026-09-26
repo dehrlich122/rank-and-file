@@ -10,18 +10,18 @@ import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMark
 import { renderLesson, type Lesson } from "./lesson";
 import { Console, Inspector, noticeCard, outcomeCard } from "./panels";
 import { callCompletion, KnownCalls } from "./completion";
+import { HelpPanel } from "./help";
 import { icon, type IconName } from "./icons";
 import { Player, buildFrames, consoleAt, controlStates } from "./playback";
 import type { ReplPanel } from "./repl";
 import type { SettingsDialog } from "./settingsDialog";
+import { progress } from "../progress";
 import { SPEEDS, settings } from "../settings";
 
 export interface LevelContext {
   client: PyClient;
   repl: ReplPanel;
   settingsDialog: SettingsDialog;
-  solved: Set<string>;
-  drafts: Map<string, string>; // code per level, kept while the tab is open
   knownCalls: Map<string, KnownCalls>; // calls typed per level, for autocomplete (QA-003)
 }
 
@@ -31,10 +31,14 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const { client } = context;
   let level: LevelInfo | null = null;
   let board: BoardView | null = null;
+  let caseBoard: BoardView | null = null; // the board of the case being replayed (M2), shown instead
+  const shownBoard = () => caseBoard ?? board;
+  let runResult: LevelResult | null = null; // the last run as a whole: its verdict, stars and cases
   let player: Player | null = null;
   let lesson: Lesson | null = null;
+  let help: HelpPanel | null = null;
   let running = false;
-  let lastResult: LevelResult | null = null;
+  let lastResult: LevelResult | null = null; // the recording on show: the run itself, or one of its cases
   let recordedCode: string | null = null; // the code the current (or last) recording was made from
 
   // -- left: Learn / Challenge ------------------------------------------------------
@@ -213,10 +217,10 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const editor: EditorView = createEditor({
     parent: editorHost,
     extensions: callCompletion({ known, piece: () => level?.piece ?? null, api: () => level?.api ?? [] }),
-    code: context.drafts.get(source.id) ?? String(source.data.starter ?? ""),
+    code: progress.level(source.id).code ?? String(source.data.starter ?? ""),
     onRun: () => void run(),
     onChange: (code) => {
-      context.drafts.set(source.id, code);
+      progress.update(source.id, { code });
       if (player && code !== recordedCode) dropRecording();
     },
     placeholder: `Write your code here, then press Run.\nYour pawn is called ${String(source.data.piece ?? "pawn")}.`,
@@ -236,7 +240,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       level = loaded.level;
       board = new BoardView(level);
       boardHost.replaceChildren(board.element);
-      challengePanel.replaceChildren(...describeChallenge(level));
+      help = new HelpPanel(source.id, level.hints, () => getCode(editor));
+      challengePanel.replaceChildren(...describeChallenge(level), help.element);
       updateControls();
     } catch (error) {
       boardHost.replaceChildren(noticeCard("bad", "Python couldn't start", String(error)));
@@ -247,11 +252,10 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   /** Run the editor's code; then play it, show its first step, or jump to the end. */
   async function run(mode: "play" | "step" | "end" = "play"): Promise<void> {
     if (!level || !board || running) return;
-    player?.dispose();
-    player = null;
     lastResult = null;
+    runResult = null;
     recordedCode = getCode(editor);
-    board.show(level.start);
+    resetStage();
     clearMarks(editor);
     inspector.reset();
     consoleView.show([]);
@@ -259,8 +263,11 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     running = true;
     updateControls();
     try {
-      const result = await client.call("runLevel", { level: source.data, code: recordedCode });
-      showResult(result, mode);
+      const hintsUsed = progress.level(source.id).hints;
+      const result = await client.call("runLevel", { level: source.data, code: recordedCode, hintsUsed });
+      runResult = result;
+      help?.recordRun(result); // once per run, here rather than in playback, which can reach the end many times
+      showCase(result.case, mode);
     } catch (error) {
       outcomeHost.replaceChildren(describeFailure(error));
     } finally {
@@ -286,7 +293,15 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     updateControls();
   }
 
-  function showResult(result: LevelResult, mode: "play" | "step" | "end"): void {
+  /** Play the last run: its recording, or with several cases (M2) case number `index`, on that case's board. */
+  function showCase(index: number, mode: "play" | "step" | "end"): void {
+    if (!runResult) return;
+    if (runResult.cases.length) showCaseBoard(runResult, index);
+    playRecording(runResult.cases[index] ?? runResult, mode);
+  }
+
+  function playRecording(result: LevelResult, mode: "play" | "step" | "end"): void {
+    player?.dispose(); // a replay started during another must stop the first
     lastResult = result;
     const marks: Mark[] = result.warnings.map((warning) => ({ ...warning, severity: "warning" }));
     if (result.error?.line) marks.push({ line: result.error.line, message: result.error.friendly, severity: "error" });
@@ -298,8 +313,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     player = new Player(
       frames,
       (frame, index, { animate, durationMs }) => {
-        if (animate && frame.step) board!.animate(frame.step.events, durationMs);
-        else board!.show(frame.state);
+        if (animate && frame.step) shownBoard()!.animate(frame.step.events, durationMs);
+        else shownBoard()!.show(frame.state);
         setActiveLine(editor, frame.step?.line ?? null);
         setErrorLine(editor, null);
         inspector.show(frame.step?.vars ?? null);
@@ -321,18 +336,61 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       setActiveLine(editor, null);
       setErrorLine(editor, result.error.line);
     }
+    // The verdict and what's on offer follow the run as a whole; the details
+    // come from the recording on show (the run, or one of its cases).
+    const run = runResult ?? result;
     const actions: HTMLElement[] = [];
-    if (result.status === "solved") {
-      context.solved.add(source.id);
+    const offer = help?.outcomeAction(run, recordedCode ?? "", showHelp);
+    if (offer) actions.push(offer);
+    if (run.status === "solved") {
       const next = nextLevel(source.id);
       actions.push(
         next
           ? h("a", { class: "btn btn-primary btn-small", href: `#/level/${next.id}` }, "Next level →")
           : h("a", { class: "btn btn-primary btn-small", href: "#/" }, "Back to the levels"),
       );
-      window.setTimeout(() => board?.setCelebrating(true), afterMs);
+      window.setTimeout(() => shownBoard()?.setCelebrating(true), afterMs);
     }
-    outcomeHost.replaceChildren(outcomeCard(result, actions));
+    outcomeHost.replaceChildren(outcomeCard(run, result, actions));
+  }
+
+  // -- several cases (M2): a hidden goal's ? squares, other maps ------------------------
+  // A run comes back with every case's result. The board shows the case being
+  // replayed (its goal, and ✓ or ✗ on each ? square), and a row of buttons
+  // above it replays any other case.
+  function showCaseBoard(run: LevelResult, index: number): void {
+    caseBoard?.dispose();
+    // ✓ or ✗ on each ? square: whether the code reached a goal hidden there.
+    const spots = new Map(run.cases.flatMap((c) => (c.level.goal ? [[squareName(c.level.goal), c.status === "solved"] as const] : [])));
+    caseBoard = new BoardView(run.cases[index]!.level, { spots });
+    const buttons = run.cases.map((c, i) =>
+      h(
+        "button",
+        { class: "btn btn-small btn-toggle", "aria-pressed": String(i === index), onClick: () => showCase(i, "play") },
+        `${c.label} ${c.status === "solved" ? "✓" : "✗"}`,
+      ),
+    );
+    const title = level?.case_title ?? "";
+    boardHost.replaceChildren(h("div", { class: "case-row", role: "group", "aria-label": title }, h("span", { class: "muted small" }, `${title}:`), ...buttons), caseBoard.element);
+  }
+
+  /** No recording, and the level's own board at the start: before every run. */
+  function resetStage(): void {
+    player?.dispose();
+    player = null;
+    if (caseBoard && board) {
+      caseBoard.dispose();
+      caseBoard = null;
+      boardHost.replaceChildren(board.element);
+    }
+    if (level) board?.show(level.start);
+  }
+
+  /** Opens the Challenge panel at the help (expanding a collapsed panel). */
+  function showHelp(): void {
+    if (layout.classList.contains("learn-collapsed")) setCollapsed(false);
+    showTab("challenge");
+    help?.focus();
   }
 
   function updateControls(): void {
@@ -382,6 +440,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     stopPausingOnSettings();
     player?.dispose();
     board?.dispose();
+    caseBoard?.dispose();
     lesson?.dispose();
     editor.destroy();
   };
@@ -402,6 +461,7 @@ function describeChallenge(level: LevelInfo): HTMLElement[] {
     parts.push(h("blockquote", { class: "sign-text" }, h("span", { class: "muted small" }, `Signpost on ${squareName(sign.pos)}`), sign.text));
   }
   if (level.rules.length) parts.push(h("h3", {}, "Rules"), list("rules", level.rules));
+  parts.push(h("h3", {}, "Stars"), list("star-goals", level.stars));
 
   parts.push(
     h("h3", {}, `Your ${level.piece} knows`),

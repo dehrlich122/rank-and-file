@@ -7,6 +7,8 @@ const SVG = "http://www.w3.org/2000/svg";
 
 type Shape = { d: string; fill?: boolean };
 
+const STAR = "M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z";
+
 const ICONS = {
   // playback: chevrons for stepping, a solid triangle for Play
   toStart: [{ d: "M12 6l-6 6 6 6M19 6l-6 6 6 6" }],
@@ -20,6 +22,9 @@ const ICONS = {
   expandPanel: [{ d: "M4 4v16" }, { d: "M14 7l5 5-5 5M8 12h11" }],
   // wrap long lines: a line that bends back under itself
   wrap: [{ d: "M4 6h16M4 12h13a3 3 0 0 1 0 6h-4M4 18h5" }, { d: "M15 16l-2 2 2 2" }],
+  // a solved level's stars: earned (filled) and not yet earned (outlined)
+  star: [{ d: STAR, fill: true }],
+  starOutline: [{ d: STAR }],
   // settings: three sliders
   settings: [{ d: "M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1" }, { d: "M15 5v4M9 10v4M17 15v4" }],
 } satisfies Record<string, Shape[]>;

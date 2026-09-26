@@ -1,7 +1,6 @@
 // The player's UI settings: one small store that every screen reads when it's
-// created and listens to for changes. Saved in localStorage when the browser
-// allows it; if it doesn't (private mode, blocked storage), the defaults apply
-// and changes last until the tab is closed.
+// created and listens to for changes. Saved in localStorage (see storage.ts).
+import { asRecord, browserStorage, readJson, writeJson, type StorageLike } from "./storage";
 
 type Theme = "system" | "light" | "dark";
 type Motion = "system" | "full" | "reduced";
@@ -26,17 +25,12 @@ const THEMES: readonly Theme[] = ["system", "light", "dark"];
 const MOTIONS: readonly Motion[] = ["system", "full", "reduced"];
 const CODE_PANELS: readonly CodePanel[] = ["right", "bottom", "left"];
 
-export interface StorageLike {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-}
-
 export class SettingsStore {
   private value: Settings;
   private readonly listeners = new Set<(settings: Settings) => void>();
 
   constructor(private readonly storage: StorageLike | null = browserStorage()) {
-    this.value = sanitize(readJson(storage));
+    this.value = sanitize(readJson(storage, STORAGE_KEY));
   }
 
   get(): Settings {
@@ -47,11 +41,7 @@ export class SettingsStore {
     const next = sanitize({ ...this.value, ...changes });
     if (JSON.stringify(next) === JSON.stringify(this.value)) return;
     this.value = next;
-    try {
-      this.storage?.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // storage full or blocked: keep the setting for this session anyway
-    }
+    writeJson(this.storage, STORAGE_KEY, next);
     for (const listener of this.listeners) listener(next);
   }
 
@@ -75,7 +65,7 @@ export function applyToDocument(settings: Settings, root: HTMLElement = document
 
 /** Keep only known values; anything missing or unrecognised falls back to its default. */
 export function sanitize(raw: unknown): Settings {
-  const input = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const input = asRecord(raw);
   const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
     allowed.includes(value as T) ? (value as T) : fallback;
   return {
@@ -86,23 +76,6 @@ export function sanitize(raw: unknown): Settings {
     codePanel: pick(input.codePanel, CODE_PANELS, DEFAULTS.codePanel),
     wrapLines: pick(input.wrapLines, [true, false], DEFAULTS.wrapLines),
   };
-}
-
-function readJson(storage: StorageLike | null): unknown {
-  try {
-    const text = storage?.getItem(STORAGE_KEY);
-    return text ? JSON.parse(text) : null;
-  } catch {
-    return null;
-  }
-}
-
-function browserStorage(): StorageLike | null {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage;
-  } catch {
-    return null; // some browsers throw just for touching localStorage when it's blocked
-  }
 }
 
 /** The app-wide settings. */

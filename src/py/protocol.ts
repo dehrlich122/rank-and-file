@@ -44,14 +44,18 @@ export interface LevelInfo {
   tiles: TileKind[][]; // tiles[y][x]; y = 0 is the bottom rank
   signs: Array<{ pos: Pos; text: string }>;
   goal: Pos | null;
+  goal_spots: Pos[]; // a hidden goal: the squares it might be on (drawn as ?)
+  case_title: string; // the title of the row of cases above the board; "" for a single case
   start: WorldState;
   objectives: { reach_goal: boolean; say: string[] };
   api: string[];
   constraints: { max_lines: number | null; min_comments: number; require_nodes: string[]; ban_nodes: string[] };
-  par: Record<string, number>;
+  par: { lines: number | null };
   starter: string;
   goals: string[]; // what to do, in words (never a passphrase)
   rules: string[]; // the level's constraints, in words
+  stars: string[]; // what each of the three stars asks for, in words
+  hints: string[]; // tiered: nudge, concept reminder, partial example
 }
 
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };
@@ -85,6 +89,13 @@ interface LintWarning {
 
 type LevelStatus = "solved" | "incomplete" | "finished" | "error" | "timeout" | "constraint";
 
+/** One of a solved run's three stars (runner.Star). */
+export interface Star {
+  kind: "solved" | "par" | "no_hints";
+  earned: boolean;
+  label: string;
+}
+
 export interface LevelResult {
   status: LevelStatus;
   summary: string;
@@ -98,7 +109,22 @@ export interface LevelResult {
   lines_run: number;
   code_lines: number;
   truncated: boolean;
+  stars: Star[]; // only for a solved run
+  // A level with several cases (a hidden goal's ? squares, other maps): this
+  // result is the verdict on the whole run, with no recording of its own;
+  // `cases` holds each case's result and recording. `case` is the one to show
+  // first (the first that failed). case_note: the run, how many cases it
+  // worked for; a case, which one it is.
+  cases: CaseResult[];
+  case: number;
+  case_note: string;
   duration_ms: number;
+}
+
+/** One case of a level (runner.run_level): its result, what to call it ("b3", "board 2") and its board. */
+interface CaseResult extends LevelResult {
+  label: string;
+  level: LevelInfo;
 }
 
 interface ReplResult {
@@ -112,7 +138,7 @@ export interface Requests {
   runSnippet: { args: { code: string }; result: SnippetResult };
   loadLevel: { args: { level: unknown }; result: LoadLevelResult };
   loadSandbox: { args: { api: string[] }; result: LevelInfo };
-  runLevel: { args: { level: unknown; code: string }; result: LevelResult };
+  runLevel: { args: { level: unknown; code: string; hintsUsed: number }; result: LevelResult };
   runSandbox: { args: { code: string; api: string[] }; result: LevelResult };
   replPush: { args: { line: string }; result: ReplResult };
   replReset: { args: Record<string, never>; result: { ok: true } };

@@ -6,7 +6,7 @@ import { BUTTONS, levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 export default async function uiChecks({ browser: b, base, root, check }) {
-  const { solution, openLevel, setCode } = levelHelpers(b, base, root);
+  const { solution, openLevel, setCode, clickButton } = levelHelpers(b, base, root);
   const dialogOpen = () => b.evaluate(`document.querySelector('.settings-dialog').open`);
   const choose = (key, value) => b.evaluate(`document.querySelector('input[name="setting-${key}"][value="${value}"]').click()`);
   const closeDialog = () => b.evaluate(`document.querySelector('.settings-dialog').close()`);
@@ -100,6 +100,28 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     await choose("codeSize", "medium");
     expect(size === "17px" && transition === "none", `font ${size} · piece transition ${transition}`);
     return `font ${size} · piece transition ${transition}`;
+  });
+
+  // -- M2: Reset progress --------------------------------------------------------------------
+  await check("M2: Reset progress asks inside Settings first; Cancel keeps your code, Yes clears it", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    await setCode("# my notes"); // our own text, not a solution
+    const hasNotes = () => b.evaluate(`document.querySelector('.level-right .cm-content').innerText.includes('my notes')`);
+    await b.evaluate(`document.querySelector('.settings-button').click()`);
+    await clickButton("Reset progress…", ".reset-progress");
+    const asked = await b.evaluate(`!!document.querySelector('.reset-progress .confirm-step')`);
+    await clickButton("Cancel", ".reset-progress");
+    const keptAfterCancel = await hasNotes();
+    await clickButton("Reset progress…", ".reset-progress");
+    await clickButton("Yes, reset", ".reset-progress");
+    await b.waitFor(`!document.querySelector('.level-right .cm-content').innerText.includes('my notes')`, 5000, "the code cleared by Reset progress");
+    const note = await b.evaluate(`document.querySelector('.reset-progress').innerText.includes('Progress reset.')`);
+    await closeDialog();
+    await openLevel("ch01-l01", { reload: true });
+    const afterReload = await hasNotes();
+    expect(asked, "Reset progress didn't ask first");
+    expect(keptAfterCancel, "Cancel cleared the code");
+    expect(note && !afterReload, `confirmation shown: ${note}; code back after a reload: ${afterReload}`);
   });
 
   // -- QA-009: code panel on the right, bottom or left ----------------------------------------

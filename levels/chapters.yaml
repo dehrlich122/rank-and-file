@@ -1,5 +1,11 @@
-# Chapter list, in play order. Each chapter's levels live in levels/chNN/.
+# Chapter list, in play order. Each chapter's levels live in levels/chNN/
+# (levels/practice/ for the Testing ground).
 - chapter: 1
   title: First Moves
   tier: pawn
   summary: Calling functions, arguments, sequencing, comments and print().
+- chapter: 0
+  title: Testing ground
+  tier: practice
+  curriculum: false # not numbered, and "Next level" never leads here
+  summary: Levels for trying out game features before the chapters that use them. Not part of the curriculum.

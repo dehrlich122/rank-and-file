@@ -42,7 +42,10 @@ def test_describe_is_ready_for_the_ui():
     assert described["start"] == {"pos": [0, 0], "facing": "east", "opened": []}
     assert described["goal"] == [1, 1]
     assert described["signs"] == [{"pos": [0, 1], "text": "hi"}]
-    assert "hints" not in described
+    assert described["hints"] == []
+    assert make_level("P G\n", hints=["a nudge", "a reminder"]).describe()["hints"] == ["a nudge", "a reminder"]
+    assert described["par"] == {"lines": None}
+    assert make_level("P G\n", par={"lines": 2}).describe()["par"] == {"lines": 2}
 
 
 @pytest.mark.parametrize(
@@ -51,7 +54,8 @@ def test_describe_is_ready_for_the_ui():
         ({"map": ". .\n. .\n"}, "start square"),
         ({"map": "P P G\n"}, "more than one start"),
         ({"map": "P G\n. . .\n"}, "same number of squares"),
-        ({"map": "P G ?\n"}, "'?'"),
+        ({"map": "P G @\n"}, "'@'"),
+        ({"map": "P G ?\n"}, "not both"),
         ({"map": "P .\n"}, "goal square"),
         ({"api": ["fly"]}, "no ability 'fly'"),
         ({"surprise": 1}, "unknown key"),
@@ -64,6 +68,14 @@ def test_describe_is_ready_for_the_ui():
         ({"legend": {"X": {"tile": "gate"}}}, "needs passphrase"),
         ({"legend": {"X": {"tile": "gate", "passphrase": "hi", "text": "x"}}}, "doesn.t take text"),
         ({"piece": "dragon"}, "unknown piece"),
+        ({"par": {"moves": 3}}, "unknown par"),
+        ({"par": {"lines": 0}}, "par lines"),
+        ({"par": {"lines": "3"}}, "par lines"),
+        ({"par": 3}, "par must be a mapping"),
+        ({"variants": {"map": "P G\n"}}, "variants must be a list"),
+        ({"variants": [{"map": "P G\n", "goal": 1}]}, "variant 1 must have a map"),
+        ({"variants": [{"map": "P G\n"}, {"map": "G .\n"}]}, "variant 2: the map needs a start"),
+        ({"variants": [{"map": "P .\n"}]}, "variant 1: objective reach_goal needs a goal"),
     ],
 )
 def test_bad_levels_fail_loudly(overrides, message):
@@ -90,6 +102,31 @@ def test_describe_puts_goals_and_rules_into_words():
         "Must use a for loop.",
         "Not allowed: a while loop.",
     ]
+    assert described["stars"] == ["Solve the level.", "There's no par here: solving is enough.", "Solve it without opening a hint."]
+    assert make_level("P G\n", par={"lines": 1}).star_goals()[1] == "Use 1 line of code or fewer (par)."
+
+
+def test_a_hidden_goal_is_one_case_per_question_mark():
+    level = make_level("? . ?\nP . .\n", start={"facing": "east"})
+    assert level.goal is None
+    assert level.goal_spots == [(0, 1), (2, 1)]
+    assert [(case.label, case.level.goal) for case in level.cases()] == [("a2", (0, 1)), ("c2", (2, 1))]
+    described = level.describe()
+    assert (described["goal"], described["goal_spots"], described["case_title"]) == (None, [[0, 1], [2, 1]], "Where the goal was")
+    assert described["goals"][0].startswith("Reach the goal. It's hidden on one of the 2 squares marked ?.")
+    assert make_level("P G\n").describe()["case_title"] == ""  # one case: no row of cases
+    with pytest.raises(LevelError, match="not both"):
+        make_level("P ?\n", variants=[{"map": "P G\n"}])
+
+
+def test_other_maps_share_the_level_but_not_its_map():
+    level = make_level("P . G\n", variants=[{"map": "P G .\n"}], api=["move", "at_goal"])
+    [other] = level.variants
+    assert (other.goal, other.api, other.variants) == ((1, 0), ["move", "at_goal"], [])
+    assert [case.label for case in level.cases()] == ["your board", "board 2"]
+    assert level.describe()["goals"][-1] == "Your code is also checked on 1 other board."
+    with pytest.raises(LevelError, match="only for the level's own map"):
+        make_level("P . G\n", variants=[{"map": "P ? .\n"}])
 
 
 def test_say_goals_point_to_the_sign_when_the_phrase_is_written_there():

@@ -799,6 +799,98 @@ mechanic, never by solution code.
   - Playback's line highlight and the error line still cover the whole
     wrapped line.
 
+## Session 4 — 2026-09-26 · M2 play-test (`m2-feedback-depth`)
+
+The rest of PR #3's manual test list passed *(Designer, 2026-09-26)*:
+- saved progress and Reset progress
+- stars and par
+- hints
+- the solution comparison
+- giving up
+- "Next level" after Chapter 1
+
+Item 6 (hidden boards) became QA-016.
+
+### QA-016 · "Hidden boards": the name, and a goal that seems to move · Verified
+
+- **Verified** *(Designer, 2026-09-26)*: passes, looks good.
+- **Fixed** in `bec7f85` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
+  - The practice level is now **Blindfold**. It has one map, with no flag and four **?** squares (b3, b5, b6, b8). The Challenge panel says the goal is hidden on one of them and the code runs once for each.
+  - After a run, each ? square shows ✓ or ✗. Above the board, a row of buttons names every case ("b3 ✗", "b6 ✓", …) and replays that case's run, with the flag where the goal was.
+  - The outcome card follows the whole run: its headline (e.g. "Not there yet"), its colour, and "It worked for 1 of the 4 places the goal could be. This run is the one with the goal on b3." Replaying a case that worked still offers no "Next level" or comparison.
+  - "Hidden board" is gone from everything the player reads. The engine calls these **cases**. Other whole maps (`variants`) still work, shown as "board 2", …, for later levels whose layout varies.
+  - The lesson, brief, first hint and solution note are rewritten, the spoiler parts blind again.
+- **Retest:**
+  - Testing ground → Blindfold. Before running, the board shows four ? squares and no flag. The Challenge panel says the goal is on one of them and your code runs once for each.
+  - Run code that counts its way to one ? square. The card says how many places it worked for. Each ? shows ✓ or ✗, and the row above the board names the cases.
+  - Click a case in the row. Its run replays, with the flag where the goal was in that case. A case that worked still doesn't offer "Next level".
+  - Solve it properly. The card says it worked for all 4 places, with three stars, and every case in the row is ✓.
+  - Nothing on the page says "hidden board".
+- **Area:** hidden boards (M2 step 6), the practice level "Hidden Corridors"
+- **Observed** *(Designer, 2026-09-26)*:
+  - The flag (goal) looks reachable with an ordinary move.
+  - Reaching it, the goal then seems to shift somewhere else, which only
+    happens once you've hit the target. It reads as though the goal moved.
+  - The name "hidden board" feels odd.
+- **Asked** *(Designer, 2026-09-26)*: why call it a hidden board? What
+  terminology might fit better? Is there a reason for this terminology in
+  Python programming?
+- **Clarified** *(Designer, 2026-09-26)*:
+  - Swapping the words won't be enough. The lesson's description ("the same
+    kind of place, a little different each time") is odd too.
+  - From the player's side the board stays the same. The success criteria
+    only change if you run the obvious code, so it feels like a
+    bait-and-switch.
+  - Better: **hide the goal entirely**, or **randomize it** around a few
+    spaces, as an honest example of a hidden target.
+  - Or use chess feint terms: **Decoy**, **Trap**, **Deflection**, rather
+    than "variations".
+- **Background** *(Claude)*:
+  - "Hidden board" isn't a Python term. It comes from `DESIGN.md`'s "hidden
+    board variants".
+  - The idea it borrows is **hidden test cases**, from autograders and coding
+    sites. You see an example, but your code is judged on inputs you haven't
+    seen, which catches hard-coded answers.
+  - In Python itself, the matching idea is running the same test on several
+    inputs: `@pytest.mark.parametrize`, and tests in general, which the
+    curriculum reaches in Chapter 15.
+- **What makes it feel like the goal moves:**
+  - The extra boards are never shown before a run.
+  - They only run after the visible board is solved.
+  - The failing one is then drawn in the visible board's place.
+- **Options for the name** *(Claude, proposed)*:
+  - **Test boards** (recommended): "Your code must also pass 3 test boards."
+    It's the vocabulary of real testing, and it doesn't suggest a trick.
+  - **Hidden tests:** closest to the autograder term, but it keeps "hidden".
+  - **Variations:** plain, and also a chess term (an alternative line of
+    play), but it teaches nothing about programming.
+- **Options for the goal seeming to move** *(Claude, proposed)*:
+  - Show the test boards before a run: small previews in the Challenge panel.
+  - Show every board's result as a row (your board ✓, test 1 ✗, …), so a
+    failure reads as another board, not the same one changing.
+  - Both.
+- **Decided** *(Designer, 2026-09-26)*:
+  - **Hidden goal.** No flag is drawn. The squares where the goal might be
+    are marked **?**. The code runs once for each possible spot and must
+    find the goal every time. Afterwards each spot shows ✓ or ✗, and any
+    spot's run can be replayed. The reason to ask `at_goal()` instead of
+    counting is plain from the start, and nothing seems to move.
+  - **No "hidden board" wording** anywhere the player reads it. The lesson,
+    goals and outcome describe it plainly, e.g. "the goal could be on any ?
+    square", "found the goal from 3 of 4 spots".
+  - **Chess feint terms** (Decoy, Deflection) go in level titles and flavour
+    only. "Trap" is kept for Chapter 9's traps, which raise exceptions.
+- **Plan** *(Claude)*:
+  - The engine keeps its general mechanism (`variants`). A level can say the
+    goal is hidden. Its description then lists the candidate squares instead
+    of the goal, and a run reports every board's outcome, not just the first
+    failure.
+  - The board draws the ? squares and each spot's ✓ or ✗. Clicking a spot
+    replays that run.
+  - Hidden Corridors gets a rewritten brief, lesson, hints and note. The
+    spoiler parts are written blind again.
+  - `ARCHITECTURE.md` and `M2.md` are updated to match.
+
 ---
 
 ## Queued work

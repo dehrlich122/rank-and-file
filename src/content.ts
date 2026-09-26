@@ -2,10 +2,9 @@
 //
 // The YAML is parsed here only to list levels and read titles; the engine
 // (levels.parse_level) is what actually checks and interprets a level.
-// Solutions are deliberately not bundled yet: M2's post-solve reveal adds them.
 import { parse } from "yaml";
 
-const levelFiles = import.meta.glob<string>("/levels/ch*/*.yaml", { query: "?raw", import: "default", eager: true });
+const levelFiles = import.meta.glob<string>("/levels/*/*.yaml", { query: "?raw", import: "default", eager: true });
 const lessonFiles = import.meta.glob<string>("/lessons/**/*.md", { query: "?raw", import: "default", eager: true });
 const chapterFile = import.meta.glob<string>("/levels/chapters.yaml", { query: "?raw", import: "default", eager: true });
 
@@ -23,6 +22,7 @@ export interface Chapter {
   title: string;
   tier: string;
   summary: string;
+  curriculum: boolean; // false for the Testing ground: not numbered, never "next"
   levels: LevelSource[];
 }
 
@@ -48,8 +48,17 @@ function loadLevels(): LevelSource[] {
 }
 
 function loadChapters(levels: LevelSource[]): Chapter[] {
-  const listed = (parseYaml(Object.values(chapterFile)[0] ?? "[]") as Omit<Chapter, "levels">[]) ?? [];
-  return listed.map((chapter) => ({ ...chapter, levels: levels.filter((level) => level.chapter === chapter.chapter) }));
+  const listed = (parseYaml(Object.values(chapterFile)[0] ?? "[]") as Array<Omit<Chapter, "levels" | "curriculum"> & { curriculum?: boolean }>) ?? [];
+  return listed.map((chapter) => ({
+    ...chapter,
+    curriculum: chapter.curriculum !== false,
+    levels: levels.filter((level) => level.chapter === chapter.chapter),
+  }));
+}
+
+/** "Chapter 1 · First Moves"; a chapter outside the curriculum is just its title. */
+export function chapterName(chapter: Chapter): string {
+  return chapter.curriculum ? `Chapter ${chapter.chapter} · ${chapter.title}` : chapter.title;
 }
 
 const levels = loadLevels();
@@ -59,7 +68,29 @@ export function findLevel(id: string): LevelSource | undefined {
   return levels.find((level) => level.id === id);
 }
 
+// Reference solutions and their notes (M2's idiomatic-solution comparison).
+// They're loaded lazily: each is its own small file, fetched only when the
+// player asks to compare after solving (or gives up), and never part of the
+// main bundle. The naive attempts are for the level checker only.
+const solutionFiles = import.meta.glob<string>(["/solutions/*/*.py", "!/solutions/**/*.naive*.py"], { query: "?raw", import: "default" });
+const noteFiles = import.meta.glob<string>("/solutions/*/*.md", { query: "?raw", import: "default" });
+
+export interface Solution {
+  code: string;
+  note: string; // Markdown: why it's written this way
+}
+
+/** A level's idiomatic solution and its note, or null if it has none. */
+export async function loadSolution(id: string): Promise<Solution | null> {
+  const load = (files: Record<string, () => Promise<string>>, extension: string) =>
+    Object.entries(files).find(([path]) => path.endsWith(`/${id}${extension}`))?.[1]();
+  const [code, note] = await Promise.all([load(solutionFiles, ".py"), load(noteFiles, ".md")]);
+  return code === undefined ? null : { code, note: note ?? "" };
+}
+
+/** The level after `id` in play order (chapters.yaml), within the curriculum only. */
 export function nextLevel(id: string): LevelSource | undefined {
-  const index = levels.findIndex((level) => level.id === id);
-  return index >= 0 ? levels[index + 1] : undefined;
+  const curriculum = chapters.filter((chapter) => chapter.curriculum).flatMap((chapter) => chapter.levels);
+  const index = curriculum.findIndex((level) => level.id === id);
+  return index >= 0 ? curriculum[index + 1] : undefined;
 }

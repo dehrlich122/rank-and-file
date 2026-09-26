@@ -29,12 +29,13 @@ The designer is also the target learner.
 npm install          # also runs scripts/copy-pyodide.mjs → public/pyodide/
 npm run dev          # dev server, http://localhost:5173
 npm run play         # production build + preview
-npm run check        # typecheck + lint + vitest + pytest; run before every commit
+npm run check        # typecheck + lint + vitest + pytest + check:bundle; run before every commit
 npm run typecheck    # tsc --noEmit (TypeScript 7)
 npm run lint         # all redundant-code checks below
 npm run lint:ts      # knip: unused files, exports and dependencies (TypeScript)
 npm run lint:py      # ruff (unused imports/variables, tidiness) + vulture (unused functions)
 npm run lint:dupes   # jscpd: copy-pasted blocks across TypeScript, JS and Python
+npm run check:bundle # production build: no reference solution in the main bundle
 
 npm run test:py -- engine/tests/test_runner.py::test_endless_loop_is_stopped_quickly
 npm run test:py -- -k budget
@@ -60,13 +61,17 @@ npm run e2e -- http://localhost:4173/ --only=app   # against `npm run play`, one
   `ui.check.mjs`, with shared helpers (`openLevel`, `setCode`, `solution`) in
   `helpers.mjs`. Each check is `check(label, fn)`, where `fn` throws via
   `expect`. It writes
-  `e2e-results/report.json` plus failure screenshots with editors blurred.
+  `e2e-results/report.json` plus failure screenshots with spoilers blurred
+  (editors, opened hints, solution notes: `SPOILERS` in `suite.mjs`).
   Add a check for every user-visible fix. Solutions are read from
   `solutions/`, never written into a check. **Never put editor contents
   into a check's message or return value.** Earlier checks type reference
-  solutions, and the app keeps each level's code for the session, so an
-  editor dump can leak a solution. Use `openLevel(id, { fresh: true })` for a
-  clean page.
+  solutions, and the app saves each level's code (`src/progress.ts`), so an
+  editor dump can leak a solution. `openLevel(id, { fresh: true })` gives a
+  clean page with no saved progress (on `?fresh=` loads, `run.mjs` clears
+  every `rank-and-file:` key except settings). `{ reload: true }` reloads and
+  keeps progress. Find buttons by label with `clickButton`/`hasButton`
+  (`helpers.mjs`), and read editors with `editorText` (compare in Node).
 - After a hash navigation, wait for `.level[data-level-id="<id>"]`; the old view
   lingers for a moment. Inside `evaluate` strings, which are JS template
   literals, write regex escapes as `\\s`.
@@ -144,16 +149,24 @@ error translations belong in `errors.py`, with a case in
 `engine/tests/test_errors.py`.
 
 **Levels are data.** YAML in `levels/chNN/`, lesson in `lessons/chNN/`,
-solutions in `solutions/chNN/`. The format is documented in
+solutions in `solutions/chNN/`. The Testing ground (outside the curriculum:
+`curriculum: false` in `levels/chapters.yaml`) uses `practice/` folders. The format is documented in
 `docs/ARCHITECTURE.md`. Adding a level must never require engine changes.
 `engine/tests/test_levels.py` checks every level automatically:
-- the reference solution solves it
+- the reference solution solves it in every case (each `?` square a hidden
+  goal might be on, each other map) and earns all three stars, so the level's
+  `par` is reachable
 - each `<id>.naive*.py` fails with the outcome named on its first line
   (`# expect: constraint`)
 - lessons have ≤150 words of prose and 1–3 runnable snippets, and every snippet
   runs (```` ```python run error ```` marks one that must fail)
 
 Constraints are checked with `ast`/`tokenize`, never with string matching.
+
+Hints, solutions and their notes are all spoilers. Write new ones without
+their text appearing in the conversation. The practice level's generator
+stored code as character codes and prose as ROT13, and printed only file
+names.
 
 ## UI conventions
 
@@ -165,14 +178,27 @@ Constraints are checked with `ast`/`tokenize`, never with string matching.
   with demo buttons for each failure path).
 - One `PyClient` is shared by the whole app; the scratch REPL's session lives
   in the worker, so it resets if the watchdog restarts Python.
-- Level content is bundled by `src/content.ts`. Solutions are deliberately not
-  bundled until M2's post-solve reveal.
+- Level content is bundled by `src/content.ts`. Reference solutions and their
+  notes are **lazy** (`loadSolution`): each is its own file, fetched only when
+  the player opens the comparison (`ui/compare.ts`) after solving.
+  `npm run check:bundle` fails if one ever lands in the main bundle. Never
+  make those globs eager.
 - Colours are CSS custom properties in `src/styles.css`, written as
   `light-dark(<light>, <dark>)`. The Theme setting switches `color-scheme` via
   `data-theme` on `<html>`. Never hard-code colours in TS. Icons come from
   `src/ui/icons.ts` (inline SVG). A visual design pass is planned, so keep new
   visuals on these seams (tokens, icons, the tile → draw-function table in
   `board.ts`).
+- Progress lives in `src/progress.ts`: per level, the best stars (solved
+  means at least one), hints opened, failed runs after the last hint, whether
+  the solution was seen, and the code. It's saved to localStorage like
+  settings; both use `src/storage.ts`. Settings → Reset progress clears it.
+- A level's help (hints, "Show me a solution", the comparison) is
+  `ui/help.ts`. It records each run's result once, from `run()` in
+  `levelView.ts`, never from playback, which can reach the end many times.
+- Dialogs and confirm steps share `ui/dialog.ts` (`modal`, `dialogHead`,
+  `confirmStep`). Confirm steps are always inside the page. Never use browser
+  `confirm()`/`alert()`, which block the page and the e2e checks.
 - Settings (speed, theme, code size, animations, code panel, wrap long lines)
   live in `src/settings.ts`, one store with `get`/`set`/`subscribe` saved to
   localStorage. Screens read it on creation and subscribe to changes. The menu

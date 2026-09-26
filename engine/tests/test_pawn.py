@@ -21,6 +21,18 @@ def test_turns_change_facing_but_not_position(corridor):
     assert result.final["pos"] == [1, 0]
 
 
+def test_at_goal_is_true_only_on_the_goal(corridor):
+    level = make_level("# G #\n# . #\n# P #\n", api=["move", "at_goal"])
+    result = run_level(level, "print(pawn.at_goal())\npawn.move(2)\nprint(pawn.at_goal())\n")
+    assert result.output == "False\nTrue\n"
+
+
+def test_at_goal_is_locked_until_a_level_unlocks_it(corridor):
+    result = run_level(corridor, "pawn.at_goal()\n")
+    assert result.status == "error"
+    assert result.error.type == "LockedAbilityError"
+
+
 def test_walls_stop_the_pawn_with_a_bump(corridor):
     result = run_level(corridor, "pawn.turn_right()\npawn.move()")
     assert result.status == "error"
