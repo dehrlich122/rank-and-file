@@ -799,6 +799,45 @@ mechanic, never by solution code.
   - Playback's line highlight and the error line still cover the whole
     wrapped line.
 
+## Session 4 — 2026-09-26 · M2 play-test (`m2-feedback-depth`)
+
+### QA-016 · "Hidden boards": the name, and a goal that seems to move · Open
+
+- **Area:** hidden boards (M2 step 6), the practice level "Hidden Corridors"
+- **Observed** *(Designer, 2026-09-26)*:
+  - The flag (goal) looks reachable with an ordinary move.
+  - Reaching it, the goal then seems to shift somewhere else, which only
+    happens once you've hit the target. It reads as though the goal moved.
+  - The name "hidden board" feels odd.
+- **Asked** *(Designer, 2026-09-26)*: why call it a hidden board? What
+  terminology might fit better? Is there a reason for this terminology in
+  Python programming?
+- **Background** *(Claude)*:
+  - "Hidden board" isn't a Python term. It comes from `DESIGN.md`'s "hidden
+    board variants".
+  - The idea it borrows is **hidden test cases**, from autograders and coding
+    sites. You see an example, but your code is judged on inputs you haven't
+    seen, which catches hard-coded answers.
+  - In Python itself, the matching idea is running the same test on several
+    inputs: `@pytest.mark.parametrize`, and tests in general, which the
+    curriculum reaches in Chapter 15.
+- **What makes it feel like the goal moves:**
+  - The extra boards are never shown before a run.
+  - They only run after the visible board is solved.
+  - The failing one is then drawn in the visible board's place.
+- **Options for the name** *(Claude, proposed)*:
+  - **Test boards** (recommended): "Your code must also pass 3 test boards."
+    It's the vocabulary of real testing, and it doesn't suggest a trick.
+  - **Hidden tests:** closest to the autograder term, but it keeps "hidden".
+  - **Variations:** plain, and also a chess term (an alternative line of
+    play), but it teaches nothing about programming.
+- **Options for the goal seeming to move** *(Claude, proposed)*:
+  - Show the test boards before a run: small previews in the Challenge panel.
+  - Show every board's result as a row (your board ✓, test 1 ✗, …), so a
+    failure reads as another board, not the same one changing.
+  - Both.
+- **Decided:** pending the designer's choice.
+
 ---
 
 ## Queued work
