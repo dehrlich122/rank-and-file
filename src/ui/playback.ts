@@ -3,13 +3,17 @@
 // A run is recorded once (by the engine) and then replayed here, so moving
 // backwards never re-runs any code. Frame 0 is the moment before the program
 // starts; frame k is the moment after step k (the k-th line that ran).
-import type { GameEvent, LevelResult, Step, WorldState } from "../py/protocol";
+import type { LevelResult, Step, WorldState } from "../py/protocol";
 
 export interface Frame {
   step: Step | null; // null for frame 0
   state: WorldState; // the world after this frame
   output: string; // everything printed up to and including this frame
-  log: LogEntry[]; // the console: printed output and game messages, in order
+  // The console, shared by every frame of a run (printed output and game
+  // messages, in order); this frame shows its first `logLength` entries.
+  // Sharing one array keeps long print-heavy runs from copying it per step.
+  log: readonly LogEntry[];
+  logLength: number;
 }
 
 /** One console entry: something the program printed, or something the game said. */
@@ -19,22 +23,26 @@ export interface LogEntry {
 }
 
 export function buildFrames(result: Pick<LevelResult, "start" | "steps">): Frame[] {
-  const frames: Frame[] = [{ step: null, state: result.start, output: "", log: [] }];
+  const log: LogEntry[] = [];
+  const frames: Frame[] = [{ step: null, state: result.start, output: "", log, logLength: 0 }];
   let state = result.start;
   let output = "";
-  let log: LogEntry[] = [];
   for (const step of result.steps) {
     for (const event of step.events) state = event.state;
     output += step.output;
     // A guard's reply is caused by the line just printed, so it comes after it.
-    const added: LogEntry[] = step.output ? [{ kind: "out", text: step.output }] : [];
+    if (step.output) log.push({ kind: "out", text: step.output });
     for (const event of step.events) {
-      if (event.message) added.push({ kind: "game", text: event.message });
+      if (event.message) log.push({ kind: "game", text: event.message });
     }
-    if (added.length) log = [...log, ...added];
-    frames.push({ step, state, output, log });
+    frames.push({ step, state, output, log, logLength: log.length });
   }
   return frames;
+}
+
+/** The console as it stands at `frame`. */
+export function consoleAt(frame: Frame): LogEntry[] {
+  return frame.log.slice(0, frame.logLength);
 }
 
 // -- which playback buttons can be used (QA-005) ---------------------------------------
@@ -165,11 +173,6 @@ export class Player {
   setSpeed(speed: number): void {
     this.speed = speed;
     this.onChange();
-  }
-
-  /** Every events-carrying frame up to `index`, in order (for tests and debugging). */
-  eventsUpTo(index: number): GameEvent[] {
-    return this.frames.slice(1, index + 1).flatMap((frame) => frame.step?.events ?? []);
   }
 
   dispose(): void {

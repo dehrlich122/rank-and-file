@@ -4,8 +4,7 @@ import { PythonHungError, StoppedError, type PyClient } from "./py/client";
 import type { SnippetResult } from "./py/protocol";
 import { h } from "./ui/dom";
 import { createEditor, getCode, setCode } from "./ui/editor";
-
-const WATCHDOG_MS = 3000;
+import { errorCard } from "./ui/panels";
 
 const EXAMPLES: Array<{ label: string; code: string }> = [
   {
@@ -88,39 +87,35 @@ export function mountHarness(root: HTMLElement, client: PyClient): () => void {
     }
   }
 
-
   function showResult(result: SnippetResult, roundTripMs: number): void {
     const timing = `${result.lines_run.toLocaleString()} lines · Python ${result.duration_ms.toFixed(1)} ms · round trip ${roundTripMs.toFixed(0)} ms`;
     const label = { ok: "✓ Finished", error: "✗ Error", timeout: "⏱ Stopped" }[result.status];
     meta.textContent = `${label} · ${timing}`;
     output.textContent = result.output || "(no output)";
-    if (result.error) {
-      showError(result.error.friendly, result.error.traceback);
-    }
+    if (result.error) showError(errorCard(result.error));
   }
 
   function showFailure(error: unknown): void {
     if (error instanceof PythonHungError) {
       meta.textContent = "⏱ Stopped by the watchdog";
       showError(
-        `Your program was still busy after ${WATCHDOG_MS / 1000} seconds, so Python was stopped and ` +
-          "restarted. It's ready again, so you can press Run straight away.",
+        h(
+          "p",
+          {},
+          `Your program was still busy after ${error.timeoutMs / 1000} seconds, so Python was stopped and ` +
+            "restarted. It's ready again, so you can press Run straight away.",
+        ),
       );
     } else if (error instanceof StoppedError) {
       meta.textContent = "■ Stopped";
     } else {
       meta.textContent = "✗ Something went wrong";
-      showError(error instanceof Error ? error.message : String(error));
+      showError(h("p", {}, error instanceof Error ? error.message : String(error)));
     }
   }
 
-  function showError(friendly: string, traceback?: string): void {
-    errorBox.replaceChildren(h("p", {}, friendly));
-    if (traceback) {
-      errorBox.append(
-        h("details", {}, h("summary", {}, "Show Python's traceback"), h("pre", { class: "traceback" }, traceback)),
-      );
-    }
+  function showError(content: HTMLElement): void {
+    errorBox.replaceChildren(content);
     errorBox.hidden = false;
   }
 

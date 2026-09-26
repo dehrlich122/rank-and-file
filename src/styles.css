@@ -1323,14 +1323,8 @@ pre {
   border-radius: 4px;
 }
 
-.error-card p {
-  margin: 0 0 6px;
-}
-
-.error-card summary {
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 13px;
+.error-card > p {
+  margin: 0;
 }
 
 /* ---- icons (src/ui/icons.ts) ---- */

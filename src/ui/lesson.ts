@@ -151,7 +151,9 @@ class Snippet {
       this.play(result, board);
     } catch (error) {
       this.status.textContent =
-        error instanceof PythonHungError ? "Stopped: it was still running after 3 seconds." : `Something went wrong: ${String(error)}`;
+        error instanceof PythonHungError
+          ? `Stopped: it was still running after ${error.timeoutMs / 1000} seconds.`
+          : `Something went wrong: ${String(error)}`;
     } finally {
       this.runButton.disabled = false;
     }

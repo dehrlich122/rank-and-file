@@ -66,7 +66,7 @@ export class ReplPanel {
       this.write(
         "repl-note",
         error instanceof PythonHungError
-          ? "That was still running after 3 seconds, so Python was restarted. The session starts fresh."
+          ? `That was still running after ${error.timeoutMs / 1000} seconds, so Python was restarted. The session starts fresh.`
           : `Something went wrong: ${String(error)}`,
       );
     } finally {

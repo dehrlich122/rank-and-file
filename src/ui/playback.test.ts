@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Step, WorldState } from "../py/protocol";
-import { BASE_STEP_MS, buildFrames, controlStates, frameDuration, Player, type Frame } from "./playback";
+import { BASE_STEP_MS, buildFrames, consoleAt, controlStates, frameDuration, Player, type Frame } from "./playback";
 
 const start: WorldState = { pos: [0, 0], facing: "north", opened: [] };
 
@@ -20,7 +20,8 @@ describe("buildFrames", () => {
   it("starts before the first line and carries state and output forward", () => {
     const frames = buildFrames({ start, steps });
     expect(frames).toHaveLength(4);
-    expect(frames[0]).toEqual({ step: null, state: start, output: "", log: [] });
+    expect(frames[0]).toMatchObject({ step: null, state: start, output: "" });
+    expect(consoleAt(frames[0]!)).toEqual([]);
     expect(frames[1]!.state.pos).toEqual([0, 1]);
     expect(frames[2]!.state.pos).toEqual([0, 1]); // printing doesn't move the pawn
     expect(frames[2]!.output).toBe("hi\n");
@@ -45,7 +46,8 @@ describe("buildFrames", () => {
       events: [{ kind: "guard", state: start, at: [0, 1], message: "The guard is not amused." }],
     };
     const frames = buildFrames({ start, steps: [step(1, null, "first\n"), said] });
-    expect(frames[2]!.log).toEqual([
+    expect(consoleAt(frames[1]!)).toEqual([{ kind: "out", text: "first\n" }]); // earlier frames see less
+    expect(consoleAt(frames[2]!)).toEqual([
       { kind: "out", text: "first\n" },
       { kind: "out", text: "hello\n" },
       { kind: "game", text: "The guard is not amused." },
@@ -165,10 +167,4 @@ describe("Player", () => {
     expect(player.index).toBe(0);
   });
 
-  it("collects events up to a frame", () => {
-    expect(player.eventsUpTo(3).map((e) => e.state.pos)).toEqual([
-      [0, 1],
-      [0, 2],
-    ]);
-  });
 });

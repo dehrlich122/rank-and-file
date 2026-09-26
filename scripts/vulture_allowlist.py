@@ -15,9 +15,12 @@ bridge.repl_reset
 pieces.Pawn.move
 pieces.Pawn.position
 
-# Dataclass fields that are serialised to JSON (asdict) for the UI.
+# Level fields read by the level checker (engine/tests/test_levels.py), which
+# vulture doesn't scan.
 levels.Level.hints
 levels.Level.lesson
+
+# Dataclass fields that are serialised to JSON (asdict) for the UI.
 runner.SnippetResult.duration_ms
 runner.LevelResult.final
 runner.LevelResult.duration_ms

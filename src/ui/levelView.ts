@@ -11,7 +11,7 @@ import { renderLesson, type Lesson } from "./lesson";
 import { Console, Inspector, noticeCard, outcomeCard } from "./panels";
 import { callCompletion, KnownCalls } from "./completion";
 import { icon, type IconName } from "./icons";
-import { Player, buildFrames, controlStates } from "./playback";
+import { Player, buildFrames, consoleAt, controlStates } from "./playback";
 import type { ReplPanel } from "./repl";
 import type { SettingsDialog } from "./settingsDialog";
 import { SPEEDS, settings } from "../settings";
@@ -272,7 +272,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         setActiveLine(editor, frame.step?.line ?? null);
         setErrorLine(editor, null);
         inspector.show(frame.step?.vars ?? null);
-        consoleView.show(frame.log);
+        consoleView.show(consoleAt(frame));
         if (index === last) finish(result, animate ? durationMs : 0);
         else outcomeHost.replaceChildren();
       },
@@ -362,30 +362,14 @@ function describeChallenge(level: LevelInfo): HTMLElement[] {
   ];
   if (level.brief) parts.push(h("p", {}, level.brief));
 
-  const goals: HTMLElement[] = [];
-  if (level.objectives.reach_goal && level.goal) goals.push(h("li", {}, `Reach the goal on ${squareName(level.goal)}.`));
-  for (const phrase of level.objectives.say) {
-    const fromSign = level.signs.some((sign) => sign.text.includes(phrase));
-    goals.push(h("li", {}, fromSign ? "Say the phrase from the signpost: print it, exactly as written." : `Say "${phrase}" (print it).`));
-  }
-  level.tiles.forEach((row, y) =>
-    row.forEach((tile, x) => {
-      if (tile === "gate") goals.push(h("li", {}, `Get past the locked gate on ${squareName([x, y])}. A guard keeps it shut.`));
-    }),
-  );
-  if (goals.length) parts.push(h("h3", {}, "Goal"), h("ul", { class: "objectives" }, ...goals));
-
+  // The goals and rules come worded from the engine (Level.describe), which owns
+  // every player-facing description of the game's rules.
+  const list = (className: string, items: string[]) => h("ul", { class: className }, ...items.map((item) => h("li", {}, item)));
+  if (level.goals.length) parts.push(h("h3", {}, "Goal"), list("objectives", level.goals));
   for (const sign of level.signs) {
     parts.push(h("blockquote", { class: "sign-text" }, h("span", { class: "muted small" }, `Signpost on ${squareName(sign.pos)}`), sign.text));
   }
-
-  const rules: string[] = [];
-  const { max_lines, min_comments, require_nodes, ban_nodes } = level.constraints;
-  if (max_lines !== null) rules.push(`At most ${max_lines} ${max_lines === 1 ? "line" : "lines"} of code. Blank lines and comments don't count.`);
-  if (min_comments) rules.push(`At least ${min_comments} ${min_comments === 1 ? "comment" : "comments"} (a note starting with #).`);
-  for (const node of require_nodes) rules.push(`Must use: ${node}`);
-  for (const node of ban_nodes) rules.push(`Not allowed: ${node}`);
-  if (rules.length) parts.push(h("h3", {}, "Rules"), h("ul", { class: "rules" }, ...rules.map((rule) => h("li", {}, rule))));
+  if (level.rules.length) parts.push(h("h3", {}, "Rules"), list("rules", level.rules));
 
   parts.push(
     h("h3", {}, `Your ${level.piece} knows`),
@@ -399,7 +383,7 @@ function describeFailure(error: unknown): HTMLElement {
     return noticeCard(
       "bad",
       "Stopped",
-      "Your program was still busy after 3 seconds, so Python was stopped and restarted. It's ready again: fix the code and press Run.",
+      `Your program was still busy after ${error.timeoutMs / 1000} seconds, so Python was stopped and restarted. It's ready again: fix the code and press Run.`,
     );
   }
   if (error instanceof StoppedError) return noticeCard("warn", "Stopped", "You stopped the program.");

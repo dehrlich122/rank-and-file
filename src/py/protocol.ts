@@ -50,6 +50,8 @@ export interface LevelInfo {
   constraints: { max_lines: number | null; min_comments: number; require_nodes: string[]; ban_nodes: string[] };
   par: Record<string, number>;
   starter: string;
+  goals: string[]; // what to do, in words (never a passphrase)
+  rules: string[]; // the level's constraints, in words
 }
 
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };

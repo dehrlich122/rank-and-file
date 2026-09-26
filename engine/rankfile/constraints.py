@@ -109,6 +109,19 @@ def lint(tree: ast.Module, namespace: dict) -> list[LintWarning]:
     return sorted(warnings, key=lambda warning: warning.line)
 
 
+def describe_rules(constraints) -> list[str]:
+    """The level's rules as the Challenge panel lists them, one sentence each."""
+    rules = []
+    if constraints.max_lines is not None:
+        rules.append(f"At most {_lines(constraints.max_lines)} of code. Blank lines and comments don't count.")
+    if constraints.min_comments:
+        count = constraints.min_comments
+        rules.append(f"At least {count} {'comment' if count == 1 else 'comments'} (a note starting with #).")
+    rules += [f"Must use {describe_node(name)}." for name in constraints.require_nodes]
+    rules += [f"Not allowed: {describe_node(name)}." for name in constraints.ban_nodes]
+    return rules
+
+
 def describe_node(name: str) -> str:
     return NODE_NAMES.get(name, f"`{name}`")
 

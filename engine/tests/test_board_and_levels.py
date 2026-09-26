@@ -76,6 +76,29 @@ def test_missing_required_keys():
         parse_level({"id": "x"})
 
 
+def test_describe_puts_goals_and_rules_into_words():
+    level = make_level(
+        "G X\nP .\n",
+        legend={"X": {"tile": "gate", "passphrase": "secret"}},
+        constraints={"max_lines": 2, "min_comments": 1, "require_nodes": ["For"], "ban_nodes": ["While"]},
+    )
+    described = level.describe()
+    assert described["goals"] == ["Reach the goal on a2.", "Get past the locked gate on b2. A guard keeps it shut."]
+    assert described["rules"] == [
+        "At most 2 lines of code. Blank lines and comments don't count.",
+        "At least 1 comment (a note starting with #).",
+        "Must use a for loop.",
+        "Not allowed: a while loop.",
+    ]
+
+
+def test_say_goals_point_to_the_sign_when_the_phrase_is_written_there():
+    on_sign = make_level("S G\nP .\n", legend={"S": {"tile": "sign", "text": "Say: hello"}}, objectives=["reach_goal", {"say": "hello"}])
+    assert on_sign.goals()[1] == "Say the phrase from the signpost: print it, exactly as written."
+    plain = make_level("G\nP\n", objectives=[{"say": "hello"}])
+    assert plain.goals() == ['Say "hello" (print it).']
+
+
 def test_sandbox_is_open_with_no_objectives():
     level = sandbox_level(["move"])
     assert level.goal is None

@@ -10,7 +10,8 @@ checker instead of confusing a player.
 import ast
 from dataclasses import asdict, dataclass, field
 
-from .board import Board, Direction, Pos, Tile
+from .board import Board, Direction, Pos, Tile, square_name
+from .constraints import describe_rules
 from .pieces import PIECES
 
 
@@ -65,6 +66,20 @@ class Level:
     brief: str = ""
     starter: str = ""
 
+    def goals(self) -> list[str]:
+        """What the player has to do, one sentence each. Never gives away a passphrase."""
+        goals = []
+        if self.objectives.reach_goal and self.goal:
+            goals.append(f"Reach the goal on {square_name(self.goal)}.")
+        for phrase in self.objectives.say:
+            if any(phrase in text for text in self.board.signs.values()):
+                goals.append("Say the phrase from the signpost: print it, exactly as written.")
+            else:
+                goals.append(f'Say "{phrase}" (print it).')
+        for gate in sorted(self.board.gates):
+            goals.append(f"Get past the locked gate on {square_name(gate)}. A guard keeps it shut.")
+        return goals
+
     def describe(self) -> dict:
         """Everything the UI needs to draw the level, as JSON-friendly data."""
         return {
@@ -90,6 +105,10 @@ class Level:
             "constraints": asdict(self.constraints),
             "par": self.par,
             "starter": self.starter,
+            # What the Challenge panel shows, in words: the engine owns every
+            # player-facing description of its rules.
+            "goals": self.goals(),
+            "rules": describe_rules(self.constraints),
         }
 
 
