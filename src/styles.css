@@ -1,97 +1,65 @@
+/* Colour tokens. Each is light-dark(<light>, <dark>): the browser picks one from
+   the element's color-scheme, which follows the system unless the Theme setting
+   forces it (data-theme on <html>, set by src/settings.ts). Never hard-code
+   colours elsewhere; the visual design pass will retune these. */
 :root {
+  color-scheme: light dark;
   --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-code: "Cascadia Code", "JetBrains Mono", Consolas, ui-monospace, monospace;
-
-  --bg: #f4f1ea;
-  --panel: #fffdf8;
-  --border: #ddd5c4;
-  --text: #2a2622;
-  --muted: #7a7166;
-  --accent: #2f6f4f;
-  --accent-text: #ffffff;
-  --good: #2f6f4f;
-  --good-bg: #e7f3ec;
-  --warn: #8a5d00;
-  --warn-bg: #fbf1dc;
-  --bad: #b3261e;
-  --bad-bg: #fbeceb;
-  --code-bg: #f1ece1;
-  /* translucent, so the text selection drawn underneath stays visible (QA-007) */
-  --step-line: rgb(255 214 0 / 0.28);
-  --error-line: rgb(220 38 38 / 0.15);
+  --code-size: 15px; /* the Code text size setting */
   --radius: 8px;
-  --active-line: rgb(47 111 79 / 0.06);
-  --selection: rgb(47 111 79 / 0.28);
+
+  --bg: light-dark(#f4f1ea, #1c1a18);
+  --panel: light-dark(#fffdf8, #252220);
+  --border: light-dark(#ddd5c4, #3a3531);
+  --text: light-dark(#2a2622, #ece6dc);
+  --muted: light-dark(#7a7166, #a39a8e);
+  --accent: light-dark(#2f6f4f, #5fae84);
+  --accent-text: light-dark(#ffffff, #0f1a14);
+  --good: light-dark(#2f6f4f, #7cc79c);
+  --good-bg: light-dark(#e7f3ec, #1f3228);
+  --warn: light-dark(#8a5d00, #e6b555);
+  --warn-bg: light-dark(#fbf1dc, #3a3020);
+  --bad: light-dark(#b3261e, #f08a80);
+  --bad-bg: light-dark(#fbeceb, #3a2322);
+  --code-bg: light-dark(#f1ece1, #1f1d1b);
+  /* translucent, so the text selection drawn underneath stays visible (QA-007) */
+  --step-line: light-dark(rgb(255 214 0 / 0.28), rgb(240 200 40 / 0.18));
+  --error-line: light-dark(rgb(220 38 38 / 0.15), rgb(240 70 60 / 0.18));
+  --active-line: light-dark(rgb(47 111 79 / 0.06), rgb(255 255 255 / 0.04));
+  --selection: light-dark(rgb(47 111 79 / 0.28), rgb(95 174 132 / 0.35));
 
   /* syntax colours */
-  --syn-keyword: #8f3f9e;
-  --syn-string: #a3431f;
-  --syn-number: #1f6a8f;
-  --syn-comment: #857a6c;
-  --syn-function: #2c5d9e;
-  --syn-definition: #1d6b4a;
-  --syn-class: #8a5d00;
+  --syn-keyword: light-dark(#8f3f9e, #d49be0);
+  --syn-string: light-dark(#a3431f, #e8a37e);
+  --syn-number: light-dark(#1f6a8f, #7cc4e8);
+  --syn-comment: light-dark(#857a6c, #8f877b);
+  --syn-function: light-dark(#2c5d9e, #8fb8f0);
+  --syn-definition: light-dark(#1d6b4a, #7cc79c);
+  --syn-class: light-dark(#8a5d00, #e6b555);
 
   /* board */
-  --sq-light: #eeeed2;
-  --sq-dark: #b5c99a;
-  --wall: #6b625a;
-  --wall-inner: #7d746b;
+  --sq-light: light-dark(#eeeed2, #c9c9ad);
+  --sq-dark: light-dark(#b5c99a, #7f9868);
+  --wall: light-dark(#6b625a, #3d3833);
+  --wall-inner: light-dark(#7d746b, #4a443e);
   --goal: #d4a017;
   --pawn: #fdfbf6;
   --pawn-stroke: #2a2622;
-  --pointer: #2f6f4f;
-  --coords: #8a8175;
-  --gate-frame: #c9b48e;
-  --gate-bars: #3f3a36;
-  --gate-lock: #c8961a;
-  --game-message: #8a4b00;
+  --pointer: light-dark(#2f6f4f, #245a3f);
+  --coords: light-dark(#8a8175, #8f877b);
+  --gate-frame: light-dark(#c9b48e, #8a7658);
+  --gate-bars: light-dark(#3f3a36, #211d1a);
+  --gate-lock: light-dark(#c8961a, #e0b04a);
+  --game-message: light-dark(#8a4b00, #e6b555);
+}
 
+:root[data-theme="light"] {
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1c1a18;
-    --panel: #252220;
-    --border: #3a3531;
-    --text: #ece6dc;
-    --muted: #a39a8e;
-    --accent: #5fae84;
-    --accent-text: #0f1a14;
-    --good: #7cc79c;
-    --good-bg: #1f3228;
-    --warn: #e6b555;
-    --warn-bg: #3a3020;
-    --bad: #f08a80;
-    --bad-bg: #3a2322;
-    --code-bg: #1f1d1b;
-    --step-line: rgb(240 200 40 / 0.18);
-    --error-line: rgb(240 70 60 / 0.18);
-    --active-line: rgb(255 255 255 / 0.04);
-    --selection: rgb(95 174 132 / 0.35);
-
-    --syn-keyword: #d49be0;
-    --syn-string: #e8a37e;
-    --syn-number: #7cc4e8;
-    --syn-comment: #8f877b;
-    --syn-function: #8fb8f0;
-    --syn-definition: #7cc79c;
-    --syn-class: #e6b555;
-
-    --sq-light: #c9c9ad;
-    --sq-dark: #7f9868;
-    --wall: #3d3833;
-    --wall-inner: #4a443e;
-    --pawn: #fdfbf6;
-    --pointer: #245a3f;
-    --coords: #8f877b;
-    --gate-frame: #8a7658;
-    --gate-bars: #211d1a;
-    --gate-lock: #e0b04a;
-    --game-message: #e6b555;
-    color-scheme: dark;
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 * {
@@ -140,7 +108,7 @@ code {
 
 pre {
   margin: 0;
-  font-size: 14px;
+  font-size: calc(var(--code-size) - 1px);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -649,7 +617,7 @@ pre {
 .traceback {
   margin-top: 6px;
   padding: 8px;
-  font-size: 13px;
+  font-size: calc(var(--code-size) - 2px);
   background: var(--code-bg);
   border-radius: 6px;
 }
@@ -665,7 +633,7 @@ pre {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-code);
-  font-size: 13.5px;
+  font-size: calc(var(--code-size) - 1.5px);
 }
 
 .inspector td {
@@ -904,14 +872,22 @@ pre {
   }
 }
 
+/* Animations setting: "Reduced" always stops movement; "Match system" follows
+   the OS preference; "Full" ignores it. (Colour flashes stay: they aren't motion.) */
+:root[data-motion="reduced"] :is(.piece, .piece-pointer, .gate-bars, .gate-lock) {
+  transition: none;
+}
+
+:root[data-motion="reduced"] :is(.celebrate .piece-body, .celebrate .goal-ring, .piece-body.bumping) {
+  animation: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .piece,
-  .piece-pointer {
+  :root:not([data-motion="full"]) :is(.piece, .piece-pointer, .gate-bars, .gate-lock) {
     transition: none;
   }
-  .celebrate .piece-body,
-  .celebrate .goal-ring,
-  .piece-body.bumping {
+
+  :root:not([data-motion="full"]) :is(.celebrate .piece-body, .celebrate .goal-ring, .piece-body.bumping) {
     animation: none;
   }
 }
@@ -977,7 +953,7 @@ pre {
   padding: 6px 8px;
   background: var(--code-bg);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: calc(var(--code-size) - 2px);
 }
 
 .snippet .error-detail {
@@ -1022,12 +998,12 @@ pre {
   padding: 6px 8px;
   background: var(--code-bg);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: calc(var(--code-size) - 2px);
   min-height: 40px;
 }
 
 .repl-log pre {
-  font-size: 13px;
+  font-size: calc(var(--code-size) - 2px);
 }
 
 .repl-echo {
@@ -1053,7 +1029,7 @@ pre {
   align-items: center;
   gap: 6px;
   font-family: var(--font-code);
-  font-size: 14px;
+  font-size: calc(var(--code-size) - 1px);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 3px 8px;
@@ -1144,6 +1120,98 @@ pre {
   cursor: pointer;
   color: var(--muted);
   font-size: 13px;
+}
+
+/* ---- icons (src/ui/icons.ts) ---- */
+
+.icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.btn-small .icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---- settings menu (src/ui/settingsDialog.ts) ---- */
+
+.settings-button {
+  gap: 6px;
+}
+
+.settings-dialog {
+  width: min(460px, 92vw);
+  padding: 18px 22px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
+}
+
+.settings-dialog::backdrop {
+  background: rgb(0 0 0 / 0.35);
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.settings-head h2 {
+  font-size: 18px;
+}
+
+.settings-dialog fieldset {
+  border: none;
+  margin: 0 0 14px;
+  padding: 0;
+}
+
+.settings-dialog legend {
+  font-weight: 650;
+  margin-bottom: 6px;
+  padding: 0;
+}
+
+.settings-dialog fieldset p {
+  margin: -2px 0 6px;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.choice span {
+  display: inline-block;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.choice input:checked + span {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.choice input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ---- narrower screens (desktop-first; phones are out of scope for now) ---- */

@@ -11,10 +11,13 @@ import { renderLesson, type Lesson } from "./lesson";
 import { Console, Inspector, noticeCard, outcomeCard } from "./panels";
 import { Player, buildFrames } from "./playback";
 import type { ReplPanel } from "./repl";
+import type { SettingsDialog } from "./settingsDialog";
+import { SPEEDS, settings } from "../settings";
 
 export interface LevelContext {
   client: PyClient;
   repl: ReplPanel;
+  settingsDialog: SettingsDialog;
   solved: Set<string>;
   drafts: Map<string, string>; // code per level, kept while the tab is open
 }
@@ -58,7 +61,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const speed = h(
     "select",
     { class: "speed", "aria-label": "Playback speed" },
-    ...[0.5, 1, 2, 4].map((value) => h("option", { value, selected: value === 1 }, `${value}×`)),
+    ...SPEEDS.map((value) => h("option", { value, selected: value === settings.get().speed }, `${value}×`)),
   );
   const control = (label: string, title: string, action: () => void) =>
     h("button", { class: "btn btn-icon", title, "aria-label": title, disabled: true, onClick: action }, label);
@@ -68,7 +71,14 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const forward = control("▶|", "Step forward", () => player?.next());
   const toEnd = control("⏭", "Jump to the end", () => player?.seek(player.last));
   slider.addEventListener("input", () => player?.seek(Number(slider.value)));
-  speed.addEventListener("change", () => player?.setSpeed(Number(speed.value)));
+  // The dropdown and the Settings menu are two views of one setting (QA-001, QA-006).
+  speed.addEventListener("change", () => settings.set({ speed: Number(speed.value) }));
+  const stopFollowingSettings = settings.subscribe((next) => {
+    speed.value = String(next.speed);
+    player?.setSpeed(next.speed);
+  });
+  // Opening Settings pauses playback, like a game's pause menu.
+  const stopPausingOnSettings = context.settingsDialog.onOpen(() => player?.pause());
 
   // -- right: editor, run bar, variables and console -------------------------------
   const runButton = h("button", { class: "btn btn-primary", disabled: true, onClick: () => void run() }, "Run ▶");
@@ -190,6 +200,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         else outcomeHost.replaceChildren();
       },
       updateControls,
+      settings.get().speed,
     );
     if (last > 0 && last <= AUTOPLAY_LIMIT && result.status !== "timeout") player.play();
     else player.seek(last);
@@ -236,6 +247,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   }
 
   return () => {
+    stopFollowingSettings();
+    stopPausingOnSettings();
     player?.dispose();
     board?.dispose();
     lesson?.dispose();

@@ -9,6 +9,7 @@ import { h } from "./dom";
 import { createEditor, getCode, setActiveLine, setErrorLine } from "./editor";
 import { errorCard } from "./panels";
 import { Player, buildFrames } from "./playback";
+import { settings } from "../settings";
 
 export interface LessonContext {
   client: PyClient;
@@ -125,7 +126,7 @@ class Snippet {
       this.output.hidden = frame.output === "";
       if (index === last) this.finish(result);
       else this.status.textContent = `Line ${frame.step?.line ?? "–"}`;
-    });
+    }, undefined, settings.get().speed);
     if (last > 0 && last <= 150) this.player.play();
     else this.player.seek(last);
   }

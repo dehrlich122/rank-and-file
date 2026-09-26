@@ -42,7 +42,7 @@ export function createEditor(options: EditorOptions): EditorView {
       if (update.docChanged) options.onChange?.(update.state.doc.toString());
     }),
     EditorView.theme({
-      "&": { height: "100%", fontSize: options.compact ? "14px" : "15px" },
+      "&": { height: "100%", fontSize: options.compact ? "calc(var(--code-size) - 1px)" : "var(--code-size)" },
       ".cm-scroller": { fontFamily: "var(--font-code)", lineHeight: "1.55" },
     }),
     themeFromPage,

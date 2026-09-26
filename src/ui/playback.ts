@@ -62,7 +62,9 @@ export class Player {
     readonly frames: Frame[],
     private readonly render: Render,
     private readonly onChange: () => void = () => {},
+    speed = 1,
   ) {
+    this.speed = speed;
     this.render(frames[0]!, 0, { animate: false, durationMs: 0 });
   }
 
