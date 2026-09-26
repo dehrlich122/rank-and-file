@@ -35,9 +35,21 @@ npm run typecheck    # tsc --noEmit (TypeScript 7)
 npm run test:py -- engine/tests/test_runner.py::test_endless_loop_is_stopped_quickly
 npm run test:py -- -k budget
 npx vitest run src/py/client.test.ts -t "hung worker"
+
+npm run e2e                          # headless-Chrome checks; needs `npm run dev` running
+npm run e2e -- http://localhost:4173/ --only=app   # against `npm run play`, one suite
 ```
 
 - No linter or formatter is configured.
+- `npm run e2e` (`scripts/e2e/`) drives the real app over the Chrome DevTools
+  protocol. The suites are `harness.check.mjs` and `app.check.mjs`, and each
+  check is `check(label, fn)`, where `fn` throws via `expect`. It writes
+  `e2e-results/report.json` plus failure screenshots with editors blurred.
+  Add a check for every user-visible fix. Solutions are read from
+  `solutions/`, never written into a check.
+- After a hash navigation, wait for `.level[data-level-id="<id>"]`; the old view
+  lingers for a moment. Inside `evaluate` strings, which are JS template
+  literals, write regex escapes as `\\s`.
 - `test:py` runs pytest from `.venv`, which is Python 3.14 to match Pyodide's
   CPython 3.14. To create it: `py -3.14 -m venv .venv`, then
   `.venv/Scripts/python -m pip install -r requirements-dev.txt`.
