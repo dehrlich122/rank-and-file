@@ -43,6 +43,7 @@ mechanic, never by solution code.
   - Every line printed next to a *still locked* gate gets the guard's reply, not just near misses. Once the gate is open, it stops listening.
   - The guard's reply appears in the console as a game message, set apart from printed output. The gate also flashes.
   - New brief and hints (no passphrase), plus one lesson line about reading the code you start with. The solution note was rewritten.
+  - Retest feedback: a wrong phrase followed by walking into the gate shows two messages. See QA-008.
 - **Area:** Level content + one new board mechanic
 - **Observed:** The passphrase sits on a signpost off to the side, printing it
   anywhere in the program counts, and a comment is required
@@ -459,6 +460,243 @@ mechanic, never by solution code.
 
 ---
 
+## Session 3 — 2026-09-26 · retesting round 1 (`m1-vertical-slice`)
+
+### QA-008 · Level 4: a wrong passphrase shows two messages · Open
+
+- **Area:** Gate mechanic (QA-002), so levels 4 and 5
+- **Observed:** A wrong passphrase printed next to the locked gate gets the
+  guard's hamster line, and the program carries on. When the pawn then walks
+  into the gate, the run stops with the elderberries error. One mistake shows
+  two messages. This is what QA-002 specified.
+- **Designer's question:** Thinking like a Python programmer, would the error
+  usually be caught at the wrong `print()`, or when the pawn tries to move
+  into the locked square?
+- **Answer:**
+  - **At the move.** `print()` can't fail because of *what* it prints. It
+    writes the text and returns. Nothing goes wrong until the program tries
+    something that can't be done, here walking into a locked square, and
+    that's the line the error points to.
+  - It's one of the most common patterns in real code: the mistake is on one
+    line, and the crash comes later on another. Working back from the crash
+    to the cause is a core debugging skill. In this level, the guard's reply
+    in the console is the clue that leads back to the `print()`.
+  - Stopping the run at the `print()` would teach something that isn't true
+    of Python. A wrong value stops a program on the spot only when it's
+    passed to something that checks it and raises an error (like `int("abc")`).
+    A later piece of the API could work like that (a method that takes the
+    phrase), but `print()` never does.
+  - The guard's reply isn't an error. It works like a warning or a log line:
+    the program notices, says so, and keeps going.
+- **Recommendation:** Keep the behavior. One wrinkle: the elderberries line
+  ends "Maybe try the passphrase first", which reads oddly when the player
+  *did* try, just with the wrong words. Option: when a wrong phrase was said
+  at that gate earlier in the run, the error card adds a line under the
+  elderberries text pointing back to it (e.g. "The guard didn't accept what
+  line N printed."). The elderberries line itself stays word for word.
+- **Decided** *(Designer, 2026-09-26)*:
+  1. **Keep both messages.** A wrong phrase gets the hamster line and the run
+     carries on. Walking into the locked gate stops the run with the
+     elderberries error, as QA-002 specifies.
+  2. **Add the pointer line.** When a wrong phrase was said at that gate
+     earlier in the run, the error adds a line under the elderberries text
+     pointing back to the line that printed it. The elderberries line stays
+     word for word. Walking in without having said anything shows the
+     elderberries line alone.
+- **Notes:**
+  - The guard event is already attached to the step of the `print()` that
+    caused it, so its line number is in the recording. The pointer can come
+    from the engine (add it to the friendly text when raising
+    `GateLockedError`, which keeps it in one place) rather than the UI working
+    it out.
+  - Tests: an engine case in `engine/tests/test_errors.py` or the gate tests
+    for "wrong phrase, then walk in" (pointer present) and "walk in without
+    saying anything" (no pointer).
+  - If more than one wrong phrase was said at the gate, point to the most
+    recent one.
+- **Open questions:** none.
+- **Retest:**
+  - Level 4: print a near miss next to the gate, then walk into it. The
+    console shows the hamster line, and the run stops with the elderberries
+    error plus a line naming the line that printed the near miss.
+  - Walk into the gate without printing anything: the elderberries error
+    alone, with no pointer line.
+  - Print the right phrase from too far away, then walk in: no pointer line,
+    since the guard never heard it.
+  - Level 5: the same with its gate.
+
+### QA-009 · Settings: code panel on the right, bottom or left · Open
+
+- **Area:** UI, level screen layout + settings menu (feature request, builds
+  on QA-006)
+- **Observed:** A level is always three columns: Learn/Challenge on the left,
+  the board in the middle, and the code on the right (the `.level` grid in
+  `src/styles.css`). The only exception is below 1180px wide, where the code
+  already drops to a full-width row under the other two.
+- **Wanted** *(Designer, 2026-09-26)*:
+  1. A new setting in the menu moves the code panel: **right** (today's
+     layout, the default), **bottom** or **left**.
+  2. **Bottom:** the Learn/Challenge panel stays as it is, on the left.
+  3. **Left:** the Learn/Challenge panel swaps to the right side, so it's code
+     | board | Learn/Challenge.
+- **Decided** *(Designer, 2026-09-26)*:
+  4. **The whole code column moves:** the Run/Stop bar, editor, Variables and
+     Console, not just the editor.
+  5. **Bottom is full width,** under both the Learn panel and the board, like
+     today's narrow layout.
+- **Notes:**
+  - Settings: a new field in `Settings` (`src/settings.ts`, with `DEFAULTS`,
+    `sanitize` and `settings.test.ts`) and a new group in
+    `src/ui/settingsDialog.ts`.
+  - Do the layout in CSS only: a `data-` attribute on `<html>` set by
+    `applyToDocument` (the same pattern as theme and animations) that
+    switches the `.level` grid's `grid-template-areas`. Nothing gets rebuilt,
+    so switching while a level is open keeps the code, its undo history and
+    the playback position.
+  - Bottom already exists as the layout below 1180px, so it can reuse those
+    rules. With the code full width, the editor can sit on the left with
+    Variables and Console beside it instead of stacked under it.
+  - The Scratch Python drawer lives in the Learn/Challenge panel, so it moves
+    with it.
+  - Narrow screens: three columns don't fit below 1180px, which is why the
+    code goes to the bottom there today. **Right and left apply on wide
+    screens only, and narrower screens keep today's layouts** *(Designer,
+    2026-09-26)*.
+- **Open questions:** none.
+- **Retest:**
+  - Settings shows the new option, with right selected by default.
+  - Bottom: the whole code column (Run/Stop, editor, Variables, Console)
+    runs full width under both the Learn panel and the board, and
+    Learn/Challenge stays on the left.
+  - Left: code | board | Learn/Challenge, and Scratch Python moves with
+    Learn/Challenge.
+  - Switching layouts mid-level keeps the code, undo history and playback
+    position. The choice carries over to the next level and survives a
+    reload.
+
+### QA-010 · Learn panel in steps, with a next page · Open
+
+- **Area:** UI, Learn panel (feature request, goes with QA-009)
+- **Observed:** The whole lesson is one scrolling column in the Learn tab
+  (`src/ui/lesson.ts`), with "Start the challenge →" at the end.
+- **Wanted** *(Designer, 2026-09-26)*: the Learn panel is **chunked into
+  steps**, and past the page limit there's a **next page** instead of a
+  longer scroll. The lesson text itself stays the same.
+- **Decided** *(Designer, 2026-09-26)*:
+  1. **Every layout,** not only with the code at the bottom.
+  2. **One step per runnable snippet.** The lesson sets the page breaks, not
+     the panel's height. A step that's still too tall for the panel scrolls
+     inside it.
+- **Notes:**
+  - Each lesson is a heading and short paragraphs around 1–3 runnable
+    snippets (≤150 words, enforced by `test_levels.py`). Ending a step after
+    each snippet gives 2–3 pages per lesson with no changes to the lesson
+    files. Text after the last snippet joins the last step.
+  - Build every step once and show one at a time (`hidden`), so a snippet's
+    code, mini board and output survive flipping pages.
+  - Back and Next buttons with "Step 2 of 3" at the bottom of the panel. On
+    the last step, Next becomes "Start the challenge →". A level opens on
+    step 1. Going to the Challenge tab and back keeps the step you were on.
+  - The Challenge tab stays one page. It's short.
+- **Open questions:** none.
+- **Retest:**
+  - In each of the three layouts (QA-009), level 1's lesson shows step 1 of
+    N, with one step per runnable snippet. Next and Back move between steps,
+    and the last step ends with "Start the challenge →".
+  - Run a snippet, go to the next step and back: its code, board and output
+    are still there.
+  - Switch to Challenge and back: still on the same step.
+
+### QA-011 · Collapse the Learn/Challenge panel; the board grows · Open
+
+- **Area:** UI, level screen layout (feature request, desktop only; goes
+  with QA-009)
+- **Observed:** The Learn/Challenge panel is always open, and the board has
+  a fixed cap: at most 560px wide and 60% of the window's height (`.board`
+  in `src/styles.css`). Extra room in its column goes unused.
+- **Wanted** *(Designer, 2026-09-26)*:
+  1. The Learn/Challenge panel can be **collapsed and expanded**.
+  2. The **board grows** into the room that frees up, and shrinks back when
+     the panel expands.
+  3. **Desktop only.** Mobile needs its own UI (see "Revisit later").
+- **Decided** *(Designer, 2026-09-26)*:
+  4. **Collapsed lasts for the level.** It stays as you left it while you're
+     on a level, including when switching tabs or layouts. Each new level
+     opens with the panel expanded, because every level starts with its
+     lesson. It isn't a saved setting.
+- **Is it possible?** Yes. The board is an SVG that scales cleanly to any
+  size. Swap the fixed caps for "fill the middle column, keep the board's
+  shape", and it grows and shrinks with whatever room the layout gives it.
+  Height is the real limit on laptop screens, since the board shares its
+  column with the playback controls and the outcome card, so it grows until
+  it runs out of height or width, whichever comes first. The same change
+  also helps QA-009's layouts.
+- **Notes:**
+  - Collapsed, the panel becomes a narrow strip with an expand button, not
+    nothing at all, so it's always clear how to get it back. The collapse
+    button sits in the panel's tab bar.
+  - It works in every QA-009 layout: the strip is on the left when the code
+    is on the right or at the bottom, and on the right when the code is on
+    the left.
+  - Hide the panel, don't rebuild it, so the lesson step (QA-010), snippet
+    runs and Scratch Python session survive collapsing. Scratch Python lives
+    in this panel, so it's out of sight while collapsed.
+  - The grid column shrinks to the strip's width, and the board's column
+    takes the rest. The resize follows the animations setting (instant when
+    reduced).
+  - Only the board needs to grow. The code column keeps its width.
+- **Open questions:** none.
+- **Retest:**
+  - Collapse the panel: it becomes a strip with an expand button, and the
+    board grows into the space. Expand it: the board shrinks back.
+  - Collapse it, then change the code-panel layout in Settings: it stays
+    collapsed. Go to the next level: it opens expanded.
+  - Collapse and expand keep the lesson step, snippet results and Scratch
+    Python history.
+  - Works with the code on the right, at the bottom and on the left.
+  - With reduced animations, the change is instant.
+
+---
+
+## Queued work
+
+Planned tasks that aren't QA findings, in the order they should happen.
+
+### After the next QA pass: checks for redundant code *(Designer, 2026-09-26)*
+
+- **When:** after the designer's next round of testing is logged and its
+  fixes (plus QA-008) are in. Do it before new features, so the first sweep
+  covers everything built so far.
+- **Why:** nothing checks for redundant code today. The TypeScript compiler
+  catches unused variables, parameters and imports (`noUnusedLocals`,
+  `noUnusedParameters` in `tsconfig.json`), but nothing covers the Python
+  engine, files or exports nobody uses, or copy-pasted logic.
+- **Steps:**
+  1. Add three development-only tools and run them in `npm run check`:
+     - `knip` (TypeScript): unused files, exports and dependencies.
+     - `ruff` (Python, via `requirements-dev.txt`): unused imports and
+       variables, and general tidiness. Add `vulture` too if unused functions
+       should be caught.
+     - `jscpd`: copy-pasted blocks across TypeScript and Python.
+
+     The engine itself stays free of third-party imports. These only run
+     during development.
+  2. Run them over the whole codebase once and fix what they find. Expect
+     false positives from code that's loaded by name rather than imported:
+     the engine files pulled in by `import.meta.glob` in `src/py/worker.ts`,
+     and the `bridge.py` functions the worker calls. Allowlist those in the
+     tools' config, don't delete them.
+  3. Run `/simplify` on that cleanup, for the things tools can't judge:
+     near-duplicate functions, code more general than it needs to be, or
+     something rebuilt where an existing helper would do.
+  4. From then on, run `/simplify` at the end of every round of fixes,
+     before committing.
+- **Done when:** `npm run check` runs all three tools and passes, and
+  `CLAUDE.md` lists them under Commands. Its line "No linter or formatter is
+  configured" gets updated too.
+
+---
+
 ## Revisit later
 
 Deferred on purpose. Not bugs, but don't lose them.
@@ -481,6 +719,10 @@ Deferred on purpose. Not bugs, but don't lose them.
 - **Variable names in autocomplete:** revisit in Chapter 2 when variables
   arrive. (QA-003)
 - **Guard art at the gate:** optional. (QA-002)
+- **Mobile UI.** Phones need a different UI entirely, not a squeezed
+  desktop layout. Not in this milestone, and it may become a phase 2 build.
+  `DESIGN.md` §7 already lists mobile layout as out of scope for now.
+  Everything in QA-009 to QA-011 is desktop only. *(Designer, 2026-09-26)*
 - **Moving obstacles and a finish-line objective, for later levels.** Obstacles
   that move on conditions. One example: an obstacle that moves each time a line
   runs *for the first time*, so a loop body only triggers it on its first pass,
