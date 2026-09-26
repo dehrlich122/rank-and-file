@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass, field, replace
 from .board import Board, Direction, Pos, Tile, square_name
 from .constraints import describe_rules
 from .pieces import PIECES
-from .words import count
+from .words import and_list, count
 from .world import World
 
 
@@ -54,6 +54,13 @@ class Par:
 class Objectives:
     reach_goal: bool = True
     say: list[str] = field(default_factory=list)  # phrases the program must print
+    waypoints: bool = False  # cross every waypoint (M3.1); set whenever the map has any
+    collect: int | str | None = None  # gems to collect (M3.1): a number, or "all"
+
+    @property
+    def empty(self) -> bool:
+        """Nothing to do, e.g. on the sandbox board: a run just finishes."""
+        return not (self.reach_goal or self.say or self.waypoints or self.collect)
 
 
 @dataclass
@@ -112,11 +119,36 @@ class Level:
                 goals.append("Say the phrase from the signpost: print it, exactly as written.")
             else:
                 goals.append(f'Say "{phrase}" (print it).')
+        waypoints = names(self.board.squares(Tile.WAYPOINT))
+        if len(waypoints) == 1:
+            goals.append(f"Cross the waypoint on {waypoints[0]} on the way. Passing over it is enough.")
+        elif waypoints:
+            goals.append(f"Cross all {len(waypoints)} waypoints on the way: {and_list(waypoints)}. Passing over them is enough.")
+        gems = len(self.board.squares(Tile.GEM))
+        if self.objectives.collect == "all":
+            goals.append("Collect the gem by walking over it." if gems == 1 else f"Collect all {gems} gems by walking over them.")
+        elif self.objectives.collect:
+            goals.append(f"Collect at least {count(self.objectives.collect, 'gem')} of the {gems} by walking over them.")
         for gate in sorted(self.board.gates):
             goals.append(f"Get past the locked gate on {square_name(gate)}. A guard keeps it shut.")
         if self.variants:
             goals.append(f"Your code is also checked on {count(len(self.variants), 'other board')}.")
         return goals
+
+    def gems_needed(self) -> int:
+        """How many gems the collect objective asks for (0 when there isn't one)."""
+        if self.objectives.collect == "all":
+            return len(self.board.squares(Tile.GEM))
+        return self.objectives.collect or 0
+
+    def obstacles(self) -> list[str]:
+        """The obstacles' rules, one sentence each (M3.1), for the Challenge panel."""
+        obstacles = []
+        pits = names(self.board.squares(Tile.PIT))
+        if pits:
+            where = f"A pit on {pits[0]}" if len(pits) == 1 else f"Pits on {and_list(pits)}"
+            obstacles.append(f"{where}: step in and the run is lost.")
+        return obstacles
 
     def star_goals(self) -> list[str]:
         """What each of the three stars asks for (runner.score awards them)."""
@@ -155,6 +187,7 @@ class Level:
             # player-facing description of its rules.
             "goals": self.goals(),
             "rules": describe_rules(self.constraints),
+            "obstacles": self.obstacles(),
             "stars": self.star_goals(),
             # Tiered hints (nudge, concept reminder, partial example); the UI
             # reveals them one at a time, and only when asked.
@@ -298,6 +331,10 @@ def sandbox_level(api: list[str], piece: str = "pawn") -> Level:
     )
 
 
+def names(squares: list[Pos]) -> list[str]:
+    return [square_name(pos) for pos in squares]
+
+
 def _text(data: dict, key: str) -> str:
     value = data.get(key)
     if not isinstance(value, str) or not value.strip():
@@ -326,11 +363,19 @@ def _parse_objectives(items) -> Objectives:
     for item in items:
         if item == "reach_goal":
             objectives.reach_goal = True
+        elif item == "waypoints":
+            objectives.waypoints = True
         elif isinstance(item, dict) and set(item) == {"say"} and isinstance(item["say"], str):
             objectives.say.append(item["say"])
+        elif isinstance(item, dict) and set(item) == {"collect"} and (item["collect"] == "all" or _positive(item["collect"])):
+            objectives.collect = item["collect"]
         else:
             raise LevelError(f"unknown objective {item!r}")
     return objectives
+
+
+def _positive(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 1
 
 
 def _parse_api(names, piece: str) -> list[str]:
@@ -348,6 +393,16 @@ def _parse_board(text: str, legend: dict, objectives: Objectives) -> tuple[Board
     board, start, goal, spots = parse_map(text, legend)
     if objectives.reach_goal and goal is None and not spots:
         raise LevelError("objective reach_goal needs a goal square (G), or ? squares for a hidden goal, on the map")
+    # Waypoints are always an objective: listing it is optional, but then the map needs some.
+    has_waypoints = bool(board.squares(Tile.WAYPOINT))
+    if objectives.waypoints and not has_waypoints:
+        raise LevelError("objective waypoints needs waypoint squares on the map")
+    objectives.waypoints = has_waypoints
+    gems = len(board.squares(Tile.GEM))
+    if objectives.collect and not gems:
+        raise LevelError("objective collect needs gem squares on the map")
+    if isinstance(objectives.collect, int) and objectives.collect > gems:
+        raise LevelError(f"objective collect asks for {objectives.collect} gems, and the map has {gems}")
     return board, start, goal, spots
 
 

@@ -1,5 +1,5 @@
-// The board, drawn as SVG: squares, tiles (walls, signposts, gates, pits), the
-// goal and the piece.
+// The board, drawn as SVG: squares, tiles (walls, signposts, gates, pits,
+// waypoints, gems), the goal and the piece.
 //
 // The board never decides anything. It draws the states the engine reported:
 // `show()` jumps straight to a state, `animate()` plays a step's events in order.
@@ -26,7 +26,7 @@ export class BoardView {
   private readonly pointer: SVGGElement; // rotates to show the facing
   private readonly flash: SVGRectElement;
   private readonly lostMark: SVGGElement; // where the run was lost (M3.1)
-  private readonly gates = new Map<string, SVGGElement>(); // "x,y" -> gate art
+  private readonly art = new Map<TileKind, Map<string, SVGGElement>>(); // tile kind -> "x,y" -> its art
   private angle = 0; // cumulative, so turns always take the short way round
   private timers: number[] = [];
 
@@ -52,9 +52,13 @@ export class BoardView {
         const [left, top] = corner([x, y], height);
         const light = (x + y) % 2 === 1;
         squares.append(svg("rect", { x: left, y: top, width: S, height: S, class: light ? "sq-light" : "sq-dark" }));
-        const art = TILE_ART[level.tiles[y]?.[x] ?? "floor"]?.(left, top, level, [x, y]);
-        if (art) squares.append(art);
-        if (art?.classList.contains("gate")) this.gates.set(`${x},${y}`, art);
+        const kind = level.tiles[y]?.[x] ?? "floor";
+        const art = TILE_ART[kind]?.(left, top, level, [x, y]);
+        if (art) {
+          squares.append(art);
+          if (!this.art.has(kind)) this.art.set(kind, new Map());
+          this.art.get(kind)!.set(`${x},${y}`, art);
+        }
       }
     }
     this.element.append(squares, labels(width, height));
@@ -125,7 +129,7 @@ export class BoardView {
     this.place(event.state);
     if (event.kind === "bump" && event.at) this.bump(event.state.pos, event.at);
     if (event.kind === "guard" && event.at) {
-      const gate = this.gates.get(`${event.at[0]},${event.at[1]}`);
+      const gate = this.art.get("gate")?.get(`${event.at[0]},${event.at[1]}`);
       if (gate) restartAnimation(gate, "refusing");
     }
   }
@@ -134,13 +138,20 @@ export class BoardView {
     const [left, top] = corner(state.pos, this.level.height);
     this.piece.style.transform = `translate(${left + S / 2}px, ${top + S / 2}px)`;
     this.pointer.style.transform = `rotate(${this.angle}deg)`;
-    const opened = new Set((state.opened ?? []).map(([x, y]) => `${x},${y}`));
-    for (const [key, gate] of this.gates) gate.classList.toggle("open", opened.has(key));
+    this.mark("gate", "open", state.opened);
+    this.mark("waypoint", "crossed", state.crossed);
+    this.mark("gem", "collected", state.collected);
     this.element.classList.toggle("lost", Boolean(state.lost));
     if (state.lost) {
       const [lostLeft, lostTop] = corner(state.lost, this.level.height);
       this.lostMark.setAttribute("transform", `translate(${lostLeft} ${lostTop})`);
     }
+  }
+
+  /** Set `className` on the art of each `kind` tile that's in `where`, and clear it from the rest. */
+  private mark(kind: TileKind, className: string, where: Pos[] = []): void {
+    const on = new Set(where.map(([x, y]) => `${x},${y}`));
+    for (const [key, art] of this.art.get(kind) ?? []) art.classList.toggle(className, on.has(key));
   }
 
   private bump(from: Pos, at: Pos): void {
@@ -196,6 +207,8 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
     signpost(left, top, level.signs.find((sign) => sign.pos[0] === x && sign.pos[1] === y)?.text ?? ""),
   gate: (left, top) => gate(left, top),
   pit: (left, top) => pit(left, top),
+  waypoint: (left, top) => waypoint(left, top),
+  gem: (left, top) => gem(left, top),
 };
 
 function wall(left: number, top: number): SVGGElement {
@@ -249,6 +262,31 @@ function pit(left: number, top: number): SVGGElement {
     title,
     svg("ellipse", { cx: left + S / 2, cy: top + S / 2, rx: S * 0.42, ry: S * 0.38, class: "pit-rim" }),
     svg("ellipse", { cx: left + S / 2, cy: top + S / 2 + 3, rx: S * 0.33, ry: S * 0.28, class: "pit-hole" }),
+  );
+  return group;
+}
+
+/** A waypoint (M3.1): a ring to pass over on the way to the goal; ✓ once crossed. */
+function waypoint(left: number, top: number): SVGGElement {
+  const group = svg("g", { class: "waypoint" });
+  const title = svg("title", {});
+  title.textContent = "A waypoint. Pass over it on the way to the goal.";
+  const tick = svg("text", { x: left + S / 2, y: top + S / 2 + 8, "text-anchor": "middle", class: "waypoint-tick" });
+  tick.textContent = "✓";
+  group.append(title, svg("circle", { cx: left + S / 2, cy: top + S / 2, r: S * 0.3, class: "waypoint-ring" }), tick);
+  return group;
+}
+
+/** A gem (M3.1): picked up by walking over it, so it vanishes once collected. */
+function gem(left: number, top: number): SVGGElement {
+  const group = svg("g", { class: "gem" });
+  const title = svg("title", {});
+  title.textContent = "A gem. Walk over it to collect it.";
+  const [cx, cy] = [left + S / 2, top + S / 2];
+  group.append(
+    title,
+    svg("path", { d: `M ${cx - 13} ${cy - 5} L ${cx - 6} ${cy - 13} L ${cx + 6} ${cy - 13} L ${cx + 13} ${cy - 5} L ${cx} ${cy + 14} Z`, class: "gem-body" }),
+    svg("path", { d: `M ${cx - 13} ${cy - 5} H ${cx + 13} M ${cx - 6} ${cy - 13} L ${cx - 3} ${cy - 5} L ${cx} ${cy + 14} M ${cx + 6} ${cy - 13} L ${cx + 3} ${cy - 5}`, class: "gem-facets" }),
   );
   return group;
 }

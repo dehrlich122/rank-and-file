@@ -42,6 +42,8 @@ class World:
         self.facing = level.facing
         self.opened: set[Pos] = set()  # gates that have heard their passphrase
         self.refused: dict[Pos, int | None] = {}  # gate -> the line that last said the wrong thing to it
+        self.crossed: set[Pos] = set()  # waypoints the piece has passed over
+        self.collected: set[Pos] = set()  # gems the piece has picked up
         self.ticks = dict.fromkeys(CLOCKS, 0)
         self.lost: Lost | None = None
         self.listeners: list[Callable[[Event], None]] = []
@@ -51,6 +53,8 @@ class World:
             "pos": list(self.pos),
             "facing": self.facing.value,
             "opened": [list(pos) for pos in sorted(self.opened)],
+            "crossed": [list(pos) for pos in sorted(self.crossed)],
+            "collected": [list(pos) for pos in sorted(self.collected)],
             "tick": self.ticks["action"],
             "lost": list(self.lost.at) if self.lost else None,  # where the run was lost
         }
@@ -65,6 +69,7 @@ class World:
             self._emit("bump", at=list(target))
             raise GateLockedError(self._gate_locked_message(target), at=target)
         self.pos = target
+        self._pass_over(target)
         self._emit("move")
         if self.board.tile(target) is Tile.PIT:
             self._lose(f"Your {self.level.piece} fell into the pit on {square_name(target)}.", target)
@@ -113,6 +118,14 @@ class World:
             else:
                 self.refused[gate] = printed_on
                 self._emit("guard", at=list(gate), message=GUARD_WRONG_PHRASE)
+
+    def _pass_over(self, pos: Pos) -> None:
+        """Crossing a waypoint or a gem counts even when the piece walks straight on."""
+        tile = self.board.tile(pos)
+        if tile is Tile.WAYPOINT:
+            self.crossed.add(pos)
+        elif tile is Tile.GEM:
+            self.collected.add(pos)
 
     def _still_playing(self) -> None:
         """A lost run stays lost: the piece can't act again, even if the player's code caught `Lost`."""

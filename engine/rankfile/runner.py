@@ -20,13 +20,13 @@ import linecache
 import time
 from dataclasses import asdict, dataclass, field, replace
 
-from .board import square_name
+from .board import Tile, square_name
 from .constraints import check_constraints, code_lines, lint
 from .errors import ErrorInfo, explain
-from .levels import Case, Level, sandbox_level
+from .levels import Case, Level, names, sandbox_level
 from .pieces import PIECES
 from .tracer import PLAYER_FILENAME, StepBudgetExceeded, Tracer
-from .words import count
+from .words import and_list, count
 from .world import World
 
 DEFAULT_LINE_BUDGET = 100_000
@@ -179,7 +179,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
         info = explain(run.error, namespace)
         status = "timeout" if isinstance(run.error, StepBudgetExceeded) else "error"
         return outcome(status, info.friendly, error=info, **recording)
-    if not level.objectives.reach_goal and not level.objectives.say:
+    if level.objectives.empty:
         return outcome("finished", "Finished.", **recording)
     unmet = unmet_objectives(level, world, run.output)
     if unmet:
@@ -212,6 +212,17 @@ def unmet_objectives(level: Level, world: World, output: str) -> list[str]:
     unmet = []
     if level.objectives.reach_goal and not world.at_goal():
         unmet.append(f"your {level.piece} stopped on {square_name(world.pos)}, and the goal is on {square_name(level.goal)}.")
+    missed = names([pos for pos in level.board.squares(Tile.WAYPOINT) if pos not in world.crossed])
+    if missed:
+        unmet.append(f"you didn't cross the {'waypoint' if len(missed) == 1 else 'waypoints'} on {and_list(missed)}.")
+    needed, collected, gems = level.gems_needed(), len(world.collected), len(level.board.squares(Tile.GEM))
+    if collected < needed:
+        if gems == 1:
+            unmet.append("you didn't collect the gem.")
+        elif needed == gems:
+            unmet.append(f"you collected {collected} of the {gems} gems.")
+        else:
+            unmet.append(f"you collected {count(collected, 'gem')}, and the level needs {needed}.")
     printed = [line.strip() for line in output.splitlines()]
     for phrase in level.objectives.say:
         if phrase in printed:

@@ -22,13 +22,15 @@ export interface SnippetResult {
 
 export type Facing = "north" | "east" | "south" | "west";
 export type Pos = [number, number];
-export type TileKind = "floor" | "wall" | "sign" | "gate" | "pit";
+export type TileKind = "floor" | "wall" | "sign" | "gate" | "pit" | "waypoint" | "gem";
 
 /** The world at one moment: where the piece is, which gates are open, and the obstacles (M3.1). */
 export interface WorldState {
   pos: Pos;
   facing: Facing;
   opened: Pos[];
+  crossed: Pos[]; // waypoints passed over
+  collected: Pos[]; // gems picked up
   tick: number; // ticks of the action clock so far (moves, turns and waits)
   lost: Pos | null; // where the run was lost: a pit, or where the piece was caught
 }
@@ -49,13 +51,14 @@ export interface LevelInfo {
   goal_spots: Pos[]; // a hidden goal: the squares it might be on (drawn as ?)
   case_title: string; // the title of the row of cases above the board; "" for a single case
   start: WorldState;
-  objectives: { reach_goal: boolean; say: string[] };
+  objectives: { reach_goal: boolean; say: string[]; waypoints: boolean; collect: number | "all" | null };
   api: string[];
   constraints: { max_lines: number | null; min_comments: number; require_nodes: string[]; ban_nodes: string[] };
   par: { lines: number | null };
   starter: string;
   goals: string[]; // what to do, in words (never a passphrase)
   rules: string[]; // the level's constraints, in words
+  obstacles: string[]; // each obstacle's rule, in words (M3.1)
   stars: string[]; // what each of the three stars asks for, in words
   hints: string[]; // tiered: nudge, concept reminder, partial example
 }

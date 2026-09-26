@@ -55,6 +55,8 @@ class Tile(Enum):
     SIGN = "sign"  # a signpost: blocks movement and holds some text
     GATE = "gate"  # locked until its passphrase is said next to it (see World.hear)
     PIT = "pit"  # stepping in loses the run (M3.1)
+    WAYPOINT = "waypoint"  # must be crossed before the goal (M3.1)
+    GEM = "gem"  # collected by walking over it (M3.1)
 
     @property
     def blocks(self) -> bool:
@@ -76,6 +78,10 @@ class Board:
 
     def tile(self, pos: Pos) -> Tile:
         return self.tiles.get(pos, Tile.FLOOR)
+
+    def squares(self, tile: Tile) -> list[Pos]:
+        """Every square with this tile, in order along the ranks from a1."""
+        return sorted((pos for pos, kind in self.tiles.items() if kind is tile), key=lambda pos: (pos[1], pos[0]))
 
     def blocked(self, pos: Pos) -> bool:
         return not self.contains(pos) or self.tile(pos).blocks
