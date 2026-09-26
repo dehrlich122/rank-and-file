@@ -222,6 +222,35 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(!card.tag && card.stars === 2, `level card: ${JSON.stringify(card)}`);
   });
 
+  // -- M2: hidden boards (the practice level) ---------------------------------------------
+  await check("M2: the practice level is in the Testing ground and says how many hidden boards it has", async () => {
+    await levelCards();
+    const heading = await b.evaluate(`[...document.querySelectorAll('.chapter h2')].map((e) => e.textContent).find((t) => t.includes('Testing ground'))`);
+    await openLevel("practice-01", { fresh: true });
+    await challengeTab();
+    const goals = await b.evaluate(`document.querySelector('.objectives').innerText`);
+    expect(heading === "Testing ground", `heading: ${heading}`);
+    expect(goals.includes("also solve 3 hidden boards"), goals);
+  });
+
+  await check("M2: code that only fits the visible board fails on a hidden one, which replaces the board", async () => {
+    await setCode(withoutExpectLine(solution("practice-01", ".naive")));
+    const r = await run();
+    const banner = await b.evaluate(`document.querySelector('.hidden-banner')?.innerText.replace(/\\s+/g, ' ') ?? null`);
+    await b.evaluate(`[...document.querySelectorAll('.hidden-banner button')].find((e) => e.textContent === 'Back to your board').click()`);
+    const back = await b.evaluate(`({ banner: !!document.querySelector('.hidden-banner'), board: !!document.querySelector('.board-host .board') })`);
+    expect(r.head === "Not on every board" && r.text.includes("not hidden board 1 of 3"), brief(r));
+    expect(banner?.startsWith("Hidden board 1 of 3"), `banner: ${banner}`);
+    expect(!back.banner && back.board, `after 'Back to your board': ${JSON.stringify(back)}`);
+  });
+
+  await check("M2: the reference solution solves the visible board and every hidden one, for three stars", async () => {
+    await setCode(solution("practice-01"));
+    const r = await run();
+    expect(r.head === "Solved!" && r.text.includes("It solved all 3 hidden boards too.") && r.stars === 3, `${r.stars} stars: ${brief(r)}`);
+    return brief(r);
+  });
+
   // -- QA-002: level 4's locked gate --------------------------------------------------------
   await check("QA-002: level 4 starts with the guard's comment, and the panels don't give the passphrase away", async () => {
     await openLevel("ch01-l04", { fresh: true });

@@ -71,6 +71,10 @@ def test_describe_is_ready_for_the_ui():
         ({"par": {"lines": 0}}, "par lines"),
         ({"par": {"lines": "3"}}, "par lines"),
         ({"par": 3}, "par must be a mapping"),
+        ({"variants": {"map": "P G\n"}}, "variants must be a list"),
+        ({"variants": [{"map": "P G\n", "goal": 1}]}, "variant 1 must have a map"),
+        ({"variants": [{"map": "P G\n"}, {"map": "G .\n"}]}, "variant 2: the map needs a start"),
+        ({"variants": [{"map": "P .\n"}]}, "variant 1: objective reach_goal needs a goal"),
     ],
 )
 def test_bad_levels_fail_loudly(overrides, message):
@@ -99,6 +103,16 @@ def test_describe_puts_goals_and_rules_into_words():
     ]
     assert described["stars"] == ["Solve the level.", "There's no par here: solving is enough.", "Solve it without opening a hint."]
     assert make_level("P G\n", par={"lines": 1}).star_goals()[1] == "Use 1 line of code or fewer (par)."
+    assert described["hidden_boards"] == 0
+
+
+def test_hidden_boards_share_the_level_but_not_its_map():
+    level = make_level("P . G\n", variants=[{"map": "P G .\n"}], api=["move", "at_goal"])
+    [hidden] = level.variants
+    assert (hidden.goal, hidden.api, hidden.variants) == ((1, 0), ["move", "at_goal"], [])
+    described = level.describe()
+    assert described["hidden_boards"] == 1
+    assert described["goals"][-1] == "Your code must also solve 1 hidden board like this one, each a little different."
 
 
 def test_say_goals_point_to_the_sign_when_the_phrase_is_written_there():

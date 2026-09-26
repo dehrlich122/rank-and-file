@@ -50,7 +50,7 @@ class Piece:
 
 class Pawn(Piece):
     NAME = "pawn"
-    ABILITIES = ("move", "turn_left", "turn_right", "position", "facing")
+    ABILITIES = ("move", "turn_left", "turn_right", "at_goal", "position", "facing")
 
     def move(self, squares=1):
         """Walk forward. `pawn.move()` takes one step; `pawn.move(3)` takes three."""
@@ -64,6 +64,10 @@ class Pawn(Piece):
     def turn_right(self):
         """Turn a quarter turn to the right, staying on the same square."""
         self._world.turn_right()
+
+    def at_goal(self) -> bool:
+        """True when the pawn is standing on the goal square."""
+        return self._world.at_goal()
 
     @property
     def position(self) -> tuple[int, int]:

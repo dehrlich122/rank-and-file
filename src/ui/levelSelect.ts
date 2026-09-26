@@ -1,5 +1,5 @@
 // The home screen: chapters and their levels.
-import type { Chapter } from "../content";
+import { chapterName, type Chapter } from "../content";
 import type { ProgressStore } from "../progress";
 import { h } from "./dom";
 import { icon } from "./icons";
@@ -36,7 +36,7 @@ export function renderLevelSelect(chapters: Chapter[], progress: ProgressStore):
           "header",
           {},
           h("span", { class: "tier" }, chapter.tier),
-          h("h2", {}, `Chapter ${chapter.chapter} · ${chapter.title}`),
+          h("h2", {}, chapterName(chapter)),
           h("p", { class: "muted" }, chapter.summary),
         ),
         h(

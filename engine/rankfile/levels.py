@@ -8,7 +8,7 @@ checker instead of confusing a player.
 """
 
 import ast
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 
 from .board import Board, Direction, Pos, Tile, square_name
 from .constraints import describe_rules
@@ -27,7 +27,7 @@ TILE_DETAILS = {Tile.SIGN: "text", Tile.GATE: "passphrase"}
 
 ALLOWED_KEYS = {
     "id", "chapter", "title", "trains", "brief", "piece", "map", "legend", "start",
-    "objectives", "api", "constraints", "par", "hints", "lesson", "starter",
+    "objectives", "api", "constraints", "par", "hints", "lesson", "starter", "variants",
 }  # fmt: skip
 REQUIRED_KEYS = {"id", "chapter", "title", "trains", "map", "api", "lesson"}
 
@@ -72,6 +72,9 @@ class Level:
     lesson: str = ""
     brief: str = ""
     starter: str = ""
+    # Hidden boards (M2): the same level on other maps. A solution must solve
+    # every one of them too, so hard-coding the visible board fails.
+    variants: list[Level] = field(default_factory=list)
 
     def goals(self) -> list[str]:
         """What the player has to do, one sentence each. Never gives away a passphrase."""
@@ -85,6 +88,10 @@ class Level:
                 goals.append(f'Say "{phrase}" (print it).')
         for gate in sorted(self.board.gates):
             goals.append(f"Get past the locked gate on {square_name(gate)}. A guard keeps it shut.")
+        if self.variants:
+            count = len(self.variants)
+            boards = "hidden board" if count == 1 else "hidden boards"
+            goals.append(f"Your code must also solve {count} {boards} like this one, each a little different.")
         return goals
 
     def star_goals(self) -> list[str]:
@@ -126,6 +133,7 @@ class Level:
             # Tiered hints (nudge, concept reminder, partial example); the UI
             # reveals them one at a time, and only when asked.
             "hints": self.hints,
+            "hidden_boards": len(self.variants),
         }
 
 
@@ -149,7 +157,7 @@ def parse_level(data: dict) -> Level:
     if objectives.reach_goal and goal is None:
         raise LevelError("objective reach_goal needs a goal square (G) on the map")
 
-    return Level(
+    level = Level(
         id=_text(data, "id"),
         chapter=_int(data, "chapter"),
         title=_text(data, "title"),
@@ -168,6 +176,8 @@ def parse_level(data: dict) -> Level:
         brief=str(data.get("brief", "")),
         starter=str(data.get("starter", "")),
     )
+    level.variants = _parse_variants(data.get("variants") or [], data.get("legend") or {}, level)
+    return level
 
 
 def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None]:
@@ -289,6 +299,24 @@ def _parse_api(names, piece: str) -> list[str]:
         if name not in known:
             raise LevelError(f"api: the {piece} has no ability {name!r}; it has {', '.join(known)}")
     return list(names)
+
+
+def _parse_variants(items, legend: dict, level: Level) -> list[Level]:
+    """Each hidden board is the level on another map: same legend, objectives and abilities."""
+    if not isinstance(items, list):
+        raise LevelError("variants must be a list of {map: ...} entries")
+    variants = []
+    for number, item in enumerate(items, start=1):
+        if not isinstance(item, dict) or set(item) != {"map"}:
+            raise LevelError(f"variant {number} must have a map, and nothing else")
+        try:
+            board, start, goal = parse_map(item["map"], legend)
+        except LevelError as exc:
+            raise LevelError(f"variant {number}: {exc}") from None
+        if level.objectives.reach_goal and goal is None:
+            raise LevelError(f"variant {number}: objective reach_goal needs a goal square (G) on the map")
+        variants.append(replace(level, board=board, start=start, goal=goal, variants=[]))
+    return variants
 
 
 def _parse_par(data: dict) -> Par:

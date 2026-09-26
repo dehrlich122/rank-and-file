@@ -4,15 +4,20 @@
 // checks type reference solutions, and the app saves each level's code.
 // Use `openLevel(id, { fresh: true })` to start from a newly loaded page with
 // no saved progress, or `{ reload: true }` for a reload that keeps it.
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const BUTTONS = ".playback-buttons button"; // back to start, step back, play, step forward, jump to end
 
 export function levelHelpers(browser, base, root) {
   return {
-    /** A solution file's text, read from disk (never written into a check). */
-    solution: (id, suffix = "") => readFileSync(join(root, "solutions", "ch01", `${id}${suffix}.py`), "utf8"),
+    /** A solution file's text, read from disk (never written into a check). Levels live in solutions/<folder>/. */
+    solution: (id, suffix = "") => {
+      const file = `${id}${suffix}.py`;
+      const folder = readdirSync(join(root, "solutions")).find((name) => existsSync(join(root, "solutions", name, file)));
+      if (!folder) throw new Error(`no solution file ${file}`);
+      return readFileSync(join(root, "solutions", folder, file), "utf8");
+    },
 
     /** A wrong attempt's code without its `# expect: ...` first line. */
     withoutExpectLine: (code) => code.split("\n").slice(1).join("\n"),

@@ -750,6 +750,28 @@ pre {
   min-height: 200px;
 }
 
+/* above a hidden board the last run failed on (M2) */
+.board-host:has(.hidden-banner) {
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.hidden-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  background: var(--warn-bg);
+}
+
+.hidden-note {
+  font-weight: 550;
+}
+
 .level-right {
   padding: 12px;
   gap: 10px;

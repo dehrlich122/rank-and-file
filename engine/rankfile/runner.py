@@ -7,7 +7,10 @@
   decides whether the level was solved.
 - `run_sandbox` is `run_level` on a small open board, for lesson snippets.
 
-A solved run is also scored: up to three stars (see `score`).
+A level can have hidden boards (`Level.variants`). Once the visible board is
+solved, the same code runs on each hidden one, and the level only counts as
+solved if every board is. A solved run is then scored: up to three stars
+(see `score`).
 """
 
 import ast
@@ -65,6 +68,9 @@ class LevelResult:
     code_lines: int = 0
     truncated: bool = False  # the run had more steps than were recorded
     stars: list[Star] = field(default_factory=list)  # only for a solved run
+    # Set when the visible board was solved but a hidden one wasn't: this
+    # result is that board's run. {index, total, note, level: Level.describe()}
+    hidden_board: dict | None = None
     duration_ms: float = 0.0
 
     def to_dict(self) -> dict:
@@ -94,6 +100,26 @@ def run_level(
     enforce_constraints: bool = True,
     hints_used: int = 0,
 ) -> LevelResult:
+    result = _run_board(level, code, line_budget=line_budget, enforce_constraints=enforce_constraints)
+    if result.status != "solved":
+        return result
+    total = len(level.variants)
+    for index, hidden in enumerate(level.variants, start=1):
+        # The code already passed the constraints on the visible board.
+        attempt = _run_board(hidden, code, line_budget=line_budget, enforce_constraints=False)
+        if attempt.status != "solved":
+            note = f"Your code solved the board you can see, but not hidden board {index} of {total}. This is its run."
+            attempt.hidden_board = {"index": index, "total": total, "note": note, "level": hidden.describe()}
+            return attempt
+    if total:
+        boards = "the hidden board" if total == 1 else f"all {total} hidden boards"
+        result.summary += f" It solved {boards} too."
+    result.stars = score(level, result.code_lines, hints_used)
+    return result
+
+
+def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints: bool) -> LevelResult:
+    """One run of `code` on one board: check it, run it, and judge the outcome."""
     started = time.perf_counter()
     world = World(level)
     piece = PIECES[level.piece](world, level.api)
@@ -138,7 +164,7 @@ def run_level(
     unmet = unmet_objectives(level, world, run.output)
     if unmet:
         return outcome("incomplete", "Your program finished, but " + " Also, ".join(unmet), **recording)
-    return outcome("solved", _solved_summary(level), stars=score(level, counted, hints_used), **recording)
+    return outcome("solved", _solved_summary(level), **recording)
 
 
 def run_sandbox(code: str, api: list[str], piece: str = "pawn") -> LevelResult:

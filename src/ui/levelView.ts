@@ -32,6 +32,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const { client } = context;
   let level: LevelInfo | null = null;
   let board: BoardView | null = null;
+  let hiddenBoard: BoardView | null = null; // a hidden board the last run failed on (M2), shown instead
+  const shownBoard = () => hiddenBoard ?? board;
   let player: Player | null = null;
   let lesson: Lesson | null = null;
   let hints: HintsPanel | null = null;
@@ -292,6 +294,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     player = null;
     lastResult = null;
     recordedCode = getCode(editor);
+    showVisibleBoard();
     board.show(level.start);
     clearMarks(editor);
     inspector.reset();
@@ -330,6 +333,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
 
   function showResult(result: LevelResult, mode: "play" | "step" | "end"): void {
     lastResult = result;
+    if (result.hidden_board) showHiddenBoard(result.hidden_board.level, result.hidden_board.index, result.hidden_board.total);
     const marks: Mark[] = result.warnings.map((warning) => ({ ...warning, severity: "warning" }));
     if (result.error?.line) marks.push({ line: result.error.line, message: result.error.friendly, severity: "error" });
     setMarks(editor, marks);
@@ -340,8 +344,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     player = new Player(
       frames,
       (frame, index, { animate, durationMs }) => {
-        if (animate && frame.step) board!.animate(frame.step.events, durationMs);
-        else board!.show(frame.state);
+        if (animate && frame.step) shownBoard()!.animate(frame.step.events, durationMs);
+        else shownBoard()!.show(frame.state);
         setActiveLine(editor, frame.step?.line ?? null);
         setErrorLine(editor, null);
         inspector.show(frame.step?.vars ?? null);
@@ -386,6 +390,35 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       else if (hints.canGiveUp) actions.push(h("button", { class: "btn btn-small", onClick: () => showHints() }, "Show me a solution…"));
     }
     outcomeHost.replaceChildren(outcomeCard(result, actions));
+  }
+
+  // -- hidden boards (M2) ---------------------------------------------------------------
+  // When the code solves the visible board but not a hidden one, the run that
+  // comes back is the hidden board's: it's drawn in the board's place, with a
+  // way back to the visible board.
+  function showHiddenBoard(hidden: LevelInfo, index: number, total: number): void {
+    hiddenBoard?.dispose();
+    hiddenBoard = new BoardView(hidden);
+    const back = h("button", { class: "btn btn-small", onClick: () => backToVisibleBoard() }, "Back to your board");
+    const banner = h("div", { class: "hidden-banner" }, h("strong", {}, `Hidden board ${index} of ${total}`), h("span", { class: "muted small" }, "The run below is on this board."), back);
+    boardHost.replaceChildren(banner, hiddenBoard.element);
+  }
+
+  function showVisibleBoard(): void {
+    if (!hiddenBoard || !board) return;
+    hiddenBoard.dispose();
+    hiddenBoard = null;
+    boardHost.replaceChildren(board.element);
+  }
+
+  /** "Back to your board": the hidden board's recording goes, and the visible board is ready to run again. */
+  function backToVisibleBoard(): void {
+    player?.dispose();
+    player = null;
+    showVisibleBoard();
+    if (level) board?.show(level.start);
+    setActiveLine(editor, null);
+    updateControls();
   }
 
   function showHints(): void {
@@ -442,6 +475,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     stopPausingOnSettings();
     player?.dispose();
     board?.dispose();
+    hiddenBoard?.dispose();
     lesson?.dispose();
     editor.destroy();
   };

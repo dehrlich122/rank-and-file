@@ -226,3 +226,53 @@ def test_the_bridge_passes_hints_used_through():
     level = {"id": "t", "chapter": 1, "title": "T", "trains": "t", "lesson": "t.md", "api": ["move"], "map": "G\nP\n"}
     result = json.loads(bridge.run_level(json.dumps(level), "pawn.move()\n", 1))
     assert [star["earned"] for star in result["stars"]] == [True, True, False]
+
+
+# -- hidden boards (M2) ------------------------------------------------------------
+
+CORRIDOR = "# . #\n# . #\n# . #\n# . #\n# P #\n"
+
+
+def corridor_with_goal(distance: int) -> str:
+    """A corridor 4 squares long with the goal `distance` squares ahead of the pawn."""
+    rows = CORRIDOR.splitlines()
+    row = len(rows) - 1 - distance
+    rows[row] = "# G #"
+    return "\n".join(rows) + "\n"
+
+
+def hidden_level(**overrides):
+    return make_level(
+        corridor_with_goal(2),
+        api=["move", "at_goal"],
+        variants=[{"map": corridor_with_goal(1)}, {"map": corridor_with_goal(4)}],
+        **overrides,
+    )
+
+
+def test_code_that_only_fits_the_visible_board_fails_on_a_hidden_one():
+    result = run_level(hidden_level(), "pawn.move(2)\n")
+    assert result.status == "incomplete"
+    assert result.hidden_board["index"] == 1
+    assert result.hidden_board["total"] == 2
+    assert "not hidden board 1 of 2" in result.hidden_board["note"]
+    # The run returned is the hidden board's, with that board to draw.
+    assert result.hidden_board["level"]["goal"] == [1, 1]
+    assert result.final["pos"] == [1, 2]
+    assert result.stars == []
+
+
+def test_code_that_generalises_solves_every_board():
+    result = run_level(hidden_level(par={"lines": 2}), "while not pawn.at_goal():\n    pawn.move()\n")
+    assert result.status == "solved"
+    assert result.hidden_board is None
+    assert result.summary.endswith("It solved all 2 hidden boards too.")
+    assert [star.earned for star in result.stars] == [True, True, True]
+    # The recording is the visible board's run.
+    assert result.final["pos"] == [1, 2]
+
+
+def test_hidden_boards_only_run_once_the_visible_board_is_solved():
+    result = run_level(hidden_level(), "pawn.move()\n")
+    assert result.status == "incomplete"
+    assert result.hidden_board is None

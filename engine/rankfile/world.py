@@ -47,6 +47,9 @@ class World:
         self.pos = target
         self._emit("move")
 
+    def at_goal(self) -> bool:
+        return self.level.goal is not None and self.pos == self.level.goal
+
     def turn_left(self) -> None:
         self.facing = self.facing.turned_left()
         self._emit("turn")

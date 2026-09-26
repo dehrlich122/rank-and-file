@@ -4,7 +4,7 @@
 //   #/                 level select
 //   #/level/<id>       a level
 //   #/harness          the raw Python harness from Milestone 0
-import { chapters, findLevel } from "./content";
+import { chapterName, chapters, findLevel } from "./content";
 import { mountHarness } from "./harness";
 import { progress } from "./progress";
 import { PyClient, startPythonWorker, type ClientStatus } from "./py/client";
@@ -75,7 +75,7 @@ export function startApp(root: HTMLElement): void {
       const chapter = chapters.find((c) => c.chapter === source.chapter);
       const number = (chapter?.levels.indexOf(source) ?? -1) + 1;
       crumbs.replaceChildren(
-        h("a", { href: "#/" }, chapter ? `Chapter ${chapter.chapter} · ${chapter.title}` : "Levels"),
+        h("a", { href: "#/" }, chapter ? chapterName(chapter) : "Levels"),
         h("span", { class: "crumb-sep" }, "/"),
         h("span", {}, `${number}. ${source.title}`),
       );

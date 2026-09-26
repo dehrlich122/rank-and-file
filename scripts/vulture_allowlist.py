@@ -24,6 +24,7 @@ runner.SnippetResult.duration_ms
 runner.LevelResult.final
 runner.LevelResult.duration_ms
 runner.LevelResult.stars
+runner.LevelResult.hidden_board
 runner.Star.earned
 runner.Star.label
 tracer.Step.scope

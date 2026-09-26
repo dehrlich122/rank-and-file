@@ -4,7 +4,7 @@
 // (levels.parse_level) is what actually checks and interprets a level.
 import { parse } from "yaml";
 
-const levelFiles = import.meta.glob<string>("/levels/ch*/*.yaml", { query: "?raw", import: "default", eager: true });
+const levelFiles = import.meta.glob<string>("/levels/*/*.yaml", { query: "?raw", import: "default", eager: true });
 const lessonFiles = import.meta.glob<string>("/lessons/**/*.md", { query: "?raw", import: "default", eager: true });
 const chapterFile = import.meta.glob<string>("/levels/chapters.yaml", { query: "?raw", import: "default", eager: true });
 
@@ -51,6 +51,11 @@ function loadChapters(levels: LevelSource[]): Chapter[] {
   return listed.map((chapter) => ({ ...chapter, levels: levels.filter((level) => level.chapter === chapter.chapter) }));
 }
 
+/** "Chapter 1 · First Moves"; the Testing ground (chapter 0) is just its title. */
+export function chapterName(chapter: Omit<Chapter, "levels">): string {
+  return chapter.chapter > 0 ? `Chapter ${chapter.chapter} · ${chapter.title}` : chapter.title;
+}
+
 const levels = loadLevels();
 export const chapters = loadChapters(levels);
 
@@ -62,8 +67,8 @@ export function findLevel(id: string): LevelSource | undefined {
 // They're loaded lazily: each is its own small file, fetched only when the
 // player asks to compare after solving (or gives up), and never part of the
 // main bundle. The naive attempts are for the level checker only.
-const solutionFiles = import.meta.glob<string>(["/solutions/ch*/*.py", "!/solutions/**/*.naive*.py"], { query: "?raw", import: "default" });
-const noteFiles = import.meta.glob<string>("/solutions/ch*/*.md", { query: "?raw", import: "default" });
+const solutionFiles = import.meta.glob<string>(["/solutions/*/*.py", "!/solutions/**/*.naive*.py"], { query: "?raw", import: "default" });
+const noteFiles = import.meta.glob<string>("/solutions/*/*.md", { query: "?raw", import: "default" });
 
 export interface Solution {
   code: string;
@@ -78,7 +83,9 @@ export async function loadSolution(id: string): Promise<Solution | null> {
   return code === undefined ? null : { code, note: note ?? "" };
 }
 
+/** The level after `id` in the curriculum. The Testing ground (chapter 0) is never "next". */
 export function nextLevel(id: string): LevelSource | undefined {
-  const index = levels.findIndex((level) => level.id === id);
-  return index >= 0 ? levels[index + 1] : undefined;
+  const curriculum = levels.filter((level) => level.chapter > 0);
+  const index = curriculum.findIndex((level) => level.id === id);
+  return index >= 0 ? curriculum[index + 1] : undefined;
 }

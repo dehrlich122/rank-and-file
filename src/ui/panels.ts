@@ -91,6 +91,7 @@ const HEADLINE: Record<LevelResult["status"], string> = {
 /** The banner shown when playback reaches the end of a run. */
 export function outcomeCard(result: LevelResult, actions: HTMLElement[] = []): HTMLElement {
   const body: HTMLElement[] = [];
+  if (result.hidden_board) body.push(h("p", { class: "hidden-note" }, result.hidden_board.note));
   if (result.error) {
     body.push(errorCard(result.error));
   } else if (result.problems.length > 0) {
@@ -106,7 +107,7 @@ export function outcomeCard(result: LevelResult, actions: HTMLElement[] = []): H
   return h(
     "div",
     { class: `outcome outcome-${TONE[result.status]}`, role: "status" },
-    h("div", { class: "outcome-head" }, h("strong", {}, HEADLINE[result.status]), ...actions),
+    h("div", { class: "outcome-head" }, h("strong", {}, result.hidden_board ? "Not on every board" : HEADLINE[result.status]), ...actions),
     ...body,
   );
 }

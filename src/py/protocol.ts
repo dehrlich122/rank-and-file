@@ -54,6 +54,7 @@ export interface LevelInfo {
   rules: string[]; // the level's constraints, in words
   stars: string[]; // what each of the three stars asks for, in words
   hints: string[]; // tiered: nudge, concept reminder, partial example
+  hidden_boards: number; // how many hidden boards the code must also solve
 }
 
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };
@@ -108,6 +109,8 @@ export interface LevelResult {
   code_lines: number;
   truncated: boolean;
   stars: Star[]; // only for a solved run
+  // The visible board was solved but this hidden one wasn't; the recording is this board's run.
+  hidden_board: { index: number; total: number; note: string; level: LevelInfo } | null;
   duration_ms: number;
 }
 
