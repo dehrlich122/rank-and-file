@@ -1,4 +1,4 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["scripts/e2e/screenshot.mjs"]
+  "entry": ["scripts/e2e/screenshot.mjs", "demo/serve.mjs"]
 }
