@@ -9,7 +9,8 @@ import { h } from "./dom";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
 import { Console, Inspector, noticeCard, outcomeCard } from "./panels";
-import { Player, buildFrames } from "./playback";
+import { icon, type IconName } from "./icons";
+import { Player, buildFrames, controlStates } from "./playback";
 import type { ReplPanel } from "./repl";
 import type { SettingsDialog } from "./settingsDialog";
 import { SPEEDS, settings } from "../settings";
@@ -31,6 +32,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   let player: Player | null = null;
   let lesson: Lesson | null = null;
   let running = false;
+  let lastResult: LevelResult | null = null;
+  let recordedCode: string | null = null; // the code the current (or last) recording was made from
 
   // -- left: Learn / Challenge ------------------------------------------------------
   const learnPanel = h("div", { class: "tab-panel" });
@@ -63,13 +66,16 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     { class: "speed", "aria-label": "Playback speed" },
     ...SPEEDS.map((value) => h("option", { value, selected: value === settings.get().speed }, `${value}×`)),
   );
-  const control = (label: string, title: string, action: () => void) =>
-    h("button", { class: "btn btn-icon", title, "aria-label": title, disabled: true, onClick: action }, label);
-  const toStart = control("⏮", "Back to the start", () => player?.seek(0));
-  const back = control("◀", "Step back", () => player?.previous());
-  const playPause = control("▶", "Play", () => player?.toggle());
-  const forward = control("▶|", "Step forward", () => player?.next());
-  const toEnd = control("⏭", "Jump to the end", () => player?.seek(player.last));
+  // Playback buttons (QA-005). Without a recording of the current code, Play and
+  // the right arrows run it first; see controlStates in playback.ts.
+  const control = (name: IconName, title: string, action: () => void) =>
+    h("button", { class: "btn btn-icon", title, "aria-label": title, disabled: true, onClick: action }, icon(name));
+  const toStart = control("toStart", "Back to the start", () => player?.seek(0));
+  const back = control("stepBack", "Step back", () => player?.previous());
+  const playPause = control("play", "Play", () => (player ? player.toggle() : void run("play")));
+  const forward = control("stepForward", "Step forward", () => (player ? player.next() : void run("step")));
+  const toEnd = control("toEnd", "Jump to the outcome", () => (player ? player.seek(player.last) : void run("end")));
+  let playIcon: IconName = "play";
   slider.addEventListener("input", () => player?.seek(Number(slider.value)));
   // The dropdown and the Settings menu are two views of one setting (QA-001, QA-006).
   speed.addEventListener("change", () => settings.set({ speed: Number(speed.value) }));
@@ -126,7 +132,10 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     parent: editorHost,
     code: context.drafts.get(source.id) ?? String(source.data.starter ?? ""),
     onRun: () => void run(),
-    onChange: (code) => context.drafts.set(source.id, code),
+    onChange: (code) => {
+      context.drafts.set(source.id, code);
+      if (player && code !== recordedCode) dropRecording();
+    },
     placeholder: `Write your code here, then press Run.\nYour pawn is called ${String(source.data.piece ?? "pawn")}.`,
   });
   inspector.reset();
@@ -145,17 +154,20 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       board = new BoardView(level);
       boardHost.replaceChildren(board.element);
       challengePanel.replaceChildren(...describeChallenge(level));
-      runButton.disabled = false;
+      updateControls();
     } catch (error) {
       boardHost.replaceChildren(noticeCard("bad", "Python couldn't start", String(error)));
     }
   })();
 
   // -- running ----------------------------------------------------------------------
-  async function run(): Promise<void> {
+  /** Run the editor's code; then play it, show its first step, or jump to the end. */
+  async function run(mode: "play" | "step" | "end" = "play"): Promise<void> {
     if (!level || !board || running) return;
     player?.dispose();
     player = null;
+    lastResult = null;
+    recordedCode = getCode(editor);
     board.show(level.start);
     clearMarks(editor);
     inspector.reset();
@@ -164,8 +176,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     running = true;
     updateControls();
     try {
-      const result = await client.call("runLevel", { level: source.data, code: getCode(editor) });
-      showResult(result);
+      const result = await client.call("runLevel", { level: source.data, code: recordedCode });
+      showResult(result, mode);
     } catch (error) {
       outcomeHost.replaceChildren(describeFailure(error));
     } finally {
@@ -179,7 +191,20 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     else player?.pause();
   }
 
-  function showResult(result: LevelResult): void {
+  /** The code changed since the last run: drop the recording, so the controls run the new code. */
+  function dropRecording(): void {
+    player?.dispose();
+    player = null;
+    const card = outcomeHost.querySelector(".outcome");
+    if (card && !card.classList.contains("stale")) {
+      card.classList.add("stale");
+      card.append(h("p", { class: "stale-note small" }, "Your code has changed since this run. Press Play to run the new version."));
+    }
+    updateControls();
+  }
+
+  function showResult(result: LevelResult, mode: "play" | "step" | "end"): void {
+    lastResult = result;
     const marks: Mark[] = result.warnings.map((warning) => ({ ...warning, severity: "warning" }));
     if (result.error?.line) marks.push({ line: result.error.line, message: result.error.friendly, severity: "error" });
     setMarks(editor, marks);
@@ -202,7 +227,9 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       updateControls,
       settings.get().speed,
     );
-    if (last > 0 && last <= AUTOPLAY_LIMIT && result.status !== "timeout") player.play();
+    const autoplay = last > 0 && last <= AUTOPLAY_LIMIT && result.status !== "timeout";
+    if (mode === "step" && last > 0) player.next();
+    else if (mode === "play" && autoplay) player.play();
     else player.seek(last);
   }
 
@@ -229,21 +256,41 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     runButton.disabled = running || !level;
     runButton.textContent = running ? "Running…" : "Run ▶";
     stopButton.disabled = !running && !player?.playing;
-    const ready = player !== null && player.last > 0;
-    for (const button of [toStart, back, playPause, forward, toEnd]) button.disabled = !ready;
-    if (player && ready) {
-      toStart.disabled = back.disabled = player.index === 0;
-      forward.disabled = toEnd.disabled = player.atEnd;
-      playPause.textContent = player.playing ? "⏸" : "▶";
-      playPause.title = player.playing ? "Pause" : player.atEnd ? "Replay" : "Play";
+    const state = controlStates({
+      loaded: level !== null,
+      running,
+      recording: player ? { index: player.index, last: player.last, playing: player.playing } : null,
+      failed: Boolean(lastResult?.error),
+    });
+    toStart.disabled = !state.toStart;
+    back.disabled = !state.back;
+    playPause.disabled = !state.play;
+    forward.disabled = !state.forward;
+    toEnd.disabled = !state.toEnd;
+    const wanted: IconName = state.playing ? "pause" : "play";
+    if (wanted !== playIcon) {
+      playPause.replaceChildren(icon(wanted));
+      playIcon = wanted;
+    }
+    for (const [button, title] of [
+      [playPause, state.playTitle],
+      [toEnd, state.toEndTitle],
+    ] as const) {
+      button.title = title;
+      button.setAttribute("aria-label", title);
+    }
+    const recorded = player !== null && player.last > 0;
+    slider.disabled = !recorded;
+    if (player) {
+      slider.max = String(player.last);
       slider.value = String(player.index);
       const line = player.frames[player.index]?.step?.line;
-      stepLabel.textContent = `Step ${player.index} of ${player.last}${line ? ` · line ${line}` : ""}`;
+      stepLabel.textContent = recorded ? `Step ${player.index} of ${player.last}${line ? ` · line ${line}` : ""}` : "";
     } else {
-      stepLabel.textContent = "";
       slider.value = "0";
+      const changed = recordedCode !== null && !running && getCode(editor) !== recordedCode;
+      stepLabel.textContent = changed ? "Code changed since the last run." : "";
     }
-    slider.disabled = !ready;
   }
 
   return () => {

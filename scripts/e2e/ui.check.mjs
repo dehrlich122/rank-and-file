@@ -120,6 +120,84 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     return `font ${size} · piece transition ${transition}`;
   });
 
+  // -- QA-005: playback buttons -----------------------------------------------------------
+  const buttons = () =>
+    b.evaluate(`[...document.querySelectorAll('${BUTTONS}')].map((e) => ({ title: e.title, disabled: e.disabled, icon: !!e.querySelector('svg'), text: e.textContent.trim() }))`);
+  const outcome = () => b.waitFor(`document.querySelector('.outcome-host .outcome')?.innerText.replace(/\\s+/g, ' ')`, 20_000, "outcome");
+  const stepLabel = () => b.evaluate(`document.querySelector('.step-label').textContent`);
+
+  await check("QA-005: five icon buttons in order, with the right hover text", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    const list = await buttons();
+    const titles = list.map((button) => button.title);
+    expect(
+      JSON.stringify(titles) === JSON.stringify(["Back to the start", "Step back", "Play", "Step forward", "Jump to the outcome"]),
+      titles.join(" | "),
+    );
+    expect(list.every((button) => button.icon && button.text === ""), "buttons should show SVG icons, not text glyphs");
+    return titles.join(" | ");
+  });
+
+  await check("QA-005: on a fresh level, Play runs the code; the left arrows wait for a run", async () => {
+    const before = await buttons();
+    expect(before[0].disabled && before[1].disabled && !before[2].disabled && !before[3].disabled && !before[4].disabled, JSON.stringify(before));
+    await setCode("pawn.move()");
+    await b.evaluate(`document.querySelectorAll('${BUTTONS}')[2].click()`);
+    const card = await outcome();
+    expect(card.startsWith("Not there yet"), card);
+  });
+
+  await check("QA-005: single right runs the code and shows step 1", async () => {
+    await openLevel("ch01-l02", { fresh: true });
+    await setCode("pawn.move()\npawn.move()");
+    await b.evaluate(`document.querySelectorAll('${BUTTONS}')[3].click()`);
+    const label = await b.waitFor(`document.querySelector('.step-label').textContent`, 10_000, "step label");
+    const highlighted = await b.evaluate(`!!document.querySelector('.level-right .cm-step-line')`);
+    expect(label.startsWith("Step 1 of 2") && highlighted, `${label} / highlighted: ${highlighted}`);
+    return label;
+  });
+
+  await check("QA-005: double right runs the code and lands on the error, with its line marked", async () => {
+    await openLevel("ch01-l03", { fresh: true });
+    await setCode("pawn.move()\npawn.turn_right()\npawn.move()");
+    await b.evaluate(`document.querySelectorAll('${BUTTONS}')[4].click()`);
+    const card = await outcome();
+    const marked = await b.evaluate(`!!document.querySelector('.level-right .cm-error-line')`);
+    const after = await buttons();
+    expect(card.startsWith("Python stopped") && marked, `${card.slice(0, 80)} / marked: ${marked}`);
+    expect(after[4].title === "Jump to the error" && after[4].disabled && !after[0].disabled, JSON.stringify(after.map((x) => [x.title, x.disabled])));
+    await b.evaluate(`document.querySelectorAll('${BUTTONS}')[0].click()`);
+    const label = await stepLabel();
+    expect(label.startsWith("Step 0 of"), `double left: ${label}`);
+    return card.slice(0, 80);
+  });
+
+  await check("QA-005: after an edit, the old recording is dropped and Play runs the new code", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    await setCode("pawn.move()");
+    await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`); // the Run button still works
+    const first = await outcome();
+    await setCode("pawn.move(9)");
+    const stale = await b.evaluate(`({
+      note: !!document.querySelector('.outcome.stale .stale-note'),
+      leftDisabled: document.querySelectorAll('${BUTTONS}')[0].disabled && document.querySelectorAll('${BUTTONS}')[1].disabled,
+      label: document.querySelector('.step-label').textContent,
+    })`);
+    expect(stale.note && stale.leftDisabled && stale.label.includes("Code changed"), JSON.stringify(stale));
+    await b.evaluate(`document.querySelectorAll('${BUTTONS}')[2].click()`);
+    await b.waitFor(`!document.querySelector('.outcome.stale')`, 10_000, "fresh run");
+    const second = await outcome();
+    expect(first.startsWith("Not there yet") && second.includes("edge of the board"), `${first.slice(0, 40)} → ${second.slice(0, 60)}`);
+  });
+
+  await check("QA-005: Ctrl+Enter still runs", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    await setCode("pawn.move()");
+    await b.key("Enter", { modifiers: 2 });
+    const card = await outcome();
+    expect(card.startsWith("Not there yet"), card);
+  });
+
   await check("settings are reset after the checks", async () => {
     await b.evaluate(`localStorage.clear()`);
   });

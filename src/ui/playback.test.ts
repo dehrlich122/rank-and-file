@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Step, WorldState } from "../py/protocol";
-import { BASE_STEP_MS, buildFrames, frameDuration, Player, type Frame } from "./playback";
+import { BASE_STEP_MS, buildFrames, controlStates, frameDuration, Player, type Frame } from "./playback";
 
 const start: WorldState = { pos: [0, 0], facing: "north", opened: [] };
 
@@ -60,6 +60,41 @@ describe("buildFrames", () => {
     };
     const frames = buildFrames({ start, steps: [opened, step(2, [0, 1])] });
     expect(frames[1]!.state.opened).toEqual([[1, 2]]);
+  });
+});
+
+describe("controlStates", () => {
+  const base = { loaded: true, running: false, failed: false };
+
+  it("without a recording, Play and the right arrows run the code; the left arrows wait", () => {
+    const state = controlStates({ ...base, recording: null });
+    expect(state).toMatchObject({ toStart: false, back: false, play: true, forward: true, toEnd: true, playTitle: "Play" });
+  });
+
+  it("everything waits while the level loads or Python is running", () => {
+    for (const input of [{ ...base, loaded: false }, { ...base, running: true }]) {
+      const state = controlStates({ ...input, recording: null });
+      expect([state.play, state.forward, state.toEnd]).toEqual([false, false, false]);
+    }
+  });
+
+  it("mid-recording, every direction works", () => {
+    const state = controlStates({ ...base, recording: { index: 3, last: 9, playing: false } });
+    expect(state).toMatchObject({ toStart: true, back: true, play: true, forward: true, toEnd: true });
+  });
+
+  it("at the start the left arrows are off; at the end the right arrows are off and Play means Replay", () => {
+    expect(controlStates({ ...base, recording: { index: 0, last: 9, playing: false } })).toMatchObject({ toStart: false, back: false });
+    expect(controlStates({ ...base, recording: { index: 9, last: 9, playing: false } })).toMatchObject({
+      forward: false,
+      toEnd: false,
+      playTitle: "Replay",
+    });
+  });
+
+  it("names Pause while playing, and the error when the run failed", () => {
+    expect(controlStates({ ...base, recording: { index: 2, last: 9, playing: true } }).playTitle).toBe("Pause");
+    expect(controlStates({ ...base, failed: true, recording: { index: 2, last: 9, playing: false } }).toEndTitle).toBe("Jump to the error");
   });
 });
 

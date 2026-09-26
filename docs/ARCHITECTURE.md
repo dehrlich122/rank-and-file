@@ -83,7 +83,11 @@ carries the whole world's state after it (`{pos, facing, opened}`: the piece,
 and which gates are open), so any frame can be drawn directly, which makes
 stepping back and scrubbing free. Moving obstacles would add their positions to
 that same state. Stepping forward animates the frame's events.
-The outcome card appears when playback reaches the last frame. Runs with more
+The outcome card appears when playback reaches the last frame. A recording belongs
+to the code it was made from: the first edit afterwards drops it (the outcome
+card is dimmed as out of date). Play and the right arrows then run the current
+code first, then play it, show step 1, or jump to the end
+(`controlStates` in `playback.ts` has the button rules). Runs with more
 than 150 steps, and timeouts, open at the last frame instead of autoplaying.
 
 ### Stopping programs that never end

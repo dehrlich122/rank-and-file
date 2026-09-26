@@ -552,6 +552,16 @@ pre {
   margin: 6px 0 0;
 }
 
+/* The code changed after this run, so the card describes an older version. */
+.outcome.stale > :not(.stale-note) {
+  opacity: 0.55;
+}
+
+.stale-note {
+  font-weight: 600;
+  color: var(--text);
+}
+
 .outcome-head {
   display: flex;
   align-items: center;

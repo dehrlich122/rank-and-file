@@ -37,6 +37,59 @@ export function buildFrames(result: Pick<LevelResult, "start" | "steps">): Frame
   return frames;
 }
 
+// -- which playback buttons can be used (QA-005) ---------------------------------------
+
+export interface ControlInput {
+  loaded: boolean; // the level is ready to run
+  running: boolean; // Python is running the code right now
+  recording: { index: number; last: number; playing: boolean } | null; // null: no run of the current code
+  failed: boolean; // the recording ends in an error
+}
+
+/** Which buttons are enabled (true), and what Play and Jump are called. */
+export interface ControlState {
+  toStart: boolean;
+  back: boolean;
+  play: boolean;
+  forward: boolean;
+  toEnd: boolean;
+  playing: boolean;
+  playTitle: string;
+  toEndTitle: string;
+}
+
+/**
+ * The left arrows need a recording to move through. Play and the right arrows
+ * always work: without a recording of the current code they run it first.
+ */
+export function controlStates({ loaded, running, recording, failed }: ControlInput): ControlState {
+  const idle = loaded && !running;
+  if (!recording) {
+    return {
+      toStart: false,
+      back: false,
+      play: idle,
+      forward: idle,
+      toEnd: idle,
+      playing: false,
+      playTitle: "Play",
+      toEndTitle: "Jump to the outcome",
+    };
+  }
+  const atStart = recording.index === 0;
+  const atEnd = recording.index === recording.last;
+  return {
+    toStart: idle && !atStart,
+    back: idle && !atStart,
+    play: idle,
+    forward: idle && !atEnd,
+    toEnd: idle && !atEnd,
+    playing: recording.playing,
+    playTitle: recording.playing ? "Pause" : atEnd ? "Replay" : "Play",
+    toEndTitle: failed ? "Jump to the error" : "Jump to the outcome",
+  };
+}
+
 export const BASE_STEP_MS = 420;
 
 /** How long a frame's animation takes: longer when a line does several things. */
