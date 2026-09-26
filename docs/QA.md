@@ -765,8 +765,9 @@ mechanic, never by solution code.
     more room. Collapsing the Learn panel still moves nothing else.
   - Judge whether the board's size and position still feel right.
 
-### QA-015 · Wrap long lines in the code editor · Fixed
+### QA-015 · Wrap long lines in the code editor · Verified
 
+- **Verified** *(Designer, 2026-09-26)*: approved.
 - **Fixed** in `987abfa` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - A new setting, **Wrap long lines** (On or Off), is On by default.
   - A **Wrap** button at the right end of the code toolbar switches the same setting. It's highlighted while wrapping is on.
