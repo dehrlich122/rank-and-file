@@ -29,12 +29,13 @@ The designer is also the target learner.
 npm install          # also runs scripts/copy-pyodide.mjs → public/pyodide/
 npm run dev          # dev server, http://localhost:5173
 npm run play         # production build + preview
-npm run check        # typecheck + lint + vitest + pytest; run before every commit
+npm run check        # typecheck + lint + vitest + pytest + check:bundle; run before every commit
 npm run typecheck    # tsc --noEmit (TypeScript 7)
 npm run lint         # all redundant-code checks below
 npm run lint:ts      # knip: unused files, exports and dependencies (TypeScript)
 npm run lint:py      # ruff (unused imports/variables, tidiness) + vulture (unused functions)
 npm run lint:dupes   # jscpd: copy-pasted blocks across TypeScript, JS and Python
+npm run check:bundle # production build: no reference solution in the main bundle
 
 npm run test:py -- engine/tests/test_runner.py::test_endless_loop_is_stopped_quickly
 npm run test:py -- -k budget
@@ -60,7 +61,8 @@ npm run e2e -- http://localhost:4173/ --only=app   # against `npm run play`, one
   `ui.check.mjs`, with shared helpers (`openLevel`, `setCode`, `solution`) in
   `helpers.mjs`. Each check is `check(label, fn)`, where `fn` throws via
   `expect`. It writes
-  `e2e-results/report.json` plus failure screenshots with editors blurred.
+  `e2e-results/report.json` plus failure screenshots with spoilers blurred
+  (editors, opened hints, solution notes: `SPOILERS` in `suite.mjs`).
   Add a check for every user-visible fix. Solutions are read from
   `solutions/`, never written into a check. **Never put editor contents
   into a check's message or return value.** Earlier checks type reference
@@ -166,8 +168,11 @@ Constraints are checked with `ast`/`tokenize`, never with string matching.
   with demo buttons for each failure path).
 - One `PyClient` is shared by the whole app; the scratch REPL's session lives
   in the worker, so it resets if the watchdog restarts Python.
-- Level content is bundled by `src/content.ts`. Solutions are deliberately not
-  bundled until M2's post-solve reveal.
+- Level content is bundled by `src/content.ts`. Reference solutions and their
+  notes are **lazy** (`loadSolution`): each is its own file, fetched only when
+  the player opens the comparison (`ui/compare.ts`) after solving.
+  `npm run check:bundle` fails if one ever lands in the main bundle. Never
+  make those globs eager.
 - Colours are CSS custom properties in `src/styles.css`, written as
   `light-dark(<light>, <dark>)`. The Theme setting switches `color-scheme` via
   `data-theme` on `<html>`. Never hard-code colours in TS. Icons come from

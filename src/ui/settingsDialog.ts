@@ -110,7 +110,7 @@ export class SettingsDialog {
       { class: "settings-dialog", "aria-labelledby": "settings-title" },
       h(
         "div",
-        { class: "settings-head" },
+        { class: "dialog-head" },
         h("h2", { id: "settings-title" }, "Settings"),
         h("button", { class: "btn btn-small", onClick: () => this.element.close() }, "Done"),
       ),
@@ -125,10 +125,6 @@ export class SettingsDialog {
     });
     this.sync(store.get());
     store.subscribe((settings) => this.sync(settings));
-  }
-
-  get isOpen(): boolean {
-    return this.element.open;
   }
 
   open(): void {

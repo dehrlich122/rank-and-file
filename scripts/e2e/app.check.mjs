@@ -125,6 +125,50 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(after.challenge && after.focused && after.open === 0, `after the click: ${JSON.stringify(after)} (it shows the hints, it doesn't open one)`);
   });
 
+  // -- M2: the idiomatic-solution comparison --------------------------------------------------
+  // The code in the dialog is compared with the files in Node; only yes/no is reported.
+  const paneText = (pane) => b.evaluate(`[...document.querySelectorAll('.compare-dialog .${pane} .cm-line')].map((line) => line.textContent).join('\\n')`);
+  const solutionFetches = () => b.evaluate(`performance.getEntriesByType('resource').filter((entry) => entry.name.includes('/solutions/')).length`);
+  const compareButtons = () => b.evaluate(`[...document.querySelectorAll('button')].filter((e) => e.textContent === 'Compare with an idiomatic solution').length`);
+
+  await check("M2: before solving, there's no comparison, and no solution has been fetched", async () => {
+    await openLevel("ch01-l03", { fresh: true });
+    await setCode("pawn.fly()\n");
+    await run();
+    await challengeTab();
+    const offered = await compareButtons();
+    const fetched = await solutionFetches();
+    expect(offered === 0 && fetched === 0, `${offered} compare buttons, ${fetched} solution files fetched`);
+  });
+
+  await check("M2: after solving, the comparison shows your code, the idiomatic solution and its note", async () => {
+    await setCode(solution("ch01-l03"));
+    const r = await run();
+    await b.evaluate(`[...document.querySelectorAll('.outcome-host button')].find((e) => e.textContent === 'Compare with an idiomatic solution').click()`);
+    // A boolean: CodeMirror's elements carry objects that can't be sent back by value.
+    await b.waitFor(`!!document.querySelector('.compare-dialog .compare-idiomatic .cm-line')`, 10_000, "the comparison");
+    const reference = solution("ch01-l03").trimEnd();
+    const yours = (await paneText("compare-yours")) === reference;
+    const idiomatic = (await paneText("compare-idiomatic")) === reference;
+    const note = await b.evaluate(`document.querySelector('.compare-note').innerText.trim().length`);
+    expect(r.head === "Solved!", brief(r));
+    expect(yours && idiomatic && note > 40, `your code matches: ${yours}; idiomatic matches the file: ${idiomatic}; note length ${note}`);
+  });
+
+  await check("M2: Esc closes the comparison (not opening Settings), and the Challenge panel keeps the button", async () => {
+    await b.key("Escape");
+    await sleep(100);
+    const state = await b.evaluate(`({
+      comparison: !!document.querySelector('.compare-dialog'),
+      settings: document.querySelector('.settings-dialog').open,
+    })`);
+    await openLevel("ch01-l03", { reload: true });
+    await challengeTab();
+    const inPanel = await b.evaluate(`!!document.querySelector('.solution-section button')`);
+    expect(!state.comparison && !state.settings, `after Esc: ${JSON.stringify(state)}`);
+    expect(inPanel, "no comparison button in the Challenge panel of a solved level");
+  });
+
   // -- QA-002: level 4's locked gate --------------------------------------------------------
   await check("QA-002: level 4 starts with the guard's comment, and the panels don't give the passphrase away", async () => {
     await openLevel("ch01-l04", { fresh: true });

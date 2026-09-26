@@ -48,9 +48,10 @@ export function startApp(root: HTMLElement): void {
 
   // Esc opens settings from anywhere, unless something else used that Esc
   // first (closing the autocomplete list or the search panel in the editor):
-  // CodeMirror marks the keys it handles with preventDefault().
+  // CodeMirror marks the keys it handles with preventDefault(). With a dialog
+  // open (Settings, or the solution comparison), Esc closes that instead.
   document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape" || event.defaultPrevented || dialog.isOpen) return;
+    if (event.key !== "Escape" || event.defaultPrevented || document.querySelector("dialog[open]")) return;
     event.preventDefault();
     dialog.open();
   });

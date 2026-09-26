@@ -2,7 +2,6 @@
 //
 // The YAML is parsed here only to list levels and read titles; the engine
 // (levels.parse_level) is what actually checks and interprets a level.
-// Solutions are deliberately not bundled yet: M2's post-solve reveal adds them.
 import { parse } from "yaml";
 
 const levelFiles = import.meta.glob<string>("/levels/ch*/*.yaml", { query: "?raw", import: "default", eager: true });
@@ -57,6 +56,26 @@ export const chapters = loadChapters(levels);
 
 export function findLevel(id: string): LevelSource | undefined {
   return levels.find((level) => level.id === id);
+}
+
+// Reference solutions and their notes (M2's idiomatic-solution comparison).
+// They're loaded lazily: each is its own small file, fetched only when the
+// player asks to compare after solving (or gives up), and never part of the
+// main bundle. The naive attempts are for the level checker only.
+const solutionFiles = import.meta.glob<string>(["/solutions/ch*/*.py", "!/solutions/**/*.naive*.py"], { query: "?raw", import: "default" });
+const noteFiles = import.meta.glob<string>("/solutions/ch*/*.md", { query: "?raw", import: "default" });
+
+export interface Solution {
+  code: string;
+  note: string; // Markdown: why it's written this way
+}
+
+/** A level's idiomatic solution and its note, or null if it has none. */
+export async function loadSolution(id: string): Promise<Solution | null> {
+  const load = (files: Record<string, () => Promise<string>>, extension: string) =>
+    Object.entries(files).find(([path]) => path.endsWith(`/${id}${extension}`))?.[1]();
+  const [code, note] = await Promise.all([load(solutionFiles, ".py"), load(noteFiles, ".md")]);
+  return code === undefined ? null : { code, note: note ?? "" };
 }
 
 export function nextLevel(id: string): LevelSource | undefined {

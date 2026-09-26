@@ -1,11 +1,14 @@
 // A tiny check runner. Each check is an async function that throws on failure
 // (use `expect`). Results go to the console and to e2e-results/report.json,
-// and every failure saves a screenshot, with code editors blurred so a failing
-// reference-solution check can never show solution code.
+// and every failure saves a screenshot, with spoilers blurred: code editors
+// (a failing reference-solution check must never show solution code), opened
+// hints, and the idiomatic solution's note.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 class CheckFailed extends Error {}
+
+const SPOILERS = ".cm-content, .hint-list, .compare-note";
 
 export function expect(condition, message) {
   if (!condition) throw new CheckFailed(message);
@@ -35,11 +38,11 @@ export function createSuite(name, browser, outDir) {
 
   async function saveFailureScreenshot(label) {
     await browser.evaluate(
-      `document.querySelectorAll('.cm-content').forEach((el) => { el.dataset.e2eBlur = el.style.filter; el.style.filter = 'blur(7px)'; })`,
+      `document.querySelectorAll('${SPOILERS}').forEach((el) => { el.dataset.e2eBlur = el.style.filter; el.style.filter = 'blur(7px)'; })`,
     );
     const png = await browser.screenshot();
     await browser.evaluate(
-      `document.querySelectorAll('.cm-content').forEach((el) => { el.style.filter = el.dataset.e2eBlur ?? ''; })`,
+      `document.querySelectorAll('${SPOILERS}').forEach((el) => { el.style.filter = el.dataset.e2eBlur ?? ''; })`,
     );
     mkdirSync(outDir, { recursive: true });
     const file = `${name}-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60)}.png`;

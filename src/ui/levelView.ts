@@ -9,6 +9,7 @@ import { h } from "./dom";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
 import { Console, Inspector, noticeCard, outcomeCard } from "./panels";
+import { openComparison } from "./compare";
 import { callCompletion, KnownCalls } from "./completion";
 import { HintsPanel } from "./hints";
 import { icon, type IconName } from "./icons";
@@ -225,6 +226,25 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   inspector.reset();
   consoleView.show([]);
 
+  // -- the idiomatic solution (M2) ---------------------------------------------------
+  // Offered once the level is solved: on the solving run's outcome card, and in
+  // the Challenge panel from then on.
+  const solutionSection = h("section", { class: "solution-section" });
+  const compareButton = (code: () => string) =>
+    h("button", { class: "btn btn-small", onClick: () => openComparison(source.id, code()) }, "Compare with an idiomatic solution");
+
+  function updateSolutionSection(): void {
+    if (!progress.level(source.id).solved) {
+      solutionSection.replaceChildren();
+      return;
+    }
+    solutionSection.replaceChildren(
+      h("h3", {}, "Solution"),
+      h("p", { class: "muted small" }, "You've solved this level. See your code next to an idiomatic solution, and why it's written that way."),
+      compareButton(() => getCode(editor)),
+    );
+  }
+
   // -- loading the level ------------------------------------------------------------
   void (async () => {
     try {
@@ -238,7 +258,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       board = new BoardView(level);
       boardHost.replaceChildren(board.element);
       hints = new HintsPanel(level.hints, progress.level(source.id).hints, (opened) => progress.update(source.id, { hints: opened }));
-      challengePanel.replaceChildren(...describeChallenge(level), hints.element);
+      challengePanel.replaceChildren(...describeChallenge(level), hints.element, solutionSection);
+      updateSolutionSection();
       updateControls();
     } catch (error) {
       boardHost.replaceChildren(noticeCard("bad", "Python couldn't start", String(error)));
@@ -328,8 +349,11 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     if (result.status === "solved") {
       const earned = result.stars.filter((star) => star.earned).length;
       progress.update(source.id, { solved: true, stars: Math.max(progress.level(source.id).stars, earned) });
+      updateSolutionSection();
+      const solvedWith = recordedCode ?? getCode(editor);
       const next = nextLevel(source.id);
       actions.push(
+        compareButton(() => solvedWith),
         next
           ? h("a", { class: "btn btn-primary btn-small", href: `#/level/${next.id}` }, "Next level →")
           : h("a", { class: "btn btn-primary btn-small", href: "#/" }, "Back to the levels"),
