@@ -186,7 +186,11 @@ Alongside each level:
 - `lessons/<chapter>/<id>.md`: at most 150 words of prose and 1–3 fenced
   ```` ```python run ```` blocks, which become runnable snippet widgets on a
   small open board with the level's abilities. Mark a snippet that is *meant*
-  to fail (to show an error) with ```` ```python run error ````.
+  to fail (to show an error) with ```` ```python run error ````. The Learn
+  panel shows the lesson in steps, one per runnable snippet. Each step is
+  the text leading up to a snippet plus the snippet; text after the last
+  snippet joins the last step. So where the snippets go decides where the
+  pages break (QA-010).
 - `solutions/<chapter>/<id>.py`: the reference solution.
 - `solutions/<chapter>/<id>.naive*.py`: approaches that must fail. The first line
   is `# expect: <outcome>` (e.g. `constraint`); the checker strips it before running.

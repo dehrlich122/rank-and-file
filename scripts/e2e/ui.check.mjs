@@ -192,6 +192,70 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     expect(r.learn.right < r.board.left && r.code.top > r.board.bottom, JSON.stringify(r));
   });
 
+  // -- QA-010: the Learn panel in steps -------------------------------------------------------
+  const pager = () =>
+    b.evaluate(`(() => {
+      const steps = [...document.querySelectorAll('.lesson-step')];
+      const [back, count, next] = document.querySelector('.lesson-pager').children;
+      return {
+        visible: steps.findIndex((s) => !s.hidden) + 1,
+        total: steps.length,
+        count: count.hidden ? '' : count.textContent,
+        back: back.hidden ? 'hidden' : back.disabled ? 'disabled' : 'enabled',
+        next: next.textContent,
+        pagerShown: !document.querySelector('.lesson-pager').hidden,
+        challenge: document.querySelectorAll('.tab')[1].classList.contains('active'),
+      };
+    })()`);
+  const pagerNext = () => b.evaluate(`document.querySelector('.lesson-pager .btn-primary').click()`);
+  const pagerBack = () => b.evaluate(`document.querySelector('.lesson-pager .btn').click()`);
+
+  for (const panel of ["right", "bottom", "left"]) {
+    await check(`QA-010: level 1's lesson pages through its steps (code panel: ${panel})`, async () => {
+      await choose("codePanel", panel);
+      await openLevel("ch01-l01", { fresh: true });
+      const first = await pager();
+      await pagerNext();
+      const second = await pager();
+      await pagerBack();
+      const back = await pager();
+      await pagerNext();
+      await pagerNext(); // "Start the challenge →" on the last step
+      const done = await pager();
+      expect(first.visible === 1 && first.count === "Step 1 of 2" && first.back === "disabled" && first.next === "Next →", JSON.stringify(first));
+      expect(second.visible === 2 && second.next === "Start the challenge →", JSON.stringify(second));
+      expect(back.visible === 1, JSON.stringify(back));
+      expect(done.challenge && !done.pagerShown, JSON.stringify(done));
+      return `${first.count} → ${second.count}`;
+    });
+  }
+  await choose("codePanel", "right");
+
+  await check("QA-010: a snippet's code, board and output survive paging, and the Challenge tab keeps the step", async () => {
+    await openLevel("ch01-l04", { fresh: true });
+    await b.evaluate(`document.querySelector('.snippet .btn').click()`);
+    await b.waitFor(`document.querySelector('.snippet-status').textContent.includes('Finished')`, 20_000, "snippet ran");
+    await pagerNext();
+    await pagerBack();
+    const kept = await b.evaluate(`({
+      output: document.querySelector('.snippet-output').textContent,
+      board: !!document.querySelector('.lesson-step:not([hidden]) .snippet-board svg'),
+      status: document.querySelector('.snippet-status').textContent,
+    })`);
+    await pagerNext();
+    await b.evaluate(`document.querySelectorAll('.tab')[1].click()`);
+    await b.evaluate(`document.querySelectorAll('.tab')[0].click()`);
+    const afterTabs = await pager();
+    expect(kept.output.includes("Hello, board!") && kept.board && kept.status.includes("Finished"), JSON.stringify(kept));
+    expect(afterTabs.visible === 2 && afterTabs.pagerShown, JSON.stringify(afterTabs));
+  });
+
+  await check("QA-010: a one-snippet lesson shows no step count, just the way to the challenge", async () => {
+    await openLevel("ch01-l05", { fresh: true });
+    const state = await pager();
+    expect(state.total === 1 && state.count === "" && state.back === "hidden" && state.next === "Start the challenge →", JSON.stringify(state));
+  });
+
   // -- QA-005: playback buttons -----------------------------------------------------------
   const buttons = () =>
     b.evaluate(`[...document.querySelectorAll('${BUTTONS}')].map((e) => ({ title: e.title, disabled: e.disabled, icon: !!e.querySelector('svg'), text: e.textContent.trim() }))`);

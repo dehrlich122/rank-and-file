@@ -1048,6 +1048,21 @@ pre {
   margin: 0;
 }
 
+/* ---- lesson steps (QA-010) ---- */
+
+.lesson-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+}
+
+.lesson-pager > .btn-primary {
+  margin-left: auto; /* stays on the right even when Back and the count are hidden */
+}
+
 /* ---- scratch REPL ---- */
 
 .repl-drawer {

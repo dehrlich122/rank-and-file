@@ -1,5 +1,10 @@
 // The Learn phase: a short Markdown lesson whose ```python run``` blocks become
 // small editors you can run in place, each with its own mini board.
+//
+// The lesson is shown in steps, one per runnable snippet (QA-010): a step is
+// the text leading up to a snippet plus the snippet itself, and any text after
+// the last snippet joins the last step. Every step is built once and shown one
+// at a time, so a snippet's code, board and output survive flipping pages.
 import { marked, type Token, type TokensList } from "marked";
 import type { EditorView } from "@codemirror/view";
 import { PythonHungError, type PyClient } from "../py/client";
@@ -18,7 +23,24 @@ export interface LessonContext {
 
 export interface Lesson {
   element: HTMLElement;
+  readonly stepCount: number;
+  /** The step on show, counting from 0. */
+  readonly step: number;
+  show(step: number): void;
   dispose(): void;
+}
+
+const isSnippet = (token: Token): boolean => token.type === "code" && /^python run\b/.test(token.lang ?? "");
+
+/** Split a lesson's Markdown tokens into steps: each step ends with a runnable snippet. */
+export function splitIntoSteps(tokens: Token[]): Token[][] {
+  const lastSnippet = tokens.findLastIndex(isSnippet);
+  const steps: Token[][] = [[]];
+  tokens.forEach((token, index) => {
+    steps.at(-1)!.push(token);
+    if (isSnippet(token) && index < lastSnippet) steps.push([]);
+  });
+  return steps;
 }
 
 export function renderLesson(markdown: string, context: LessonContext): Lesson {
@@ -29,27 +51,47 @@ export function renderLesson(markdown: string, context: LessonContext): Lesson {
     (sandbox ??= context.client.ready().then(() => context.client.call("loadSandbox", { api: context.api })));
 
   const tokens = marked.lexer(markdown);
-  let pending: Token[] = [];
-  const flush = () => {
-    if (pending.length === 0) return;
-    const list = Object.assign([...pending], { links: tokens.links }) as TokensList;
-    // Lessons are our own trusted content, so rendering their HTML is fine.
-    element.insertAdjacentHTML("beforeend", marked.parser(list));
-    pending = [];
-  };
-  for (const token of tokens) {
-    if (token.type === "code" && /^python run\b/.test(token.lang ?? "")) {
-      flush();
-      const snippet = new Snippet(token.text, context, loadSandbox);
-      snippets.push(snippet);
-      element.append(snippet.element);
-    } else {
-      pending.push(token);
+  const stepElements = splitIntoSteps(tokens).map((stepTokens) => {
+    const step = h("div", { class: "lesson-step" });
+    let pending: Token[] = [];
+    const flush = () => {
+      if (pending.length === 0) return;
+      const list = Object.assign([...pending], { links: tokens.links }) as TokensList;
+      // Lessons are our own trusted content, so rendering their HTML is fine.
+      step.insertAdjacentHTML("beforeend", marked.parser(list));
+      pending = [];
+    };
+    for (const token of stepTokens) {
+      if (isSnippet(token)) {
+        flush();
+        const snippet = new Snippet((token as { text: string }).text, context, loadSandbox);
+        snippets.push(snippet);
+        step.append(snippet.element);
+      } else {
+        pending.push(token);
+      }
     }
-  }
-  flush();
+    flush();
+    return step;
+  });
+  element.append(...stepElements);
 
-  return { element, dispose: () => snippets.forEach((snippet) => snippet.dispose()) };
+  let current = 0;
+  const show = (step: number) => {
+    current = Math.max(0, Math.min(stepElements.length - 1, step));
+    stepElements.forEach((element, index) => (element.hidden = index !== current));
+  };
+  show(0);
+
+  return {
+    element,
+    stepCount: stepElements.length,
+    get step() {
+      return current;
+    },
+    show,
+    dispose: () => snippets.forEach((snippet) => snippet.dispose()),
+  };
 }
 
 class Snippet {

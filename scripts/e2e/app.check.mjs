@@ -276,6 +276,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   await check("a snippet meant to fail explains itself (level 2)", async () => {
     await openLevel("ch01-l02");
+    await b.evaluate(`document.querySelector('.lesson-pager .btn-primary').click()`); // to step 2, where this snippet is
     await b.evaluate(`document.querySelectorAll('.snippet .btn')[1].click()`);
     await b.waitFor(`document.querySelectorAll('.snippet-status')[1].textContent.includes('stopped')`, 20_000, "error snippet");
     const text = await b.evaluate(`document.querySelectorAll('.snippet')[1].innerText.replace(/\\s+/g, ' ')`);

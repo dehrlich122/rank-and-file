@@ -45,15 +45,42 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const replDrawer = h("details", { class: "repl-drawer" }, h("summary", {}, "Scratch Python"), context.repl.element);
 
   lesson = renderLesson(source.lesson, { client, api: (source.data.api as string[]) ?? [] });
-  learnPanel.append(
-    h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), source.trains),
-    lesson.element,
-    h("button", { class: "btn btn-primary", onClick: () => showTab("challenge") }, "Start the challenge →"),
-  );
+  learnPanel.append(h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), source.trains), lesson.element);
+
+  // The lesson is paged, one step per runnable snippet (QA-010). The pager sits
+  // at the bottom of the panel, outside the scrolling area.
+  const stepBack = h("button", { class: "btn btn-small", onClick: () => goToStep(lesson!.step - 1) }, "← Back");
+  const stepCount = h("span", { class: "muted small" });
+  const stepNext = h("button", { class: "btn btn-small btn-primary", onClick: () => nextStep() });
+  const pager = h("div", { class: "lesson-pager" }, stepBack, stepCount, stepNext);
+  const tabScroll = h("div", { class: "tab-scroll" }, learnPanel, challengePanel);
+
+  function goToStep(step: number): void {
+    lesson!.show(step);
+    tabScroll.scrollTop = 0;
+    updatePager();
+  }
+
+  function nextStep(): void {
+    if (lesson!.step < lesson!.stepCount - 1) goToStep(lesson!.step + 1);
+    else showTab("challenge");
+  }
+
+  function updatePager(): void {
+    const { step, stepCount: total } = lesson!;
+    const last = step === total - 1;
+    stepBack.hidden = total === 1;
+    stepBack.disabled = step === 0;
+    stepCount.hidden = total === 1;
+    stepCount.textContent = `Step ${step + 1} of ${total}`;
+    stepNext.textContent = last ? "Start the challenge →" : "Next →";
+  }
+  updatePager();
 
   function showTab(which: "learn" | "challenge"): void {
     learnPanel.hidden = which !== "learn";
     challengePanel.hidden = which !== "challenge";
+    pager.hidden = which !== "learn";
     learnTab.classList.toggle("active", which === "learn");
     challengeTab.classList.toggle("active", which === "challenge");
   }
@@ -103,7 +130,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         "aside",
         { class: "panel level-left" },
         h("div", { class: "tabs", role: "tablist" }, learnTab, challengeTab),
-        h("div", { class: "tab-scroll" }, learnPanel, challengePanel),
+        tabScroll,
+        pager,
         replDrawer,
       ),
       h(
