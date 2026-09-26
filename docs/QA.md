@@ -989,4 +989,6 @@ Deferred on purpose. Not bugs, but don't lose them.
   the goal square). Early levels keep the set target. *(Designer, 2026-09-26)*
   Engine note: events already carry the full world state (the piece, and from
   QA-002 the opened gates), so moving obstacles would add their positions to
-  that state.
+  that state. **Now planned:** M3.1's obstacle toolkit (`docs/M3.md`): patrols,
+  chasers, a clock set per obstacle (including this first-time-a-line-runs
+  trigger), and waypoints you pass over.
