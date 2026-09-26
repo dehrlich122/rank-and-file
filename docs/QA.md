@@ -527,8 +527,9 @@ mechanic, never by solution code.
     since the guard never heard it.
   - Level 5: the same with its gate.
 
-### QA-009 · Settings: code panel on the right, bottom or left · Fixed
+### QA-009 · Settings: code panel on the right, bottom or left · Verified (right, left) · bottom → QA-012
 
+- **Retest** *(Designer, 2026-09-26)*: right and left look good. Bottom is off by a fair margin; continued in QA-012.
 - **Fixed** in `3641cd8` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - Bottom: the code row takes about 40% of the window's height. The editor is on the left, with Variables above Console on the right.
   - Windows 1180px wide or less ignore the setting and keep today's layout.
@@ -579,8 +580,9 @@ mechanic, never by solution code.
     position. The choice carries over to the next level and survives a
     reload.
 
-### QA-010 · Learn panel in steps, with a next page · Fixed
+### QA-010 · Learn panel in steps, with a next page · Verified
 
+- **Retest** *(Designer, 2026-09-26)*: okay. A design-pass idea is under Revisit later: make it more obvious that there are more steps.
 - **Fixed** in `9559bfd` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - A lesson with one snippet (level 5) has one step. It shows only "Start the challenge →", with no step count and no Back button.
 - **Area:** UI, Learn panel (feature request, goes with QA-009)
@@ -614,8 +616,9 @@ mechanic, never by solution code.
     are still there.
   - Switch to Challenge and back: still on the same step.
 
-### QA-011 · Collapse the Learn/Challenge panel; the board grows · Fixed
+### QA-011 · Collapse the Learn/Challenge panel; the board grows · Reworked → QA-013
 
+- **Retest** *(Designer, 2026-09-26)*: not happy with it in any layout, and especially with the code at the bottom. Collapsing should make the board easier to see and work with, but it made it harder. Continued in QA-013.
 - **Fixed** in `a6689a7` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - The board lost its old 560px cap in every layout, so on big windows it's larger even with the panel open.
   - **To check on retest:** in the Bottom layout, the playback controls and outcome sit *beside* the board, and the board already fills its row's height. Height is the limit there (the "whichever comes first" case), so collapsing widens the board's column but doesn't make the board itself bigger. With the code on the right or left, the board grows (e.g. 444 → 530 px in a 1400×860 window).
@@ -664,6 +667,61 @@ mechanic, never by solution code.
   - Collapse and expand keep the lesson step, snippet results and Scratch
     Python history.
   - Works with the code on the right, at the bottom and on the left.
+  - With reduced animations, the change is instant.
+
+### QA-012 · Bottom layout: controls and outcome too wide · Open
+
+- **Area:** UI, level layout (continues QA-009)
+- **Observed** *(Designer, 2026-09-26)*: with the code at the bottom, the
+  whole playback line (buttons, slider, speed) and the outcome/error card are
+  far too wide. They stretch across the board's row, beside the board.
+- **Wanted** *(Designer, 2026-09-26)*: preferably fit them into the area next
+  to the editor, where Variables and Console are. Otherwise, at least make
+  them narrower so the board is larger and more central.
+- **Decided:** the preferred option.
+  - In the Bottom layout, the playback bar and the outcome card move into
+    the code row, beside the editor, with Variables and Console.
+  - The board then has its row to itself, fills that row's height, and sits
+    in the middle of the screen (see QA-013).
+- **Notes:**
+  - The playback bar and outcome card are *moved* between the board panel
+    and the code row when the layout changes (not rebuilt), so the playback
+    position and the outcome survive a switch.
+  - Narrow windows (1180px and below) keep today's layout, as QA-009 decided.
+- **Retest:**
+  - Bottom: the playback buttons, slider and speed, and the outcome or error
+    card, sit beside the editor, together with Variables and Console. Nothing
+    of theirs is left in the board's row.
+  - The board fills the height of its row and is centred on the screen.
+  - Switch between Bottom and Right mid-run: the playback position and the
+    outcome card come along. Right and left are unchanged.
+
+### QA-013 · Collapsing the Learn panel: the board stays put · Open
+
+- **Area:** UI, level layout (reworks QA-011)
+- **Observed** *(Designer, 2026-09-26)*: collapsing made things worse in
+  every layout, and most of all with the code at the bottom. The board
+  shifted sideways, and the code area grew too, although it never needs to.
+- **Wanted** *(Designer, 2026-09-26)*: keep the board in the centre of the
+  screen in most cases, and don't have it shift. The code area doesn't need
+  to enlarge.
+- **The trade-off:** collapsing frees space on one side of the board only,
+  so the board can either stay put or grow into that space, not both.
+- **Decided** *(Designer, 2026-09-26, "Board stays put")*:
+  - The Learn and code panels have **equal fixed widths**, so the board sits
+    in the middle of the screen and is as large as the window allows.
+  - **Collapsing only hides the lesson.** The panel shrinks to its strip
+    against the outer edge, and nothing else moves or resizes.
+  - The code panel never enlarges.
+  - With the code at the bottom, the board is centred in its row (QA-012).
+- **Retest:**
+  - With the code on the right or left, the board is in the middle of the
+    screen. Collapse and expand the Learn panel: the board and the code
+    panel don't move or change size; only the lesson panel shrinks to its
+    strip and back.
+  - The same with the code at the bottom.
+  - Collapsed still lasts for the level, and still keeps the lesson step,
+    snippet results and Scratch Python (as in QA-011).
   - With reduced animations, the change is instant.
 
 ---
@@ -749,6 +807,7 @@ Deferred on purpose. Not bugs, but don't lose them.
 - **Variable names in autocomplete:** revisit in Chapter 2 when variables
   arrive. (QA-003)
 - **Guard art at the gate:** optional. (QA-002)
+- **Make it obvious a lesson has more steps** (design pass). For example, the Next button could name what's coming ("Step 2 →", "Step 3 →") instead of a plain "Next →". *(Designer, 2026-09-26; QA-010)*
 - **Mobile UI.** Phones need a different UI entirely, not a squeezed
   desktop layout. Not in this milestone, and it may become a phase 2 build.
   `DESIGN.md` §7 already lists mobile layout as out of scope for now.
