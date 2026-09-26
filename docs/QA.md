@@ -742,7 +742,7 @@ mechanic, never by solution code.
 
 ### QA-014 · Code panel a little too narrow on the left or right · Fixed
 
-- **Fixed** in `COMMIT` (2026-09-26); awaiting the designer's retest.
+- **Fixed** in `0d81b06` (2026-09-26); awaiting the designer's retest.
 - **Observed** *(Designer, 2026-09-26)*: after QA-013, the code area is a
   little too narrow when it's on the left or right.
 - **Wanted** *(Designer, 2026-09-26)*: about 25% wider.
