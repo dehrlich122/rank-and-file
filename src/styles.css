@@ -340,18 +340,20 @@ pre {
 
 /* A level is a grid of three areas: "learn" (the Learn/Challenge panel), "board"
    and "code" (Run/Stop, editor, Variables, Console). The Learn and code columns
-   have the same fixed width, so the board sits in the middle of the screen and
-   takes whatever the window has left (QA-013). The Code panel setting
+   have fixed widths (the code a quarter wider, QA-014) and the board takes
+   whatever the window has left, so it never moves or resizes when the Learn
+   panel collapses (QA-013). The Code panel setting
    (data-code-panel on <html>, QA-009, QA-012) rearranges the areas on wide
    screens; narrow windows always put the code underneath (see the end of this
    file). Switching layouts never rebuilds anything: only the grid changes, and
    for "bottom" the playback bar and outcome move beside the editor
    (placePlayback in levelView.ts). */
 .level {
-  --side-col: clamp(340px, 29vw, 440px);
+  --side-col: clamp(340px, 29vw, 440px); /* the Learn panel */
+  --code-col: calc(var(--side-col) * 1.25); /* the code panel, when it's beside the board */
   --board-max-height: max(240px, calc(100vh - 330px)); /* leaves room for the controls and outcome */
   display: grid;
-  grid-template-columns: var(--side-col) minmax(0, 1fr) var(--side-col);
+  grid-template-columns: var(--side-col) minmax(0, 1fr) var(--code-col);
   grid-template-areas: "learn board code";
   gap: 12px;
   padding: 12px;
@@ -446,6 +448,7 @@ pre {
 
 @media (min-width: 1181px) {
   :root[data-code-panel="left"] .level {
+    grid-template-columns: var(--code-col) minmax(0, 1fr) var(--side-col);
     grid-template-areas: "code board learn";
   }
 
@@ -464,6 +467,7 @@ pre {
      height. The code row runs full width, with the playback bar, the outcome,
      Variables and Console beside the editor. */
   :root[data-code-panel="bottom"] .level {
+    grid-template-columns: var(--side-col) minmax(0, 1fr) var(--side-col);
     grid-template-rows: minmax(0, 1fr) minmax(300px, 45%);
     grid-template-areas:
       "learn board ."

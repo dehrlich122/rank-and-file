@@ -303,7 +303,15 @@ export default async function uiChecks({ browser: b, base, root, check }) {
       const centre = Math.round((await b.evaluate(`document.documentElement.clientWidth`)) / 2);
       expect(state.collapsed && state.strip && state.tabsHidden, JSON.stringify(state));
       expect(JSON.stringify(before) === JSON.stringify(after), `moved: ${JSON.stringify({ before, after })}`);
-      expect(Math.abs(before.board.centre - centre) <= 3, `board centre ${before.board.centre}, screen centre ${centre}`);
+      // Centred on the screen at the bottom; beside a (wider, QA-014) code panel, centred in its column.
+      const column = await b.evaluate(`(() => { const r = document.querySelector('.level-middle').getBoundingClientRect(); return Math.round(r.left + r.width / 2); })()`);
+      const target = panel === "bottom" ? centre : column;
+      expect(Math.abs(before.board.centre - target) <= 3, `board centre ${before.board.centre}, expected ${target}`);
+      if (panel !== "bottom") {
+        // (measured after expand(), so the Learn panel is back to its full width)
+        const ratio = (r.code.right - r.code.left) / (await b.evaluate(`document.querySelector('.level-left').getBoundingClientRect().width`));
+        expect(Math.abs(ratio - 1.25) < 0.03, `QA-014: code panel should be about 25% wider than the Learn column (ratio ${ratio.toFixed(2)})`);
+      }
       const stripSide = panel === "left" ? r.learn.left > r.board.right : r.learn.right < r.board.left;
       expect(stripSide && r.learn.right - r.learn.left < 60, `strip at the wrong side or too wide: ${JSON.stringify(r.learn)}`);
       return `board ${before.board.width}×${before.board.height} at centre ${before.board.centre}, unchanged`;

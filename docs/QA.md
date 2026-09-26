@@ -18,8 +18,9 @@ mechanic, never by solution code.
 
 ## Session 1 — 2026-09-26 · M1 vertical slice (`m1-vertical-slice`)
 
-### QA-001 · Playback speed resets on every level · Fixed
+### QA-001 · Playback speed resets on every level · Verified
 
+- **Verified** by the designer, 2026-09-26.
 - **Fixed** in `8d9687a` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - Speed is now a field of the shared settings store (`src/settings.ts`, together with QA-006). It's saved in localStorage, so it also survives a reload.
 - **Area:** UI, playback controls
@@ -36,8 +37,9 @@ mechanic, never by solution code.
 - **Retest:** Set 2× on level 1, go to level 2 via Next and via the level
   select: selector shows 2× and playback runs at 2×.
 
-### QA-002 · Level 4 (`ch01-l04`, "The Password") redesign · Fixed
+### QA-002 · Level 4 (`ch01-l04`, "The Password") redesign · Verified
 
+- **Verified** by the designer, 2026-09-26.
 - **Fixed** in `bc8320d` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - "Exact match" means nothing is trimmed. A trailing space, a different capital or the quote marks all get the hamster line.
   - Every line printed next to a *still locked* gate gets the guard's reply, not just near misses. Once the gate is open, it stops listening.
@@ -127,8 +129,9 @@ mechanic, never by solution code.
   - No comment is required. The brief and instructions panel don't show the
     passphrase. The starter code shows the comment above word for word.
 
-### QA-003 · Autocomplete for calls you've already written · Fixed
+### QA-003 · Autocomplete for calls you've already written · Verified
 
+- **Verified** by the designer, 2026-09-26.
 - **Fixed** in `1f12e64` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - A call counts as typed once its opening `(` is typed. Pasting counts as typing, since it's the player's own action. Known calls last for the level until the tab is closed; they aren't saved across reloads.
   - Noticed while testing: pressing Enter after an unfinished line like `pawn.` gives the new line Python's continuation indent. That's CodeMirror's normal Python indentation.
@@ -229,8 +232,9 @@ mechanic, never by solution code.
   - Plain calls: after one `print(...)`, `p` offers `print()`
     and `pa` closes the list. Nothing pops up inside a comment or a string.
 
-### QA-004 · Level 5 (`ch01-l05`, "The Winding Path") rework · Fixed
+### QA-004 · Level 5 (`ch01-l05`, "The Winding Path") rework · Verified
 
+- **Verified** by the designer, 2026-09-26.
 - **Fixed** in `bdf8755` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - The script found a minimum of 11 lines with the gate, so `par` is 11 and `max_lines` is 13. One move per line needs 19.
 - **Area:** Level content (reuses QA-002's gate)
@@ -285,8 +289,9 @@ mechanic, never by solution code.
 
 ## Session 2 — 2026-09-26 · M1 vertical slice (`m1-vertical-slice`)
 
-### QA-005 · Playback buttons: new scheme, Play doubles as Run · Fixed
+### QA-005 · Playback buttons: new scheme, Play doubles as Run · Verified
 
+- **Verified** by the designer, 2026-09-26.
 - **Fixed** in `a0ac8e7` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - **Choice to check on retest:** after an edit, the board stays where the last run left it, and the outcome card dims with "Your code has changed since this run". The label under the buttons says "Code changed since the last run." The next run starts from the beginning.
 - **Area:** UI, playback controls
@@ -349,8 +354,9 @@ mechanic, never by solution code.
     marked. Double left goes back to before the first line.
   - The Run button and Ctrl+Enter still work.
 
-### QA-006 · Settings menu on every screen · Fixed
+### QA-006 · Settings menu on every screen · Verified
 
+- **Verified** by the designer, 2026-09-26.
 - **Fixed** in `8d9687a` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - Animations offers **Match system / Full / Reduced** (default: Match system).
   - Code text sizes are Small 13, Medium 15, Large 17 and Extra large 20 px.
@@ -426,8 +432,9 @@ mechanic, never by solution code.
     the other way round. The theme can be forced light or dark
     whatever the system says, and set back to follow the system.
 
-### QA-007 · Selected text doesn't show on highlighted lines · Fixed
+### QA-007 · Selected text doesn't show on highlighted lines · Verified
 
+- **Verified** by the designer, 2026-09-26.
 - **Fixed** in `7366901` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
 - **Area:** UI, code editor (bug)
 - **Observed:** Highlighting text on line 1 to copy and paste it doesn't
@@ -462,8 +469,9 @@ mechanic, never by solution code.
 
 ## Session 3 — 2026-09-26 · retesting round 1 (`m1-vertical-slice`)
 
-### QA-008 · Level 4: a wrong passphrase shows two messages · Fixed
+### QA-008 · Level 4: a wrong passphrase shows two messages · Verified
 
+- **Verified** by the designer, 2026-09-26.
 - **Fixed** in `5127e8b` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - Pointer wording: "The guard didn't accept what line N printed." It sits on its own line under the elderberries line, and points to the most recent wrong phrase said at that gate. The same applies in level 5.
 - **Area:** Gate mechanic (QA-002), so levels 4 and 5
@@ -671,6 +679,7 @@ mechanic, never by solution code.
 
 ### QA-012 · Bottom layout: controls and outcome too wide · Fixed
 
+- **Retest** *(Designer, 2026-09-26)*: the empty space to the right of the board stays for now; an idea for it is under Revisit later (design pass).
 - **Fixed** in `1b1f9b2` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - Beside the editor, from top to bottom: the playback bar (buttons, slider, step, speed on one line), then the outcome or error card (scrolls if it's long), then Variables and Console side by side.
   - The board's row keeps an empty space on the right, the same width as the Learn panel, so the board is centred on the screen.
@@ -701,6 +710,7 @@ mechanic, never by solution code.
 
 ### QA-013 · Collapsing the Learn panel: the board stays put · Fixed
 
+- **Retest** *(Designer, 2026-09-26)*: with the code on the left or right, the code area is now a little too narrow. Continued in QA-014.
 - **Fixed** in `1b1f9b2` (2026-09-26); awaiting the designer's retest (steps under **Retest**).
   - The Learn and code panels are both 29% of the window width, kept between 340 and 440px. In a 1400px window, the code panel is now 406px wide (it was about 510) and the board is 514px.
   - Collapsed, the panel becomes a strip at the outer edge of its column. The rest of that column is left empty, so nothing else moves.
@@ -729,6 +739,28 @@ mechanic, never by solution code.
   - Collapsed still lasts for the level, and still keeps the lesson step,
     snippet results and Scratch Python (as in QA-011).
   - With reduced animations, the change is instant.
+
+### QA-014 · Code panel a little too narrow on the left or right · Fixed
+
+- **Fixed** in `COMMIT` (2026-09-26); awaiting the designer's retest.
+- **Observed** *(Designer, 2026-09-26)*: after QA-013, the code area is a
+  little too narrow when it's on the left or right.
+- **Wanted** *(Designer, 2026-09-26)*: about 25% wider.
+- **Done:**
+  - With the code on the left or right, the code column is now 1.25× the
+    Learn column. In a 1400px window, it's 508px instead of 406px. Bottom is
+    unchanged.
+  - **Trade-off:** the board keeps QA-013's promise of never moving or
+    resizing when the Learn panel collapses, and it's centred in its own
+    column. But with a wider panel on one side, it now sits about 50px off
+    the exact screen centre (towards the Learn panel), and it's 413px in a
+    1400×860 window instead of 514px. Keeping it exactly centred would mean
+    widening the Learn panel too, which would shrink the board to about
+    340px. The Bottom layout keeps it exactly centred.
+- **Retest:**
+  - With the code on the right, and on the left, the editor has noticeably
+    more room. Collapsing the Learn panel still moves nothing else.
+  - Judge whether the board's size and position still feel right.
 
 ---
 
@@ -813,6 +845,7 @@ Deferred on purpose. Not bugs, but don't lose them.
 - **Variable names in autocomplete:** revisit in Chapter 2 when variables
   arrive. (QA-003)
 - **Guard art at the gate:** optional. (QA-002)
+- **Bottom layout, the empty space right of the board** (design pass). One idea: Variables move there, and Console takes the whole area under the playback slider beside the editor. *(Designer, 2026-09-26; QA-012)*
 - **Make it obvious a lesson has more steps** (design pass). For example, the Next button could name what's coming ("Step 2 →", "Step 3 →") instead of a plain "Next →". *(Designer, 2026-09-26; QA-010)*
 - **Mobile UI.** Phones need a different UI entirely, not a squeezed
   desktop layout. Not in this milestone, and it may become a phase 2 build.
