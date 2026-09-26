@@ -214,13 +214,13 @@ class _StepOutput(io.StringIO):
         if self._world is not None:
             *finished, self._line = (self._line + text).split("\n")
             for line in finished:
-                self._world.hear(line)
+                self._world.hear(line, printed_on=self._tracer.line)
         return written
 
     def finish_line(self) -> None:
         """The program stopped: a last line printed without a newline still counts."""
         if self._world is not None and self._line:
-            self._world.hear(self._line)
+            self._world.hear(self._line, printed_on=self._tracer.line)
         self._line = ""
 
 

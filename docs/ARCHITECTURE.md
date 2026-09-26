@@ -169,7 +169,10 @@ Built-in map symbols: `.` floor, `#` wall, `P` start, `G` goal. Legend tiles:
     `World.hear`.
   - Any other line printed there gets the guard's reply. That's a `guard` event
     with a message shown in the console; it isn't an error.
-  - Walking into it while locked raises `GateLockedError`.
+  - Walking into it while locked raises `GateLockedError`. If a wrong phrase
+    was said at that gate earlier, the error adds a line pointing back to
+    the line that printed it (QA-008). The crash is still reported at the
+    move, as it would be in Python.
   - Both guard lines live in `world.py`.
   - `describe()` never includes the passphrase.
 

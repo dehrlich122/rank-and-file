@@ -79,6 +79,25 @@ def test_walking_into_the_locked_gate_stops_the_run(gated):
     assert result.output == ""
 
 
+def test_after_a_wrong_phrase_the_error_points_back_to_it(gated):
+    result = run_level(gated, "pawn.move()\nprint('open sesame')\npawn.move()")
+    assert result.error.type == "GateLockedError"
+    assert result.error.line == 3  # the crash is still at the move
+    assert result.error.friendly == f"{GUARD_GATE_LOCKED}\nThe guard didn't accept what line 2 printed."
+
+
+def test_the_pointer_names_the_most_recent_wrong_phrase(gated):
+    result = run_level(gated, "pawn.move()\nprint('hello')\nprint('open sesame')\npawn.move()")
+    assert result.error.friendly.endswith("The guard didn't accept what line 3 printed.")
+
+
+def test_no_pointer_when_the_guard_never_heard_anything(gated):
+    too_far = run_level(gated, f'print("{PHRASE}")\npawn.move()\npawn.move()')
+    assert too_far.error.friendly == GUARD_GATE_LOCKED
+    silent = run_level(gated, "pawn.move()\npawn.move()")
+    assert silent.error.friendly == GUARD_GATE_LOCKED
+
+
 def test_a_line_printed_in_pieces_is_heard_whole(gated):
     code = 'pawn.move()\nprint("Open", end=" ")\nprint("sesame")\npawn.move(2)'
     assert run_level(gated, code).status == "solved"

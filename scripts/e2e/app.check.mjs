@@ -104,6 +104,12 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(guard.join() === "The guard called your mother a hamster! The gate remains locked.", `guard said: ${JSON.stringify(guard)}`);
     expect(!open, "the gate opened");
     expect(r.text.includes("Does your father really smell of elderberries? Maybe try the passphrase first."), brief(r));
+    // QA-008: the error also points back to the line that said the wrong thing
+    const pointer = r.text.match(/The guard didn't accept what line (\d+) printed\./);
+    const printLine = await b.evaluate(
+      `[...document.querySelectorAll('.level-right .cm-line')].findIndex((l) => l.textContent.startsWith('print(')) + 1`,
+    );
+    expect(pointer && Number(pointer[1]) === printLine, `pointer: ${pointer?.[0] ?? "missing"} (print is on line ${printLine})`);
     return brief(r);
   });
 
@@ -113,6 +119,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     const r = await run();
     const guard = await b.evaluate(`document.querySelectorAll('.console .game-message').length`);
     expect(guard === 0 && r.text.includes("elderberries"), `${brief(r)} | guard lines: ${guard}`);
+    expect(!r.text.includes("didn't accept"), "QA-008: no pointer line when the guard never heard anything");
   });
 
   // -- QA-004: level 5's gate mid-route ------------------------------------------------------
@@ -136,11 +143,18 @@ export default async function appChecks({ browser: b, base, root, check }) {
     return brief(r);
   });
 
+  await check("QA-008: in level 5, a near miss at the gate is pointed back to from the error", async () => {
+    await openLevel("ch01-l05");
+    await setCode(withoutExpectLine(solution("ch01-l05", ".naive4")));
+    const r = await run();
+    expect(r.text.includes("elderberries") && /The guard didn't accept what line (\d+) printed\./.test(r.text), brief(r));
+  });
+
   await check("QA-004: the old route with nothing said is stopped at the gate", async () => {
     await openLevel("ch01-l05");
     await setCode(withoutExpectLine(solution("ch01-l05", ".naive2")));
     const r = await run();
-    expect(r.text.includes("elderberries"), brief(r));
+    expect(r.text.includes("elderberries") && !r.text.includes("didn't accept"), brief(r));
   });
 
   await check("step controls: rewind to the start, then step forward twice", async () => {

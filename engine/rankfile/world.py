@@ -30,6 +30,7 @@ class World:
         self.pos = level.start
         self.facing = level.facing
         self.opened: set[Pos] = set()  # gates that have heard their passphrase
+        self.refused: dict[Pos, int | None] = {}  # gate -> the line that last said the wrong thing to it
         self.listeners: list[Callable[[Event], None]] = []
 
     def state(self) -> dict:
@@ -42,7 +43,7 @@ class World:
             raise BlockedError(self._bump_message(target), at=target)
         if self._locked_gate(target):
             self._emit("bump", at=list(target))
-            raise GateLockedError(GUARD_GATE_LOCKED, at=target)
+            raise GateLockedError(self._gate_locked_message(target), at=target)
         self.pos = target
         self._emit("move")
 
@@ -54,8 +55,8 @@ class World:
         self.facing = self.facing.turned_right()
         self._emit("turn")
 
-    def hear(self, line: str) -> None:
-        """React to one line the program printed.
+    def hear(self, line: str, printed_on: int | None = None) -> None:
+        """React to one line the program printed (on line `printed_on` of the player's code).
 
         Locked gates right next to the piece (north, east, south or west, whichever
         way it faces) are listening. The exact passphrase opens a gate; anything
@@ -68,7 +69,21 @@ class World:
                 self.opened.add(gate)
                 self._emit("gate_open", at=list(gate))
             else:
+                self.refused[gate] = printed_on
                 self._emit("guard", at=list(gate), message=GUARD_WRONG_PHRASE)
+
+    def _gate_locked_message(self, gate: Pos) -> str:
+        """The guard's line, plus a pointer back to a wrong phrase if one was said here.
+
+        The crash happens at the move, but the mistake was the earlier print, so
+        the error points back to it: working from a crash back to its cause is
+        a core debugging skill (QA-008).
+        """
+        if gate not in self.refused:
+            return GUARD_GATE_LOCKED
+        line = self.refused[gate]
+        said = f"what line {line} printed" if line is not None else "what you said earlier"
+        return f"{GUARD_GATE_LOCKED}\nThe guard didn't accept {said}."
 
     def _locked_gate(self, pos: Pos) -> bool:
         return self.board.tile(pos) is Tile.GATE and pos not in self.opened

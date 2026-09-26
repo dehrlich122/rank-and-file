@@ -615,6 +615,7 @@ pre {
 
 .error-detail p {
   margin: 6px 0 0;
+  white-space: pre-line; /* friendly messages can have a second line (QA-008) */
 }
 
 .error-detail summary {

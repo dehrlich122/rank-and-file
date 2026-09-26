@@ -68,6 +68,7 @@ class Tracer:
         self.record = record
         self.max_steps = max_steps
         self.lines_run = 0
+        self.line: int | None = None  # the player's line running right now
         self.steps: list[Step] = []
         self.truncated = False  # True if the run had more steps than we keep
         self._current: Step | None = None
@@ -106,6 +107,7 @@ class Tracer:
     def _on_player_event(self, frame, event, arg):
         if event == "line":
             self.lines_run += 1
+            self.line = frame.f_lineno
             if self.lines_run > self.budget:
                 raise StepBudgetExceeded(self.budget, frame.f_lineno)
             if self.record:
