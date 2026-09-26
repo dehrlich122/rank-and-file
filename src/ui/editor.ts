@@ -1,13 +1,61 @@
 // The Python code editor (CodeMirror 6), plus the markings the game adds:
 // the line currently playing back, the line an error came from, and warnings.
-import { indentWithTab } from "@codemirror/commands";
+import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { python } from "@codemirror/lang-python";
-import { HighlightStyle, indentUnit, syntaxHighlighting } from "@codemirror/language";
-import { lintGutter, setDiagnostics, type Diagnostic } from "@codemirror/lint";
-import { Prec, StateEffect, StateField, type Extension } from "@codemirror/state";
-import { Decoration, keymap, placeholder, type DecorationSet } from "@codemirror/view";
+import {
+  bracketMatching,
+  defaultHighlightStyle,
+  foldGutter,
+  foldKeymap,
+  HighlightStyle,
+  indentOnInput,
+  indentUnit,
+  syntaxHighlighting,
+} from "@codemirror/language";
+import { lintGutter, lintKeymap, setDiagnostics, type Diagnostic } from "@codemirror/lint";
+import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
+import { EditorState, Prec, StateEffect, StateField, type Extension } from "@codemirror/state";
+import {
+  crosshairCursor,
+  Decoration,
+  drawSelection,
+  dropCursor,
+  EditorView,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  highlightSpecialChars,
+  keymap,
+  lineNumbers,
+  placeholder,
+  rectangularSelection,
+  type DecorationSet,
+} from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { EditorView, basicSetup } from "codemirror";
+
+/**
+ * CodeMirror's usual "basic setup", minus its autocompletion: the game offers
+ * only calls the player has typed (see completion.ts), and never on Enter.
+ */
+const editorSetup: Extension[] = [
+  lineNumbers(),
+  highlightActiveLineGutter(),
+  highlightSpecialChars(),
+  history(),
+  foldGutter(),
+  drawSelection(),
+  dropCursor(),
+  EditorState.allowMultipleSelections.of(true),
+  indentOnInput(),
+  syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+  bracketMatching(),
+  closeBrackets(),
+  rectangularSelection(),
+  crosshairCursor(),
+  highlightActiveLine(),
+  highlightSelectionMatches(),
+  keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, ...foldKeymap, ...lintKeymap]),
+];
 
 export interface EditorOptions {
   parent: HTMLElement;
@@ -18,11 +66,13 @@ export interface EditorOptions {
   onChange?: (code: string) => void;
   placeholder?: string;
   compact?: boolean; // smaller, for lesson snippets
+  /** Extra extensions, e.g. callCompletion(...) from completion.ts. */
+  extensions?: Extension[];
 }
 
 export function createEditor(options: EditorOptions): EditorView {
   const extensions: Extension[] = [
-    basicSetup,
+    editorSetup,
     python(),
     indentUnit.of("    "),
     keymap.of([indentWithTab]),
@@ -50,7 +100,70 @@ export function createEditor(options: EditorOptions): EditorView {
   ];
   if (!options.compact) extensions.push(lintGutter());
   if (options.placeholder) extensions.push(placeholder(options.placeholder));
+  if (options.extensions) extensions.push(...options.extensions);
   return new EditorView({ parent: options.parent, doc: options.code, extensions });
+}
+
+export interface LineEditorOptions {
+  parent: HTMLElement;
+  /** Enter: the line to run. */
+  onSubmit: (line: string) => void;
+  /** Up/Down with no suggestion list open: step through history. Return the line to show, or null. */
+  onHistory?: (direction: "older" | "newer") => string | null;
+  extensions?: Extension[];
+  label?: string;
+}
+
+/** A one-line Python input, for the scratch REPL. */
+export function createLineEditor(options: LineEditorOptions): EditorView {
+  const replaceLine = (view: EditorView, text: string) =>
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, selection: { anchor: text.length } });
+  const stepHistory = (direction: "older" | "newer") => (view: EditorView) => {
+    const line = options.onHistory?.(direction);
+    if (line === null || line === undefined) return false;
+    replaceLine(view, line);
+    return true;
+  };
+  return new EditorView({
+    parent: options.parent,
+    extensions: [
+      Prec.high(
+        keymap.of([
+          {
+            key: "Enter",
+            run: (view) => {
+              const line = view.state.doc.toString();
+              replaceLine(view, "");
+              options.onSubmit(line);
+              return true;
+            },
+          },
+          { key: "ArrowUp", run: stepHistory("older") },
+          { key: "ArrowDown", run: stepHistory("newer") },
+        ]),
+      ),
+      // One line only: an edit that would add a line break is refused.
+      EditorState.transactionFilter.of((tr) => (tr.newDoc.lines > 1 ? [] : tr)),
+      highlightSpecialChars(),
+      history(),
+      drawSelection(),
+      closeBrackets(),
+      bracketMatching(),
+      keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
+      python(),
+      syntaxHighlighting(pythonColors),
+      themeFromPage,
+      EditorView.theme({
+        "&": { fontSize: "calc(var(--code-size) - 1px)", flex: "1", minWidth: "0", backgroundColor: "transparent" },
+        "&.cm-focused": { outline: "none" },
+        ".cm-scroller": { fontFamily: "var(--font-code)", lineHeight: "1.5" },
+        ".cm-content": { padding: "0" },
+        ".cm-line": { padding: "0" },
+      }),
+      EditorView.contentAttributes.of({ "aria-label": options.label ?? "Python input" }),
+      ...(options.extensions ?? []),
+    ],
+  });
 }
 
 export function getCode(view: EditorView): string {
@@ -150,6 +263,8 @@ const themeFromPage = EditorView.theme({
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": { backgroundColor: "var(--selection)" },
   ".cm-matchingBracket": { backgroundColor: "var(--selection)", outline: "none" },
   ".cm-tooltip": { backgroundColor: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)" },
+  ".cm-tooltip-autocomplete ul li": { fontFamily: "var(--font-code)", padding: "2px 8px" },
+  ".cm-tooltip-autocomplete ul li[aria-selected]": { backgroundColor: "var(--accent)", color: "var(--accent-text)" },
 });
 
 const pythonColors = HighlightStyle.define([

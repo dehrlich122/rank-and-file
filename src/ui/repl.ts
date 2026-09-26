@@ -1,25 +1,26 @@
 // The scratch REPL: type Python, see the answer, like the `python` prompt.
 // The session lives in the worker, so variables survive between lines.
+// The input is a one-line code editor, so it gets the same highlighting and
+// autocomplete as the main editor, scoped to calls made in this session.
+import type { EditorView } from "@codemirror/view";
 import { PythonHungError, type PyClient } from "../py/client";
+import { callCompletion, KnownCalls } from "./completion";
 import { h } from "./dom";
+import { createLineEditor } from "./editor";
 import { errorCard } from "./panels";
 
 export class ReplPanel {
   readonly element: HTMLElement;
   private readonly log = h("div", { class: "repl-log", "aria-live": "polite" });
   private readonly prompt = h("span", { class: "repl-prompt" }, ">>>");
-  private readonly input = h("input", {
-    class: "repl-input",
-    type: "text",
-    spellcheck: "false",
-    autocomplete: "off",
-    "aria-label": "Python input",
-  });
+  private readonly input: EditorView;
+  private readonly known = new KnownCalls();
   private readonly history: string[] = [];
   private historyIndex = 0;
   private busy = false;
 
   constructor(private readonly client: PyClient) {
+    const inputHost = h("div", { class: "repl-editor" });
     this.element = h(
       "div",
       { class: "repl" },
@@ -29,30 +30,29 @@ export class ReplPanel {
         "Try any Python here. Press Enter to run a line; a line ending in : starts a block, and an empty line finishes it.",
       ),
       this.log,
-      h("label", { class: "repl-line" }, this.prompt, this.input),
+      h("div", { class: "repl-line" }, this.prompt, inputHost),
       h("div", { class: "repl-actions" }, h("button", { class: "btn btn-small", onClick: () => void this.reset() }, "Reset session")),
     );
-    this.input.addEventListener("keydown", (event) => this.onKey(event));
+    this.input = createLineEditor({
+      parent: inputHost,
+      label: "Python input",
+      onSubmit: (line) => void this.submit(line),
+      onHistory: (direction) => this.stepHistory(direction),
+      // No piece in the scratch session: only real plain calls typed here are offered.
+      extensions: callCompletion({ known: this.known, piece: () => null, api: () => [] }),
+    });
     this.log.addEventListener("click", () => this.input.focus());
   }
 
-  private onKey(event: KeyboardEvent): void {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      void this.submit(this.input.value);
-    } else if (event.key === "ArrowUp" && this.historyIndex > 0) {
-      event.preventDefault();
-      this.input.value = this.history[--this.historyIndex] ?? "";
-    } else if (event.key === "ArrowDown" && this.historyIndex < this.history.length) {
-      event.preventDefault();
-      this.input.value = this.history[++this.historyIndex] ?? "";
-    }
+  private stepHistory(direction: "older" | "newer"): string | null {
+    if (direction === "older" && this.historyIndex > 0) return this.history[--this.historyIndex] ?? "";
+    if (direction === "newer" && this.historyIndex < this.history.length) return this.history[++this.historyIndex] ?? "";
+    return null;
   }
 
   private async submit(line: string): Promise<void> {
     if (this.busy) return;
     this.busy = true;
-    this.input.value = "";
     if (line.trim()) this.history.push(line);
     this.historyIndex = this.history.length;
     this.write("repl-echo", `${this.prompt.textContent} ${line}`);
@@ -77,6 +77,7 @@ export class ReplPanel {
 
   private async reset(): Promise<void> {
     await this.client.call("replReset", {}).catch(() => {});
+    this.known.clear();
     this.log.replaceChildren();
     this.prompt.textContent = ">>>";
     this.write("repl-note", "Session reset. All variables are forgotten.");

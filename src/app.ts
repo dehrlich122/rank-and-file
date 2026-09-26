@@ -55,6 +55,7 @@ export function startApp(root: HTMLElement): void {
     settingsDialog: dialog,
     solved: new Set(),
     drafts: new Map(),
+    knownCalls: new Map(),
   };
   let unmount: () => void = () => {};
 

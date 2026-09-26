@@ -151,7 +151,24 @@ Constraints are checked with `ast`/`tokenize`, never with string matching.
   in the worker, so it resets if the watchdog restarts Python.
 - Level content is bundled by `src/content.ts`. Solutions are deliberately not
   bundled until M2's post-solve reveal.
-- Colors are CSS custom properties in `src/styles.css`, with a dark-mode override.
+- Colours are CSS custom properties in `src/styles.css`, written as
+  `light-dark(<light>, <dark>)`. The Theme setting switches `color-scheme` via
+  `data-theme` on `<html>`. Never hard-code colours in TS. Icons come from
+  `src/ui/icons.ts` (inline SVG). A visual design pass is planned, so keep new
+  visuals on these seams (tokens, icons, the tile → draw-function table in
+  `board.ts`).
+- Settings (speed, theme, code size, animations) live in `src/settings.ts`, one
+  store with `get`/`set`/`subscribe` saved to localStorage. Screens read it
+  on creation and subscribe to changes. The menu is `ui/settingsDialog.ts`.
+  Esc opens it unless CodeMirror used that Esc (`defaultPrevented`).
+- Editors don't use `basicSetup`: `editor.ts` assembles the same extensions
+  minus CodeMirror's autocompletion. Autocomplete is `ui/completion.ts`
+  (QA-003). It offers only calls the player typed that are also real (level
+  API / builtins / their own `def`s), and only Tab accepts. The level editor
+  and the REPL use it; lesson snippets don't.
+- Playback buttons follow `controlStates()` in `ui/playback.ts`. Editing code
+  drops the current recording, and Play or the right arrows then run the new
+  code.
 
 ## Git
 

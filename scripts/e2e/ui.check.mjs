@@ -198,6 +198,129 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     expect(card.startsWith("Not there yet"), card);
   });
 
+  // -- QA-003: autocomplete for calls you've typed ---------------------------------------------
+  const MAIN = ".level-right";
+  const type = async (text) => {
+    await b.send("Input.insertText", { text });
+    await sleep(350); // the list opens shortly after typing
+  };
+  const suggestions = (scope = MAIN) =>
+    b.evaluate(
+      `[...document.querySelectorAll('${scope} .cm-tooltip-autocomplete li')].map((li) => li.querySelector('.cm-completionLabel')?.textContent ?? li.textContent)`,
+    );
+  const lastLine = (scope = MAIN) => b.evaluate(`[...document.querySelectorAll('${scope} .cm-line')].at(-1)?.textContent ?? ''`);
+  const focusMain = () => b.evaluate(`document.querySelector('${MAIN} .cm-content').focus()`);
+
+  await check("QA-003: a fresh level offers nothing (the standard Python suggestions are gone)", async () => {
+    await openLevel("ch01-l03", { fresh: true });
+    await focusMain();
+    await type("pawn.");
+    const afterDot = await suggestions();
+    await type("\npr");
+    const afterWord = await suggestions();
+    expect(afterDot.length === 0 && afterWord.length === 0, JSON.stringify({ afterDot, afterWord }));
+  });
+
+  await check("QA-003: typed methods are offered after `pawn.`, and narrow as you type", async () => {
+    await openLevel("ch01-l03", { fresh: true });
+    await focusMain();
+    await type("pawn.move()\npawn.turn_left()\npawn.");
+    const both = await suggestions();
+    await type("t");
+    const narrowed = await suggestions();
+    const hint = await b.evaluate(
+      `getComputedStyle(document.querySelector('${MAIN} .cm-tooltip-autocomplete li[aria-selected] .cm-tab-hint')).display`,
+    );
+    expect(JSON.stringify(both) === JSON.stringify(["move()Tab", "turn_left()"]) || JSON.stringify(both) === JSON.stringify(["move()", "turn_left()"]), JSON.stringify(both));
+    expect(narrowed.length === 1 && narrowed[0].startsWith("turn_left()"), JSON.stringify(narrowed));
+    expect(hint !== "none", "the Tab label isn't shown on the highlighted row");
+    return `${JSON.stringify(both)} → ${JSON.stringify(narrowed)}`;
+  });
+
+  await check("QA-003: Tab accepts with the cursor inside (); Enter always makes a new line", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    await focusMain();
+    await type("pawn.move()\npawn.m");
+    await b.key("Tab");
+    await type("2"); // lands between the parentheses
+    const accepted = await lastLine();
+    await b.key("End", { keyCode: 35 });
+    await type("\npawn.");
+    const listOpen = (await suggestions()).length > 0;
+    await b.key("Enter");
+    await sleep(100);
+    const afterEnter = await b.evaluate(`[...document.querySelectorAll('${MAIN} .cm-line')].map((l) => l.textContent).slice(-2)`);
+    expect(accepted === "pawn.move(2)", `after Tab + typing: ${accepted}`);
+    // Enter kept "pawn." as typed (nothing accepted) and started a new, blank line
+    // (which may carry Python's continuation indent).
+    expect(listOpen && afterEnter[0] === "pawn." && afterEnter[1].trim() === "", `list open: ${listOpen}, last lines: ${JSON.stringify(afterEnter)}`);
+  });
+
+  await check("QA-003: Tab still indents when no list is open", async () => {
+    const before = (await lastLine()).length;
+    await b.key("Tab");
+    const after = (await lastLine()).length;
+    expect(after === before + 4, `indent went from ${before} to ${after} spaces`);
+  });
+
+  await check("QA-003: a misspelled call is never offered", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    await focusMain();
+    await type("pawn.mvoe()\nprnit('x')\npawn.");
+    const method = await suggestions();
+    await type("\npr");
+    const plain = await suggestions();
+    expect(method.length === 0 && plain.length === 0, JSON.stringify({ method, plain }));
+  });
+
+  await check("QA-003: plain calls — `p` offers print(), `pa` closes the list; nothing in comments or strings", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    await focusMain();
+    await type("print('hi')\np");
+    const p = await suggestions();
+    await type("a");
+    const pa = await suggestions();
+    await type("\n# p");
+    const inComment = await suggestions();
+    await type("\nprint('p");
+    const inString = await suggestions();
+    expect(p.length === 1 && p[0].startsWith("print()"), `p: ${JSON.stringify(p)}`);
+    expect(pa.length === 0 && inComment.length === 0 && inString.length === 0, JSON.stringify({ pa, inComment, inString }));
+  });
+
+  await check("QA-003: lesson snippets never show suggestions", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    await b.evaluate(`document.querySelector('.snippet .cm-content').focus()`);
+    await b.key("End", { keyCode: 35, modifiers: 2 });
+    await type("\npawn.");
+    const offered = await suggestions(".snippet");
+    expect(offered.length === 0, JSON.stringify(offered));
+  });
+
+  await check("QA-003: scratch REPL offers only calls made in the session, and Reset clears them", async () => {
+    await b.evaluate(`document.querySelector('.repl-drawer').open = true`);
+    await b.evaluate(`document.querySelector('.repl-editor .cm-content').focus()`);
+    await type("p");
+    const before = await suggestions(".repl");
+    await b.key("Escape"); // closes the list if one opened (it shouldn't have)
+    await b.evaluate(`document.querySelector('.settings-dialog').open && document.querySelector('.settings-dialog').close()`);
+    await b.evaluate(`document.querySelector('.repl-editor .cm-content').focus()`);
+    await b.key("End", { keyCode: 35 });
+    await type("rint(1)");
+    await b.key("Enter");
+    await sleep(300);
+    await type("p");
+    const after = await suggestions(".repl");
+    await b.key("Escape");
+    await b.evaluate(`[...document.querySelectorAll('.repl-actions button')][0].click()`);
+    await sleep(300);
+    await b.evaluate(`document.querySelector('.repl-editor .cm-content').focus()`);
+    await type("p");
+    const reset = await suggestions(".repl");
+    const log = await b.evaluate(`document.querySelector('.repl-log').innerText`);
+    expect(before.length === 0 && after.length === 1 && after[0].startsWith("print()") && reset.length === 0, JSON.stringify({ before, after, reset, log }));
+  });
+
   await check("settings are reset after the checks", async () => {
     await b.evaluate(`localStorage.clear()`);
   });

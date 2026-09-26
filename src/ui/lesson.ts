@@ -1,7 +1,7 @@
 // The Learn phase: a short Markdown lesson whose ```python run``` blocks become
 // small editors you can run in place, each with its own mini board.
 import { marked, type Token, type TokensList } from "marked";
-import type { EditorView } from "codemirror";
+import type { EditorView } from "@codemirror/view";
 import { PythonHungError, type PyClient } from "../py/client";
 import type { LevelInfo, LevelResult } from "../py/protocol";
 import { BoardView } from "./board";

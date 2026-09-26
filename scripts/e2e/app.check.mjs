@@ -272,7 +272,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await openLevel("ch01-l01");
     await b.evaluate(`document.querySelector('.repl-drawer').open = true`);
     for (const line of ["gold = 20", "gold * 2", "glod"]) {
-      await b.evaluate(`document.querySelector('.repl-input').focus()`);
+      await b.evaluate(`document.querySelector('.repl-editor .cm-content').focus()`);
       await b.send("Input.insertText", { text: line });
       await b.key("Enter");
       await sleep(300);

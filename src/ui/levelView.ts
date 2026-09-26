@@ -1,6 +1,6 @@
 // A level: the lesson and challenge on the left, the board in the middle, the
 // code editor and what the program is doing on the right.
-import type { EditorView } from "codemirror";
+import type { EditorView } from "@codemirror/view";
 import { nextLevel, type LevelSource } from "../content";
 import { PythonHungError, StoppedError, type PyClient } from "../py/client";
 import type { LevelInfo, LevelResult } from "../py/protocol";
@@ -9,6 +9,7 @@ import { h } from "./dom";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
 import { Console, Inspector, noticeCard, outcomeCard } from "./panels";
+import { callCompletion, KnownCalls } from "./completion";
 import { icon, type IconName } from "./icons";
 import { Player, buildFrames, controlStates } from "./playback";
 import type { ReplPanel } from "./repl";
@@ -21,6 +22,7 @@ export interface LevelContext {
   settingsDialog: SettingsDialog;
   solved: Set<string>;
   drafts: Map<string, string>; // code per level, kept while the tab is open
+  knownCalls: Map<string, KnownCalls>; // calls typed per level, for autocomplete (QA-003)
 }
 
 const AUTOPLAY_LIMIT = 150; // longer runs open at the end instead of playing
@@ -128,8 +130,11 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     ),
   );
 
+  const known = context.knownCalls.get(source.id) ?? new KnownCalls();
+  context.knownCalls.set(source.id, known);
   const editor: EditorView = createEditor({
     parent: editorHost,
+    extensions: callCompletion({ known, piece: () => level?.piece ?? null, api: () => level?.api ?? [] }),
     code: context.drafts.get(source.id) ?? String(source.data.starter ?? ""),
     onRun: () => void run(),
     onChange: (code) => {

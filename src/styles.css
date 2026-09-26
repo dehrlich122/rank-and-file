@@ -1051,13 +1051,31 @@ pre {
   font-weight: 700;
 }
 
-.repl-input {
+.repl-editor {
   flex: 1;
-  border: none;
-  outline: none;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
+  min-width: 0;
+  display: flex;
+}
+
+.repl-line:focus-within {
+  border-color: var(--accent);
+}
+
+/* ---- autocomplete (src/ui/completion.ts) ---- */
+
+.cm-tab-hint {
+  display: none;
+  margin-left: 14px;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.cm-tooltip-autocomplete li[aria-selected] .cm-tab-hint {
+  display: inline-block;
 }
 
 .repl-actions {
