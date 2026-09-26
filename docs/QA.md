@@ -812,6 +812,16 @@ mechanic, never by solution code.
 - **Asked** *(Designer, 2026-09-26)*: why call it a hidden board? What
   terminology might fit better? Is there a reason for this terminology in
   Python programming?
+- **Clarified** *(Designer, 2026-09-26)*:
+  - Swapping the words won't be enough. The lesson's description ("the same
+    kind of place, a little different each time") is odd too.
+  - From the player's side the board stays the same. The success criteria
+    only change if you run the obvious code, so it feels like a
+    bait-and-switch.
+  - Better: **hide the goal entirely**, or **randomize it** around a few
+    spaces, as an honest example of a hidden target.
+  - Or use chess feint terms: **Decoy**, **Trap**, **Deflection**, rather
+    than "variations".
 - **Background** *(Claude)*:
   - "Hidden board" isn't a Python term. It comes from `DESIGN.md`'s "hidden
     board variants".
@@ -836,7 +846,27 @@ mechanic, never by solution code.
   - Show every board's result as a row (your board ✓, test 1 ✗, …), so a
     failure reads as another board, not the same one changing.
   - Both.
-- **Decided:** pending the designer's choice.
+- **Decided** *(Designer, 2026-09-26)*:
+  - **Hidden goal.** No flag is drawn. The squares where the goal might be
+    are marked **?**. The code runs once for each possible spot and must
+    find the goal every time. Afterwards each spot shows ✓ or ✗, and any
+    spot's run can be replayed. The reason to ask `at_goal()` instead of
+    counting is plain from the start, and nothing seems to move.
+  - **No "hidden board" wording** anywhere the player reads it. The lesson,
+    goals and outcome describe it plainly, e.g. "the goal could be on any ?
+    square", "found the goal from 3 of 4 spots".
+  - **Chess feint terms** (Decoy, Deflection) go in level titles and flavour
+    only. "Trap" is kept for Chapter 9's traps, which raise exceptions.
+- **Plan** *(Claude)*:
+  - The engine keeps its general mechanism (`variants`). A level can say the
+    goal is hidden. Its description then lists the candidate squares instead
+    of the goal, and a run reports every board's outcome, not just the first
+    failure.
+  - The board draws the ? squares and each spot's ✓ or ✗. Clicking a spot
+    replays that run.
+  - Hidden Corridors gets a rewritten brief, lesson, hints and note. The
+    spoiler parts are written blind again.
+  - `ARCHITECTURE.md` and `M2.md` are updated to match.
 
 ---
 
