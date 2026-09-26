@@ -460,6 +460,7 @@ function describeChallenge(level: LevelInfo): HTMLElement[] {
   for (const sign of level.signs) {
     parts.push(h("blockquote", { class: "sign-text" }, h("span", { class: "muted small" }, `Signpost on ${squareName(sign.pos)}`), sign.text));
   }
+  if (level.obstacles.length) parts.push(h("h3", {}, "Obstacles"), list("obstacles", level.obstacles));
   if (level.rules.length) parts.push(h("h3", {}, "Rules"), list("rules", level.rules));
   parts.push(h("h3", {}, "Stars"), list("star-goals", level.stars));
 
