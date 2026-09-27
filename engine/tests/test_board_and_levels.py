@@ -141,3 +141,19 @@ def test_sandbox_is_open_with_no_objectives():
     assert level.goal is None
     assert not level.objectives.reach_goal
     assert level.board.tiles == {}
+
+
+def test_a_lesson_board_gives_snippets_the_levels_obstacles():
+    board = {"map": ". . .\n. # .\n. P .\n", "enemies": [{"kind": "chaser", "start": "b3"}]}
+    level = make_level("G\nP\n", lesson_board=board)
+    sandbox = sandbox_level(level.api, lesson_board=level.lesson_board)
+    assert sandbox.describe()["enemies"][0]["kind"] == "chaser"
+    assert sandbox.describe()["start"]["enemies"] == [[1, 2]]
+    assert sandbox_level(["move"]).board.width == 5  # without one, the small open board
+
+
+def test_a_lesson_board_is_checked_like_a_map():
+    with pytest.raises(LevelError, match="lesson_board: a lesson board takes map, legend, enemies and start"):
+        make_level("G\nP\n", lesson_board={"map": "P\n", "goal": "a1"})
+    with pytest.raises(LevelError, match="lesson_board: enemy 1: starts on the pawn's square"):
+        make_level("G\nP\n", lesson_board={"map": "P .\n", "enemies": [{"kind": "chaser", "start": "a1"}]})

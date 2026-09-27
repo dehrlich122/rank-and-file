@@ -188,9 +188,9 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
     return outcome("solved", _solved_summary(level), **recording)
 
 
-def run_sandbox(code: str, api: list[str], piece: str = "pawn") -> LevelResult:
-    """Run a lesson snippet on a small open board with the given abilities."""
-    return run_level(sandbox_level(api, piece), code, enforce_constraints=False)
+def run_sandbox(code: str, api: list[str], piece: str = "pawn", lesson_board: dict | None = None) -> LevelResult:
+    """Run a lesson snippet with the given abilities, on a small open board or the level's lesson board."""
+    return run_level(sandbox_level(api, piece, lesson_board), code, enforce_constraints=False)
 
 
 def score(level: Level, code_lines: int, hints_used: int, solution_seen: bool = False) -> list[Star]:

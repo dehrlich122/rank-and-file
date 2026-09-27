@@ -27,3 +27,12 @@ hints:
 - "It always tries the bigger gap first. Work out its next few steps from where you'll be."
 - "One way to start: `pawn.move(3)`, then `pawn.turn_right()`."
 lesson: practice/practice-10.md
+lesson_board:
+  map: |
+    . . . . .
+    P . O . .
+    . . . . .
+  legend: {"O": "pit"}
+  enemies:
+  - {"kind": "chaser", "start": "e2"}
+  start: {"facing": "east"}

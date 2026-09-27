@@ -214,6 +214,9 @@ variants:                    # optional: the same level on other maps, which it 
       ...
 lesson: ch01/ch01-l03.md
 starter: ""                  # optional initial editor contents
+lesson_board:                # optional (QA-019): the board the lesson's snippets run on
+  map: |                     # map, legend, enemies and start, as above; no objectives
+    ...
 ```
 
 Built-in map symbols: `.` floor, `#` wall, `P` start, `G` goal, `?` a square
@@ -277,7 +280,8 @@ Alongside each level:
 
 - `lessons/<chapter>/<id>.md`: at most 150 words of prose and 1–3 fenced
   ```` ```python run ```` blocks, which become runnable snippet widgets on a
-  small open board with the level's abilities. Mark a snippet that is *meant*
+  small open board with the level's abilities, or on its `lesson_board` *(QA-019)*,
+  so a snippet can show an obstacle at work. Mark a snippet that is *meant*
   to fail (to show an error) with ```` ```python run error ````. The Learn
   panel shows the lesson in steps, one per runnable snippet. Each step is
   the text leading up to a snippet plus the snippet; text after the last

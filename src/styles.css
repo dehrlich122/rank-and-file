@@ -1022,7 +1022,8 @@ pre {
 }
 
 /* What the game says (e.g. the guard at a gate), as opposed to what the program printed. */
-.console .game-message {
+.console .game-message,
+.snippet-output .game-message {
   display: block;
   margin: 2px 0;
   padding-left: 8px;

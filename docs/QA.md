@@ -1010,6 +1010,25 @@ Item 6 (hidden boards) became QA-016.
   - Best stars are never taken back. A level solved with three stars keeps
     them after its solution is viewed.
 
+### QA-019 · Pursuit's lesson snippet has no chaser in it · Open
+
+- **Area:** lesson snippets (M1), Testing ground 5 (Pursuit)
+- **Observed** *(Designer, 2026-09-27)*: Pursuit's sample code doesn't make
+  any sense. It should show the chaser at work as the code runs.
+- **Cause** *(Claude)*: every lesson snippet runs on the same small, empty
+  board. Pursuit's snippet just walks the pawn about. Pitfall's is worse: it
+  prints "The chaser took two steps" on a board with no chaser.
+- **Plan** *(Claude)*:
+  - A level can give its lesson a board (`lesson_board`: map, legend,
+    enemies, start). The level checker validates it like the level's own
+    map. Levels without one keep the plain board.
+  - Pursuit and Pitfall get boards with a chaser, and snippets that show it
+    moving: for Pursuit, stepping toward the pawn and held by a wall; for
+    Pitfall, falling into a pit.
+  - Snippets show the game's messages (e.g. "The chaser fell into the pit")
+    under their output, as the level's console does. A snippet that ends
+    in a loss reads "Lost", not "Python stopped".
+
 ---
 
 ## Queued work

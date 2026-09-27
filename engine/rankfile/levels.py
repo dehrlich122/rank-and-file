@@ -50,7 +50,7 @@ CLOCK_TICKS = {
 ALLOWED_KEYS = {
     "id", "chapter", "title", "trains", "brief", "piece", "map", "legend", "start",
     "objectives", "api", "constraints", "par", "hints", "lesson", "starter", "variants",
-    "enemies",
+    "enemies", "lesson_board",
 }  # fmt: skip
 REQUIRED_KEYS = {"id", "chapter", "title", "trains", "map", "api", "lesson"}
 
@@ -146,6 +146,7 @@ class Level:
     variants: list[Level] = field(default_factory=list)
     enemies: list[Enemy] = field(default_factory=list)  # patrols and chasers (M3.1)
     planks: int = 0  # planks the piece starts with (QA-017)
+    lesson_board: dict | None = None  # the board the lesson's snippets run on, as the level file gives it (QA-019)
 
     def cases(self) -> list[Case]:
         """Every situation a solution must handle: one per square a hidden goal
@@ -336,6 +337,12 @@ def parse_level(data: dict) -> Level:
         brief=str(data.get("brief", "")),
         starter=str(data.get("starter", "")),
     )
+    if "lesson_board" in data:
+        try:
+            sandbox_level(level.api, piece, data["lesson_board"])
+        except LevelError as exc:
+            raise LevelError(f"lesson_board: {exc}") from None
+        level.lesson_board = data["lesson_board"]
     level.enemies = _parse_enemies(data.get("enemies") or [])
     _check_enemies(level)
     capturable = level.capturable
@@ -437,10 +444,12 @@ class Case:
     level: Level  # the level as it is in this case
 
 
-def sandbox_level(api: list[str], piece: str = "pawn") -> Level:
-    """A small open board for trying things out in lesson snippets."""
+def sandbox_level(api: list[str], piece: str = "pawn", lesson_board: dict | None = None) -> Level:
+    """The board lesson snippets run on: a small open one, or the level's own
+    `lesson_board` (a map, legend, enemies and start: QA-019). Snippets have no
+    objectives, so a run just finishes."""
     board = Board(width=5, height=4)
-    return Level(
+    level = Level(
         id="sandbox",
         chapter=0,
         title="Sandbox",
@@ -454,6 +463,16 @@ def sandbox_level(api: list[str], piece: str = "pawn") -> Level:
         api=list(api),
         constraints=Constraints(),
     )
+    if lesson_board is None:
+        return level
+    if not isinstance(lesson_board, dict) or set(lesson_board) - {"map", "legend", "enemies", "start"}:
+        raise LevelError("a lesson board takes map, legend, enemies and start")
+    board, start, goal, _spots = parse_map(lesson_board.get("map"), lesson_board.get("legend") or {})
+    facing, planks = _parse_start(lesson_board.get("start") or {})
+    level = replace(level, board=board, start=start, goal=goal, facing=facing, planks=planks)
+    level.enemies = _parse_enemies(lesson_board.get("enemies") or [])
+    _check_enemies(level)
+    return level
 
 
 def names(squares: list[Pos]) -> list[str]:

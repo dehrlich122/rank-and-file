@@ -110,7 +110,7 @@ def test_lesson_is_short_and_runnable(level_file):
     snippets = SNIPPET.findall(text)
     assert 1 <= len(snippets) <= 3, f"{level.lesson} needs 1-3 runnable snippets"
     for flagged_error, code in snippets:
-        result = run_sandbox(code, level.api)
+        result = run_sandbox(code, level.api, lesson_board=level.lesson_board)
         if flagged_error:
             assert result.status == "error", f"snippet should fail on purpose:\n{code}"
         else:

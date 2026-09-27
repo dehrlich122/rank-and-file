@@ -158,9 +158,9 @@ interface ReplResult {
 export interface Requests {
   runSnippet: { args: { code: string }; result: SnippetResult };
   loadLevel: { args: { level: unknown }; result: LoadLevelResult };
-  loadSandbox: { args: { api: string[] }; result: LevelInfo };
+  loadSandbox: { args: { api: string[]; board?: unknown }; result: LevelInfo }; // board: a level's lesson_board (QA-019)
   runLevel: { args: { level: unknown; code: string; hintsUsed: number; solutionSeen: boolean }; result: LevelResult };
-  runSandbox: { args: { code: string; api: string[] }; result: LevelResult };
+  runSandbox: { args: { code: string; api: string[]; board?: unknown }; result: LevelResult };
   replPush: { args: { line: string }; result: ReplResult };
   replReset: { args: Record<string, never>; result: { ok: true } };
 }

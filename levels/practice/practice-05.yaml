@@ -24,3 +24,11 @@ hints:
 - "A chaser that can't step toward you just waits. Walls can hold it while you get away."
 - "One way to start: `pawn.turn_left()`, then `pawn.turn_right()`."
 lesson: practice/practice-05.md
+lesson_board:
+  map: |
+    . . . . .
+    . . # . .
+    . . . . .
+    . . P . .
+  enemies:
+  - {"kind": "chaser", "start": "c4"}

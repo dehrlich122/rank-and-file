@@ -48,7 +48,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const challengeTab = h("button", { class: "tab", onClick: () => showTab("challenge") }, "Challenge");
   const replDrawer = h("details", { class: "repl-drawer" }, h("summary", {}, "Scratch Python"), context.repl.element);
 
-  lesson = renderLesson(source.lesson, { client, api: (source.data.api as string[]) ?? [] });
+  lesson = renderLesson(source.lesson, { client, api: (source.data.api as string[]) ?? [], board: source.data.lesson_board });
   learnPanel.append(h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), source.trains), lesson.element);
 
   // The lesson is paged, one step per runnable snippet (QA-010). The pager sits

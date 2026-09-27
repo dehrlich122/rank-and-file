@@ -4,10 +4,10 @@ A chaser follows its rule without looking where it steps. A wall stops it, and i
 
 So pits can work for you. Stand where the chaser's next step, along the bigger gap, takes it into a pit.
 
-Standing still is a move too. `pawn.wait()` lets the chaser take a step while you stay put:
+Standing still is a move too. `pawn.wait()` lets the chaser take a step while you stay put. Here, a pit lies between you:
 
 ```python run
 pawn.wait()
-pawn.move()
-print("The chaser took two steps")
+pawn.wait()
+print("Where did the chaser go?")
 ```

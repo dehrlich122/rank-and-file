@@ -34,12 +34,12 @@ def run_level(level_json: str, code: str, hints_used: int = 0, solution_seen: bo
     return json.dumps(result.to_dict())
 
 
-def load_sandbox(api_json: str) -> str:
-    return json.dumps(sandbox_level(json.loads(api_json)).describe())
+def load_sandbox(api_json: str, board_json: str = "null") -> str:
+    return json.dumps(sandbox_level(json.loads(api_json), lesson_board=json.loads(board_json)).describe())
 
 
-def run_sandbox(code: str, api_json: str) -> str:
-    return json.dumps(runner.run_sandbox(code, json.loads(api_json)).to_dict())
+def run_sandbox(code: str, api_json: str, board_json: str = "null") -> str:
+    return json.dumps(runner.run_sandbox(code, json.loads(api_json), lesson_board=json.loads(board_json)).to_dict())
 
 
 def repl_push(line: str) -> str:
