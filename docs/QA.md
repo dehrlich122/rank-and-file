@@ -1010,8 +1010,29 @@ Item 6 (hidden boards) became QA-016.
   - Best stars are never taken back. A level solved with three stars keeps
     them after its solution is viewed.
 
-### QA-019 · Pursuit's lesson snippet has no chaser in it · Open
+### QA-019 · Pursuit's lesson snippet has no chaser in it · Fixed
 
+- **Fixed** in `e3e7a76` (2026-09-27); awaiting the designer's retest (steps
+  under **Retest**).
+  - A level can give its lesson a board of its own (`lesson_board`).
+  - Pursuit's lesson has two snippets on a board with a chaser straight
+    ahead and a wall between. Turning on the spot, the chaser gets no
+    closer. Stepping aside, it slides round the wall.
+  - Pitfall's snippet has a pit between the pawn and a chaser. Two waits,
+    and it falls in.
+  - Snippets show the game's messages under their output, and a snippet
+    that ends in a loss reads "Lost".
+  - Other obstacle lessons (The Sentry's Round, Clockwork, Portcullis, The
+    Capture) still use the plain board. They can get boards of their own
+    if wanted.
+- **Retest:**
+  - Testing ground → Pursuit, Learn tab. Each snippet's board shows the
+    chaser and the wall. Run the first: the pawn turns, and the chaser
+    stays behind the wall. Run the second: the chaser moves round the wall
+    toward the pawn, step by step.
+  - Testing ground → Pitfall, Learn tab. Run the snippet: the chaser steps
+    into the pit and disappears. Under the snippet, "The chaser fell into
+    the pit on c2." appears before the printed line.
 - **Area:** lesson snippets (M1), Testing ground 5 (Pursuit)
 - **Observed** *(Designer, 2026-09-27)*: Pursuit's sample code doesn't make
   any sense. It should show the chaser at work as the code runs.
