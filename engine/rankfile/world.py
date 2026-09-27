@@ -91,6 +91,7 @@ class World:
         self.foes = [Foe(enemy, enemy.start, enemy.path.index(enemy.start)) for enemy in level.enemies]
         # The clocks something keeps time with: their ticks show up in the recording.
         self.clocked = {timer.clock for timer in self.board.timers.values()} | {enemy.clock for enemy in level.enemies}
+        self.code_clocked = sorted(self.clocked & CODE_CLOCKS)  # clocks the code winds, whose counts the board shows (QA-021)
         self.lost: Lost | None = None
         self.listeners: list[Callable[[Event], None]] = []
 
@@ -106,7 +107,7 @@ class World:
 
     def state(self) -> dict:
         opened = self.opened | self._open_timed_gates() if self.board.timers else self.opened
-        return {
+        state = {
             "pos": list(self.pos),
             "facing": self.facing.value,
             "opened": [list(pos) for pos in sorted(opened)],
@@ -118,6 +119,9 @@ class World:
             "tick": self.ticks["action"],
             "lost": list(self.lost.at) if self.lost else None,  # where the run was lost
         }
+        if self.code_clocked:  # only on levels with clockwork, so other levels' recordings stay lean
+            state["clock_ticks"] = {clock: self.ticks[clock] for clock in self.code_clocked}
+        return state
 
     @_acts
     def move_forward(self) -> None:

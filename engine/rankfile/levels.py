@@ -40,6 +40,9 @@ ENEMY_KEYS = {
 }
 OPEN_GROUND = (Tile.FLOOR, Tile.WAYPOINT, Tile.GEM, Tile.PLANK)
 
+# What a code clock does while the code only repeats lines that have already run (QA-021).
+CLOCK_STILL = {"new_line": " While your code only repeats lines that have already run, it stands still."}
+
 # What makes each clock tick, in words: "one square for ..." (M3.1).
 CLOCK_TICKS = {
     "action": "each square you move, each turn and each wait",
@@ -106,7 +109,7 @@ class Enemy:
                 f"A chaser starts on {start}. It steps one square toward you for {ticks}: along the rank or "
                 "the file, whichever gap is bigger (east or west when they're equal). If that way is blocked "
                 "it tries the other, and if both are blocked it waits."
-            )
+            ) + CLOCK_STILL.get(self.clock, "")
         elif len(self.path) == 1:
             text = f"A patrol stands guard on {start}."
         else:
@@ -115,7 +118,7 @@ class Enemy:
                 way = " to ".join([*corners, corners[0]]) + ", round and round"
             else:
                 way = " to ".join(corners) + " and back"
-            text = f"A patrol starts on {start} and walks {way}, one square for {ticks}."
+            text = f"A patrol starts on {start} and walks {way}, one square for {ticks}.{CLOCK_STILL.get(self.clock, '')}"
         return f"{text} It's armoured: it can't be captured." if self.armoured else text
 
 

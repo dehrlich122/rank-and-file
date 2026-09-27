@@ -27,7 +27,7 @@ from .levels import Case, Level, names, sandbox_level
 from .pieces import PIECES
 from .tracer import PLAYER_FILENAME, StepBudgetExceeded, Tracer
 from .words import and_list, count
-from .world import CODE_CLOCKS, World
+from .world import World
 
 DEFAULT_LINE_BUDGET = 100_000
 
@@ -268,7 +268,7 @@ def execute(
     """Run compiled player code under the tracer, capturing everything it prints."""
     remember_source(source)
     # The code's own clocks only matter when something keeps time with them.
-    keeps_time = world is not None and world.clocked & CODE_CLOCKS
+    keeps_time = world is not None and world.code_clocked
     tracer = Tracer(line_budget, record=record, on_line=world.on_line if keeps_time else None)
     output = _StepOutput(tracer, world)
     if world is not None:

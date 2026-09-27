@@ -509,3 +509,20 @@ def test_a_bridged_pit_is_floor_for_enemies_too():
 
 def test_the_obstacles_explain_bridging(plank_walk):
     assert plank_walk.obstacles()[1] == "A plank laid over a pit (`bridge()`) makes it safe to cross. Walk over a plank to pick it up."
+
+
+# -- QA-021: clockwork shows its count, and says it stands still ----------------------------
+
+
+def test_the_state_counts_code_clock_ticks_only_when_something_uses_them():
+    level = enemy_level("P . . . . . G\n", {"kind": "patrol", "route": ["c1", "e1"], "clock": "new_line"}, start={"facing": "east"})
+    result = run_level(level, "for i in range(3):\n    x = i")
+    assert level.describe()["start"]["clock_ticks"] == {"new_line": 0}
+    assert result.final["clock_ticks"] == {"new_line": 2}  # two new lines; the loop repeating them adds nothing
+    plain = run_level(make_level("G\nP\n"), "pawn.move()")
+    assert "clock_ticks" not in plain.final
+
+
+def test_a_new_line_patrol_says_it_stands_still_while_lines_repeat():
+    level = enemy_level("P . . . . . G\n", {"kind": "patrol", "route": ["c1", "e1"], "clock": "new_line"}, start={"facing": "east"})
+    assert level.obstacles()[0].endswith("While your code only repeats lines that have already run, it stands still.")

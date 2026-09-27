@@ -37,6 +37,7 @@ export interface WorldState {
   enemies: Array<Pos | null>; // where each of the level's enemies is; null once captured or fallen into a pit
   tick: number; // ticks of the action clock so far (moves, turns and waits)
   lost: Pos | null; // where the run was lost: a pit, or where the piece was caught
+  clock_ticks?: Partial<Record<Clock, number>>; // the code clocks' counts, on levels with clockwork (QA-021)
 }
 
 /** A level as the engine describes it (levels.Level.describe). */

@@ -9,7 +9,7 @@ for step in range(3):
     print("Round", step)
 ```
 
-The indented lines can be moves. Your pawn walks three squares, but the loop is only two lines of code, so the patrol takes two steps:
+The indented lines can be moves. Your pawn walks three squares, but the loop is only two lines of code, so the patrol takes two steps, then stands still while the loop repeats. Its gear counts its steps:
 
 ```python run
 for step in range(3):
@@ -19,7 +19,7 @@ for step in range(3):
 The same moves copied out are three new lines, and three steps:
 
 ```python run
-pawn.move()
-pawn.move()
-pawn.move()
+pawn.move()  # round 0
+pawn.move()  # round 1
+pawn.move()  # round 2
 ```

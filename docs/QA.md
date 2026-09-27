@@ -1057,6 +1057,7 @@ Item 6 (hidden boards) became QA-016.
 - **Area:** Testing ground 6 (Clockwork), its lesson
 - **Observed** *(Designer, 2026-09-27)*: `range()` isn't well explained in
   this lesson.
+- **See also** QA-021, the same level's patrol.
 - **Cause** *(Claude)*: the lesson gives `range(3)` half a sentence ("counts
   0, 1, 2"). It doesn't say where the numbers stop, what the loop variable
   holds, or that the repeated lines can be moves.
@@ -1067,6 +1068,24 @@ Item 6 (hidden boards) became QA-016.
   2. A loop of moves: the pawn walks three squares, but the loop is only
      two lines of code, so the clockwork patrol takes two steps.
   3. The same moves copied out: three new lines, three steps.
+
+### QA-021 · Clockwork's patrol seems to stop at a5 instead of turning back · Open
+
+- **Area:** clockwork obstacles (M3.1 step 4), Testing ground 6 (Clockwork)
+- **Observed** *(Designer, 2026-09-27)*: the patrol stops once it reaches a5,
+  instead of turning back and carrying on with its patrol.
+- **Answer** *(Claude)*: it isn't a route bug, but it clearly doesn't read
+  as intended.
+  - Checked with the engine: nine new lines of code take it d5 → e5 → a5
+    and back to e5, turning at both ends.
+  - A clockwork patrol only steps when a line runs for the first time. A
+    loop repeats old lines, so once the code runs no new ones, it stands
+    still.
+  - A five-line program gives it five steps, and five steps from d5 end
+    exactly on a5. So it looks as if it stopped at the end of its route.
+  - Nothing on the board shows that it's waiting for a new line. The
+    Obstacles text says what moves it, but not that it stands still
+    otherwise.
 - **Retest:**
   - Testing ground → Pursuit, Learn tab. Each snippet's board shows the
     chaser and the wall. Run the first: the pawn turns, and the chaser
