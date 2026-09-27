@@ -1193,7 +1193,29 @@ Item 6 (hidden boards) became QA-016.
     different message).
 
 
-### QA-024 · Portcullis: a gate that shuts on the pawn should crush it · Open
+### QA-024 · Portcullis: a gate that shuts on the pawn should crush it · Fixed
+
+- **Fixed** in `bc8c4b1` (2026-09-27); awaiting the designer's retest (steps
+  under **Retest**).
+  - A timed gate is open for its first `open` ticks (default 2) of every
+    `every`, starting open. Its badge reads "2 of 3".
+  - Anything under a shut gate after a tick is crushed: the pawn loses the
+    run ("crushed by the gate on …"), and a chaser is gone. Walking into a
+    shut gate still bumps, like a wall.
+  - Portcullis is regenerated for the new timing: new par, and new hints,
+    written blind as before. Its lesson shows a bump, a crush and a clean
+    pass.
+- **Decided** *(Designer, 2026-09-27)*:
+  - A level sets how long a gate stays open, 2 ticks by default.
+  - A shutting gate crushes enemies too.
+- **Retest:**
+  - Testing ground → Portcullis. The gates' badges and the Obstacles text
+    say how long each is open and that it crushes.
+  - Walk straight through: the run is lost, crushed.
+  - Walk into a shut gate: a bump, as before.
+  - Arrive at each gate as it opens and step out the next tick to get
+    through.
+  - Learn tab: the three snippets show a bump, a crush and a clean pass.
 
 - **Area:** timed gates (M3.1 step 3), Testing ground 7 (Portcullis)
 - **Asked** *(Designer, 2026-09-27)*: can the gate open before the move and
