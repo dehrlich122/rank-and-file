@@ -893,8 +893,34 @@ Item 6 (hidden boards) became QA-016.
 
 ## Session 5 — 2026-09-27 · M3.1 play-test (`m3-1-toolkit`, PR #8)
 
-### QA-017 · Pits are too much like walls · Open
+### QA-017 · Pits are too much like walls · Fixed
 
+- **Fixed** in `15a0499` (2026-09-27); awaiting the designer's retest (steps
+  under **Retest**).
+  - A chaser whose step lands on an open pit falls in and is gone. The
+    console says "The chaser fell into the pit on …".
+  - Planks lie on the board and are picked up by walking over them. The
+    console says how many the pawn carries. `pawn.bridge()` lays one over
+    the pit ahead, and the board draws the plank over it. With no plank, or
+    no open pit ahead, it's an error.
+  - Stepping Stones is reworked around a plank. **Pitfall** is a new
+    Testing-ground level (the last in the list).
+  - Deferred: a general inventory for carried items (planks now, keys
+    later), to be done when a second item arrives.
+- **Retest:**
+  - Testing ground → Stepping Stones:
+    - The board shows the trench of pits and a plank.
+    - The Challenge panel's Obstacles section explains pits and bridging.
+    - Walking into a pit still reads "Lost".
+    - `pawn.bridge()` with no plank, or with no pit ahead, is an error that
+      says why.
+    - Pick up the plank (the console says so), bridge a pit (a plank
+      appears over it) and walk across.
+  - Testing ground → Pitfall:
+    - The Obstacles section says a chaser doesn't see pits.
+    - Lure the chaser into a pit. It disappears, the console says it fell,
+      and the way is clear.
+  - Hovering an open pit says it's a pit, not that it's bridged.
 - **Area:** pits (M3.1 step 1); Testing ground 2, Stepping Stones
 - **Observed** *(Designer, 2026-09-27)*: it's not clear how a pit differs
   from a wall here. Both stop the code, and both let you run again.
