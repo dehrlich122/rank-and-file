@@ -1165,7 +1165,7 @@ Item 6 (hidden boards) became QA-016.
 
 ### QA-023 · The Toll teaches nothing that level 1.4 didn't · Fixed
 
-- **Fixed** (2026-09-27, commit below); awaiting the designer's retest.
+- **Fixed** in `656ab0f` (2026-09-27); awaiting the designer's retest.
   - The Toll's Trains line and brief now say it's a demo of two mechanics
     that teaches nothing beyond level 1.4, and that both come into their
     own later, when the code has to work the answer out as it runs.
