@@ -1137,7 +1137,7 @@ Item 6 (hidden boards) became QA-016.
 
 ### QA-022 · Is The Toll teaching variables? · Fixed
 
-- **Fixed** (2026-09-27, commit below); awaiting the designer's retest.
+- **Fixed** in `fc26f1a` (2026-09-27); awaiting the designer's retest.
   - The lesson snippet prints the answer directly (`print(2)`), with no
     variable, and the text says where to stand.
   - Counting gems in a variable is noted in `docs/M3.md` as an idea for
