@@ -335,6 +335,11 @@ public/pyodide/    Pyodide runtime, copied from node_modules (not committed)
   option if tracing ever becomes a bottleneck.
 - The game must be served over http (`npm run dev` / `npm run play`); browsers
   won't run workers or WebAssembly from `file://`.
+- The game is published on GitHub Pages under `/rank-and-file/`, not at the
+  root. `.github/workflows/pages.yml` builds with Vite's `--base`, and the
+  worker finds Pyodide through `import.meta.env.BASE_URL`. So never write
+  root-absolute URLs (`/pyodide/...`) in the app. The e2e suite passes against
+  a subpath build (`npm run e2e -- http://localhost:4174/rank-and-file/`).
 
 ## Open questions for later milestones
 

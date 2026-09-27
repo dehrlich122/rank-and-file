@@ -4,6 +4,11 @@ Learn Python by writing real Python to move a chess piece across a board.
 Everything runs locally in your browser; player code runs in real CPython
 (via [Pyodide](https://pyodide.org)) inside a Web Worker.
 
+**Play it online: https://dehrlich122.github.io/rank-and-file/.** It's the
+latest version on `main`, republished after every merge. Progress is saved in
+your browser, separately for each address, so progress from a local copy
+doesn't carry over.
+
 ## Run it
 
 Requirements: Node.js 22.12+ (24 LTS recommended) and, for the engine tests, Python 3.14.

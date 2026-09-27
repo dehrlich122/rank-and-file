@@ -249,6 +249,17 @@ names.
 
 ## Git
 
-- Remote: private `github.com/dehrlich122/rank-and-file`.
+- Remote: public `github.com/dehrlich122/rank-and-file` (public since
+  2026-09-27). Because it's public, `solutions/` and the hints in `levels/` can
+  be read on github.com.
+- Every merge to `main` publishes the game to GitHub Pages,
+  https://dehrlich122.github.io/rank-and-file/, via
+  `.github/workflows/pages.yml`. Pull requests only build. The site lives under
+  `/rank-and-file/`, so app URLs must go through `import.meta.env.BASE_URL`,
+  never `/...`. To try a subpath build locally, run
+  `npx vite build --base=/rank-and-file/`, then
+  `npx vite preview --base=/rank-and-file/`. In Git Bash, prefix both with
+  `MSYS_NO_PATHCONV=1`, or Git Bash rewrites `/rank-and-file/` into a Windows
+  path.
 - Work on one branch per milestone (e.g. `m1-vertical-slice`) and open a PR for
   the designer to merge after manual testing.
