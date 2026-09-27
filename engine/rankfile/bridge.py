@@ -28,9 +28,10 @@ def load_level(level_json: str) -> str:
     return json.dumps({"ok": True, "level": level.describe()})
 
 
-def run_level(level_json: str, code: str, hints_used: int = 0) -> str:
+def run_level(level_json: str, code: str, hints_used: int = 0, solution_seen: bool = False) -> str:
     level = parse_level(json.loads(level_json))
-    return json.dumps(runner.run_level(level, code, hints_used=int(hints_used)).to_dict())
+    result = runner.run_level(level, code, hints_used=int(hints_used), solution_seen=bool(solution_seen))
+    return json.dumps(result.to_dict())
 
 
 def load_sandbox(api_json: str) -> str:

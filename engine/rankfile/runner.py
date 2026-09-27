@@ -105,6 +105,7 @@ def run_level(
     line_budget: int = DEFAULT_LINE_BUDGET,
     enforce_constraints: bool = True,
     hints_used: int = 0,
+    solution_seen: bool = False,
 ) -> LevelResult:
     cases = level.cases()
     result = _run_board(cases[0].level, code, line_budget=line_budget, enforce_constraints=enforce_constraints)
@@ -116,7 +117,7 @@ def run_level(
         others = [_run_board(case.level, code, line_budget=line_budget, enforce_constraints=False) for case in cases[1:]]
         result = _whole_run(level, cases, [result, *others])
     if result.status == "solved":
-        result.stars = score(level, result.code_lines, hints_used)
+        result.stars = score(level, result.code_lines, hints_used, solution_seen)
     return result
 
 
@@ -192,8 +193,9 @@ def run_sandbox(code: str, api: list[str], piece: str = "pawn") -> LevelResult:
     return run_level(sandbox_level(api, piece), code, enforce_constraints=False)
 
 
-def score(level: Level, code_lines: int, hints_used: int) -> list[Star]:
-    """The three stars of a solved run: solving it, meeting par, and using no hints."""
+def score(level: Level, code_lines: int, hints_used: int, solution_seen: bool = False) -> list[Star]:
+    """The three stars of a solved run: solving it, meeting par, and needing no help
+    (no hints opened, and the solution not seen: QA-018)."""
     par = level.par.lines
     if par is None:
         par_star = Star("par", True, "Within par (this level doesn't set one)")
@@ -201,10 +203,13 @@ def score(level: Level, code_lines: int, hints_used: int) -> list[Star]:
         par_star = Star("par", True, f"Within par: {count(par, "line")} of code or fewer")
     else:
         par_star = Star("par", False, f"Par is {count(par, "line")} of code; yours has {code_lines}")
-    if hints_used == 0:
-        hints_star = Star("no_hints", True, "No hints opened")
+    help_used = [f"opened {count(hints_used, 'hint')}"] if hints_used else []
+    if solution_seen:
+        help_used.append("looked at the solution")
+    if help_used:
+        hints_star = Star("no_hints", False, f"No hints or solution seen (you {' and '.join(help_used)})")
     else:
-        hints_star = Star("no_hints", False, f"No hints opened (you opened {hints_used})")
+        hints_star = Star("no_hints", True, "No hints or solution seen")
     return [Star("solved", True, "Solved"), par_star, hints_star]
 
 

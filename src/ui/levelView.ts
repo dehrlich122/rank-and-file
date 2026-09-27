@@ -263,8 +263,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     running = true;
     updateControls();
     try {
-      const hintsUsed = progress.level(source.id).hints;
-      const result = await client.call("runLevel", { level: source.data, code: recordedCode, hintsUsed });
+      const { hints: hintsUsed, solutionSeen } = progress.level(source.id);
+      const result = await client.call("runLevel", { level: source.data, code: recordedCode, hintsUsed, solutionSeen });
       runResult = result;
       help?.recordRun(result); // once per run, here rather than in playback, which can reach the end many times
       showCase(result.case, mode);

@@ -2,12 +2,13 @@
 //
 // - Tiered hints: a nudge, then a concept reminder, then a partial example.
 //   They open one at a time, only when asked, and stay open. Opening the
-//   first gives up the level's no-hints star, and the panel says so first.
+//   first gives up the level's third star, and the panel says so first.
 // - Once every hint is open and GIVE_UP_AFTER more runs have failed, "Show me
 //   a solution", behind a confirm step. Seeing it marks the level solved with
 //   help, with no stars until the player solves it themselves.
 // - Once the level is solved (or its solution seen), the comparison with an
-//   idiomatic solution.
+//   idiomatic solution. Seeing it gives up the third star too (QA-018), so
+//   when there's a star to lose, the panel asks first.
 //
 // It keeps the level's progress up to date: `recordRun` once per run.
 import { progress } from "../progress";
@@ -23,6 +24,7 @@ export class HelpPanel {
   private readonly solutionSection = h("section", { class: "solution-section" });
   readonly element = h("div", { class: "help" }, this.hintsSection, this.solutionSection);
   private confirming = false;
+  private comparing: (() => string) | null = null; // asking before a comparison: the code it would show as yours
 
   constructor(
     private readonly levelId: string,
@@ -61,7 +63,7 @@ export class HelpPanel {
    * hint costs, and asks before showing a solution.
    */
   outcomeAction(result: LevelResult, runCode: string, showHelp: () => void): HTMLElement | null {
-    if (result.status === "solved") return this.compareButton(() => runCode);
+    if (result.status === "solved") return this.compareButton(() => runCode, showHelp);
     const label = !this.allOpen ? "Need a hint?" : this.canGiveUp ? "Show me a solution…" : null;
     return label ? h("button", { class: "btn btn-small", onClick: showHelp }, label) : null;
   }
@@ -87,13 +89,32 @@ export class HelpPanel {
 
   private giveUp(): void {
     this.confirming = false;
-    progress.update(this.levelId, { helped: true });
-    this.render();
-    openComparison(this.levelId, this.currentCode());
+    progress.update(this.levelId, { helped: true, solutionSeen: true });
+    this.showComparison(this.currentCode());
   }
 
-  private compareButton(code: () => string): HTMLElement {
-    return h("button", { class: "btn btn-small", onClick: () => openComparison(this.levelId, code()) }, "Compare with an idiomatic solution");
+  /** Seeing the solution would give up the third star: none lost yet, and no hint opened (which already gave it up). */
+  private get comparingCosts(): boolean {
+    const { stars, hints, solutionSeen } = progress.level(this.levelId);
+    return stars < 3 && hints === 0 && !solutionSeen;
+  }
+
+  /** `reveal` opens the Challenge panel, where the question is asked (from the outcome card). */
+  private compareButton(code: () => string, reveal?: () => void): HTMLElement {
+    const compare = () => {
+      if (!this.comparingCosts) return this.showComparison(code());
+      this.comparing = code;
+      this.render();
+      reveal?.();
+    };
+    return h("button", { class: "btn btn-small", onClick: compare }, "Compare with an idiomatic solution");
+  }
+
+  private showComparison(yourCode: string): void {
+    this.comparing = null;
+    if (!progress.level(this.levelId).solutionSeen) progress.update(this.levelId, { solutionSeen: true });
+    this.render();
+    openComparison(this.levelId, yourCode);
   }
 
   private render(): void {
@@ -116,7 +137,7 @@ export class HelpPanel {
       const label = opened === 0 ? `Show a hint (1 of ${total})` : `Show the next hint (${opened + 1} of ${total})`;
       parts.push(h("button", { class: "btn btn-small hint-button", onClick: () => this.openNextHint() }, label));
       if (opened === 0) {
-        parts.push(h("p", { class: "muted small" }, "Opening a hint gives up this level's no-hints star. Hints stay open once you've seen them."));
+        parts.push(h("p", { class: "muted small" }, "Opening a hint gives up this level's third star. Hints stay open once you've seen them."));
       }
     } else if (this.canGiveUp) {
       parts.push(
@@ -145,7 +166,22 @@ export class HelpPanel {
     const why = solved
       ? "You've solved this level. See your code next to an idiomatic solution, and why it's written that way."
       : "You've seen a solution. Solve the level yourself to earn its stars.";
-    this.solutionSection.replaceChildren(h("h3", {}, "Solution"), h("p", { class: "muted small" }, why), this.compareButton(this.currentCode));
+    const code = this.comparing;
+    const action = code
+      ? confirmStep(
+          "Seeing the idiomatic solution gives up this level's third star: from now on, a run can earn two at most. See it?",
+          "Show it",
+          "Not yet",
+          (yes) => (yes ? this.showComparison(code()) : this.cancelComparing()),
+        )
+      : this.compareButton(this.currentCode);
+    this.solutionSection.replaceChildren(h("h3", {}, "Solution"), h("p", { class: "muted small" }, why), action);
+  }
+
+  private cancelComparing(): void {
+    this.comparing = null;
+    this.render();
+    this.solutionSection.querySelector<HTMLElement>("button")?.focus();
   }
 }
 

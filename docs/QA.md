@@ -964,6 +964,29 @@ Item 6 (hidden boards) became QA-016.
       pits are the way to be rid of it.
   - The Obstacles text explains both rules.
 
+### QA-018 · The idiomatic solution can be copied for three stars · Open
+
+- **Area:** stars and the solution comparison (M2)
+- **Observed** *(Designer, 2026-09-27)*: viewing the idiomatic solution
+  doesn't count against the no-hints star. So a player can view it, write
+  the code exactly as shown, and earn three stars.
+- **Wanted** *(Designer, 2026-09-27)*: viewing the idiomatic solution should
+  leave you at two stars at most, the same as opening a hint.
+- **Plan** *(Claude)*:
+  - The third star becomes "no hints and no solution seen".
+    - The UI tells the engine whether the solution was seen, as it does
+      for hints.
+    - A run that misses the star says why: the hints opened, the solution
+      seen, or both.
+  - A new progress flag records that the solution was seen. Opening the
+    comparison sets it, and so does "Show me a solution".
+  - Opening the comparison would give up the star, so it asks first, inside
+    the Challenge panel, the way "Show me a solution" does. When the level
+    already has three stars, there's nothing to lose, and it opens straight
+    away.
+  - Best stars are never taken back. A level solved with three stars keeps
+    them after its solution is viewed.
+
 ---
 
 ## Queued work

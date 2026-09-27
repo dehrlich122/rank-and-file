@@ -159,7 +159,7 @@ export interface Requests {
   runSnippet: { args: { code: string }; result: SnippetResult };
   loadLevel: { args: { level: unknown }; result: LoadLevelResult };
   loadSandbox: { args: { api: string[] }; result: LevelInfo };
-  runLevel: { args: { level: unknown; code: string; hintsUsed: number }; result: LevelResult };
+  runLevel: { args: { level: unknown; code: string; hintsUsed: number; solutionSeen: boolean }; result: LevelResult };
   runSandbox: { args: { code: string; api: string[] }; result: LevelResult };
   replPush: { args: { line: string }; result: ReplResult };
   replReset: { args: Record<string, never>; result: { ok: true } };

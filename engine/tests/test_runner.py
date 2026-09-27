@@ -204,11 +204,25 @@ def test_par_counts_lines_of_code_like_max_lines():
     assert result.stars[1].label == "Par is 1 line of code; yours has 2"
 
 
+BRIDGE_LEVEL = {"id": "t", "chapter": 1, "title": "T", "trains": "t", "lesson": "t.md", "api": ["move"], "map": "G\nP\n"}
+
+
 def test_opening_hints_gives_up_the_third_star():
     level = make_level("# G #\n# P #\n", par={"lines": 1})
     result = run_level(level, "pawn.move()\n", hints_used=2)
     assert stars(result) == [("solved", True), ("par", True), ("no_hints", False)]
-    assert "you opened 2" in result.stars[2].label
+    assert result.stars[2].label == "No hints or solution seen (you opened 2 hints)"
+
+
+def test_seeing_the_solution_gives_up_the_third_star_too():
+    level = make_level("# G #\n# P #\n", par={"lines": 1})
+    seen = run_level(level, "pawn.move()\n", solution_seen=True)
+    assert stars(seen) == [("solved", True), ("par", True), ("no_hints", False)]
+    assert seen.stars[2].label == "No hints or solution seen (you looked at the solution)"
+    both = run_level(level, "pawn.move()\n", hints_used=1, solution_seen=True)
+    assert both.stars[2].label == "No hints or solution seen (you opened 1 hint and looked at the solution)"
+    bridged = json.loads(bridge.run_level(json.dumps({**BRIDGE_LEVEL, "par": {"lines": 1}}), "pawn.move()\n", 0, True))
+    assert [star["earned"] for star in bridged["stars"]] == [True, True, False]
 
 
 def test_a_level_without_par_gives_the_par_star_freely():
@@ -223,8 +237,7 @@ def test_only_solved_runs_are_scored():
 
 
 def test_the_bridge_passes_hints_used_through():
-    level = {"id": "t", "chapter": 1, "title": "T", "trains": "t", "lesson": "t.md", "api": ["move"], "map": "G\nP\n"}
-    result = json.loads(bridge.run_level(json.dumps(level), "pawn.move()\n", 1))
+    result = json.loads(bridge.run_level(json.dumps(BRIDGE_LEVEL), "pawn.move()\n", 1))
     assert [star["earned"] for star in result["stars"]] == [True, True, False]
 
 

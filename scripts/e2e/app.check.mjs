@@ -176,6 +176,40 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(inPanel, "no comparison button in the Challenge panel of a solved level");
   });
 
+  // -- QA-018: seeing the idiomatic solution gives up the third star -----------------------
+  await check("QA-018: with a star to lose, Compare asks first in the Challenge panel; 'Not yet' keeps it closed", async () => {
+    await openLevel("practice-04", { fresh: true });
+    await setCode(`${solution("practice-04")}\nsteps = 0\n`); // solves it, one line over par
+    const r = await run();
+    await clickButton("Compare with an idiomatic solution", ".outcome-host");
+    const asked = await b.evaluate(`({
+      tab: document.querySelector('.tab.active')?.textContent,
+      question: document.querySelector('.solution-section .confirm-step p')?.textContent ?? '',
+      focused: document.activeElement?.textContent,
+      dialog: !!document.querySelector('.compare-dialog'),
+    })`);
+    await clickButton("Not yet", ".solution-section .confirm-step");
+    const after = await b.evaluate(`({ confirm: !!document.querySelector('.confirm-step'), dialog: !!document.querySelector('.compare-dialog') })`);
+    expect(r.head === "Solved!" && r.stars === 2, `${r.stars} stars: ${brief(r)}`);
+    expect(asked.tab === "Challenge" && asked.question.includes("gives up this level's third star") && asked.focused === "Show it" && !asked.dialog, JSON.stringify(asked));
+    expect(!after.confirm && !after.dialog, `after 'Not yet': ${JSON.stringify(after)}`);
+  });
+
+  await check("QA-018: once the solution is seen, a run earns two stars at most, and says why", async () => {
+    await clickButton("Compare with an idiomatic solution", ".solution-section");
+    await clickButton("Show it", ".solution-section .confirm-step");
+    await b.waitFor(`!!document.querySelector('.compare-dialog .compare-idiomatic .cm-line')`, 10_000, "the comparison");
+    await b.key("Escape");
+    await setCode(solution("practice-04"));
+    const r = await run();
+    await clickButton("Compare with an idiomatic solution", ".outcome-host");
+    const reopened = await b.evaluate(`!!document.querySelector('.compare-dialog') && !document.querySelector('.confirm-step')`);
+    await b.key("Escape");
+    expect(r.head === "Solved!" && r.stars === 2 && r.text.includes("No hints or solution seen (you looked at the solution)"), `${r.stars} stars: ${brief(r)}`);
+    expect(reopened, "a second look should open straight away: there's no star left to lose");
+    return `${r.stars} stars`;
+  });
+
   // -- M2: giving up ------------------------------------------------------------------------
   const offersSolution = () => hasButton("Show me a solution…", ".outcome-host");
 
@@ -606,7 +640,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     const text = await b.evaluate(`document.querySelector('.tab-panel:not([hidden])').innerText.replace(/\\s+/g, ' ')`);
     expect(text.includes("Reach the goal on b8") && text.includes("At most 2 lines"), text.slice(0, 160));
     // Headings are styled in capitals, and innerText returns them that way.
-    expect(/stars solve the level\. use \d+ lines? of code or fewer \(par\)\. solve it without opening a hint\./i.test(text), "the Stars section is missing or worded differently");
+    expect(/stars solve the level\. use \d+ lines? of code or fewer \(par\)\. solve it without opening a hint or seeing the solution\./i.test(text), "the Stars section is missing or worded differently");
     return text.slice(0, 120);
   });
 

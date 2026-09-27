@@ -102,7 +102,7 @@ def test_describe_puts_goals_and_rules_into_words():
         "Must use a for loop.",
         "Not allowed: a while loop.",
     ]
-    assert described["stars"] == ["Solve the level.", "There's no par here: solving is enough.", "Solve it without opening a hint."]
+    assert described["stars"] == ["Solve the level.", "There's no par here: solving is enough.", "Solve it without opening a hint or seeing the solution."]
     assert make_level("P G\n", par={"lines": 1}).star_goals()[1] == "Use 1 line of code or fewer (par)."
 
 

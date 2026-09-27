@@ -249,7 +249,7 @@ class Level:
         """What each of the three stars asks for (runner.score awards them)."""
         par = self.par.lines
         within = f"Use {count(par, 'line')} of code or fewer (par)." if par else "There's no par here: solving is enough."
-        return ["Solve the level.", within, "Solve it without opening a hint."]
+        return ["Solve the level.", within, "Solve it without opening a hint or seeing the solution."]
 
     def describe(self) -> dict:
         """Everything the UI needs to draw the level, as JSON-friendly data."""
