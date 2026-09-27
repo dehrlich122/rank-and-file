@@ -1,8 +1,8 @@
 id: practice-08
 chapter: 0
 title: "The Toll"
-trains: "Collecting gems, then answering a guard's question"
-brief: "The toll keeper wants to know how much you're carrying."
+trains: "A demo of gems and a guard who asks a question: nothing new to learn"
+brief: "This level only tries out two mechanics: gems, collected by walking over them, and a guard who asks a question instead of wanting a passphrase. It teaches nothing beyond level 1.4. Both come into their own in later chapters, where the answer has to be worked out by the code as it runs."
 piece: pawn
 map: |
   # # # G

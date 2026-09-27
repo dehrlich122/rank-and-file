@@ -1162,6 +1162,36 @@ Item 6 (hidden boards) became QA-016.
   - Variables belong to Chapter 2 (M3.2), where counting gems in a variable
     fits naturally.
 
+
+### QA-023 · The Toll teaches nothing that level 1.4 didn't · Fixed
+
+- **Fixed** (2026-09-27, commit below); awaiting the designer's retest.
+  - The Toll's Trains line and brief now say it's a demo of two mechanics
+    that teaches nothing beyond level 1.4, and that both come into their
+    own later, when the code has to work the answer out as it runs.
+- **Decided** *(Designer, 2026-09-27)*: keep it as a demo, and say so.
+  - Not chosen: an answer that varies between boards (`print(pawn.gems)`),
+    or removing the level.
+  - The idea that makes a question guard worth having is in `docs/M3.md`
+    for Chapter 2: an answer that can't be known ahead of time.
+- **Retest:** Testing ground → The Toll. The level list and the Challenge
+  panel say it's a demo with nothing new to learn.
+
+- **Area:** gems and guards with a question (M3.1 steps 2-3), Testing ground
+  8 (The Toll)
+- **Observed** *(Designer, 2026-09-27)*: after QA-022, it's not clear what
+  the gems are for, or what The Toll teaches that level 1.4 (the guard's
+  gate) didn't.
+- **Answer** *(Claude)*: nothing new.
+  - The gems are waypoints you count, and the guard's question is 1.4's
+    passphrase, worked out by counting on the board before writing any
+    code.
+  - A question only differs from a passphrase when its answer can't be
+    known ahead of time, so the program has to find it out as it runs. On
+    one fixed board, you can always count by eye.
+  - This is the same kind of gap as QA-017 (pits were walls with a
+    different message).
+
 ---
 
 ## Queued work
