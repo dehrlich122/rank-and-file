@@ -1025,6 +1025,26 @@ Item 6 (hidden boards) became QA-016.
   - Other obstacle lessons (The Sentry's Round, Clockwork, Portcullis, The
     Capture) still use the plain board. They can get boards of their own
     if wanted.
+- **Decided** *(Designer, 2026-09-27)*: yes. As new obstacles or
+  interactions are introduced, they're shown in the sample code. The rule
+  is in `CLAUDE.md`.
+- **Extended** in `6d25779`: every Testing-ground lesson that brings in
+  something new has a lesson board and snippets that show it at work:
+  - **Stepping Stones:** a long move falls into a pit (Lost); a plank
+    bridges it.
+  - **Checkpoints:** a waypoint ticked off in the middle of a move.
+  - **The Sentry's Round:** stepping out too soon is caught (Lost); waiting
+    lets the patrol pass.
+  - **Clockwork:** a loop winds the patrol two steps, and the same prints
+    copied out wind it three.
+  - **Portcullis:** arriving early bumps the shut gate; waiting gets
+    through.
+  - **The Toll:** collect two gems, then answer the guard.
+  - **The Capture:** take one enemy; trying the armoured one is an error.
+  - A snippet can be marked meant to lose (`python run lost`), as one can
+    be marked meant to fail.
+- **Retest (extension):** on each of those lessons' Learn tabs, the
+  snippet's board shows the obstacle, and running it shows it at work.
 - **Retest:**
   - Testing ground → Pursuit, Learn tab. Each snippet's board shows the
     chaser and the wall. Run the first: the pawn turns, and the chaser
