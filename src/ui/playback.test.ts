@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Step, WorldState } from "../py/protocol";
 import { BASE_STEP_MS, buildFrames, consoleAt, controlStates, frameDuration, Player, type Frame } from "./playback";
 
-const start: WorldState = { pos: [0, 0], facing: "north", opened: [], crossed: [], collected: [], enemies: [], tick: 0, lost: null };
+const start: WorldState = { pos: [0, 0], facing: "north", opened: [], crossed: [], collected: [], planks: 0, bridged: [], enemies: [], tick: 0, lost: null };
 const at = (pos: [number, number], facing: WorldState["facing"] = "north"): WorldState => ({ ...start, pos, facing });
 
 function step(line: number, pos: [number, number] | null, output = ""): Step {

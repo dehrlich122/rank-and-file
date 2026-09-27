@@ -1,0 +1,29 @@
+id: practice-10
+chapter: 0
+title: "Pitfall"
+trains: "Luring a chaser into a pit"
+brief: "A chaser guards the goal. It never looks where it steps."
+piece: pawn
+map: |
+  . . . O . G
+  . . . . . .
+  . O . . . .
+  . . . . . .
+  P O . . . .
+legend:
+  "O": "pit"
+enemies:
+- {"kind": "chaser", "start": "e5"}
+start: {"facing": "north"}
+api:
+- move
+- turn_left
+- turn_right
+- wait
+par:
+  lines: 5
+hints:
+- "The chaser walks straight into a pit if its step takes it there. Where could you stand so its next step does?"
+- "It always tries the bigger gap first. Work out its next few steps from where you'll be."
+- "One way to start: `pawn.move(3)`, then `pawn.turn_right()`."
+lesson: practice/practice-10.md

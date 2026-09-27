@@ -33,7 +33,7 @@ from rankfile.runner import unmet_objectives  # noqa: E402
 from rankfile.world import CODE_CLOCKS, World  # noqa: E402
 
 MAX_STATES = 400_000
-CALLS = ("move", "turn_left", "turn_right", "wait", "capture_left", "capture_right")
+CALLS = ("move", "turn_left", "turn_right", "wait", "capture_left", "capture_right", "bridge")
 
 
 def fewest_lines(level: Level) -> list[tuple] | None:
@@ -107,8 +107,8 @@ def _try(level: Level, world: World, action: tuple) -> World | None:
 def _key(world: World, last: str, said: str) -> tuple:
     """Everything that decides what can happen next (and whether a step is free)."""
     timers = tuple(world.ticks["action"] % timer.every for timer in world.board.timers.values())
-    foes = tuple((foe.pos, foe.index, foe.heading, foe.captured) for foe in world.foes)
-    return (world.pos, world.facing, frozenset(world.opened), frozenset(world.crossed), frozenset(world.collected), foes, timers, said, last == "move")
+    foes = tuple((foe.pos, foe.index, foe.heading, foe.gone) for foe in world.foes)
+    return (world.pos, world.facing, frozenset(world.opened), frozenset(world.crossed), frozenset(world.collected), frozenset(world.bridged), foes, timers, said, last == "move")
 
 
 def main(paths: list[str]) -> None:

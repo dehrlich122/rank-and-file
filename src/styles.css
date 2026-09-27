@@ -53,6 +53,8 @@
   --gate-lock: light-dark(#c8961a, #e0b04a);
   --pit-rim: light-dark(#5b4a3b, #3a2f26);
   --pit-hole: light-dark(#1d1712, #0c0907);
+  --plank: light-dark(#b98a55, #9a6f40);
+  --plank-grain: light-dark(#8a6236, #6e4d2a);
   --waypoint: light-dark(#2c6fb0, #7fb2e8);
   --enemy: light-dark(#3b2f4a, #2a2233);
   --enemy-rim: var(--bad);
@@ -1230,6 +1232,29 @@ pre {
   fill: var(--pit-hole);
 }
 
+.plank-wood {
+  fill: var(--plank);
+}
+
+.plank-grain {
+  fill: none;
+  stroke: var(--plank-grain);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+/* a plank on the floor vanishes once picked up; one over a pit appears once laid */
+.plank,
+.pit-plank {
+  transition: opacity 250ms ease-in-out;
+}
+
+.plank.collected,
+.pit:not(.bridged) .pit-plank {
+  opacity: 0;
+  pointer-events: none; /* so its tooltip doesn't show */
+}
+
 .waypoint-ring {
   fill: none;
   stroke: var(--waypoint);
@@ -1271,6 +1296,7 @@ pre {
 
 .gem.collected {
   opacity: 0;
+  pointer-events: none;
   transform: scale(1.4);
 }
 
@@ -1302,7 +1328,7 @@ pre {
   fill: var(--enemy-eye);
 }
 
-.enemy.captured {
+.enemy.gone {
   opacity: 0;
 }
 
@@ -1358,7 +1384,7 @@ pre {
 
 /* Animations setting: "Reduced" always stops movement; "Match system" follows
    the OS preference; "Full" ignores it. (Colour flashes stay: they aren't motion.) */
-:root[data-motion="reduced"] :is(.piece, .piece-pointer, .enemy, .gate-bars, .gate-lock, .gem, .waypoint-tick, .level-left) {
+:root[data-motion="reduced"] :is(.piece, .piece-pointer, .enemy, .gate-bars, .gate-lock, .gem, .plank, .pit-plank, .waypoint-tick, .level-left) {
   transition: none;
 }
 
@@ -1367,7 +1393,7 @@ pre {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion="full"]) :is(.piece, .piece-pointer, .enemy, .gate-bars, .gate-lock, .gem, .waypoint-tick, .level-left) {
+  :root:not([data-motion="full"]) :is(.piece, .piece-pointer, .enemy, .gate-bars, .gate-lock, .gem, .plank, .pit-plank, .waypoint-tick, .level-left) {
     transition: none;
   }
 

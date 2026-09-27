@@ -10,6 +10,10 @@ example with `try`/`except` in later chapters.
 class GameError(Exception):
     """Base class for errors whose message is already written for the player."""
 
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.__module__ = "builtins"  # see the note at the end of this file
+
 
 class BlockedError(GameError):
     """The piece tried to walk into a wall, a signpost, or off the board."""
@@ -25,6 +29,10 @@ class GateLockedError(BlockedError):
 
 class CaptureError(GameError):
     """The piece tried to capture where there's nothing it can take (M3.1)."""
+
+
+class BridgeError(GameError):
+    """The piece tried to lay a plank with none to lay, or where there's no pit (QA-017)."""
 
 
 class LockedAbilityError(GameError, AttributeError):
@@ -59,6 +67,7 @@ class Lost(BaseException):
 
 # Tracebacks name an exception by its module, e.g. `rankfile.exceptions.BlockedError`.
 # Claiming the builtins module makes them read like Python's own errors
-# (`BlockedError: ...`), without the engine's internals in the way.
-for _error in (GameError, BlockedError, GateLockedError, CaptureError, LockedAbilityError, GameArgumentError, CantChangePieceError, Lost):
+# (`BlockedError: ...`), without the engine's internals in the way. Every
+# subclass of GameError claims it by itself (GameError.__init_subclass__).
+for _error in (GameError, Lost):
     _error.__module__ = "builtins"

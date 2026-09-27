@@ -1,3 +1,3 @@
-The reference solution uses 7 lines of code.
+The reference solution uses 9 lines of code.
 
-Steps in a row share one call: `pawn.move(2)` walks two squares. Each change of direction is a line of its own, so a good route turns as few times as it can.
+Picking up the plank is just a move over it, and laying it is one call while facing the pit. From then on the bridged pit is ordinary floor.

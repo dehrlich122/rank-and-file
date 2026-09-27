@@ -39,6 +39,8 @@ export default async function appChecks({ browser: b, base, root, check }) {
     })`);
   }
   const brief = (r) => `${r.head}: ${r.text.slice(0, 110)}`;
+  /** What the game said in the console (guards, pick-ups, falls). Check it in Node; never report it: it can give a solution away. */
+  const gameMessages = () => b.evaluate(`[...document.querySelectorAll('.console .game-message')].map((e) => e.textContent)`);
 
   // -- every level can be solved -------------------------------------------------------
   for (const id of LEVELS) {
@@ -299,7 +301,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   // -- M3.1: the obstacle toolkit (the Testing ground's practice-02 to practice-09) ------------
   // Counts, labels and outcomes only: never code, never the console (it can hold an answer).
-  const PRACTICE = ["practice-02", "practice-03", "practice-04", "practice-05", "practice-06", "practice-07", "practice-08", "practice-09"];
+  const PRACTICE = ["practice-02", "practice-03", "practice-04", "practice-05", "practice-06", "practice-07", "practice-08", "practice-09", "practice-10"];
   const drawn = () =>
     b.evaluate(`(() => {
       const board = document.querySelector('.board-host .board');
@@ -307,7 +309,8 @@ export default async function appChecks({ browser: b, base, root, check }) {
       return {
         pits: count('.pit'), waypoints: count('.waypoint'), gems: count('.gem'), timed: count('.timed-gate'),
         enemies: count('.enemy'), armoured: count('.enemy.armoured'), routes: count('.route'),
-        crossed: count('.waypoint.crossed'), collected: count('.gem.collected'), captured: count('.enemy.captured'),
+        crossed: count('.waypoint.crossed'), collected: count('.gem.collected'), gone: count('.enemy.gone'),
+        planks: count('.plank'), planksTaken: count('.plank.collected'), bridged: count('.pit.bridged'),
         badges: [...board.querySelectorAll('.badge-text')].map((e) => e.textContent),
         lost: board.classList.contains('lost'),
       };
@@ -321,7 +324,8 @@ export default async function appChecks({ browser: b, base, root, check }) {
       const obstacles = await b.evaluate(`document.querySelector('ul.obstacles')?.innerText ?? ''`);
       d[id] = { ...(await drawn()), obstacles: obstacles.split("\n").filter(Boolean).length };
     }
-    expect(d["practice-02"].pits === 4 && d["practice-02"].obstacles === 1, `pits: ${JSON.stringify(d["practice-02"])}`);
+    expect(d["practice-02"].pits === 10 && d["practice-02"].planks === 1 && d["practice-02"].obstacles === 2, `pits and a plank: ${JSON.stringify(d["practice-02"])}`);
+    expect(d["practice-10"].pits === 3 && d["practice-10"].enemies === 1 && d["practice-10"].obstacles === 4, `pitfall: ${JSON.stringify(d["practice-10"])}`);
     expect(d["practice-03"].waypoints === 3, `waypoints: ${JSON.stringify(d["practice-03"])}`);
     expect(d["practice-04"].enemies === 1 && d["practice-04"].routes === 1 && d["practice-04"].obstacles === 2, `patrol: ${JSON.stringify(d["practice-04"])}`);
     expect(d["practice-05"].badges.includes("chases") && d["practice-05"].routes === 0, `chaser: ${JSON.stringify(d["practice-05"])}`);
@@ -365,7 +369,9 @@ export default async function appChecks({ browser: b, base, root, check }) {
   const afterwards = {
     "practice-03": (board) => expect(board.crossed === 3, `waypoints ticked off: ${board.crossed}`),
     "practice-08": (board) => expect(board.collected === 3, `gems collected: ${board.collected}`),
-    "practice-09": (board) => expect(board.captured === 1, `enemies captured: ${board.captured}`),
+    "practice-09": (board) => expect(board.gone === 1, `enemies captured: ${board.gone}`),
+    "practice-02": (board) => expect(board.bridged === 1 && board.planksTaken === 1, `pits bridged: ${board.bridged}, planks taken: ${board.planksTaken}`),
+    "practice-10": (board) => expect(board.gone === 1, `chasers gone: ${board.gone}`),
   };
   for (const id of PRACTICE) {
     await check(`${id}: reference solution solves it`, async () => {
@@ -377,6 +383,28 @@ export default async function appChecks({ browser: b, base, root, check }) {
       return brief(r);
     });
   }
+
+  // -- QA-017: pits swallow chasers, and planks bridge them -------------------------------
+  await check("QA-017: in Pitfall, the chaser that steps into a pit falls in, and the console says so", async () => {
+    await openLevel("practice-10", { fresh: true });
+    await setCode(solution("practice-10"));
+    const r = await run();
+    const said = await gameMessages();
+    const fell = said.filter((text) => /^The chaser fell into the pit on [a-f][1-5]\.$/.test(text)).length;
+    expect(r.head === "Solved!" && fell === 1, `${r.head}, ${fell} falls in ${said.length} messages`);
+  });
+
+  await check("QA-017: in Stepping Stones, picking up the plank is announced, and bridging where there's no pit is an error", async () => {
+    await openLevel("practice-02", { fresh: true });
+    await setCode(solution("practice-02"));
+    await run();
+    const said = await gameMessages();
+    expect(said.includes("Your pawn picked up a plank. It's carrying 1 plank."), `no pick-up among ${said.length} messages`);
+    await setCode("pawn.bridge()");
+    const r = await run();
+    expect(r.head === "Python stopped" && r.text.includes("Planks only go over pits, and there's no open pit on c2."), brief(r));
+    return brief(r);
+  });
 
   // -- QA-002: level 4's locked gate --------------------------------------------------------
   await check("QA-002: level 4 starts with the guard's comment, and the panels don't give the passphrase away", async () => {
@@ -405,7 +433,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await openLevel("ch01-l04");
     await setCode(withoutExpectLine(solution("ch01-l04", ".naive3"))); // passphrase printed with its quote marks
     const r = await run();
-    const guard = await b.evaluate(`[...document.querySelectorAll('.console .game-message')].map((e) => e.textContent)`);
+    const guard = await gameMessages();
     const open = await b.evaluate(`!!document.querySelector('.board .gate.open')`);
     expect(guard.join() === "The guard called your mother a hamster! The gate remains locked.", `guard said: ${JSON.stringify(guard)}`);
     expect(!open, "the gate opened");
@@ -423,7 +451,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await openLevel("ch01-l04");
     await setCode(withoutExpectLine(solution("ch01-l04", ".naive"))); // passphrase said far from the gate
     const r = await run();
-    const guard = await b.evaluate(`document.querySelectorAll('.console .game-message').length`);
+    const guard = (await gameMessages()).length;
     expect(guard === 0 && r.text.includes("elderberries"), `${brief(r)} | guard lines: ${guard}`);
     expect(!r.text.includes("didn't accept"), "QA-008: no pointer line when the guard never heard anything");
   });

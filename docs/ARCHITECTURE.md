@@ -192,19 +192,20 @@ legend:                      # optional: extra symbols beyond the built-ins
   O: pit
   W: waypoint
   $: gem
+  L: plank
 enemies:                     # optional (M3.1); squares are chess names
   - {kind: patrol, route: [b4, e4]}                   # there and back, from its first corner
   - {kind: patrol, start: c2, route: [c2, f2, f5, c5], loop: true, clock: new_line}
   - {kind: patrol, start: d4, armoured: true}         # no route: it stands guard
   - {kind: chaser, start: g6, strategy: simple}
-start: {facing: north}
+start: {facing: north}       # also `planks: 1`: planks the piece starts with (QA-017)
 objectives:                  # default [reach_goal]
   - reach_goal               # end the program on the goal square
   - say: open sesame         # print this exact line at some point
   - waypoints                # cross every waypoint (added whenever the map has any)
   - collect: all             # or a number: gems to walk over
   - capture: all             # or a number: enemies to capture (armoured ones can't be)
-api: [move, turn_left, turn_right]      # abilities the piece has in this level (also at_goal, wait, capture_left, capture_right)
+api: [move, turn_left, turn_right]      # abilities the piece has in this level (also at_goal, wait, capture_left, capture_right, bridge)
 constraints: {max_lines: 4, min_comments: 1, require_nodes: [For], ban_nodes: []}
 par: {lines: 3}              # the par star: this many lines of code or fewer
 hints: ["nudge", "concept reminder", "partial example"]   # opened one at a time, on request
@@ -237,7 +238,11 @@ must reach the goal whichever `?` it's on). Legend tiles:
   - `describe()` never includes the passphrase.
 - `timed_gate` *(M3.1)*: open when its clock's tick count is a multiple of
   `every` (2 or more), so it starts open. Shut, it blocks like a wall.
-- `pit` *(M3.1)*: stepping in loses the run.
+- `pit` *(M3.1)*: stepping in loses the run. `pawn.bridge()` lays a plank
+  over the pit ahead *(QA-017)*, which makes it floor for everyone. A chaser
+  whose step lands on an open pit falls in and is gone.
+- `plank` *(QA-017)*: picked up by walking over it. The piece carries any
+  number. Bridging with none, or with no open pit ahead, is a `BridgeError`.
 - `waypoint` *(M3.1)*: must be crossed (passed over, not stopped on) before
   the program ends.
 - `gem` *(M3.1)*: collected by walking over it.
@@ -249,18 +254,19 @@ Enemies *(M3.1)* move one square per tick of their clock:
   on the route.
 - A **chaser** (`strategy: simple`, the only one so far) steps toward the
   piece along the bigger gap (east or west on a tie). If that way is blocked,
-  it tries the other. If both are blocked, it waits.
+  it tries the other. If both are blocked, it waits. Pits don't block it: it
+  falls in *(QA-017)*.
 - An enemy on the piece's square catches it, and the run is `lost`.
 - `armoured: true` means it can't be captured. `pawn.capture_left()` and
   `capture_right()` take an enemy one square diagonally forward and move onto
   its square. That costs a tick. An empty square or an armoured enemy is a
   `CaptureError`.
-- The checker keeps enemies on open ground (floor, waypoints, gems) and
+- The checker keeps enemies on open ground (floor, waypoints, gems, planks) and
   starts them apart from the piece and from each other.
 - `Level.obstacles()` words every obstacle's rule for the Challenge panel.
-- Every event's state carries each enemy's square (`null` once captured),
-  the waypoints crossed, the gems collected, the tick count, and where a run
-  was lost.
+- Every event's state carries each enemy's square (`null` once captured or
+  fallen), the waypoints crossed, the gems and planks picked up, the planks
+  carried, the pits bridged, the tick count, and where a run was lost.
 
 Unknown keys, symbols,
 abilities or `ast` node names are errors, so typos fail in the level checker.

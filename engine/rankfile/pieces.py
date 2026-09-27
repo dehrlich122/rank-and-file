@@ -50,7 +50,7 @@ class Piece:
 
 class Pawn(Piece):
     NAME = "pawn"
-    ABILITIES = ("move", "turn_left", "turn_right", "at_goal", "position", "facing", "wait", "capture_left", "capture_right")
+    ABILITIES = ("move", "turn_left", "turn_right", "at_goal", "position", "facing", "wait", "capture_left", "capture_right", "bridge")
 
     def move(self, squares=1):
         """Walk forward. `pawn.move()` takes one step; `pawn.move(3)` takes three."""
@@ -76,6 +76,10 @@ class Pawn(Piece):
     def capture_right(self):
         """Take the enemy one square diagonally forward and to the right, and move onto its square."""
         self._world.capture("right")
+
+    def bridge(self):
+        """Lay a plank over the pit straight ahead, so it can be walked across."""
+        self._world.bridge()
 
     def at_goal(self) -> bool:
         """True when the pawn is standing on the goal square."""

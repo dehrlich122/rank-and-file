@@ -891,6 +891,53 @@ Item 6 (hidden boards) became QA-016.
     spoiler parts are written blind again.
   - `ARCHITECTURE.md` and `M2.md` are updated to match.
 
+## Session 5 — 2026-09-27 · M3.1 play-test (`m3-1-toolkit`, PR #8)
+
+### QA-017 · Pits are too much like walls · Open
+
+- **Area:** pits (M3.1 step 1); Testing ground 2, Stepping Stones
+- **Observed** *(Designer, 2026-09-27)*: it's not clear how a pit differs
+  from a wall here. Both stop the code, and both let you run again.
+- **Asked** *(Designer, 2026-09-27)*:
+  - What makes them structurally different?
+  - Can a pit be hopped over?
+  - Can something be built to go over a pit, rather than around it?
+  - Pits need better differentiation to be worth much. If they're worth
+    anything, it's as a problem like a wall that has different ways to get
+    past it.
+- **Answer** *(Claude)*: today, almost nothing sets them apart.
+  - **A wall** is a bump. The move never happens, the pawn stays where it
+    was, and the run ends as an error ("Python stopped", with a traceback).
+  - **A pit** is a loss. The pawn steps in, and the run ends as "Lost".
+  - That error/loss difference is the only one. Nothing can jump a pit or
+    cross it, and chasers avoid pits just as they avoid walls. So in play,
+    a pit is a wall with a different message.
+- **Decided** *(Designer, 2026-09-27)*: fix it in PR #8 in two ways:
+  - **Pits swallow enemies.**
+  - **Planks bridge pits.**
+  - Not chosen: jumping (a knight's move, better kept for the knight tier),
+    and hidden pits (they need sensing, from Chapter 4).
+- **Plan** *(Claude)*:
+  - **Swallowing:**
+    - A chaser no longer avoids pits. If its step lands on one, it falls in
+      and is gone. The console says so, and it no longer counts as an enemy.
+    - Walls still hold a chaser, so luring one into a pit is a new tactic.
+    - Patrols keep their fixed routes, which never cross a pit.
+  - **Planks:**
+    - A new `plank` tile, picked up by walking over it. The console says
+      how many the pawn now carries. A level can also hand some out at the
+      start (`start: {planks: 1}`).
+    - `pawn.bridge()`, a new ability, lays a plank over the pit ahead. It's
+      an action, so it costs a tick. The pit becomes floor, for enemies too.
+    - With no plank, or no pit ahead, it's an error, as bumping a wall is.
+    - Walls can't be bridged.
+  - **Levels:**
+    - Stepping Stones is reworked: a row of pits cuts the goal off, and a
+      plank lies off to one side.
+    - A new Testing-ground level, **Pitfall**: a chaser guards the way, and
+      pits are the way to be rid of it.
+  - The Obstacles text explains both rules.
+
 ---
 
 ## Queued work

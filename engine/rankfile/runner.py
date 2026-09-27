@@ -221,7 +221,7 @@ def unmet_objectives(level: Level, world: World, output: str) -> list[str]:
         unmet.append(f"you captured {captured} of the {count(needed, 'enemy', 'enemies')} that can be taken.")
     elif captured < needed:
         unmet.append(f"you captured {captured}, and the level needs {needed}.")
-    collected = len(world.collected)
+    collected = world.gems_collected
     needed = level.gems_needed()
     if collected < needed:
         if level.gems == 1:

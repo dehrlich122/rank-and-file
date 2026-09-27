@@ -62,6 +62,7 @@ class Tile(Enum):
     PIT = "pit"  # stepping in loses the run (M3.1)
     WAYPOINT = "waypoint"  # must be crossed before the goal (M3.1)
     GEM = "gem"  # collected by walking over it (M3.1)
+    PLANK = "plank"  # picked up by walking over it; pawn.bridge() lays it over a pit (QA-017)
     TIMED_GATE = "timed_gate"  # open only on every Nth tick of its clock (M3.1)
 
     @property

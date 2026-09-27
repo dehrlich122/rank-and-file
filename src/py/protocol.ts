@@ -22,7 +22,7 @@ export interface SnippetResult {
 
 export type Facing = "north" | "east" | "south" | "west";
 export type Pos = [number, number];
-export type TileKind = "floor" | "wall" | "sign" | "gate" | "pit" | "waypoint" | "gem" | "timed_gate";
+export type TileKind = "floor" | "wall" | "sign" | "gate" | "pit" | "waypoint" | "gem" | "timed_gate" | "plank";
 export type Clock = "action" | "line" | "new_line";
 
 /** The world at one moment: where the piece is, which gates are open, and the obstacles (M3.1). */
@@ -31,8 +31,10 @@ export interface WorldState {
   facing: Facing;
   opened: Pos[];
   crossed: Pos[]; // waypoints passed over
-  collected: Pos[]; // gems picked up
-  enemies: Array<Pos | null>; // where each of the level's enemies is; null once captured
+  collected: Pos[]; // gems and planks picked up
+  planks: number; // planks the piece is carrying (QA-017)
+  bridged: Pos[]; // pits with a plank over them
+  enemies: Array<Pos | null>; // where each of the level's enemies is; null once captured or fallen into a pit
   tick: number; // ticks of the action clock so far (moves, turns and waits)
   lost: Pos | null; // where the run was lost: a pit, or where the piece was caught
 }
@@ -80,10 +82,10 @@ export interface Enemy {
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };
 
 export interface GameEvent {
-  kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "capture" | "tick" | "lost";
+  kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "capture" | "tick" | "lost" | "pick_up" | "bridge" | "fall";
   state: WorldState; // the whole world's state after the event
-  at?: Pos; // bump: the square bumped into; gate_open/guard: the gate; capture: the enemy's square; lost: where
-  message?: string; // guard: what the guard said; lost: what happened
+  at?: Pos; // bump: the square bumped into; gate_open/guard: the gate; capture, fall: the enemy's square; bridge: the pit; pick_up, lost: where
+  message?: string; // guard: what the guard said; pick_up, fall, lost: what happened
 }
 
 export interface Var {

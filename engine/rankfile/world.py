@@ -30,7 +30,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from .board import Pos, Tile, sign, square_name, step
-from .exceptions import BlockedError, CaptureError, GateLockedError, Lost
+from .exceptions import BlockedError, BridgeError, CaptureError, GateLockedError, Lost
+from .words import count
 
 if TYPE_CHECKING:
     from .levels import Enemy, Level
@@ -56,11 +57,12 @@ class Foe:
     index: int = 0  # a patrol: where it is along its path
     heading: int = 1  # a patrol that walks back and forth: 1 along its path, -1 back
     captured: bool = False
+    gone: bool = False  # off the board: captured, or fallen into a pit (QA-017)
 
 
 
 def _acts(method: Callable) -> Callable:
-    """A piece's action (a move, turn, wait or capture). A lost piece can't act
+    """A piece's action (a move, turn, wait, capture or bridge). A lost piece can't act
     again, and every action is one tick of the `action` clock once it's done."""
 
     @functools.wraps(method)
@@ -81,7 +83,9 @@ class World:
         self.opened: set[Pos] = set()  # gates that have heard their passphrase
         self.refused: dict[Pos, int | None] = {}  # gate -> the line that last said the wrong thing to it
         self.crossed: set[Pos] = set()  # waypoints the piece has passed over
-        self.collected: set[Pos] = set()  # gems the piece has picked up
+        self.collected: set[Pos] = set()  # gems and planks the piece has picked up
+        self.planks = level.planks  # planks it's carrying (QA-017)
+        self.bridged: set[Pos] = set()  # pits with a plank over them
         self.ticks = dict.fromkeys(CLOCKS, 0)
         self.lines_seen: set[int] = set()  # for the new_line clock
         self.foes = [Foe(enemy, enemy.start, enemy.path.index(enemy.start)) for enemy in level.enemies]
@@ -94,7 +98,7 @@ class World:
         """An independent copy, with no listeners, for trying moves out (scripts/solve.py)."""
         twin = copy.copy(self)
         twin.opened, twin.refused = set(self.opened), dict(self.refused)
-        twin.crossed, twin.collected = set(self.crossed), set(self.collected)
+        twin.crossed, twin.collected, twin.bridged = set(self.crossed), set(self.collected), set(self.bridged)
         twin.ticks, twin.lines_seen = dict(self.ticks), set(self.lines_seen)
         twin.foes = [copy.copy(foe) for foe in self.foes]
         twin.listeners = []
@@ -108,7 +112,9 @@ class World:
             "opened": [list(pos) for pos in sorted(opened)],
             "crossed": [list(pos) for pos in sorted(self.crossed)],
             "collected": [list(pos) for pos in sorted(self.collected)],
-            "enemies": [None if foe.captured else list(foe.pos) for foe in self.foes],  # None once captured
+            "planks": self.planks,
+            "bridged": [list(pos) for pos in sorted(self.bridged)],
+            "enemies": [None if foe.gone else list(foe.pos) for foe in self.foes],  # None once captured or fallen
             "tick": self.ticks["action"],
             "lost": list(self.lost.at) if self.lost else None,  # where the run was lost
         }
@@ -122,11 +128,7 @@ class World:
         if self._locked_gate(target):
             self._emit("bump", at=list(target))
             raise GateLockedError(self._gate_locked_message(target), at=target)
-        self._step_onto(target)
-        self._emit("move")
-        if self.board.tile(target) is Tile.PIT:
-            self._lose(f"Your {self.level.piece} fell into the pit on {square_name(target)}.", target)
-        self._check_caught()
+        self._arrive(target, "move")
 
     def at_goal(self) -> bool:
         return self.level.goal is not None and self.pos == self.level.goal
@@ -155,19 +157,32 @@ class World:
         if foe is None or foe.enemy.armoured:
             self._emit("bump", at=list(target))
             raise CaptureError(self._capture_message(target, foe))
-        foe.captured = True
-        self._step_onto(target)
-        self._emit("capture", at=list(target))
-        self._check_caught()
+        foe.captured = foe.gone = True
+        self._arrive(target, "capture", at=list(target))
+
+    @_acts
+    def bridge(self) -> None:
+        """Lay a plank over the pit straight ahead, which makes it floor (QA-017)."""
+        target = step(self.pos, self.facing)
+        if not self._open_pit(target) or self.planks == 0:
+            self._emit("bump", at=list(target))
+            raise BridgeError(self._bridge_message(target))
+        self.planks -= 1
+        self.bridged.add(target)
+        self._emit("bridge", at=list(target))
 
     def tick(self, clock: str) -> None:
         """One tick of `clock`: everything that keeps time with it takes its turn."""
         self.ticks[clock] += 1
-        moving = [foe for foe in self.foes if foe.enemy.clock == clock and not foe.captured]
+        moving = [foe for foe in self.foes if foe.enemy.clock == clock and not foe.gone]
         for foe in moving:
             self._advance(foe)
         if clock in self.clocked:
             self._emit("tick")
+        for foe in moving:
+            if foe.enemy.kind == "chaser" and self._open_pit(foe.pos):  # a patrol's route never crosses a pit
+                foe.gone = True
+                self._emit("fall", at=list(foe.pos), message=f"The {foe.enemy.kind} fell into the pit on {square_name(foe.pos)}.")
         if moving:
             self._check_caught()
 
@@ -200,14 +215,29 @@ class World:
                 reply = GUARD_WRONG_ANSWER if gate in self.board.questions else GUARD_WRONG_PHRASE
                 self._emit("guard", at=list(gate), message=reply)
 
-    def _step_onto(self, pos: Pos) -> None:
-        """Move the piece. Crossing a waypoint or a gem counts even when it walks straight on."""
+    @property
+    def gems_collected(self) -> int:
+        return sum(self.board.tile(pos) is Tile.GEM for pos in self.collected)
+
+    def _arrive(self, pos: Pos, kind: str, **details) -> None:
+        """The piece steps onto `pos` (announced as a `kind` event). Waypoints,
+        gems and planks count even when it walks straight on; a pit ends the
+        run, and so does an enemy there."""
         self.pos = pos
         tile = self.board.tile(pos)
+        picked_up = tile is Tile.PLANK and pos not in self.collected
         if tile is Tile.WAYPOINT:
             self.crossed.add(pos)
-        elif tile is Tile.GEM:
+        elif tile in (Tile.GEM, Tile.PLANK):
             self.collected.add(pos)
+        if picked_up:
+            self.planks += 1
+        self._emit(kind, **details)
+        if picked_up:
+            self._emit("pick_up", at=list(pos), message=f"Your {self.level.piece} picked up a plank. It's carrying {count(self.planks, 'plank')}.")
+        if tile is Tile.PIT and pos not in self.bridged:
+            self._lose(f"Your {self.level.piece} fell into the pit on {square_name(pos)}.", pos)
+        self._check_caught()
 
     def _advance(self, foe: Foe) -> None:
         """An enemy's turn: a chaser steps toward the piece, a patrol along its route."""
@@ -239,13 +269,14 @@ class World:
         return pos
 
     def _enemy_can_enter(self, pos: Pos) -> bool:
-        if self.board.blocked(pos) or self.board.tile(pos) is Tile.PIT or self._locked_gate(pos) or self._shut(pos):
+        """Walls and shut gates hold an enemy back. Pits don't: it falls in (see tick)."""
+        if self.board.blocked(pos) or self._locked_gate(pos) or self._shut(pos):
             return False
         return self._foe_at(pos) is None
 
     def _foe_at(self, pos: Pos) -> Foe | None:
-        """The enemy on `pos`, if one is there (captured ones are gone)."""
-        return next((foe for foe in self.foes if not foe.captured and foe.pos == pos), None)
+        """The enemy on `pos`, if one is there (captured and fallen ones are gone)."""
+        return next((foe for foe in self.foes if not foe.gone and foe.pos == pos), None)
 
     def _check_caught(self) -> None:
         if foe := self._foe_at(self.pos):
@@ -257,6 +288,13 @@ class World:
         if foe is None:
             return f"There's nothing to capture on {square_name(target)}."
         return f"The {foe.enemy.kind} on {square_name(target)} is armoured: it can't be captured."
+
+    def _bridge_message(self, target: Pos) -> str:
+        if not self.board.contains(target):
+            return f"There's nothing ahead to bridge: your {self.level.piece} is at the edge of the board."
+        if not self._open_pit(target):
+            return f"Planks only go over pits, and there's no open pit on {square_name(target)}."
+        return f"Your {self.level.piece} has no plank to lay. Walk over one to pick it up."
 
     def _still_playing(self) -> None:
         """A lost run stays lost: the piece can't act again, even if the player's code caught `Lost`."""
@@ -282,6 +320,10 @@ class World:
         line = self.refused[gate]
         said = f"what line {line} printed" if line is not None else "what you said earlier"
         return f"{locked}\nThe guard didn't accept {said}."
+
+    def _open_pit(self, pos: Pos) -> bool:
+        """A pit with no plank over it."""
+        return self.board.tile(pos) is Tile.PIT and pos not in self.bridged
 
     def _open_timed_gates(self) -> set[Pos]:
         return {pos for pos in self.board.timers if not self._shut(pos)}

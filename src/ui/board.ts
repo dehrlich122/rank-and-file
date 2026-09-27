@@ -1,6 +1,6 @@
 // The board, drawn as SVG: squares, tiles (walls, signposts, gates, pits,
-// waypoints, gems, timed gates), the goal, the enemies and their routes (M3.1)
-// and the piece.
+// waypoints, gems, timed gates, planks), the goal, the enemies and their
+// routes (M3.1) and the piece.
 //
 // The board never decides anything. It draws the states the engine reported:
 // `show()` jumps straight to a state, `animate()` plays a step's events in order.
@@ -146,10 +146,12 @@ export class BoardView {
     this.mark("timed_gate", "open", state.opened);
     this.mark("waypoint", "crossed", state.crossed);
     this.mark("gem", "collected", state.collected);
+    this.mark("plank", "collected", state.collected);
+    this.mark("pit", "bridged", state.bridged);
     (state.enemies ?? []).forEach((pos, i) => {
       const enemy = this.enemies[i];
       if (!enemy) return;
-      enemy.classList.toggle("captured", pos === null);
+      enemy.classList.toggle("gone", pos === null);
       if (pos) enemy.style.transform = centre(pos, this.level.height);
     });
     this.element.classList.toggle("lost", Boolean(state.lost));
@@ -234,6 +236,7 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
     return gate(left, top, title, `${clockwork(timer?.clock) ? `${GEAR} ` : ""}every ${every}`, true);
   },
   pit: (left, top) => pit(left, top),
+  plank: (left, top) => plank(left, top, "plank", "A plank. Walk over it to pick it up; bridge() lays it over a pit."),
   waypoint: (left, top) => waypoint(left, top),
   gem: (left, top) => gem(left, top),
 };
@@ -294,7 +297,18 @@ function gate(left: number, top: number, text: string, label = "", timed = false
   return group;
 }
 
-/** A pit (M3.1): stepping in loses the run. */
+/** A plank (QA-017), lying on the floor or laid over a pit (`className` "pit-plank"). */
+function plank(left: number, top: number, className: string, text: string): SVGGElement {
+  const group = svg("g", { class: className });
+  group.append(
+    tooltip(text),
+    svg("rect", { x: left + 8, y: top + S / 2 - 9, width: S - 16, height: 18, rx: 3, class: "plank-wood" }),
+    svg("path", { d: `M ${left + 12} ${top + S / 2 - 3} h ${S - 24} M ${left + 12} ${top + S / 2 + 3} h ${S - 30}`, class: "plank-grain" }),
+  );
+  return group;
+}
+
+/** A pit (M3.1): stepping in loses the run. The `bridged` class shows a plank laid over it (QA-017). */
 function pit(left: number, top: number): SVGGElement {
   const group = svg("g", { class: "pit" });
   const title = tooltip("A pit. Step in and the run is lost.");
@@ -302,6 +316,7 @@ function pit(left: number, top: number): SVGGElement {
     title,
     svg("ellipse", { cx: left + S / 2, cy: top + S / 2, rx: S * 0.42, ry: S * 0.38, class: "pit-rim" }),
     svg("ellipse", { cx: left + S / 2, cy: top + S / 2 + 3, rx: S * 0.33, ry: S * 0.28, class: "pit-hole" }),
+    plank(left, top, "pit-plank", "A pit with a plank over it: safe to cross."),
   );
   return group;
 }

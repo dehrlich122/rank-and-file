@@ -38,7 +38,7 @@ ENEMY_KEYS = {
     "patrol": {"kind", "start", "route", "loop", "clock", "armoured"},
     "chaser": {"kind", "start", "clock", "strategy", "armoured"},
 }
-OPEN_GROUND = (Tile.FLOOR, Tile.WAYPOINT, Tile.GEM)
+OPEN_GROUND = (Tile.FLOOR, Tile.WAYPOINT, Tile.GEM, Tile.PLANK)
 
 # What makes each clock tick, in words: "one square for ..." (M3.1).
 CLOCK_TICKS = {
@@ -145,6 +145,7 @@ class Level:
     # solve too. For levels whose layout varies, e.g. randomized walls.
     variants: list[Level] = field(default_factory=list)
     enemies: list[Enemy] = field(default_factory=list)  # patrols and chasers (M3.1)
+    planks: int = 0  # planks the piece starts with (QA-017)
 
     def cases(self) -> list[Case]:
         """Every situation a solution must handle: one per square a hidden goal
@@ -230,6 +231,10 @@ class Level:
         if pits:
             where = f"A pit on {pits[0]}" if len(pits) == 1 else f"Pits on {and_list(pits)}"
             obstacles.append(f"{where}: step in and the run is lost.")
+            if "bridge" in self.api:
+                obstacles.append("A plank laid over a pit (`bridge()`) makes it safe to cross. Walk over a plank to pick it up.")
+            if any(enemy.kind == "chaser" for enemy in self.enemies):
+                obstacles.append("A chaser doesn't see pits: if its step lands on one, it falls in and is gone.")
         for pos, timer in sorted(self.board.timers.items()):
             obstacles.append(
                 f"The gate on {square_name(pos)} is open at the start, then shut for {count(timer.every - 1, 'tick')}, "
@@ -308,7 +313,7 @@ def parse_level(data: dict) -> Level:
     legend = data.get("legend") or {}
     objectives = _parse_objectives(data.get("objectives", ["reach_goal"]))
     board, start, goal, spots = _parse_board(data["map"], legend, objectives)
-    facing = _parse_facing((data.get("start") or {}).get("facing", "north"))
+    facing, planks = _parse_start(data.get("start") or {})
 
     level = Level(
         id=_text(data, "id"),
@@ -319,6 +324,7 @@ def parse_level(data: dict) -> Level:
         board=board,
         start=start,
         facing=facing,
+        planks=planks,
         goal=goal,
         goal_spots=spots,
         objectives=objectives,
@@ -466,6 +472,16 @@ def _int(data: dict, key: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool):
         raise LevelError(f"{key} must be a whole number")
     return value
+
+
+def _parse_start(start) -> tuple[Direction, int]:
+    """Which way the piece faces at the start, and how many planks it carries."""
+    if not isinstance(start, dict) or set(start) - {"facing", "planks"}:
+        raise LevelError("start takes facing and planks, e.g. {facing: north, planks: 1}")
+    planks = start.get("planks", 0)
+    if not isinstance(planks, int) or isinstance(planks, bool) or planks < 0:
+        raise LevelError("start planks must be a whole number")
+    return _parse_facing(start.get("facing", "north")), planks
 
 
 def _parse_facing(value) -> Direction:

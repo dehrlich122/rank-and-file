@@ -433,3 +433,79 @@ def test_enemies_are_checked(enemy, message):
 def test_the_capture_objective_is_checked():
     with pytest.raises(LevelError, match="isn't armoured"):
         make_level(". .\nP G\n", objectives=[{"capture": "all"}], enemies=[{"kind": "patrol", "start": "a2", "armoured": True}])
+
+
+# -- QA-017: pits that swallow chasers, and planks that bridge them -----------------------
+
+BRIDGE_API = [*API, "bridge"]
+
+
+@pytest.fixture
+def plank_walk():
+    """Pawn on a1 facing east; a plank on b1; a pit on c1; the goal on d1."""
+    return make_level("P L O G\n", legend={"L": "plank", "O": "pit"}, api=BRIDGE_API, start={"facing": "east"})
+
+
+def test_walking_over_a_plank_picks_it_up(plank_walk):
+    result = run_level(plank_walk, "pawn.move()")
+    picked = events(result, "pick_up")
+    assert [(event["at"], event["message"]) for event in picked] == [([1, 0], "Your pawn picked up a plank. It's carrying 1 plank.")]
+    assert result.final["planks"] == 1
+    assert result.final["collected"] == [[1, 0]]
+
+
+def test_a_plank_bridges_the_pit_ahead(plank_walk):
+    result = run_level(plank_walk, "pawn.move()\npawn.bridge()\npawn.move(2)")
+    assert result.status == "solved"
+    assert result.final["bridged"] == [[2, 0]]
+    assert result.final["planks"] == 0
+    assert result.final["tick"] == 4  # the bridge is an action, like a step
+
+
+def test_bridging_needs_a_plank_and_a_pit(plank_walk):
+    none = run_level(make_level("P O G\n", legend={"O": "pit"}, api=BRIDGE_API, start={"facing": "east"}), "pawn.bridge()")
+    assert none.error.type == "BridgeError"
+    assert none.error.friendly == "Your pawn has no plank to lay. Walk over one to pick it up."
+    floor = run_level(plank_walk, "pawn.bridge()")  # b1 has the plank on it, not a pit
+    assert floor.error.friendly == "Planks only go over pits, and there's no open pit on b1."
+    twice = run_level(make_level("P O G\n", legend={"O": "pit"}, api=BRIDGE_API, start={"facing": "east", "planks": 2}), "pawn.bridge()\npawn.bridge()")
+    assert twice.error.friendly == "Planks only go over pits, and there's no open pit on b1."
+    edge = run_level(plank_walk, "pawn.turn_left()\npawn.bridge()")
+    assert edge.error.friendly == "There's nothing ahead to bridge: your pawn is at the edge of the board."
+
+
+def test_a_level_can_hand_out_planks_at_the_start():
+    level = make_level("P O G\n", legend={"O": "pit"}, api=BRIDGE_API, start={"facing": "east", "planks": 1})
+    assert level.describe()["start"]["planks"] == 1
+    assert run_level(level, "pawn.bridge()\npawn.move(2)").status == "solved"
+    with pytest.raises(LevelError, match="start takes facing and planks"):
+        make_level("P G\n", start={"facing": "east", "gems": 1})
+    with pytest.raises(LevelError, match="start planks must be a whole number"):
+        make_level("P G\n", start={"planks": -1})
+
+
+@pytest.fixture
+def pitfall():
+    """Pawn on a1 facing north; a pit on c1; a chaser on d1, with the pit between it and the pawn; the goal on a3."""
+    return make_level("G . . .\n. . . .\nP . O .\n", legend={"O": "pit"}, api=BRIDGE_API, enemies=[{"kind": "chaser", "start": "d1"}])
+
+
+def test_a_chaser_that_steps_into_a_pit_falls_in(pitfall):
+    result = run_level(pitfall, "pawn.wait()\npawn.wait()")
+    fell = events(result, "fall")
+    assert [(event["at"], event["message"]) for event in fell] == [([2, 0], "The chaser fell into the pit on c1.")]
+    assert positions(result)[0] == [[2, 0]]  # the step into the pit is shown, then the fall
+    assert result.final["enemies"] == [None]
+    assert "A chaser doesn't see pits: if its step lands on one, it falls in and is gone." in pitfall.obstacles()
+
+
+def test_a_bridged_pit_is_floor_for_enemies_too():
+    level = make_level("P O . .\n", legend={"O": "pit"}, api=BRIDGE_API, objectives=[{"say": "x"}], start={"facing": "east", "planks": 1},
+                       enemies=[{"kind": "chaser", "start": "d1"}])
+    result = run_level(level, "pawn.bridge()\npawn.wait()")  # the chaser steps to c1, then onto the bridge on b1
+    assert events(result, "fall") == []
+    assert result.final["enemies"] == [[1, 0]]
+
+
+def test_the_obstacles_explain_bridging(plank_walk):
+    assert plank_walk.obstacles()[1] == "A plank laid over a pit (`bridge()`) makes it safe to cross. Walk over a plank to pick it up."
