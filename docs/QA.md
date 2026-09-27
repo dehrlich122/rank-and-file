@@ -1069,8 +1069,30 @@ Item 6 (hidden boards) became QA-016.
      two lines of code, so the clockwork patrol takes two steps.
   3. The same moves copied out: three new lines, three steps.
 
-### QA-021 · Clockwork's patrol seems to stop at a5 instead of turning back · Open
+### QA-021 · Clockwork's patrol seems to stop at a5 instead of turning back · Fixed
 
+- **Fixed** in `16bb3ee` (2026-09-27); awaiting the designer's retest (steps
+  under **Retest**).
+  - A clockwork enemy's gear badge counts its steps: ⚙ 0, ⚙ 1, ⚙ 2… While
+    a loop repeats lines, the count stops, and so does the patrol. A
+    clockwork timed gate's badge counts the same way ("⚙ 2 · every 3").
+  - The Obstacles text for a new-line patrol adds: "While your code only
+    repeats lines that have already run, it stands still." The lesson says
+    it too.
+  - The same commit fixes a slip in QA-020: the lesson's copied-out moves
+    matched Chapter 1 level 1's reference solution word for word. The
+    bundle check caught it. Each copied line now names its round in a
+    comment.
+- **Decided** *(Designer, 2026-09-27)*: show it with a count on the gear,
+  and say it in words. (Not chosen: moving the patrol's start.)
+- **Retest:**
+  - Testing ground → Clockwork. Before running, the patrol's badge reads
+    ⚙ 0.
+  - Run code with a loop. The count goes up only on lines that run for the
+    first time, and stays put, with the patrol, while the loop repeats.
+  - The Obstacles section says it stands still while your code only
+    repeats lines.
+  - On the Learn tab, the second snippet shows the count stopping at 2.
 - **Area:** clockwork obstacles (M3.1 step 4), Testing ground 6 (Clockwork)
 - **Observed** *(Designer, 2026-09-27)*: the patrol stops once it reaches a5,
   instead of turning back and carrying on with its patrol.
