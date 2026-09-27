@@ -1045,6 +1045,22 @@ Item 6 (hidden boards) became QA-016.
     be marked meant to fail.
 - **Retest (extension):** on each of those lessons' Learn tabs, the
   snippet's board shows the obstacle, and running it shows it at work.
+
+### QA-020 · `range()` isn't well explained in Clockwork's lesson · Open
+
+- **Area:** Testing ground 6 (Clockwork), its lesson
+- **Observed** *(Designer, 2026-09-27)*: `range()` isn't well explained in
+  this lesson.
+- **Cause** *(Claude)*: the lesson gives `range(3)` half a sentence ("counts
+  0, 1, 2"). It doesn't say where the numbers stop, what the loop variable
+  holds, or that the repeated lines can be moves.
+- **Plan** *(Claude)*: rewrite the lesson in three steps:
+  1. What `range(3)` hands the loop: 0, 1 and 2, one per round, starting at
+     0 and stopping just before 3, so "three rounds". Each round, the loop
+     variable holds that round's number (printed).
+  2. A loop of moves: the pawn walks three squares, but the loop is only
+     two lines of code, so the clockwork patrol takes two steps.
+  3. The same moves copied out: three new lines, three steps.
 - **Retest:**
   - Testing ground → Pursuit, Learn tab. Each snippet's board shows the
     chaser and the wall. Run the first: the pawn turns, and the chaser

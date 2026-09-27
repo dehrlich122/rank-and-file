@@ -1,18 +1,25 @@
 # Clockwork and loops
 
-A patrol with a gear badge is **clockwork**. It doesn't keep time with your pawn: your code winds it up. It takes one step each time a line of your code runs for the first time. A line that runs again doesn't wind it.
+A patrol with a gear badge is **clockwork**: your code winds it up, not your pawn. It takes one step each time a line of your code runs *for the first time*. A line that runs again doesn't wind it.
 
-A `for` loop runs the lines indented under it again and again. `range(3)` counts 0, 1, 2, so the indented line runs three times, but it's new only the first time. Watch the patrol: two new lines, two steps.
+A `for` loop repeats the lines indented under it. `range(3)` hands the loop the numbers 0, 1 and 2, one per round. It starts at 0 and stops just before 3, so `range(3)` means three rounds. Each round, `step` holds that round's number:
 
 ```python run
 for step in range(3):
-    print("This line runs again:", step)
+    print("Round", step)
 ```
 
-The same three prints, copied out, are three new lines, and three steps:
+The indented lines can be moves. Your pawn walks three squares, but the loop is only two lines of code, so the patrol takes two steps:
 
 ```python run
-print("One")
-print("Two")
-print("Three")
+for step in range(3):
+    pawn.move()
+```
+
+The same moves copied out are three new lines, and three steps:
+
+```python run
+pawn.move()
+pawn.move()
+pawn.move()
 ```
