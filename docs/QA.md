@@ -1025,6 +1025,14 @@ Item 6 (hidden boards) became QA-016.
   - Other obstacle lessons (The Sentry's Round, Clockwork, Portcullis, The
     Capture) still use the plain board. They can get boards of their own
     if wanted.
+- **Retest:**
+  - Testing ground → Pursuit, Learn tab. Each snippet's board shows the
+    chaser and the wall. Run the first: the pawn turns, and the chaser
+    stays behind the wall. Run the second: the chaser moves round the wall
+    toward the pawn, step by step.
+  - Testing ground → Pitfall, Learn tab. Run the snippet: the chaser steps
+    into the pit and disappears. Under the snippet, "The chaser fell into
+    the pit on c2." appears before the printed line.
 - **Decided** *(Designer, 2026-09-27)*: yes. As new obstacles or
   interactions are introduced, they're shown in the sample code. The rule
   is in `CLAUDE.md`.
@@ -1045,6 +1053,23 @@ Item 6 (hidden boards) became QA-016.
     be marked meant to fail.
 - **Retest (extension):** on each of those lessons' Learn tabs, the
   snippet's board shows the obstacle, and running it shows it at work.
+
+- **Area:** lesson snippets (M1), Testing ground 5 (Pursuit)
+- **Observed** *(Designer, 2026-09-27)*: Pursuit's sample code doesn't make
+  any sense. It should show the chaser at work as the code runs.
+- **Cause** *(Claude)*: every lesson snippet runs on the same small, empty
+  board. Pursuit's snippet just walks the pawn about. Pitfall's is worse: it
+  prints "The chaser took two steps" on a board with no chaser.
+- **Plan** *(Claude)*:
+  - A level can give its lesson a board (`lesson_board`: map, legend,
+    enemies, start). The level checker validates it like the level's own
+    map. Levels without one keep the plain board.
+  - Pursuit and Pitfall get boards with a chaser, and snippets that show it
+    moving: for Pursuit, stepping toward the pawn and held by a wall; for
+    Pitfall, falling into a pit.
+  - Snippets show the game's messages (e.g. "The chaser fell into the pit")
+    under their output, as the level's console does. A snippet that ends
+    in a loss reads "Lost", not "Python stopped".
 
 ### QA-020 · `range()` isn't well explained in Clockwork's lesson · Fixed
 
@@ -1108,30 +1133,34 @@ Item 6 (hidden boards) became QA-016.
   - Nothing on the board shows that it's waiting for a new line. The
     Obstacles text says what moves it, but not that it stands still
     otherwise.
-- **Retest:**
-  - Testing ground → Pursuit, Learn tab. Each snippet's board shows the
-    chaser and the wall. Run the first: the pawn turns, and the chaser
-    stays behind the wall. Run the second: the chaser moves round the wall
-    toward the pawn, step by step.
-  - Testing ground → Pitfall, Learn tab. Run the snippet: the chaser steps
-    into the pit and disappears. Under the snippet, "The chaser fell into
-    the pit on c2." appears before the printed line.
-- **Area:** lesson snippets (M1), Testing ground 5 (Pursuit)
-- **Observed** *(Designer, 2026-09-27)*: Pursuit's sample code doesn't make
-  any sense. It should show the chaser at work as the code runs.
-- **Cause** *(Claude)*: every lesson snippet runs on the same small, empty
-  board. Pursuit's snippet just walks the pawn about. Pitfall's is worse: it
-  prints "The chaser took two steps" on a board with no chaser.
-- **Plan** *(Claude)*:
-  - A level can give its lesson a board (`lesson_board`: map, legend,
-    enemies, start). The level checker validates it like the level's own
-    map. Levels without one keep the plain board.
-  - Pursuit and Pitfall get boards with a chaser, and snippets that show it
-    moving: for Pursuit, stepping toward the pawn and held by a wall; for
-    Pitfall, falling into a pit.
-  - Snippets show the game's messages (e.g. "The chaser fell into the pit")
-    under their output, as the level's console does. A snippet that ends
-    in a loss reads "Lost", not "Python stopped".
+
+
+### QA-022 · Is The Toll teaching variables? · Fixed
+
+- **Fixed** (2026-09-27, commit below); awaiting the designer's retest.
+  - The lesson snippet prints the answer directly (`print(2)`), with no
+    variable, and the text says where to stand.
+  - Counting gems in a variable is noted in `docs/M3.md` as an idea for
+    Chapter 2's level specs.
+- **Decided** *(Designer, 2026-09-27)*: drop the variable, and keep the level
+  about its two mechanics.
+- **Retest:** Testing ground → The Toll, Learn tab. The snippet collects two
+  gems, prints 2 next to the gate, and walks through. Nothing mentions
+  variables.
+
+- **Area:** Testing ground 8 (The Toll), its lesson
+- **Asked** *(Designer, 2026-09-27)*: is The Toll supposed to teach creating
+  variables? Neither the lesson nor the Challenge information makes it
+  clear.
+- **Answer** *(Claude)*: no. It's a Testing-ground level for two mechanics,
+  collecting gems and a guard who asks a question.
+  - Printing the answer directly passes the guard; no variable is needed.
+  - The Trains line and the goals don't mention variables.
+  - The confusion came from the lesson snippet written for QA-019
+    (`gems = 2`, then `print(gems)`). It brings in a variable with no
+    explanation.
+  - Variables belong to Chapter 2 (M3.2), where counting gems in a variable
+    fits naturally.
 
 ---
 
