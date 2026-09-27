@@ -1046,8 +1046,14 @@ Item 6 (hidden boards) became QA-016.
 - **Retest (extension):** on each of those lessons' Learn tabs, the
   snippet's board shows the obstacle, and running it shows it at work.
 
-### QA-020 · `range()` isn't well explained in Clockwork's lesson · Open
+### QA-020 · `range()` isn't well explained in Clockwork's lesson · Fixed
 
+- **Fixed** in `1c19fa3` (2026-09-27); awaiting the designer's retest.
+- **Retest:** Testing ground → Clockwork, Learn tab. It's three steps now:
+  - `range(3)` and the numbers it hands the loop, printed round by round.
+  - A loop of moves: the pawn walks three squares, and the clockwork
+    patrol takes two steps.
+  - The same moves copied out: the patrol takes three.
 - **Area:** Testing ground 6 (Clockwork), its lesson
 - **Observed** *(Designer, 2026-09-27)*: `range()` isn't well explained in
   this lesson.
