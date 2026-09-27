@@ -893,8 +893,9 @@ Item 6 (hidden boards) became QA-016.
 
 ## Session 5 — 2026-09-27 · M3.1 play-test (`m3-1-toolkit`, PR #8)
 
-### QA-017 · Pits are too much like walls · Fixed
+### QA-017 · Pits are too much like walls · Verified
 
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
 - **Fixed** in `15a0499` (2026-09-27); awaiting the designer's retest (steps
   under **Retest**).
   - A chaser whose step lands on an open pit falls in and is gone. The
@@ -964,8 +965,9 @@ Item 6 (hidden boards) became QA-016.
       pits are the way to be rid of it.
   - The Obstacles text explains both rules.
 
-### QA-018 · The idiomatic solution can be copied for three stars · Fixed
+### QA-018 · The idiomatic solution can be copied for three stars · Verified
 
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
 - **Fixed** in `120930a` (2026-09-27); awaiting the designer's retest (steps
   under **Retest**).
   - The third star is now "No hints or solution seen". A run that misses it
@@ -1010,8 +1012,9 @@ Item 6 (hidden boards) became QA-016.
   - Best stars are never taken back. A level solved with three stars keeps
     them after its solution is viewed.
 
-### QA-019 · Pursuit's lesson snippet has no chaser in it · Fixed
+### QA-019 · Pursuit's lesson snippet has no chaser in it · Verified
 
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
 - **Fixed** in `e3e7a76` (2026-09-27); awaiting the designer's retest (steps
   under **Retest**).
   - A level can give its lesson a board of its own (`lesson_board`).
@@ -1071,8 +1074,9 @@ Item 6 (hidden boards) became QA-016.
     under their output, as the level's console does. A snippet that ends
     in a loss reads "Lost", not "Python stopped".
 
-### QA-020 · `range()` isn't well explained in Clockwork's lesson · Fixed
+### QA-020 · `range()` isn't well explained in Clockwork's lesson · Verified
 
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
 - **Fixed** in `1c19fa3` (2026-09-27); awaiting the designer's retest.
 - **Retest:** Testing ground → Clockwork, Learn tab. It's three steps now:
   - `range(3)` and the numbers it hands the loop, printed round by round.
@@ -1094,8 +1098,9 @@ Item 6 (hidden boards) became QA-016.
      two lines of code, so the clockwork patrol takes two steps.
   3. The same moves copied out: three new lines, three steps.
 
-### QA-021 · Clockwork's patrol seems to stop at a5 instead of turning back · Fixed
+### QA-021 · Clockwork's patrol seems to stop at a5 instead of turning back · Verified
 
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
 - **Fixed** in `16bb3ee` (2026-09-27); awaiting the designer's retest (steps
   under **Retest**).
   - A clockwork enemy's gear badge counts its steps: ⚙ 0, ⚙ 1, ⚙ 2… While
@@ -1135,8 +1140,9 @@ Item 6 (hidden boards) became QA-016.
     otherwise.
 
 
-### QA-022 · Is The Toll teaching variables? · Fixed
+### QA-022 · Is The Toll teaching variables? · Verified
 
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
 - **Fixed** in `fc26f1a` (2026-09-27); awaiting the designer's retest.
   - The lesson snippet prints the answer directly (`print(2)`), with no
     variable, and the text says where to stand.
@@ -1163,8 +1169,9 @@ Item 6 (hidden boards) became QA-016.
     fits naturally.
 
 
-### QA-023 · The Toll teaches nothing that level 1.4 didn't · Fixed
+### QA-023 · The Toll teaches nothing that level 1.4 didn't · Verified
 
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
 - **Fixed** in `656ab0f` (2026-09-27); awaiting the designer's retest.
   - The Toll's Trains line and brief now say it's a demo of two mechanics
     that teaches nothing beyond level 1.4, and that both come into their
@@ -1193,8 +1200,9 @@ Item 6 (hidden boards) became QA-016.
     different message).
 
 
-### QA-024 · Portcullis: a gate that shuts on the pawn should crush it · Fixed
+### QA-024 · Portcullis: a gate that shuts on the pawn should crush it · Verified
 
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
 - **Fixed** in `bc8c4b1` (2026-09-27); awaiting the designer's retest (steps
   under **Retest**).
   - A timed gate is open for its first `open` ticks (default 2) of every

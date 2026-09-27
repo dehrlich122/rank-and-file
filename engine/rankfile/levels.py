@@ -41,7 +41,12 @@ ENEMY_KEYS = {
 OPEN_GROUND = (Tile.FLOOR, Tile.WAYPOINT, Tile.GEM, Tile.PLANK)
 
 # What a code clock does while the code only repeats lines that have already run (QA-021).
-CLOCK_STILL = {"new_line": " While your code only repeats lines that have already run, it stands still."}
+CLOCK_STILL = {"new_line": " While your code only repeats lines that have already run, it {still}."}
+
+
+def clock_still(clock: str, still: str = "stands still") -> str:
+    """The sentence about what a code-clocked obstacle does while lines repeat ("" for other clocks)."""
+    return CLOCK_STILL.get(clock, "").format(still=still)
 
 # What makes each clock tick, in words: "one square for ..." (M3.1).
 CLOCK_TICKS = {
@@ -109,7 +114,7 @@ class Enemy:
                 f"A chaser starts on {start}. It steps one square toward you for {ticks}: along the rank or "
                 "the file, whichever gap is bigger (east or west when they're equal). If that way is blocked "
                 "it tries the other, and if both are blocked it waits."
-            ) + CLOCK_STILL.get(self.clock, "")
+            ) + clock_still(self.clock)
         elif len(self.path) == 1:
             text = f"A patrol stands guard on {start}."
         else:
@@ -118,7 +123,7 @@ class Enemy:
                 way = " to ".join([*corners, corners[0]]) + ", round and round"
             else:
                 way = " to ".join(corners) + " and back"
-            text = f"A patrol starts on {start} and walks {way}, one square for {ticks}.{CLOCK_STILL.get(self.clock, '')}"
+            text = f"A patrol starts on {start} and walks {way}, one square for {ticks}.{clock_still(self.clock)}"
         return f"{text} It's armoured: it can't be captured." if self.armoured else text
 
 
@@ -207,8 +212,8 @@ class Level:
 
     @property
     def nothing_to_do(self) -> bool:
-        """No objectives at all, e.g. on the sandbox board: a run just finishes.
-        (Waypoints on the map are always an objective, listed or not.)"""
+        """No objectives at all: a run just finishes. (Waypoints on the map are
+        always an objective, listed or not. Lesson snippets are never judged.)"""
         return self.objectives.empty and not self.board.squares(Tile.WAYPOINT)
 
     @property
@@ -239,12 +244,7 @@ class Level:
                 obstacles.append("A plank laid over a pit (`bridge()`) makes it safe to cross. Walk over a plank to pick it up.")
             if any(enemy.kind == "chaser" for enemy in self.enemies):
                 obstacles.append("A chaser doesn't see pits: if its step lands on one, it falls in and is gone.")
-        for pos, timer in sorted(self.board.timers.items()):
-            obstacles.append(
-                f"The gate on {square_name(pos)} is open for {count(timer.open, 'tick')}, then shut for "
-                f"{count(timer.every - timer.open, 'tick')}, over and over, starting open. It ticks once for "
-                f"{CLOCK_TICKS[timer.clock]}. Anything under it when it shuts is crushed: if that's you, the run is lost."
-            )
+        obstacles.extend(gate_rule(pos, timer) for pos, timer in sorted(self.board.timers.items()))
         obstacles.extend(enemy.describe() for enemy in self.enemies)
         if self.enemies:
             obstacles.append("If an enemy lands on your square, or you walk into one, you're caught and the run is lost.")
@@ -274,7 +274,7 @@ class Level:
             ],
             "signs": [{"pos": list(pos), "text": text} for pos, text in self.board.signs.items()],
             "questions": [{"pos": list(pos), "text": text} for pos, text in self.board.questions.items()],
-            "timed_gates": [{"pos": list(pos), **asdict(timer)} for pos, timer in self.board.timers.items()],
+            "timed_gates": [{"pos": list(pos), **asdict(timer), "text": gate_rule(pos, timer)} for pos, timer in self.board.timers.items()],
             "enemies": [
                 {"kind": enemy.kind, "route": [list(pos) for pos in enemy.route], "loop": enemy.loop, "clock": enemy.clock, "armoured": enemy.armoured}
                 for enemy in self.enemies
@@ -436,8 +436,9 @@ def _parse_details(symbol: str, tile: Tile, meaning: dict) -> dict:
             _check_clock(f"legend {symbol!r}", value)
         elif not isinstance(value, str) or not value:
             raise LevelError(f"legend {symbol!r}: a {tile.value} needs {key}")
-    if tile is Tile.TIMED_GATE and details["every"] <= details.get("open", Timer.open):
-        raise LevelError(f"legend {symbol!r}: a timed gate's every must be more than its open ({details.get('open', Timer.open)}), or it would never shut")
+    open_for = details.get("open", Timer.open)
+    if tile is Tile.TIMED_GATE and details["every"] <= open_for:
+        raise LevelError(f"legend {symbol!r}: a timed gate's every must be more than its open ({open_for}), or it would never shut")
     return details
 
 
@@ -453,15 +454,14 @@ class Case:
 def sandbox_level(api: list[str], piece: str = "pawn", lesson_board: dict | None = None) -> Level:
     """The board lesson snippets run on: a small open one, or the level's own
     `lesson_board` (a map, legend, enemies and start: QA-019). Snippets have no
-    objectives, so a run just finishes."""
-    board = Board(width=5, height=4)
+    objectives: runner.run_sandbox never judges a run."""
     level = Level(
         id="sandbox",
         chapter=0,
         title="Sandbox",
         trains="",
         piece=piece,
-        board=board,
+        board=Board(width=5, height=4),
         start=(2, 0),
         facing=Direction.NORTH,
         goal=None,
@@ -475,10 +475,20 @@ def sandbox_level(api: list[str], piece: str = "pawn", lesson_board: dict | None
         raise LevelError("a lesson board takes map, legend, enemies and start")
     board, start, goal, _spots = parse_map(lesson_board.get("map"), lesson_board.get("legend") or {})
     facing, planks = _parse_start(lesson_board.get("start") or {})
-    level = replace(level, board=board, start=start, goal=goal, facing=facing, planks=planks)
-    level.enemies = _parse_enemies(lesson_board.get("enemies") or [])
+    enemies = _parse_enemies(lesson_board.get("enemies") or [])
+    level = replace(level, board=board, start=start, goal=goal, facing=facing, planks=planks, enemies=enemies)
     _check_enemies(level)
     return level
+
+
+def gate_rule(pos: Pos, timer: Timer) -> str:
+    """A timed gate's rule, in words: the Obstacles text and the gate's tooltip (QA-024)."""
+    return (
+        f"The gate on {square_name(pos)} is open for {count(timer.open, 'tick')}, then shut for "
+        f"{count(timer.every - timer.open, 'tick')}, over and over, starting open. It ticks once for "
+        f"{CLOCK_TICKS[timer.clock]}.{clock_still(timer.clock, 'doesn’t open or shut')} Anything under it "
+        "when it shuts is crushed: if that's you, the run is lost."
+    )
 
 
 def names(squares: list[Pos]) -> list[str]:

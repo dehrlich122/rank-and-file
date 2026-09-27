@@ -30,7 +30,7 @@ from rankfile.exceptions import GameError, Lost  # noqa: E402
 from rankfile.levels import Level, parse_level  # noqa: E402
 from rankfile.pieces import PIECES  # noqa: E402
 from rankfile.runner import unmet_objectives  # noqa: E402
-from rankfile.world import CODE_CLOCKS, World  # noqa: E402
+from rankfile.world import World  # noqa: E402
 
 MAX_STATES = 400_000
 CALLS = ("move", "turn_left", "turn_right", "wait", "capture_left", "capture_right", "bridge")
@@ -43,7 +43,7 @@ def fewest_lines(level: Level) -> list[tuple] | None:
     a step right after a step is free, anything else costs a line.
     """
     start = World(level)
-    if start.clocked & CODE_CLOCKS:
+    if start.code_clocked:
         raise ValueError(f"{level.id}: clockwork obstacles depend on how the code is written; solve it by hand")
     actions = _actions(level)
     first = _key(start, "", "")

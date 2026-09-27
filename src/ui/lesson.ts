@@ -12,9 +12,20 @@ import type { LevelInfo, LevelResult } from "../py/protocol";
 import { BoardView } from "./board";
 import { h } from "./dom";
 import { createEditor, getCode, setActiveLine, setErrorLine } from "./editor";
-import { errorCard } from "./panels";
+import { errorCard, logNodes } from "./panels";
 import { Player, buildFrames, consoleAt } from "./playback";
 import { settings } from "../settings";
+
+/** How a snippet's run ended, beside its Run button. (Snippets are never judged: see runner.run_sandbox.) */
+const SNIPPET_STATUS: Record<LevelResult["status"], string> = {
+  finished: "✓ Finished",
+  solved: "✓ Finished",
+  incomplete: "✓ Finished",
+  lost: "✗ Lost",
+  error: "✗ Python stopped",
+  timeout: "⏱ Stopped",
+  constraint: "✗ Python stopped",
+};
 
 export interface LessonContext {
   client: PyClient;
@@ -148,8 +159,7 @@ class Snippet {
     try {
       const level = await this.loadSandbox();
       const board = this.showBoard(level);
-      const { api, board: lessonBoard } = this.context;
-      const result = await this.context.client.call("runSandbox", { code: getCode(this.editor), api, board: lessonBoard });
+      const result = await this.context.client.call("runSandbox", { code: getCode(this.editor), api: this.context.api, board: this.context.board });
       this.play(result, board);
     } catch (error) {
       this.status.textContent =
@@ -170,7 +180,7 @@ class Snippet {
       setActiveLine(this.editor, frame.step?.line ?? null);
       // What the program printed, and what the game said (e.g. a chaser falling), as in the level's console.
       const log = consoleAt(frame);
-      this.output.replaceChildren(...log.map((entry) => (entry.kind === "game" ? h("span", { class: "game-message" }, entry.text) : entry.text)));
+      this.output.replaceChildren(...logNodes(log));
       this.output.hidden = log.length === 0;
       if (index === last) this.finish(result);
       else this.status.textContent = `Line ${frame.step?.line ?? "–"}`;
@@ -181,12 +191,10 @@ class Snippet {
 
   private finish(result: LevelResult): void {
     setActiveLine(this.editor, null);
+    this.status.textContent = SNIPPET_STATUS[result.status];
     if (result.error) {
-      this.status.textContent = result.status === "timeout" ? "⏱ Stopped" : result.status === "lost" ? "✗ Lost" : "✗ Python stopped";
       setErrorLine(this.editor, result.error.line);
       this.errorHost.replaceChildren(errorCard(result.error));
-    } else {
-      this.status.textContent = "✓ Finished";
     }
   }
 

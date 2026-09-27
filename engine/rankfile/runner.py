@@ -106,9 +106,10 @@ def run_level(
     enforce_constraints: bool = True,
     hints_used: int = 0,
     solution_seen: bool = False,
+    judge: bool = True,
 ) -> LevelResult:
     cases = level.cases()
-    result = _run_board(cases[0].level, code, line_budget=line_budget, enforce_constraints=enforce_constraints)
+    result = _run_board(cases[0].level, code, line_budget=line_budget, enforce_constraints=enforce_constraints, judge=judge)
     # Code that never ran (it broke a rule, or has a syntax error) or never
     # ended would do the same in every case, so it's reported once.
     never_ran = result.status in ("constraint", "error") and result.lines_run == 0
@@ -136,7 +137,7 @@ def _whole_run(level: Level, cases: list[Case], results: list[LevelResult]) -> L
     return replace(results[shown], steps=[], output="", cases=recorded, case=shown, case_note=note)
 
 
-def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints: bool) -> LevelResult:
+def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints: bool, judge: bool = True) -> LevelResult:
     """One run of `code` on one board: check it, run it, and judge the outcome."""
     started = time.perf_counter()
     world = World(level)
@@ -180,7 +181,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
         info = explain(run.error, namespace)
         status = "timeout" if isinstance(run.error, StepBudgetExceeded) else "error"
         return outcome(status, info.friendly, error=info, **recording)
-    if level.nothing_to_do:
+    if not judge or level.nothing_to_do:
         return outcome("finished", "Finished.", **recording)
     unmet = unmet_objectives(level, world, run.output)
     if unmet:
@@ -189,8 +190,9 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
 
 
 def run_sandbox(code: str, api: list[str], piece: str = "pawn", lesson_board: dict | None = None) -> LevelResult:
-    """Run a lesson snippet with the given abilities, on a small open board or the level's lesson board."""
-    return run_level(sandbox_level(api, piece, lesson_board), code, enforce_constraints=False)
+    """Run a lesson snippet with the given abilities, on a small open board or the
+    level's lesson board. Snippets have no objectives: a run just finishes (or fails, or loses)."""
+    return run_level(sandbox_level(api, piece, lesson_board), code, enforce_constraints=False, judge=False)
 
 
 def score(level: Level, code_lines: int, hints_used: int, solution_seen: bool = False) -> list[Star]:

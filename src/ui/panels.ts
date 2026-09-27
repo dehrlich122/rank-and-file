@@ -47,7 +47,7 @@ export class Console {
   show(log: LogEntry[]): void {
     if (log.length) {
       this.element.replaceChildren(
-        ...log.map((entry) => (entry.kind === "game" ? h("span", { class: "game-message" }, entry.text) : entry.text)),
+        ...logNodes(log),
       );
       this.element.classList.remove("empty");
     } else {
@@ -56,6 +56,11 @@ export class Console {
     }
     this.element.scrollTop = this.element.scrollHeight;
   }
+}
+
+/** What was printed as text, and what the game said as highlighted lines: the console's and snippets' contents. */
+export function logNodes(log: LogEntry[]): Array<string | HTMLElement> {
+  return log.map((entry) => (entry.kind === "game" ? h("span", { class: "game-message" }, entry.text) : entry.text));
 }
 
 /** A card describing how an error happened, with the real traceback tucked away. */

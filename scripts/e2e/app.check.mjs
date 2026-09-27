@@ -364,7 +364,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(d["practice-04"].enemies === 1 && d["practice-04"].routes === 1 && d["practice-04"].obstacles === 2, `patrol: ${JSON.stringify(d["practice-04"])}`);
     expect(d["practice-05"].badges.includes("chases") && d["practice-05"].routes === 0, `chaser: ${JSON.stringify(d["practice-05"])}`);
     expect(d["practice-06"].badges.some((text) => text.startsWith("⚙")), `clockwork: ${JSON.stringify(d["practice-06"])}`);
-    expect(d["practice-07"].timed === 2 && d["practice-07"].badges.join() === "every 3,every 4", `timed gates: ${JSON.stringify(d["practice-07"])}`);
+    expect(d["practice-07"].timed === 2 && d["practice-07"].badges.join() === "2 of 3,2 of 4", `timed gates: ${JSON.stringify(d["practice-07"])}`);
     expect(d["practice-08"].gems === 3 && d["practice-08"].badges.includes("?"), `gems and the guard: ${JSON.stringify(d["practice-08"])}`);
     expect(d["practice-09"].enemies === 2 && d["practice-09"].armoured === 1, `capture: ${JSON.stringify(d["practice-09"])}`);
     return Object.entries(d).map(([id, x]) => `${id}: ${x.obstacles} rules`).join(", ");
@@ -438,6 +438,75 @@ export default async function appChecks({ browser: b, base, root, check }) {
     const r = await run();
     expect(r.head === "Python stopped" && r.text.includes("Planks only go over pits, and there's no open pit on c2."), brief(r));
     return brief(r);
+  });
+
+  // -- QA-019 to QA-024: lesson boards, clockwork counts, crushing gates -----------------------
+  // Statuses, counts and the game's messages only: never a snippet's or a level's code.
+  const snippet = (index) => `document.querySelectorAll('.lesson .snippet')[${index}]`;
+  /** Run a lesson snippet (counting from 0), wait for it to end, and describe how it ended. */
+  async function runSnippet(index, { settle = false } = {}) {
+    await b.evaluate(`${snippet(index)}.querySelector('.btn').click()`);
+    await b.waitFor(`/Finished|Lost|stopped/i.test(${snippet(index)}.querySelector('.snippet-status').textContent)`, 20_000, "snippet ended");
+    if (settle) await sleep(1500); // the status shows as the last line starts; its moves animate just after
+    return snippetBoard(index);
+  }
+  const snippetBoard = (index) =>
+    b.evaluate(`(() => {
+      const s = ${snippet(index)};
+      return {
+        status: s.querySelector('.snippet-status').textContent,
+        said: [...s.querySelectorAll('.snippet-output .game-message')].map((e) => e.textContent),
+        enemies: [...s.querySelectorAll('.board .enemy:not(.gone)')].map((e) => e.style.transform),
+        badges: [...s.querySelectorAll('.board .badge-text')].map((e) => e.textContent),
+      };
+    })()`);
+  const gearCount = (text = "") => /^⚙\uFE0E? (\d+)$/.exec(text)?.[1];
+
+  await check("QA-019: Pursuit's lesson snippets have a chaser, and it moves as the code runs", async () => {
+    await openLevel("practice-05", { fresh: true });
+    await b.waitFor(`${snippet(1)}.querySelector('.board .enemy')`, 20_000, "the lesson board");
+    const before = await snippetBoard(1);
+    const after = await runSnippet(1, { settle: true });
+    expect(before.enemies.length === 1 && after.enemies.length === 1 && before.enemies[0] !== after.enemies[0], `chaser: ${JSON.stringify([before.enemies, after.enemies])}`);
+    expect(after.status.includes("Finished"), after.status);
+  });
+
+  await check("QA-019: snippets show the game's messages, and one meant to lose reads Lost", async () => {
+    await openLevel("practice-10", { fresh: true });
+    const pitfall = await runSnippet(0, { settle: true });
+    await openLevel("practice-02", { fresh: true });
+    const stones = await runSnippet(0);
+    expect(pitfall.said.includes("The chaser fell into the pit on c2.") && pitfall.enemies.length === 0, JSON.stringify(pitfall));
+    expect(stones.status.includes("Lost") && stones.said.includes("Your pawn fell into the pit on c1."), JSON.stringify(stones));
+    return `${pitfall.status} / ${stones.status}`;
+  });
+
+  await check("QA-021: a clockwork patrol's gear counts only the lines that run for the first time", async () => {
+    await openLevel("practice-06", { fresh: true });
+    const start = (await drawn()).badges;
+    await setCode("for i in range(5):\n    x = i\n"); // two new lines, the second run five times
+    await run();
+    const end = (await drawn()).badges;
+    const looped = await runSnippet(1, { settle: true }); // the lesson's loop of moves
+    expect(gearCount(start[0]) === "0" && gearCount(end[0]) === "2", `gear before and after: ${JSON.stringify([start, end])}`);
+    expect(gearCount(looped.badges[0]) === "2", `the lesson's loop: ${JSON.stringify(looped.badges)}`);
+    return `${start[0]} → ${end[0]}`;
+  });
+
+  await check("QA-024: Portcullis crushes a pawn under a shutting gate, and its lesson shows bump, crush and pass", async () => {
+    await openLevel("practice-07", { fresh: true });
+    await setCode("pawn.move(2)\n"); // into the first gate on its last open tick
+    const r = await run();
+    const lesson = [await runSnippet(0), await runSnippet(1), await runSnippet(2)].map((s) => s.status);
+    expect(r.head === "Lost" && r.text.includes("Your pawn was crushed by the gate on c1."), brief(r));
+    expect(/stopped/.test(lesson[0]) && lesson[1].includes("Lost") && lesson[2].includes("Finished"), JSON.stringify(lesson));
+    return lesson.join(" / ");
+  });
+
+  await check("QA-023: The Toll says it's a demo with nothing new to learn", async () => {
+    await levelCards();
+    const card = await b.evaluate(`document.querySelector('a[href="#/level/practice-08"]').innerText`);
+    expect(card.includes("A demo of gems and a guard who asks a question"), card);
   });
 
   // -- QA-002: level 4's locked gate --------------------------------------------------------

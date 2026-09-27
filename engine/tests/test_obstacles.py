@@ -220,7 +220,8 @@ def test_a_gate_that_shuts_on_a_chaser_crushes_it():
 
 def test_a_level_sets_how_long_a_gate_stays_open():
     level = make_level("P T G\n", legend={"T": {"tile": "timed_gate", "every": 5, "open": 3}}, api=API, start={"facing": "east"})
-    assert level.describe()["timed_gates"] == [{"pos": [1, 0], "every": 5, "clock": "action", "open": 3}]
+    gate = level.describe()["timed_gates"][0]
+    assert (gate["pos"], gate["every"], gate["open"]) == ([1, 0], 5, 3)
     assert run_level(level, "pawn.wait()\npawn.move(2)").status == "solved"  # in on tick 1, out on tick 2: still open
 
 
@@ -241,7 +242,9 @@ def test_the_new_line_clock_ticks_once_per_line():
 def test_timed_gates_are_described():
     level = make_level("P T G\n", legend={"T": {"tile": "timed_gate", "every": 3}}, start={"facing": "east"})
     described = level.describe()
-    assert described["timed_gates"] == [{"pos": [1, 0], "every": 3, "clock": "action", "open": 2}]
+    gate = described["timed_gates"][0]
+    assert {key: gate[key] for key in ("pos", "every", "clock", "open")} == {"pos": [1, 0], "every": 3, "clock": "action", "open": 2}
+    assert gate["text"] == described["obstacles"][0]  # the tooltip says what the Obstacles section says
     assert described["obstacles"] == [
         "The gate on b1 is open for 2 ticks, then shut for 1 tick, over and over, starting open. "
         "It ticks once for each square you move, each turn and each wait. "

@@ -53,7 +53,7 @@ export interface LevelInfo {
   tiles: TileKind[][]; // tiles[y][x]; y = 0 is the bottom rank
   signs: Array<{ pos: Pos; text: string }>;
   questions: Array<{ pos: Pos; text: string }>; // what the guard asks, at gates that ask (never the answer)
-  timed_gates: Array<{ pos: Pos; every: number; open: number; clock: Clock }>; // open for the first `open` ticks of every `every` (QA-024)
+  timed_gates: Array<{ pos: Pos; every: number; open: number; clock: Clock; text: string }>; // open for the first `open` ticks of every `every` (QA-024); text: its rule in words
   enemies: Enemy[]; // patrols and chasers; where they are is in each WorldState
   goal: Pos | null;
   goal_spots: Pos[]; // a hidden goal: the squares it might be on (drawn as ?)

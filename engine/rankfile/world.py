@@ -178,11 +178,12 @@ class World:
     def tick(self, clock: str) -> None:
         """One tick of `clock`: everything that keeps time with it takes its turn."""
         self.ticks[clock] += 1
+        if clock not in self.clocked:
+            return  # nothing keeps time with it (e.g. the line clock on a new_line level)
         moving = [foe for foe in self.foes if foe.enemy.clock == clock and not foe.gone]
         for foe in moving:
             self._advance(foe)
-        if clock in self.clocked:
-            self._emit("tick")
+        self._emit("tick")
         for foe in moving:
             if foe.enemy.kind == "chaser" and self._open_pit(foe.pos):  # a patrol's route never crosses a pit
                 foe.gone = True
@@ -264,7 +265,7 @@ class World:
         """Anything under a timed gate on `clock` that is now shut is crushed (QA-024):
         a chaser is gone, and the piece loses the run."""
         for pos, timer in self.board.timers.items():
-            if timer.clock != clock or not self._shut(pos):
+            if timer.clock != clock or timer.is_open(self.ticks[clock]):
                 continue
             if foe := self._foe_at(pos):  # only a chaser can be under a gate: patrol routes avoid them
                 foe.gone = True

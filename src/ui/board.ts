@@ -80,7 +80,7 @@ export class BoardView {
 
     // Enemies (M3.1): every patrol's route, dotted, and the enemies themselves, under the piece.
     for (const enemy of level.enemies) if (enemy.route.length > 1) squares.append(route(enemy, height));
-    this.enemies = level.enemies.map((enemy) => enemyPiece(enemy));
+    this.enemies = level.enemies.map((enemy) => enemyPiece(enemy, level));
 
     this.flash = svg("rect", { class: "bump-flash", width: S, height: S, x: 0, y: 0 });
     this.element.append(this.flash, ...this.enemies);
@@ -237,11 +237,9 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
   },
   timed_gate: (left, top, level, pos) => {
     const timer = find(level.timed_gates, pos);
-    const [open, every] = [timer?.open ?? 0, timer?.every ?? 0];
-    const title = `A timed gate: open for ${open} ticks, then shut for ${every - open}, over and over. Anything under it when it shuts is crushed.`;
-    const label = gate(left, top, title, `${clockwork(timer?.clock) ? `${GEAR} {n} · ` : ""}${open} of ${every}`, true);
-    if (timer && clockwork(timer.clock)) label.querySelector<SVGGElement>(".badge-group")!.dataset.clock = timer.clock;
-    return label;
+    const counted = counts(level, timer?.clock);
+    const label = `${counted ? `${GEAR} {n} · ` : ""}${timer?.open ?? 0} of ${timer?.every ?? 0}`;
+    return gate(left, top, timer?.text ?? "A timed gate.", label, true, counted ? timer?.clock : undefined);
   },
   pit: (left, top) => pit(left, top),
   plank: (left, top) => plank(left, top, "plank", "A plank. Walk over it to pick it up; bridge() lays it over a pit."),
@@ -275,17 +273,22 @@ function find<T extends { pos: Pos }>(items: T[], [x, y]: Pos): T | undefined {
   return items.find((item) => item.pos[0] === x && item.pos[1] === y);
 }
 
-/** Clocks that keep time with the code rather than the piece: shown with a gear (M3.1). */
-function clockwork(clock: Clock | undefined): boolean {
-  return clock === "line" || clock === "new_line";
+/**
+ * Whether `clock` keeps time with the code rather than the piece: shown with a
+ * gear that counts its ticks (M3.1, QA-021). The engine reports these clocks'
+ * counts in every state on such levels, so the board takes the list from there.
+ */
+function counts(level: LevelInfo, clock: Clock | undefined): boolean {
+  return clock !== undefined && clock in (level.start.clock_ticks ?? {});
 }
 
 /**
  * A barred gate. The `open` class lifts the bars (see styles.css). A guarded
  * gate has a padlock; a timed one (M3.1) has none. `label`: a short badge
- * along the bottom, e.g. a timed gate's "every 3", or "?" for a guard's question.
+ * along the bottom, e.g. a timed gate's "2 of 3", or "?" for a guard's question;
+ * `clock`: the clock whose count fills its "{n}".
  */
-function gate(left: number, top: number, text: string, label = "", timed = false): SVGGElement {
+function gate(left: number, top: number, text: string, label = "", timed = false, clock?: Clock): SVGGElement {
   const group = svg("g", { class: timed ? "gate timed-gate" : "gate" });
   const title = tooltip(text);
   const bars = svg("g", { class: "gate-bars" });
@@ -301,7 +304,7 @@ function gate(left: number, top: number, text: string, label = "", timed = false
   );
   group.append(title, svg("rect", { x: left + 2, y: top + 2, width: S - 4, height: S - 4, rx: 3, class: "gate-frame" }), bars);
   if (!timed) group.append(lock);
-  if (label) group.append(badge(left + S / 2, top + S - 16, label));
+  if (label) group.append(badge(left + S / 2, top + S - 16, label, clock));
   return group;
 }
 
@@ -363,9 +366,10 @@ function route(enemy: Enemy, height: number): SVGPathElement {
  * chaser's "chases", a gear for clockwork (it keeps time with the code), and
  * "armoured".
  */
-function enemyPiece(enemy: Enemy): SVGGElement {
+function enemyPiece(enemy: Enemy, level: LevelInfo): SVGGElement {
   const group = svg("g", { class: `enemy enemy-${enemy.kind}${enemy.armoured ? " armoured" : ""}` });
-  const clock = clockwork(enemy.clock) ? ", keeping time with your code" : "";
+  const counted = counts(level, enemy.clock);
+  const clock = counted ? ", keeping time with your code" : "";
   const title = tooltip(`A ${enemy.kind}${clock}${enemy.armoured ? ". It's armoured" : ""}.`);
   group.append(
     title,
@@ -373,12 +377,8 @@ function enemyPiece(enemy: Enemy): SVGGElement {
     svg("circle", { cx: -6, cy: -2, r: 3.2, class: "enemy-eye" }),
     svg("circle", { cx: 6, cy: -2, r: 3.2, class: "enemy-eye" }),
   );
-  const badges = [enemy.kind === "chaser" ? "chases" : "", clockwork(enemy.clock) ? `${GEAR} {n}` : "", enemy.armoured ? "armoured" : ""].filter(Boolean);
-  if (badges.length) {
-    const label = badge(0, -S * 0.3 - 12, badges.join(" "));
-    if (clockwork(enemy.clock)) label.dataset.clock = enemy.clock; // its {n} counts the clock's ticks
-    group.append(label);
-  }
+  const badges = [enemy.kind === "chaser" ? "chases" : "", counted ? `${GEAR} {n}` : "", enemy.armoured ? "armoured" : ""].filter(Boolean);
+  if (badges.length) group.append(badge(0, -S * 0.3 - 12, badges.join(" "), counted ? enemy.clock : undefined));
   return group;
 }
 
@@ -433,13 +433,13 @@ const GEAR = "⚙\uFE0E";
 
 /**
  * A small rounded label, centred on `cx` with its top at `y`: a timed gate's
- * "every 3", an enemy's "chases" (M3.1). A clockwork badge's text is a
- * template: `place()` fills in "{n}" with its clock's ticks (QA-021).
+ * "2 of 3", an enemy's "chases" (M3.1). With a `clock`, its text is a
+ * template: `place()` fills in "{n}" with that clock's ticks (QA-021).
  */
-function badge(cx: number, y: number, text: string): SVGGElement {
+function badge(cx: number, y: number, text: string, clock?: Clock): SVGGElement {
   const group = svg("g", { class: "badge-group" });
   group.dataset.template = text;
-  group.dataset.cx = String(cx);
+  if (clock) group.dataset.clock = clock;
   group.append(svg("rect", { y, height: 14, rx: 7, class: "badge" }), svg("text", { x: cx, y: y + 10.5, "text-anchor": "middle", class: "badge-text" }));
   setBadgeText(group, text.replace("{n}", "0"));
   return group;
@@ -452,7 +452,7 @@ function setBadgeText(group: SVGGElement, text: string): void {
   label.textContent = text;
   const width = Math.max(16, text.length * 6.5 + 8);
   pill.setAttribute("width", String(width));
-  pill.setAttribute("x", String(Number(group.dataset.cx) - width / 2));
+  pill.setAttribute("x", String(Number(label.getAttribute("x")) - width / 2));
 }
 
 /** An SVG <title>: the text a browser shows on hover. */

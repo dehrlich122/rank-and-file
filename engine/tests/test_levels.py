@@ -115,6 +115,4 @@ def test_lesson_is_short_and_runnable(level_file):
         if meant:
             assert result.status == meant, f"snippet should end in {meant} on purpose, not {result.status}:\n{code}"
         else:
-            # Snippets have no objectives, so a run just finishes. (A lesson board with
-            # waypoints counts crossing them all as solved; the widget shows both the same.)
-            assert result.status in ("finished", "solved"), f"snippet failed ({result.summary}):\n{code}"
+            assert result.status == "finished", f"snippet failed ({result.summary}):\n{code}"
