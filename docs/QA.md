@@ -964,8 +964,31 @@ Item 6 (hidden boards) became QA-016.
       pits are the way to be rid of it.
   - The Obstacles text explains both rules.
 
-### QA-018 · The idiomatic solution can be copied for three stars · Open
+### QA-018 · The idiomatic solution can be copied for three stars · Fixed
 
+- **Fixed** in `120930a` (2026-09-27); awaiting the designer's retest (steps
+  under **Retest**).
+  - The third star is now "No hints or solution seen". A run that misses it
+    says why: "(you looked at the solution)", "(you opened 2 hints)", or
+    both.
+  - When seeing the solution would cost the star, Compare asks first in
+    the Challenge panel ("Show it" / "Not yet"). From the outcome card, it
+    opens the panel at the question. With nothing to lose (three stars
+    already, a hint open, or the solution seen before), it opens straight
+    away.
+  - "Show me a solution" counts as seeing it. Best stars are never taken
+    back.
+- **Retest:**
+  - Solve a Testing-ground level with one line over par (two stars), then
+    press Compare on the outcome card. The Challenge panel asks first.
+    "Not yet" keeps the solution closed; "Show it" opens it.
+  - Run the idiomatic solution. It's solved with two stars, and the third
+    says "(you looked at the solution)".
+  - Press Compare again. It opens straight away.
+  - On a level already solved with three stars, Compare opens straight
+    away, and the level keeps its three stars.
+  - The Challenge panel's Stars section says "Solve it without opening a
+    hint or seeing the solution."
 - **Area:** stars and the solution comparison (M2)
 - **Observed** *(Designer, 2026-09-27)*: viewing the idiomatic solution
   doesn't count against the no-hints star. So a player can view it, write
