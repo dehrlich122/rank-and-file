@@ -48,7 +48,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const challengeTab = h("button", { class: "tab", onClick: () => showTab("challenge") }, "Challenge");
   const replDrawer = h("details", { class: "repl-drawer" }, h("summary", {}, "Scratch Python"), context.repl.element);
 
-  lesson = renderLesson(source.lesson, { client, api: (source.data.api as string[]) ?? [] });
+  lesson = renderLesson(source.lesson, { client, api: (source.data.api as string[]) ?? [], board: source.data.lesson_board });
   learnPanel.append(h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), source.trains), lesson.element);
 
   // The lesson is paged, one step per runnable snippet (QA-010). The pager sits
@@ -263,8 +263,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     running = true;
     updateControls();
     try {
-      const hintsUsed = progress.level(source.id).hints;
-      const result = await client.call("runLevel", { level: source.data, code: recordedCode, hintsUsed });
+      const { hints: hintsUsed, solutionSeen } = progress.level(source.id);
+      const result = await client.call("runLevel", { level: source.data, code: recordedCode, hintsUsed, solutionSeen });
       runResult = result;
       help?.recordRun(result); // once per run, here rather than in playback, which can reach the end many times
       showCase(result.case, mode);
@@ -460,6 +460,7 @@ function describeChallenge(level: LevelInfo): HTMLElement[] {
   for (const sign of level.signs) {
     parts.push(h("blockquote", { class: "sign-text" }, h("span", { class: "muted small" }, `Signpost on ${squareName(sign.pos)}`), sign.text));
   }
+  if (level.obstacles.length) parts.push(h("h3", {}, "Obstacles"), list("obstacles", level.obstacles));
   if (level.rules.length) parts.push(h("h3", {}, "Rules"), list("rules", level.rules));
   parts.push(h("h3", {}, "Stars"), list("star-goals", level.stars));
 

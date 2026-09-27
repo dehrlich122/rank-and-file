@@ -891,6 +891,352 @@ Item 6 (hidden boards) became QA-016.
     spoiler parts are written blind again.
   - `ARCHITECTURE.md` and `M2.md` are updated to match.
 
+## Session 5 — 2026-09-27 · M3.1 play-test (`m3-1-toolkit`, PR #8)
+
+### QA-017 · Pits are too much like walls · Verified
+
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
+- **Fixed** in `15a0499` (2026-09-27); awaiting the designer's retest (steps
+  under **Retest**).
+  - A chaser whose step lands on an open pit falls in and is gone. The
+    console says "The chaser fell into the pit on …".
+  - Planks lie on the board and are picked up by walking over them. The
+    console says how many the pawn carries. `pawn.bridge()` lays one over
+    the pit ahead, and the board draws the plank over it. With no plank, or
+    no open pit ahead, it's an error.
+  - Stepping Stones is reworked around a plank. **Pitfall** is a new
+    Testing-ground level (the last in the list).
+  - Deferred: a general inventory for carried items (planks now, keys
+    later), to be done when a second item arrives.
+- **Retest:**
+  - Testing ground → Stepping Stones:
+    - The board shows the trench of pits and a plank.
+    - The Challenge panel's Obstacles section explains pits and bridging.
+    - Walking into a pit still reads "Lost".
+    - `pawn.bridge()` with no plank, or with no pit ahead, is an error that
+      says why.
+    - Pick up the plank (the console says so), bridge a pit (a plank
+      appears over it) and walk across.
+  - Testing ground → Pitfall:
+    - The Obstacles section says a chaser doesn't see pits.
+    - Lure the chaser into a pit. It disappears, the console says it fell,
+      and the way is clear.
+  - Hovering an open pit says it's a pit, not that it's bridged.
+- **Area:** pits (M3.1 step 1); Testing ground 2, Stepping Stones
+- **Observed** *(Designer, 2026-09-27)*: it's not clear how a pit differs
+  from a wall here. Both stop the code, and both let you run again.
+- **Asked** *(Designer, 2026-09-27)*:
+  - What makes them structurally different?
+  - Can a pit be hopped over?
+  - Can something be built to go over a pit, rather than around it?
+  - Pits need better differentiation to be worth much. If they're worth
+    anything, it's as a problem like a wall that has different ways to get
+    past it.
+- **Answer** *(Claude)*: today, almost nothing sets them apart.
+  - **A wall** is a bump. The move never happens, the pawn stays where it
+    was, and the run ends as an error ("Python stopped", with a traceback).
+  - **A pit** is a loss. The pawn steps in, and the run ends as "Lost".
+  - That error/loss difference is the only one. Nothing can jump a pit or
+    cross it, and chasers avoid pits just as they avoid walls. So in play,
+    a pit is a wall with a different message.
+- **Decided** *(Designer, 2026-09-27)*: fix it in PR #8 in two ways:
+  - **Pits swallow enemies.**
+  - **Planks bridge pits.**
+  - Not chosen: jumping (a knight's move, better kept for the knight tier),
+    and hidden pits (they need sensing, from Chapter 4).
+- **Plan** *(Claude)*:
+  - **Swallowing:**
+    - A chaser no longer avoids pits. If its step lands on one, it falls in
+      and is gone. The console says so, and it no longer counts as an enemy.
+    - Walls still hold a chaser, so luring one into a pit is a new tactic.
+    - Patrols keep their fixed routes, which never cross a pit.
+  - **Planks:**
+    - A new `plank` tile, picked up by walking over it. The console says
+      how many the pawn now carries. A level can also hand some out at the
+      start (`start: {planks: 1}`).
+    - `pawn.bridge()`, a new ability, lays a plank over the pit ahead. It's
+      an action, so it costs a tick. The pit becomes floor, for enemies too.
+    - With no plank, or no pit ahead, it's an error, as bumping a wall is.
+    - Walls can't be bridged.
+  - **Levels:**
+    - Stepping Stones is reworked: a row of pits cuts the goal off, and a
+      plank lies off to one side.
+    - A new Testing-ground level, **Pitfall**: a chaser guards the way, and
+      pits are the way to be rid of it.
+  - The Obstacles text explains both rules.
+
+### QA-018 · The idiomatic solution can be copied for three stars · Verified
+
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
+- **Fixed** in `120930a` (2026-09-27); awaiting the designer's retest (steps
+  under **Retest**).
+  - The third star is now "No hints or solution seen". A run that misses it
+    says why: "(you looked at the solution)", "(you opened 2 hints)", or
+    both.
+  - When seeing the solution would cost the star, Compare asks first in
+    the Challenge panel ("Show it" / "Not yet"). From the outcome card, it
+    opens the panel at the question. With nothing to lose (three stars
+    already, a hint open, or the solution seen before), it opens straight
+    away.
+  - "Show me a solution" counts as seeing it. Best stars are never taken
+    back.
+- **Retest:**
+  - Solve a Testing-ground level with one line over par (two stars), then
+    press Compare on the outcome card. The Challenge panel asks first.
+    "Not yet" keeps the solution closed; "Show it" opens it.
+  - Run the idiomatic solution. It's solved with two stars, and the third
+    says "(you looked at the solution)".
+  - Press Compare again. It opens straight away.
+  - On a level already solved with three stars, Compare opens straight
+    away, and the level keeps its three stars.
+  - The Challenge panel's Stars section says "Solve it without opening a
+    hint or seeing the solution."
+- **Area:** stars and the solution comparison (M2)
+- **Observed** *(Designer, 2026-09-27)*: viewing the idiomatic solution
+  doesn't count against the no-hints star. So a player can view it, write
+  the code exactly as shown, and earn three stars.
+- **Wanted** *(Designer, 2026-09-27)*: viewing the idiomatic solution should
+  leave you at two stars at most, the same as opening a hint.
+- **Plan** *(Claude)*:
+  - The third star becomes "no hints and no solution seen".
+    - The UI tells the engine whether the solution was seen, as it does
+      for hints.
+    - A run that misses the star says why: the hints opened, the solution
+      seen, or both.
+  - A new progress flag records that the solution was seen. Opening the
+    comparison sets it, and so does "Show me a solution".
+  - Opening the comparison would give up the star, so it asks first, inside
+    the Challenge panel, the way "Show me a solution" does. When the level
+    already has three stars, there's nothing to lose, and it opens straight
+    away.
+  - Best stars are never taken back. A level solved with three stars keeps
+    them after its solution is viewed.
+
+### QA-019 · Pursuit's lesson snippet has no chaser in it · Verified
+
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
+- **Fixed** in `e3e7a76` (2026-09-27); awaiting the designer's retest (steps
+  under **Retest**).
+  - A level can give its lesson a board of its own (`lesson_board`).
+  - Pursuit's lesson has two snippets on a board with a chaser straight
+    ahead and a wall between. Turning on the spot, the chaser gets no
+    closer. Stepping aside, it slides round the wall.
+  - Pitfall's snippet has a pit between the pawn and a chaser. Two waits,
+    and it falls in.
+  - Snippets show the game's messages under their output, and a snippet
+    that ends in a loss reads "Lost".
+  - Other obstacle lessons (The Sentry's Round, Clockwork, Portcullis, The
+    Capture) still use the plain board. They can get boards of their own
+    if wanted.
+- **Retest:**
+  - Testing ground → Pursuit, Learn tab. Each snippet's board shows the
+    chaser and the wall. Run the first: the pawn turns, and the chaser
+    stays behind the wall. Run the second: the chaser moves round the wall
+    toward the pawn, step by step.
+  - Testing ground → Pitfall, Learn tab. Run the snippet: the chaser steps
+    into the pit and disappears. Under the snippet, "The chaser fell into
+    the pit on c2." appears before the printed line.
+- **Decided** *(Designer, 2026-09-27)*: yes. As new obstacles or
+  interactions are introduced, they're shown in the sample code. The rule
+  is in `CLAUDE.md`.
+- **Extended** in `6d25779`: every Testing-ground lesson that brings in
+  something new has a lesson board and snippets that show it at work:
+  - **Stepping Stones:** a long move falls into a pit (Lost); a plank
+    bridges it.
+  - **Checkpoints:** a waypoint ticked off in the middle of a move.
+  - **The Sentry's Round:** stepping out too soon is caught (Lost); waiting
+    lets the patrol pass.
+  - **Clockwork:** a loop winds the patrol two steps, and the same prints
+    copied out wind it three.
+  - **Portcullis:** arriving early bumps the shut gate; waiting gets
+    through.
+  - **The Toll:** collect two gems, then answer the guard.
+  - **The Capture:** take one enemy; trying the armoured one is an error.
+  - A snippet can be marked meant to lose (`python run lost`), as one can
+    be marked meant to fail.
+- **Retest (extension):** on each of those lessons' Learn tabs, the
+  snippet's board shows the obstacle, and running it shows it at work.
+
+- **Area:** lesson snippets (M1), Testing ground 5 (Pursuit)
+- **Observed** *(Designer, 2026-09-27)*: Pursuit's sample code doesn't make
+  any sense. It should show the chaser at work as the code runs.
+- **Cause** *(Claude)*: every lesson snippet runs on the same small, empty
+  board. Pursuit's snippet just walks the pawn about. Pitfall's is worse: it
+  prints "The chaser took two steps" on a board with no chaser.
+- **Plan** *(Claude)*:
+  - A level can give its lesson a board (`lesson_board`: map, legend,
+    enemies, start). The level checker validates it like the level's own
+    map. Levels without one keep the plain board.
+  - Pursuit and Pitfall get boards with a chaser, and snippets that show it
+    moving: for Pursuit, stepping toward the pawn and held by a wall; for
+    Pitfall, falling into a pit.
+  - Snippets show the game's messages (e.g. "The chaser fell into the pit")
+    under their output, as the level's console does. A snippet that ends
+    in a loss reads "Lost", not "Python stopped".
+
+### QA-020 · `range()` isn't well explained in Clockwork's lesson · Verified
+
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
+- **Fixed** in `1c19fa3` (2026-09-27); awaiting the designer's retest.
+- **Retest:** Testing ground → Clockwork, Learn tab. It's three steps now:
+  - `range(3)` and the numbers it hands the loop, printed round by round.
+  - A loop of moves: the pawn walks three squares, and the clockwork
+    patrol takes two steps.
+  - The same moves copied out: the patrol takes three.
+- **Area:** Testing ground 6 (Clockwork), its lesson
+- **Observed** *(Designer, 2026-09-27)*: `range()` isn't well explained in
+  this lesson.
+- **See also** QA-021, the same level's patrol.
+- **Cause** *(Claude)*: the lesson gives `range(3)` half a sentence ("counts
+  0, 1, 2"). It doesn't say where the numbers stop, what the loop variable
+  holds, or that the repeated lines can be moves.
+- **Plan** *(Claude)*: rewrite the lesson in three steps:
+  1. What `range(3)` hands the loop: 0, 1 and 2, one per round, starting at
+     0 and stopping just before 3, so "three rounds". Each round, the loop
+     variable holds that round's number (printed).
+  2. A loop of moves: the pawn walks three squares, but the loop is only
+     two lines of code, so the clockwork patrol takes two steps.
+  3. The same moves copied out: three new lines, three steps.
+
+### QA-021 · Clockwork's patrol seems to stop at a5 instead of turning back · Verified
+
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
+- **Fixed** in `16bb3ee` (2026-09-27); awaiting the designer's retest (steps
+  under **Retest**).
+  - A clockwork enemy's gear badge counts its steps: ⚙ 0, ⚙ 1, ⚙ 2… While
+    a loop repeats lines, the count stops, and so does the patrol. A
+    clockwork timed gate's badge counts the same way ("⚙ 2 · every 3").
+  - The Obstacles text for a new-line patrol adds: "While your code only
+    repeats lines that have already run, it stands still." The lesson says
+    it too.
+  - The same commit fixes a slip in QA-020: the lesson's copied-out moves
+    matched Chapter 1 level 1's reference solution word for word. The
+    bundle check caught it. Each copied line now names its round in a
+    comment.
+- **Decided** *(Designer, 2026-09-27)*: show it with a count on the gear,
+  and say it in words. (Not chosen: moving the patrol's start.)
+- **Retest:**
+  - Testing ground → Clockwork. Before running, the patrol's badge reads
+    ⚙ 0.
+  - Run code with a loop. The count goes up only on lines that run for the
+    first time, and stays put, with the patrol, while the loop repeats.
+  - The Obstacles section says it stands still while your code only
+    repeats lines.
+  - On the Learn tab, the second snippet shows the count stopping at 2.
+- **Area:** clockwork obstacles (M3.1 step 4), Testing ground 6 (Clockwork)
+- **Observed** *(Designer, 2026-09-27)*: the patrol stops once it reaches a5,
+  instead of turning back and carrying on with its patrol.
+- **Answer** *(Claude)*: it isn't a route bug, but it clearly doesn't read
+  as intended.
+  - Checked with the engine: nine new lines of code take it d5 → e5 → a5
+    and back to e5, turning at both ends.
+  - A clockwork patrol only steps when a line runs for the first time. A
+    loop repeats old lines, so once the code runs no new ones, it stands
+    still.
+  - A five-line program gives it five steps, and five steps from d5 end
+    exactly on a5. So it looks as if it stopped at the end of its route.
+  - Nothing on the board shows that it's waiting for a new line. The
+    Obstacles text says what moves it, but not that it stands still
+    otherwise.
+
+
+### QA-022 · Is The Toll teaching variables? · Verified
+
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
+- **Fixed** in `fc26f1a` (2026-09-27); awaiting the designer's retest.
+  - The lesson snippet prints the answer directly (`print(2)`), with no
+    variable, and the text says where to stand.
+  - Counting gems in a variable is noted in `docs/M3.md` as an idea for
+    Chapter 2's level specs.
+- **Decided** *(Designer, 2026-09-27)*: drop the variable, and keep the level
+  about its two mechanics.
+- **Retest:** Testing ground → The Toll, Learn tab. The snippet collects two
+  gems, prints 2 next to the gate, and walks through. Nothing mentions
+  variables.
+
+- **Area:** Testing ground 8 (The Toll), its lesson
+- **Asked** *(Designer, 2026-09-27)*: is The Toll supposed to teach creating
+  variables? Neither the lesson nor the Challenge information makes it
+  clear.
+- **Answer** *(Claude)*: no. It's a Testing-ground level for two mechanics,
+  collecting gems and a guard who asks a question.
+  - Printing the answer directly passes the guard; no variable is needed.
+  - The Trains line and the goals don't mention variables.
+  - The confusion came from the lesson snippet written for QA-019
+    (`gems = 2`, then `print(gems)`). It brings in a variable with no
+    explanation.
+  - Variables belong to Chapter 2 (M3.2), where counting gems in a variable
+    fits naturally.
+
+
+### QA-023 · The Toll teaches nothing that level 1.4 didn't · Verified
+
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
+- **Fixed** in `656ab0f` (2026-09-27); awaiting the designer's retest.
+  - The Toll's Trains line and brief now say it's a demo of two mechanics
+    that teaches nothing beyond level 1.4, and that both come into their
+    own later, when the code has to work the answer out as it runs.
+- **Decided** *(Designer, 2026-09-27)*: keep it as a demo, and say so.
+  - Not chosen: an answer that varies between boards (`print(pawn.gems)`),
+    or removing the level.
+  - The idea that makes a question guard worth having is in `docs/M3.md`
+    for Chapter 2: an answer that can't be known ahead of time.
+- **Retest:** Testing ground → The Toll. The level list and the Challenge
+  panel say it's a demo with nothing new to learn.
+
+- **Area:** gems and guards with a question (M3.1 steps 2-3), Testing ground
+  8 (The Toll)
+- **Observed** *(Designer, 2026-09-27)*: after QA-022, it's not clear what
+  the gems are for, or what The Toll teaches that level 1.4 (the guard's
+  gate) didn't.
+- **Answer** *(Claude)*: nothing new.
+  - The gems are waypoints you count, and the guard's question is 1.4's
+    passphrase, worked out by counting on the board before writing any
+    code.
+  - A question only differs from a passphrase when its answer can't be
+    known ahead of time, so the program has to find it out as it runs. On
+    one fixed board, you can always count by eye.
+  - This is the same kind of gap as QA-017 (pits were walls with a
+    different message).
+
+
+### QA-024 · Portcullis: a gate that shuts on the pawn should crush it · Verified
+
+- **Verified** *(Designer, 2026-09-27)*: tested, checks out.
+- **Fixed** in `bc8c4b1` (2026-09-27); awaiting the designer's retest (steps
+  under **Retest**).
+  - A timed gate is open for its first `open` ticks (default 2) of every
+    `every`, starting open. Its badge reads "2 of 3".
+  - Anything under a shut gate after a tick is crushed: the pawn loses the
+    run ("crushed by the gate on …"), and a chaser is gone. Walking into a
+    shut gate still bumps, like a wall.
+  - Portcullis is regenerated for the new timing: new par, and new hints,
+    written blind as before. Its lesson shows a bump, a crush and a clean
+    pass.
+- **Decided** *(Designer, 2026-09-27)*:
+  - A level sets how long a gate stays open, 2 ticks by default.
+  - A shutting gate crushes enemies too.
+- **Retest:**
+  - Testing ground → Portcullis. The gates' badges and the Obstacles text
+    say how long each is open and that it crushes.
+  - Walk straight through: the run is lost, crushed.
+  - Walk into a shut gate: a bump, as before.
+  - Arrive at each gate as it opens and step out the next tick to get
+    through.
+  - Learn tab: the three snippets show a bump, a crush and a clean pass.
+
+- **Area:** timed gates (M3.1 step 3), Testing ground 7 (Portcullis)
+- **Asked** *(Designer, 2026-09-27)*: can the gate open before the move and
+  close after it, so that a pawn on the gate square at any time the gate is
+  shut is lost?
+- **Answer** *(Claude)*: yes, with one catch.
+  - Today a timed gate is open for a single tick of each cycle ("every 3" is
+    open on ticks 0, 3, 6, …).
+  - Stepping onto the gate square takes a tick, and stepping off takes
+    another. So a one-tick opening would always shut with the pawn on it.
+  - For the rule to work, a gate has to stay open long enough to pass
+    through: at least two ticks.
+
 ---
 
 ## Queued work
@@ -946,6 +1292,10 @@ Planned tasks that aren't QA findings, in the order they should happen.
      something rebuilt where an existing helper would do.
   4. From then on, run `/simplify` at the end of every round of fixes,
      before committing.
+     - **Changed** *(Designer, 2026-09-27)*: `/simplify` and the e2e
+       checks (writing and running them) now happen once per PR, just
+       before it's merged, not after each QA fix. They cost too many
+       tokens. See `CLAUDE.md`.
 - **Done when:** `npm run check` runs all three tools and passes, and
   `CLAUDE.md` lists them under Commands. Its line "No linter or formatter is
   configured" gets updated too.

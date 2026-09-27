@@ -38,6 +38,11 @@ _DELTAS = {
 }
 
 
+def sign(n: int) -> int:
+    """-1, 0 or 1: which way along an axis `n` points."""
+    return (n > 0) - (n < 0)
+
+
 def step(pos: Pos, direction: Direction) -> Pos:
     dx, dy = direction.delta
     return (pos[0] + dx, pos[1] + dy)
@@ -54,11 +59,29 @@ class Tile(Enum):
     WALL = "wall"
     SIGN = "sign"  # a signpost: blocks movement and holds some text
     GATE = "gate"  # locked until its passphrase is said next to it (see World.hear)
+    PIT = "pit"  # stepping in loses the run (M3.1)
+    WAYPOINT = "waypoint"  # must be crossed before the goal (M3.1)
+    GEM = "gem"  # collected by walking over it (M3.1)
+    PLANK = "plank"  # picked up by walking over it; pawn.bridge() lays it over a pit (QA-017)
+    TIMED_GATE = "timed_gate"  # open only on every Nth tick of its clock (M3.1)
 
     @property
     def blocks(self) -> bool:
         """Always in the way. (Gates block only while locked, which the World tracks.)"""
         return self in (Tile.WALL, Tile.SIGN)
+
+
+@dataclass
+class Timer:
+    """When a timed gate is open: for the first `open` ticks of every `every`
+    ticks of its clock, starting open (QA-024)."""
+
+    every: int
+    clock: str = "action"
+    open: int = 2  # long enough to step in, then out, arriving as it opens
+
+    def is_open(self, ticks: int) -> bool:
+        return ticks % self.every < self.open
 
 
 @dataclass
@@ -68,6 +91,8 @@ class Board:
     tiles: dict[Pos, Tile] = field(default_factory=dict)  # squares not listed are floor
     signs: dict[Pos, str] = field(default_factory=dict)  # text written on sign tiles
     gates: dict[Pos, str] = field(default_factory=dict)  # the passphrase for each gate
+    questions: dict[Pos, str] = field(default_factory=dict)  # what the guard asks, at gates that ask (M3.1)
+    timers: dict[Pos, Timer] = field(default_factory=dict)  # when each timed gate is open (M3.1)
 
     def contains(self, pos: Pos) -> bool:
         x, y = pos
@@ -75,6 +100,10 @@ class Board:
 
     def tile(self, pos: Pos) -> Tile:
         return self.tiles.get(pos, Tile.FLOOR)
+
+    def squares(self, tile: Tile) -> list[Pos]:
+        """Every square with this tile, in order along the ranks from a1."""
+        return sorted((pos for pos, kind in self.tiles.items() if kind is tile), key=lambda pos: (pos[1], pos[0]))
 
     def blocked(self, pos: Pos) -> bool:
         return not self.contains(pos) or self.tile(pos).blocks

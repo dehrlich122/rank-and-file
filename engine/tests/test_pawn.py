@@ -1,9 +1,5 @@
-from conftest import make_level
+from conftest import basics, events, make_level
 from rankfile.runner import run_level
-
-
-def events(result):
-    return [event for step in result.steps for event in step["events"]]
 
 
 def test_move_with_an_argument_emits_one_event_per_square(corridor):
@@ -12,7 +8,7 @@ def test_move_with_an_argument_emits_one_event_per_square(corridor):
     moves = events(result)
     assert [e["kind"] for e in moves] == ["move", "move", "move"]
     assert [e["state"]["pos"] for e in moves] == [[1, 1], [1, 2], [1, 3]]
-    assert result.final == {"pos": [1, 3], "facing": "north", "opened": []}
+    assert basics(result.final) == {"pos": [1, 3], "facing": "north", "opened": []}
 
 
 def test_turns_change_facing_but_not_position(corridor):
@@ -38,7 +34,8 @@ def test_walls_stop_the_pawn_with_a_bump(corridor):
     assert result.status == "error"
     assert result.error.type == "BlockedError"
     assert "wall on c1" in result.error.friendly
-    assert events(result)[-1] == {"kind": "bump", "state": {"pos": [1, 0], "facing": "east", "opened": []}, "at": [2, 0]}
+    bump = events(result)[-1]
+    assert (bump["kind"], bump["at"], basics(bump["state"])) == ("bump", [2, 0], {"pos": [1, 0], "facing": "east", "opened": []})
 
 
 def test_the_edge_of_the_board_stops_the_pawn():

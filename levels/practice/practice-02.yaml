@@ -1,0 +1,34 @@
+id: practice-02
+chapter: 0
+title: "Stepping Stones"
+trains: "Getting past pits: around them, or across on a plank"
+brief: "A trench of pits cuts the goal off, and there's no way round. Somebody left a plank lying about."
+piece: pawn
+map: |
+  O . G . O
+  O O O O O
+  . O . . .
+  . . . O L
+  O . P . .
+legend:
+  "O": "pit"
+  "L": "plank"
+start: {"facing": "north"}
+api:
+- move
+- turn_left
+- turn_right
+- bridge
+par:
+  lines: 9
+hints:
+- "This row of pits can't be walked around. Is there anything on the board that could get you across?"
+- "Walk over the plank to pick it up. Then face a pit and call `pawn.bridge()`."
+- "One way to start: `pawn.turn_right()`, then `pawn.move(2)`, then `pawn.turn_left()`."
+lesson: practice/practice-02.md
+lesson_board:
+  map: |
+    . . . . .
+    P L O . .
+  legend: {"L": "plank", "O": "pit"}
+  start: {"facing": "east"}

@@ -1,6 +1,6 @@
 import pytest
 
-from conftest import make_level
+from conftest import basics, make_level
 from rankfile.board import Direction, Tile, square_name, step
 from rankfile.levels import LevelError, parse_level, sandbox_level
 
@@ -39,7 +39,7 @@ def test_describe_is_ready_for_the_ui():
     level = make_level("S G\nP .\n", legend={"S": {"tile": "sign", "text": "hi"}}, start={"facing": "east"})
     described = level.describe()
     assert described["tiles"] == [["floor", "floor"], ["sign", "floor"]]  # tiles[y][x]
-    assert described["start"] == {"pos": [0, 0], "facing": "east", "opened": []}
+    assert basics(described["start"]) == {"pos": [0, 0], "facing": "east", "opened": []}
     assert described["goal"] == [1, 1]
     assert described["signs"] == [{"pos": [0, 1], "text": "hi"}]
     assert described["hints"] == []
@@ -102,7 +102,7 @@ def test_describe_puts_goals_and_rules_into_words():
         "Must use a for loop.",
         "Not allowed: a while loop.",
     ]
-    assert described["stars"] == ["Solve the level.", "There's no par here: solving is enough.", "Solve it without opening a hint."]
+    assert described["stars"] == ["Solve the level.", "There's no par here: solving is enough.", "Solve it without opening a hint or seeing the solution."]
     assert make_level("P G\n", par={"lines": 1}).star_goals()[1] == "Use 1 line of code or fewer (par)."
 
 
@@ -141,3 +141,19 @@ def test_sandbox_is_open_with_no_objectives():
     assert level.goal is None
     assert not level.objectives.reach_goal
     assert level.board.tiles == {}
+
+
+def test_a_lesson_board_gives_snippets_the_levels_obstacles():
+    board = {"map": ". . .\n. # .\n. P .\n", "enemies": [{"kind": "chaser", "start": "b3"}]}
+    level = make_level("G\nP\n", lesson_board=board)
+    sandbox = sandbox_level(level.api, lesson_board=level.lesson_board)
+    assert sandbox.describe()["enemies"][0]["kind"] == "chaser"
+    assert sandbox.describe()["start"]["enemies"] == [[1, 2]]
+    assert sandbox_level(["move"]).board.width == 5  # without one, the small open board
+
+
+def test_a_lesson_board_is_checked_like_a_map():
+    with pytest.raises(LevelError, match="lesson_board: a lesson board takes map, legend, enemies and start"):
+        make_level("G\nP\n", lesson_board={"map": "P\n", "goal": "a1"})
+    with pytest.raises(LevelError, match="lesson_board: enemy 1: starts on the pawn's square"):
+        make_level("G\nP\n", lesson_board={"map": "P .\n", "enemies": [{"kind": "chaser", "start": "a1"}]})

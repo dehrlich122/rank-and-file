@@ -10,10 +10,11 @@ checker instead of confusing a player.
 import ast
 from dataclasses import asdict, dataclass, field, replace
 
-from .board import Board, Direction, Pos, Tile, square_name
+from .board import Board, Direction, Pos, Tile, Timer, sign, square_name
 from .constraints import describe_rules
 from .pieces import PIECES
-from .words import count
+from .words import and_list, count
+from .world import CHASERS, CLOCKS, World
 
 
 class LevelError(ValueError):
@@ -24,12 +25,40 @@ class LevelError(ValueError):
 # SPOT marks a square the goal might be on, when the goal is hidden (M2).
 START, GOAL, SPOT = "P", "G", "?"
 BUILTIN_SYMBOLS = {".": Tile.FLOOR, "#": Tile.WALL, START: Tile.FLOOR, GOAL: Tile.FLOOR, SPOT: Tile.FLOOR}
-# Legend tiles that need one extra detail, e.g. `S: {tile: sign, text: "..."}`.
-TILE_DETAILS = {Tile.SIGN: "text", Tile.GATE: "passphrase"}
+# Legend tiles that take details, e.g. `S: {tile: sign, text: "..."}`: the
+# details each one needs, then the ones it may add.
+TILE_DETAILS: dict[Tile, tuple[set[str], set[str]]] = {
+    Tile.SIGN: ({"text"}, set()),
+    Tile.GATE: ({"passphrase"}, {"question"}),
+    Tile.TIMED_GATE: ({"every"}, {"clock", "open"}),
+}
+
+# Enemies (M3.1): the keys each kind takes, and the ground they can walk on.
+ENEMY_KEYS = {
+    "patrol": {"kind", "start", "route", "loop", "clock", "armoured"},
+    "chaser": {"kind", "start", "clock", "strategy", "armoured"},
+}
+OPEN_GROUND = (Tile.FLOOR, Tile.WAYPOINT, Tile.GEM, Tile.PLANK)
+
+# What a code clock does while the code only repeats lines that have already run (QA-021).
+CLOCK_STILL = {"new_line": " While your code only repeats lines that have already run, it {still}."}
+
+
+def clock_still(clock: str, still: str = "stands still") -> str:
+    """The sentence about what a code-clocked obstacle does while lines repeat ("" for other clocks)."""
+    return CLOCK_STILL.get(clock, "").format(still=still)
+
+# What makes each clock tick, in words: "one square for ..." (M3.1).
+CLOCK_TICKS = {
+    "action": "each square you move, each turn and each wait",
+    "line": "each line of your code that runs",
+    "new_line": "each line of your code that runs for the first time",
+}
 
 ALLOWED_KEYS = {
     "id", "chapter", "title", "trains", "brief", "piece", "map", "legend", "start",
     "objectives", "api", "constraints", "par", "hints", "lesson", "starter", "variants",
+    "enemies", "lesson_board",
 }  # fmt: skip
 REQUIRED_KEYS = {"id", "chapter", "title", "trains", "map", "api", "lesson"}
 
@@ -53,6 +82,49 @@ class Par:
 class Objectives:
     reach_goal: bool = True
     say: list[str] = field(default_factory=list)  # phrases the program must print
+    waypoints: bool = False  # listed (M3.1); every waypoint on a map must be crossed either way
+    collect: int | str | None = None  # gems to collect (M3.1): a number, or "all"
+    capture: int | str | None = None  # enemies to capture (M3.1): a number, or "all" that can be taken
+
+    @property
+    def empty(self) -> bool:
+        """Nothing listed (see Level.nothing_to_do, which also counts the map's waypoints)."""
+        return not (self.reach_goal or self.say or self.waypoints or self.collect or self.capture)
+
+
+@dataclass
+class Enemy:
+    """A patrol or a chaser (M3.1). The World moves it (`world.Foe`)."""
+
+    kind: str  # "patrol" or "chaser"
+    start: Pos
+    route: list[Pos]  # a patrol's corners, as the level lists them
+    path: list[Pos]  # every square a patrol walks, in order (just its start if it stands guard)
+    loop: bool = False  # a patrol: round and round, instead of there and back
+    clock: str = "action"
+    strategy: str = "simple"  # a chaser: how it picks its step
+    armoured: bool = False  # can't be captured
+
+    def describe(self) -> str:
+        """Its rule, in words, for the Challenge panel."""
+        start = square_name(self.start)
+        ticks = CLOCK_TICKS[self.clock]
+        if self.kind == "chaser":
+            text = (
+                f"A chaser starts on {start}. It steps one square toward you for {ticks}: along the rank or "
+                "the file, whichever gap is bigger (east or west when they're equal). If that way is blocked "
+                "it tries the other, and if both are blocked it waits."
+            ) + clock_still(self.clock)
+        elif len(self.path) == 1:
+            text = f"A patrol stands guard on {start}."
+        else:
+            corners = names(self.route)
+            if self.loop:
+                way = " to ".join([*corners, corners[0]]) + ", round and round"
+            else:
+                way = " to ".join(corners) + " and back"
+            text = f"A patrol starts on {start} and walks {way}, one square for {ticks}.{clock_still(self.clock)}"
+        return f"{text} It's armoured: it can't be captured." if self.armoured else text
 
 
 @dataclass
@@ -80,6 +152,9 @@ class Level:
     # Other maps (M2): the same level on other boards, which a solution must
     # solve too. For levels whose layout varies, e.g. randomized walls.
     variants: list[Level] = field(default_factory=list)
+    enemies: list[Enemy] = field(default_factory=list)  # patrols and chasers (M3.1)
+    planks: int = 0  # planks the piece starts with (QA-017)
+    lesson_board: dict | None = None  # the board the lesson's snippets run on, as the level file gives it (QA-019)
 
     def cases(self) -> list[Case]:
         """Every situation a solution must handle: one per square a hidden goal
@@ -111,17 +186,75 @@ class Level:
                 goals.append("Say the phrase from the signpost: print it, exactly as written.")
             else:
                 goals.append(f'Say "{phrase}" (print it).')
+        waypoints = names(self.board.squares(Tile.WAYPOINT))
+        if len(waypoints) == 1:
+            goals.append(f"Cross the waypoint on {waypoints[0]} on the way. Passing over it is enough.")
+        elif waypoints:
+            goals.append(f"Cross all {len(waypoints)} waypoints on the way: {and_list(waypoints)}. Passing over them is enough.")
+        gems = self.gems
+        if self.objectives.collect == "all":
+            goals.append("Collect the gem by walking over it." if gems == 1 else f"Collect all {gems} gems by walking over them.")
+        elif self.objectives.collect:
+            goals.append(f"Collect at least {count(self.objectives.collect, 'gem')} of the {gems} by walking over them.")
+        capture = self.captures_needed()
+        if self.objectives.capture == "all":
+            goals.append("Capture the enemy that can be taken." if capture == 1 else f"Capture all {capture} enemies that can be taken.")
+        elif capture:
+            goals.append(f"Capture at least {count(capture, 'enemy', 'enemies')}.")
         for gate in sorted(self.board.gates):
-            goals.append(f"Get past the locked gate on {square_name(gate)}. A guard keeps it shut.")
+            if question := self.board.questions.get(gate):
+                goals.append(f'Get past the gate on {square_name(gate)}. The guard asks: "{question}" Print the answer next to the gate.')
+            else:
+                goals.append(f"Get past the locked gate on {square_name(gate)}. A guard keeps it shut.")
         if self.variants:
             goals.append(f"Your code is also checked on {count(len(self.variants), 'other board')}.")
         return goals
+
+    @property
+    def nothing_to_do(self) -> bool:
+        """No objectives at all: a run just finishes. (Waypoints on the map are
+        always an objective, listed or not. Lesson snippets are never judged.)"""
+        return self.objectives.empty and not self.board.squares(Tile.WAYPOINT)
+
+    @property
+    def gems(self) -> int:
+        return len(self.board.squares(Tile.GEM))
+
+    @property
+    def capturable(self) -> int:
+        """How many enemies can be captured: the ones that aren't armoured."""
+        return sum(not enemy.armoured for enemy in self.enemies)
+
+    def gems_needed(self) -> int:
+        """How many gems the collect objective asks for (0 when there isn't one)."""
+        return _needed(self.objectives.collect, self.gems)
+
+    def captures_needed(self) -> int:
+        """How many enemies the capture objective asks for (0 when there isn't one)."""
+        return _needed(self.objectives.capture, self.capturable)
+
+    def obstacles(self) -> list[str]:
+        """The obstacles' rules, one sentence each (M3.1), for the Challenge panel."""
+        obstacles = []
+        pits = names(self.board.squares(Tile.PIT))
+        if pits:
+            where = f"A pit on {pits[0]}" if len(pits) == 1 else f"Pits on {and_list(pits)}"
+            obstacles.append(f"{where}: step in and the run is lost.")
+            if "bridge" in self.api:
+                obstacles.append("A plank laid over a pit (`bridge()`) makes it safe to cross. Walk over a plank to pick it up.")
+            if any(enemy.kind == "chaser" for enemy in self.enemies):
+                obstacles.append("A chaser doesn't see pits: if its step lands on one, it falls in and is gone.")
+        obstacles.extend(gate_rule(pos, timer) for pos, timer in sorted(self.board.timers.items()))
+        obstacles.extend(enemy.describe() for enemy in self.enemies)
+        if self.enemies:
+            obstacles.append("If an enemy lands on your square, or you walk into one, you're caught and the run is lost.")
+        return obstacles
 
     def star_goals(self) -> list[str]:
         """What each of the three stars asks for (runner.score awards them)."""
         par = self.par.lines
         within = f"Use {count(par, 'line')} of code or fewer (par)." if par else "There's no par here: solving is enough."
-        return ["Solve the level.", within, "Solve it without opening a hint."]
+        return ["Solve the level.", within, "Solve it without opening a hint or seeing the solution."]
 
     def describe(self) -> dict:
         """Everything the UI needs to draw the level, as JSON-friendly data."""
@@ -140,11 +273,17 @@ class Level:
                 for y in range(self.board.height)
             ],
             "signs": [{"pos": list(pos), "text": text} for pos, text in self.board.signs.items()],
+            "questions": [{"pos": list(pos), "text": text} for pos, text in self.board.questions.items()],
+            "timed_gates": [{"pos": list(pos), **asdict(timer), "text": gate_rule(pos, timer)} for pos, timer in self.board.timers.items()],
+            "enemies": [
+                {"kind": enemy.kind, "route": [list(pos) for pos in enemy.route], "loop": enemy.loop, "clock": enemy.clock, "armoured": enemy.armoured}
+                for enemy in self.enemies
+            ],  # where each one is comes with the world's state
             "goal": list(self.goal) if self.goal else None,
             "goal_spots": [list(spot) for spot in self.goal_spots],
             "case_title": self.case_words[0] if self.goal_spots or self.variants else "",
             # Gates appear in `tiles`; their passphrases are deliberately left out.
-            "start": {"pos": list(self.start), "facing": self.facing.value, "opened": []},
+            "start": World(self).state(),
             "objectives": asdict(self.objectives),
             "api": self.api,
             "constraints": asdict(self.constraints),
@@ -154,6 +293,7 @@ class Level:
             # player-facing description of its rules.
             "goals": self.goals(),
             "rules": describe_rules(self.constraints),
+            "obstacles": self.obstacles(),
             "stars": self.star_goals(),
             # Tiered hints (nudge, concept reminder, partial example); the UI
             # reveals them one at a time, and only when asked.
@@ -178,7 +318,7 @@ def parse_level(data: dict) -> Level:
     legend = data.get("legend") or {}
     objectives = _parse_objectives(data.get("objectives", ["reach_goal"]))
     board, start, goal, spots = _parse_board(data["map"], legend, objectives)
-    facing = _parse_facing((data.get("start") or {}).get("facing", "north"))
+    facing, planks = _parse_start(data.get("start") or {})
 
     level = Level(
         id=_text(data, "id"),
@@ -189,6 +329,7 @@ def parse_level(data: dict) -> Level:
         board=board,
         start=start,
         facing=facing,
+        planks=planks,
         goal=goal,
         goal_spots=spots,
         objectives=objectives,
@@ -200,6 +341,19 @@ def parse_level(data: dict) -> Level:
         brief=str(data.get("brief", "")),
         starter=str(data.get("starter", "")),
     )
+    if "lesson_board" in data:
+        try:
+            sandbox_level(level.api, piece, data["lesson_board"])
+        except LevelError as exc:
+            raise LevelError(f"lesson_board: {exc}") from None
+        level.lesson_board = data["lesson_board"]
+    level.enemies = _parse_enemies(data.get("enemies") or [])
+    _check_enemies(level)
+    capturable = level.capturable
+    if level.objectives.capture and not capturable:
+        raise LevelError("objective capture needs an enemy that isn't armoured")
+    if isinstance(level.objectives.capture, int) and level.objectives.capture > capturable:
+        raise LevelError(f"objective capture asks for {level.objectives.capture}, and only {capturable} can be taken")
     level.variants = _parse_variants(data.get("variants") or [], legend, level)
     if level.variants and level.goal_spots:
         raise LevelError("a level has ? squares for a hidden goal or other maps (variants), not both")
@@ -217,7 +371,7 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
         raise LevelError("every map row must have the same number of squares")
 
     symbols = dict(BUILTIN_SYMBOLS)
-    details: dict[str, str] = {}  # symbol -> its sign text or gate passphrase
+    details: dict[str, dict] = {}  # symbol -> its details, e.g. a sign's text or a gate's passphrase
     for symbol, meaning in legend.items():
         symbol = str(symbol)
         if symbol in BUILTIN_SYMBOLS:
@@ -227,14 +381,7 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
             tile = symbols[symbol] = Tile(meaning.get("tile"))
         except ValueError:
             raise LevelError(f"legend {symbol!r}: unknown tile {meaning.get('tile')!r}") from None
-        needs = TILE_DETAILS.get(tile)
-        unknown = set(meaning) - {"tile"} - ({needs} if needs else set())
-        if unknown:
-            raise LevelError(f"legend {symbol!r}: a {tile.value} doesn't take {', '.join(sorted(unknown))}")
-        if needs:
-            if not isinstance(meaning.get(needs), str) or not meaning[needs]:
-                raise LevelError(f"legend {symbol!r}: a {tile.value} needs {needs}")
-            details[symbol] = meaning[needs]
+        details[symbol] = _parse_details(symbol, tile, meaning)
 
     board = Board(width, height)
     start: Pos | None = None
@@ -249,9 +396,13 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
             if tile is not Tile.FLOOR:
                 board.tiles[(x, y)] = tile
             if tile is Tile.SIGN:
-                board.signs[(x, y)] = details[symbol]
+                board.signs[(x, y)] = details[symbol]["text"]
             if tile is Tile.GATE:
-                board.gates[(x, y)] = details[symbol]
+                board.gates[(x, y)] = details[symbol]["passphrase"]
+                if "question" in details[symbol]:
+                    board.questions[(x, y)] = details[symbol]["question"]
+            if tile is Tile.TIMED_GATE:
+                board.timers[(x, y)] = Timer(**details[symbol])
             if symbol == START:
                 if start is not None:
                     raise LevelError("the map has more than one start square (P)")
@@ -269,6 +420,28 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
     return board, start, goal, sorted(spots)
 
 
+def _parse_details(symbol: str, tile: Tile, meaning: dict) -> dict:
+    """A legend tile's details, checked: each text is non-empty, and a timed gate's timing makes sense."""
+    needs, may = TILE_DETAILS.get(tile, (set(), set()))
+    unknown = set(meaning) - {"tile"} - needs - may
+    if unknown:
+        raise LevelError(f"legend {symbol!r}: a {tile.value} doesn't take {', '.join(sorted(unknown))}")
+    details = {key: value for key, value in meaning.items() if key != "tile"}
+    for key in needs | set(details):
+        value = details.get(key)
+        if key in ("every", "open"):
+            if not _positive(value):
+                raise LevelError(f"legend {symbol!r}: a timed gate needs {key}: a whole number of ticks")
+        elif key == "clock":
+            _check_clock(f"legend {symbol!r}", value)
+        elif not isinstance(value, str) or not value:
+            raise LevelError(f"legend {symbol!r}: a {tile.value} needs {key}")
+    open_for = details.get("open", Timer.open)
+    if tile is Tile.TIMED_GATE and details["every"] <= open_for:
+        raise LevelError(f"legend {symbol!r}: a timed gate's every must be more than its open ({open_for}), or it would never shut")
+    return details
+
+
 @dataclass
 class Case:
     """One situation a solution must handle (see Level.cases)."""
@@ -278,16 +451,17 @@ class Case:
     level: Level  # the level as it is in this case
 
 
-def sandbox_level(api: list[str], piece: str = "pawn") -> Level:
-    """A small open board for trying things out in lesson snippets."""
-    board = Board(width=5, height=4)
-    return Level(
+def sandbox_level(api: list[str], piece: str = "pawn", lesson_board: dict | None = None) -> Level:
+    """The board lesson snippets run on: a small open one, or the level's own
+    `lesson_board` (a map, legend, enemies and start: QA-019). Snippets have no
+    objectives: runner.run_sandbox never judges a run."""
+    level = Level(
         id="sandbox",
         chapter=0,
         title="Sandbox",
         trains="",
         piece=piece,
-        board=board,
+        board=Board(width=5, height=4),
         start=(2, 0),
         facing=Direction.NORTH,
         goal=None,
@@ -295,6 +469,30 @@ def sandbox_level(api: list[str], piece: str = "pawn") -> Level:
         api=list(api),
         constraints=Constraints(),
     )
+    if lesson_board is None:
+        return level
+    if not isinstance(lesson_board, dict) or set(lesson_board) - {"map", "legend", "enemies", "start"}:
+        raise LevelError("a lesson board takes map, legend, enemies and start")
+    board, start, goal, _spots = parse_map(lesson_board.get("map"), lesson_board.get("legend") or {})
+    facing, planks = _parse_start(lesson_board.get("start") or {})
+    enemies = _parse_enemies(lesson_board.get("enemies") or [])
+    level = replace(level, board=board, start=start, goal=goal, facing=facing, planks=planks, enemies=enemies)
+    _check_enemies(level)
+    return level
+
+
+def gate_rule(pos: Pos, timer: Timer) -> str:
+    """A timed gate's rule, in words: the Obstacles text and the gate's tooltip (QA-024)."""
+    return (
+        f"The gate on {square_name(pos)} is open for {count(timer.open, 'tick')}, then shut for "
+        f"{count(timer.every - timer.open, 'tick')}, over and over, starting open. It ticks once for "
+        f"{CLOCK_TICKS[timer.clock]}.{clock_still(timer.clock, 'doesn’t open or shut')} Anything under it "
+        "when it shuts is crushed: if that's you, the run is lost."
+    )
+
+
+def names(squares: list[Pos]) -> list[str]:
+    return [square_name(pos) for pos in squares]
 
 
 def _text(data: dict, key: str) -> str:
@@ -311,6 +509,16 @@ def _int(data: dict, key: str) -> int:
     return value
 
 
+def _parse_start(start) -> tuple[Direction, int]:
+    """Which way the piece faces at the start, and how many planks it carries."""
+    if not isinstance(start, dict) or set(start) - {"facing", "planks"}:
+        raise LevelError("start takes facing and planks, e.g. {facing: north, planks: 1}")
+    planks = start.get("planks", 0)
+    if not isinstance(planks, int) or isinstance(planks, bool) or planks < 0:
+        raise LevelError("start planks must be a whole number")
+    return _parse_facing(start.get("facing", "north")), planks
+
+
 def _parse_facing(value) -> Direction:
     try:
         return Direction(value)
@@ -325,11 +533,32 @@ def _parse_objectives(items) -> Objectives:
     for item in items:
         if item == "reach_goal":
             objectives.reach_goal = True
+        elif item == "waypoints":
+            objectives.waypoints = True
         elif isinstance(item, dict) and set(item) == {"say"} and isinstance(item["say"], str):
             objectives.say.append(item["say"])
+        elif isinstance(item, dict) and len(item) == 1 and set(item) <= {"collect", "capture"}:
+            [(kind, target)] = item.items()
+            if target != "all" and not _positive(target):
+                raise LevelError(f"unknown objective {item!r}")
+            setattr(objectives, kind, target)  # how many gems to collect, or enemies to capture
         else:
             raise LevelError(f"unknown objective {item!r}")
     return objectives
+
+
+def _positive(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 1
+
+
+def _needed(target: int | str | None, total: int) -> int:
+    """A counted objective's number: `total` for "all", 0 when there's no such objective."""
+    return total if target == "all" else target or 0
+
+
+def _check_clock(where: str, clock) -> None:
+    if clock not in CLOCKS:
+        raise LevelError(f"{where}: clock must be one of {', '.join(CLOCKS)}, not {clock!r}")
 
 
 def _parse_api(names, piece: str) -> list[str]:
@@ -347,6 +576,14 @@ def _parse_board(text: str, legend: dict, objectives: Objectives) -> tuple[Board
     board, start, goal, spots = parse_map(text, legend)
     if objectives.reach_goal and goal is None and not spots:
         raise LevelError("objective reach_goal needs a goal square (G), or ? squares for a hidden goal, on the map")
+    # Waypoints are always an objective: listing it is optional, but then the map needs some.
+    if objectives.waypoints and not board.squares(Tile.WAYPOINT):
+        raise LevelError("objective waypoints needs waypoint squares on the map")
+    gems = len(board.squares(Tile.GEM))
+    if objectives.collect and not gems:
+        raise LevelError("objective collect needs gem squares on the map")
+    if isinstance(objectives.collect, int) and objectives.collect > gems:
+        raise LevelError(f"objective collect asks for {objectives.collect} gems, and the map has {gems}")
     return board, start, goal, spots
 
 
@@ -364,8 +601,94 @@ def _parse_variants(items, legend: dict, level: Level) -> list[Level]:
             raise LevelError(f"variant {number}: {exc}") from None
         if spots:
             raise LevelError(f"variant {number}: ? squares are only for the level's own map")
-        variants.append(replace(level, board=board, start=start, goal=goal, variants=[]))
+        variant = replace(level, board=board, start=start, goal=goal, variants=[])
+        try:
+            _check_enemies(variant)
+        except LevelError as exc:
+            raise LevelError(f"variant {number}: {exc}") from None
+        variants.append(variant)
     return variants
+
+
+def _parse_enemies(items) -> list[Enemy]:
+    if not isinstance(items, list):
+        raise LevelError("enemies must be a list, e.g. [{kind: patrol, route: [b4, e4]}]")
+    enemies = []
+    for number, item in enumerate(items, start=1):
+        where = f"enemy {number}"
+        if not isinstance(item, dict) or item.get("kind") not in ENEMY_KEYS:
+            raise LevelError(f"{where}: kind must be patrol or chaser")
+        kind = item["kind"]
+        unknown = set(item) - ENEMY_KEYS[kind]
+        if unknown:
+            raise LevelError(f"{where}: a {kind} doesn't take {', '.join(sorted(unknown))}")
+        route = item.get("route", [])
+        if not isinstance(route, list):
+            raise LevelError(f"{where}: route must be a list of squares, e.g. [b4, e4]")
+        corners = [_square(where, name) for name in route]
+        if "start" in item:
+            start = _square(where, item["start"])
+        elif corners:
+            start = corners[0]
+        else:
+            raise LevelError(f"{where}: needs a start square")
+        loop = item.get("loop", False)
+        clock = item.get("clock", "action")
+        strategy = item.get("strategy", "simple")
+        armoured = item.get("armoured", False)
+        if not isinstance(loop, bool) or not isinstance(armoured, bool):
+            raise LevelError(f"{where}: loop and armoured are true or false")
+        _check_clock(where, clock)
+        if strategy not in CHASERS:
+            raise LevelError(f"{where}: strategy must be one of {', '.join(CHASERS)}, not {strategy!r}")
+        corners = corners or [start]
+        path = _walk(where, corners, loop)
+        if start not in path:
+            raise LevelError(f"{where}: starts on {square_name(start)}, which isn't on its route")
+        enemies.append(Enemy(kind, start, corners, path, loop, clock, strategy, armoured))
+    return enemies
+
+
+def _square(where: str, name) -> Pos:
+    """A square from its chess name, e.g. "b4" -> (1, 3)."""
+    text = str(name)
+    if len(text) < 2 or not ("a" <= text[0] <= "z") or not text[1:].isdigit() or int(text[1:]) < 1:
+        raise LevelError(f"{where}: {name!r} isn't a square; squares are named like b4")
+    return (ord(text[0]) - ord("a"), int(text[1:]) - 1)
+
+
+def _walk(where: str, corners: list[Pos], loop: bool) -> list[Pos]:
+    """Every square along a patrol's route: straight lines from corner to corner
+    (and back to the first, for a loop)."""
+    closed = loop and len(corners) > 1
+    path = [corners[0]]
+    for end in corners[1:] + ([corners[0]] if closed else []):
+        x, y = path[-1]
+        if (x, y) == end or (x != end[0] and y != end[1]):
+            raise LevelError(f"{where}: {square_name((x, y))} to {square_name(end)} isn't a straight line along a rank or file")
+        dx, dy = sign(end[0] - x), sign(end[1] - y)
+        while (x, y) != end:
+            x, y = x + dx, y + dy
+            path.append((x, y))
+    if closed:
+        path.pop()  # back where it started
+    return path
+
+
+def _check_enemies(level: Level) -> None:
+    """Enemies stay on open ground, and start apart from the piece and each other."""
+    starts: set[Pos] = set()
+    for number, enemy in enumerate(level.enemies, start=1):
+        for pos in enemy.path:
+            if not level.board.contains(pos):
+                raise LevelError(f"enemy {number}: {square_name(pos)} isn't on the board")
+            if level.board.tile(pos) not in OPEN_GROUND:
+                raise LevelError(f"enemy {number}: {square_name(pos)} is a {level.board.tile(pos).value}, and enemies walk on open ground")
+        if enemy.start == level.start:
+            raise LevelError(f"enemy {number}: starts on the {level.piece}'s square")
+        if enemy.start in starts:
+            raise LevelError(f"enemy {number}: starts on the same square as another enemy")
+        starts.add(enemy.start)
 
 
 def _parse_par(data: dict) -> Par:
@@ -375,7 +698,7 @@ def _parse_par(data: dict) -> Par:
     if unknown:
         raise LevelError(f"unknown par key(s): {', '.join(sorted(unknown))}")
     lines = data.get("lines")
-    if lines is not None and (not isinstance(lines, int) or isinstance(lines, bool) or lines < 1):
+    if lines is not None and not _positive(lines):
         raise LevelError("par lines must be a whole number of at least 1")
     return Par(lines=lines)
 

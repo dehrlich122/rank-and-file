@@ -1,0 +1,36 @@
+id: practice-06
+chapter: 0
+title: "Clockwork"
+trains: "Loops, and a clock that ticks with each new line of code"
+brief: "The patrol here is wound up by your code: every new line you write gives it another step."
+piece: pawn
+map: |
+  # # # # # G
+  . . . . . .
+  # # # . . #
+  # # . . # #
+  # . . # # #
+  P . # # # #
+enemies:
+- {"kind": "patrol", "start": "d5", "route": ["a5", "e5"], "clock": "new_line"}
+start: {"facing": "east"}
+api:
+- move
+- turn_left
+- turn_right
+par:
+  lines: 5
+hints:
+- "The patrol moves once for each line of your code that runs for the first time. Count lines, not moves."
+- "A `for` loop runs the same lines again, and a line running again doesn't wind the patrol."
+- "One way to start: `for _ in range(5):`, then `pawn.move()`."
+lesson: practice/practice-06.md
+lesson_board:
+  map: |
+    . . . . .
+    . . . . .
+    . . . . .
+    P . . . .
+  start: {"facing": "east"}
+  enemies:
+  - {"kind": "patrol", "route": ["a3", "e3"], "clock": "new_line"}

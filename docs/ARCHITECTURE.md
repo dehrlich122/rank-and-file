@@ -86,6 +86,7 @@ what makes step, pause and rewind easy: nothing is re-executed.
 | `solved` | Ran to the end with every objective met, in every case (see step 6) |
 | `incomplete` | Ran to the end, but an objective wasn't met (the summary says which) |
 | `finished` | Ran to the end on a board with no objectives (lesson snippets) |
+| `lost` | Fell into a pit or was caught by an enemy *(M3.1)*: a game over, not a mistake in the code |
 | `error` | Python or the game raised an error (syntax errors never start running) |
 | `timeout` | Hit the line budget |
 | `constraint` | Broke a level rule, so it wasn't run at all |
@@ -95,6 +96,23 @@ their own player-facing message. They still subclass the matching built-in type
 (`TypeError`, `AttributeError`) so they behave normally with `try`/`except`
 later, and they report their module as `builtins` so tracebacks read
 `BlockedError: …` rather than exposing the engine's module path.
+
+A loss *(M3.1)* raises `Lost`, which derives from `BaseException` like the
+line budget's `StepBudgetExceeded`, so `except Exception:` can't swallow it.
+The World also remembers it (`World.lost`), and a lost piece can't act again,
+so even a bare `except:` can't undo a loss.
+
+**Ticks and clocks** *(M3.1)*. Timed gates and enemies keep time with a clock:
+- `action` (the default): one tick per square moved, per turn, per wait and
+  per capture. The piece acts, then everything on that clock takes its turn,
+  then the World checks for a catch. `pawn.move(3)` is three ticks.
+- `line`: one tick as each line of player code starts to run.
+- `new_line`: one tick the first time each line runs, so a loop gives it
+  fewer ticks than the same calls copied out.
+
+The tracer calls `World.on_line` as each player line starts. That's where
+the `line` and `new_line` clocks tick. Asking the board (`at_goal()`,
+`position`) costs no tick.
 
 ### Playback
 
@@ -169,11 +187,25 @@ map: |                       # top row is the highest rank; symbols separated by
 legend:                      # optional: extra symbols beyond the built-ins
   S: {tile: sign, text: "Words written on the signpost"}
   X: {tile: gate, passphrase: Open sesame}
-start: {facing: north}
+  Q: {tile: gate, question: "How many gems did you collect?", passphrase: "4"}
+  T: {tile: timed_gate, every: 3, open: 2}           # open and clock (action) are optional
+  O: pit
+  W: waypoint
+  $: gem
+  L: plank
+enemies:                     # optional (M3.1); squares are chess names
+  - {kind: patrol, route: [b4, e4]}                   # there and back, from its first corner
+  - {kind: patrol, start: c2, route: [c2, f2, f5, c5], loop: true, clock: new_line}
+  - {kind: patrol, start: d4, armoured: true}         # no route: it stands guard
+  - {kind: chaser, start: g6, strategy: simple}
+start: {facing: north}       # also `planks: 1`: planks the piece starts with (QA-017)
 objectives:                  # default [reach_goal]
   - reach_goal               # end the program on the goal square
   - say: open sesame         # print this exact line at some point
-api: [move, turn_left, turn_right]      # abilities the piece has in this level (also at_goal)
+  - waypoints                # cross every waypoint (added whenever the map has any)
+  - collect: all             # or a number: gems to walk over
+  - capture: all             # or a number: enemies to capture (armoured ones can't be)
+api: [move, turn_left, turn_right]      # abilities the piece has in this level (also at_goal, wait, capture_left, capture_right, bridge)
 constraints: {max_lines: 4, min_comments: 1, require_nodes: [For], ban_nodes: []}
 par: {lines: 3}              # the par star: this many lines of code or fewer
 hints: ["nudge", "concept reminder", "partial example"]   # opened one at a time, on request
@@ -182,6 +214,9 @@ variants:                    # optional: the same level on other maps, which it 
       ...
 lesson: ch01/ch01-l03.md
 starter: ""                  # optional initial editor contents
+lesson_board:                # optional (QA-019): the board the lesson's snippets run on
+  map: |                     # map, legend, enemies and start, as above; no objectives
+    ...
 ```
 
 Built-in map symbols: `.` floor, `#` wall, `P` start, `G` goal, `?` a square
@@ -199,8 +234,44 @@ must reach the goal whichever `?` it's on). Legend tiles:
     was said at that gate earlier, the error adds a line pointing back to
     the line that printed it (QA-008). The crash is still reported at the
     move, as it would be in Python.
-  - Both guard lines live in `world.py`.
+  - With a `question` *(M3.1)*, the guard asks it: the question is shown in
+    the goals and on the gate, and the passphrase is its answer. A wrong
+    answer gets its own reply.
+  - The guard lines live in `world.py`.
   - `describe()` never includes the passphrase.
+- `timed_gate` *(M3.1)*: open for the first `open` ticks (default 2) of every
+  `every` ticks of its clock, starting open; `every` must be more than
+  `open`. Shut, it blocks like a wall. Anything under it when it shuts is
+  crushed *(QA-024)*: the piece loses the run, and a chaser is gone.
+- `pit` *(M3.1)*: stepping in loses the run. `pawn.bridge()` lays a plank
+  over the pit ahead *(QA-017)*, which makes it floor for everyone. A chaser
+  whose step lands on an open pit falls in and is gone.
+- `plank` *(QA-017)*: picked up by walking over it. The piece carries any
+  number. Bridging with none, or with no open pit ahead, is a `BridgeError`.
+- `waypoint` *(M3.1)*: must be crossed (passed over, not stopped on) before
+  the program ends.
+- `gem` *(M3.1)*: collected by walking over it.
+
+Enemies *(M3.1)* move one square per tick of their clock:
+- A **patrol** walks its `route`, straight lines between the corners listed,
+  there and back (or round and round with `loop: true`). With no route it
+  stands guard on `start`. `start` defaults to the first corner and must be
+  on the route.
+- A **chaser** (`strategy: simple`, the only one so far) steps toward the
+  piece along the bigger gap (east or west on a tie). If that way is blocked,
+  it tries the other. If both are blocked, it waits. Pits don't block it: it
+  falls in *(QA-017)*.
+- An enemy on the piece's square catches it, and the run is `lost`.
+- `armoured: true` means it can't be captured. `pawn.capture_left()` and
+  `capture_right()` take an enemy one square diagonally forward and move onto
+  its square. That costs a tick. An empty square or an armoured enemy is a
+  `CaptureError`.
+- The checker keeps enemies on open ground (floor, waypoints, gems, planks) and
+  starts them apart from the piece and from each other.
+- `Level.obstacles()` words every obstacle's rule for the Challenge panel.
+- Every event's state carries each enemy's square (`null` once captured or
+  fallen), the waypoints crossed, the gems and planks picked up, the planks
+  carried, the pits bridged, the tick count, and where a run was lost.
 
 Unknown keys, symbols,
 abilities or `ast` node names are errors, so typos fail in the level checker.
@@ -211,8 +282,10 @@ Alongside each level:
 
 - `lessons/<chapter>/<id>.md`: at most 150 words of prose and 1–3 fenced
   ```` ```python run ```` blocks, which become runnable snippet widgets on a
-  small open board with the level's abilities. Mark a snippet that is *meant*
-  to fail (to show an error) with ```` ```python run error ````. The Learn
+  small open board with the level's abilities, or on its `lesson_board` *(QA-019)*,
+  so a snippet can show an obstacle at work. Mark a snippet that is *meant*
+  to fail (to show an error) with ```` ```python run error ````, and one meant
+  to lose (to show a pit or an enemy at work) with ```` ```python run lost ````. The Learn
   panel shows the lesson in steps, one per runnable snippet. Each step is
   the text leading up to a snippet plus the snippet; text after the last
   snippet joins the last step. So where the snippets go decides where the

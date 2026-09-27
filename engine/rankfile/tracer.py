@@ -21,6 +21,7 @@ The tracer does two jobs:
 import reprlib
 import sys
 import types
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 PLAYER_FILENAME = "<player>"
@@ -63,9 +64,17 @@ class Tracer:
         tracer.lines_run  # how many lines of player code ran
     """
 
-    def __init__(self, budget: int, *, record: bool = False, max_steps: int = MAX_RECORDED_STEPS):
+    def __init__(
+        self,
+        budget: int,
+        *,
+        record: bool = False,
+        max_steps: int = MAX_RECORDED_STEPS,
+        on_line: Callable[[int], None] | None = None,
+    ):
         self.budget = budget
         self.record = record
+        self.on_line = on_line  # told as each player line starts (the World's line clocks)
         self.max_steps = max_steps
         self.lines_run = 0
         self.line: int | None = None  # the player's line running right now
@@ -112,6 +121,8 @@ class Tracer:
                 raise StepBudgetExceeded(self.budget, frame.f_lineno)
             if self.record:
                 self._start_step(frame)
+            if self.on_line is not None:
+                self.on_line(frame.f_lineno)
         elif event == "return" and self.record and frame is self._current_frame:
             self._close_step()
         return self._on_player_event

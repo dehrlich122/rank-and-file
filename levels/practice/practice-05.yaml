@@ -1,0 +1,34 @@
+id: practice-05
+chapter: 0
+title: "Pursuit"
+trains: "Predicting a chaser that follows a simple rule"
+brief: "Something is hunting your pawn. It's fast, but it isn't clever."
+piece: pawn
+map: |
+  . . . . . . G
+  . . # . # . .
+  . . # # # . .
+  . . . . . . .
+  P . . . . . .
+enemies:
+- {"kind": "chaser", "start": "f4"}
+start: {"facing": "north"}
+api:
+- move
+- turn_left
+- turn_right
+par:
+  lines: 5
+hints:
+- "The chaser always tries the direction with the bigger gap first. Where would that rule walk it into a wall?"
+- "A chaser that can't step toward you just waits. Walls can hold it while you get away."
+- "One way to start: `pawn.turn_left()`, then `pawn.turn_right()`."
+lesson: practice/practice-05.md
+lesson_board:
+  map: |
+    . . . . .
+    . . # . .
+    . . . . .
+    . . P . .
+  enemies:
+  - {"kind": "chaser", "start": "c4"}

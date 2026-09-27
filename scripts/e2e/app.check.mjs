@@ -39,6 +39,8 @@ export default async function appChecks({ browser: b, base, root, check }) {
     })`);
   }
   const brief = (r) => `${r.head}: ${r.text.slice(0, 110)}`;
+  /** What the game said in the console (guards, pick-ups, falls). Check it in Node; never report it: it can give a solution away. */
+  const gameMessages = () => b.evaluate(`[...document.querySelectorAll('.console .game-message')].map((e) => e.textContent)`);
 
   // -- every level can be solved -------------------------------------------------------
   for (const id of LEVELS) {
@@ -174,6 +176,40 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(inPanel, "no comparison button in the Challenge panel of a solved level");
   });
 
+  // -- QA-018: seeing the idiomatic solution gives up the third star -----------------------
+  await check("QA-018: with a star to lose, Compare asks first in the Challenge panel; 'Not yet' keeps it closed", async () => {
+    await openLevel("practice-04", { fresh: true });
+    await setCode(`${solution("practice-04")}\nsteps = 0\n`); // solves it, one line over par
+    const r = await run();
+    await clickButton("Compare with an idiomatic solution", ".outcome-host");
+    const asked = await b.evaluate(`({
+      tab: document.querySelector('.tab.active')?.textContent,
+      question: document.querySelector('.solution-section .confirm-step p')?.textContent ?? '',
+      focused: document.activeElement?.textContent,
+      dialog: !!document.querySelector('.compare-dialog'),
+    })`);
+    await clickButton("Not yet", ".solution-section .confirm-step");
+    const after = await b.evaluate(`({ confirm: !!document.querySelector('.confirm-step'), dialog: !!document.querySelector('.compare-dialog') })`);
+    expect(r.head === "Solved!" && r.stars === 2, `${r.stars} stars: ${brief(r)}`);
+    expect(asked.tab === "Challenge" && asked.question.includes("gives up this level's third star") && asked.focused === "Show it" && !asked.dialog, JSON.stringify(asked));
+    expect(!after.confirm && !after.dialog, `after 'Not yet': ${JSON.stringify(after)}`);
+  });
+
+  await check("QA-018: once the solution is seen, a run earns two stars at most, and says why", async () => {
+    await clickButton("Compare with an idiomatic solution", ".solution-section");
+    await clickButton("Show it", ".solution-section .confirm-step");
+    await b.waitFor(`!!document.querySelector('.compare-dialog .compare-idiomatic .cm-line')`, 10_000, "the comparison");
+    await b.key("Escape");
+    await setCode(solution("practice-04"));
+    const r = await run();
+    await clickButton("Compare with an idiomatic solution", ".outcome-host");
+    const reopened = await b.evaluate(`!!document.querySelector('.compare-dialog') && !document.querySelector('.confirm-step')`);
+    await b.key("Escape");
+    expect(r.head === "Solved!" && r.stars === 2 && r.text.includes("No hints or solution seen (you looked at the solution)"), `${r.stars} stars: ${brief(r)}`);
+    expect(reopened, "a second look should open straight away: there's no star left to lose");
+    return `${r.stars} stars`;
+  });
+
   // -- M2: giving up ------------------------------------------------------------------------
   const offersSolution = () => hasButton("Show me a solution…", ".outcome-host");
 
@@ -297,6 +333,182 @@ export default async function appChecks({ browser: b, base, root, check }) {
     return brief(r);
   });
 
+  // -- M3.1: the obstacle toolkit (the Testing ground's practice-02 to practice-09) ------------
+  // Counts, labels and outcomes only: never code, never the console (it can hold an answer).
+  const PRACTICE = ["practice-02", "practice-03", "practice-04", "practice-05", "practice-06", "practice-07", "practice-08", "practice-09", "practice-10"];
+  const drawn = () =>
+    b.evaluate(`(() => {
+      const board = document.querySelector('.board-host .board');
+      const count = (selector) => board.querySelectorAll(selector).length;
+      return {
+        pits: count('.pit'), waypoints: count('.waypoint'), gems: count('.gem'), timed: count('.timed-gate'),
+        enemies: count('.enemy'), armoured: count('.enemy.armoured'), routes: count('.route'),
+        crossed: count('.waypoint.crossed'), collected: count('.gem.collected'), gone: count('.enemy.gone'),
+        planks: count('.plank'), planksTaken: count('.plank.collected'), bridged: count('.pit.bridged'),
+        badges: [...board.querySelectorAll('.badge-text')].map((e) => e.textContent),
+        lost: board.classList.contains('lost'),
+      };
+    })()`);
+
+  await check("M3.1: each obstacle is drawn, and the Challenge panel says its rule", async () => {
+    const d = {};
+    for (const id of PRACTICE) {
+      await openLevel(id, { fresh: true });
+      await challengeTab();
+      const obstacles = await b.evaluate(`document.querySelector('ul.obstacles')?.innerText ?? ''`);
+      d[id] = { ...(await drawn()), obstacles: obstacles.split("\n").filter(Boolean).length };
+    }
+    expect(d["practice-02"].pits === 10 && d["practice-02"].planks === 1 && d["practice-02"].obstacles === 2, `pits and a plank: ${JSON.stringify(d["practice-02"])}`);
+    expect(d["practice-10"].pits === 3 && d["practice-10"].enemies === 1 && d["practice-10"].obstacles === 4, `pitfall: ${JSON.stringify(d["practice-10"])}`);
+    expect(d["practice-03"].waypoints === 3, `waypoints: ${JSON.stringify(d["practice-03"])}`);
+    expect(d["practice-04"].enemies === 1 && d["practice-04"].routes === 1 && d["practice-04"].obstacles === 2, `patrol: ${JSON.stringify(d["practice-04"])}`);
+    expect(d["practice-05"].badges.includes("chases") && d["practice-05"].routes === 0, `chaser: ${JSON.stringify(d["practice-05"])}`);
+    expect(d["practice-06"].badges.some((text) => text.startsWith("⚙")), `clockwork: ${JSON.stringify(d["practice-06"])}`);
+    expect(d["practice-07"].timed === 2 && d["practice-07"].badges.join() === "2 of 3,2 of 4", `timed gates: ${JSON.stringify(d["practice-07"])}`);
+    expect(d["practice-08"].gems === 3 && d["practice-08"].badges.includes("?"), `gems and the guard: ${JSON.stringify(d["practice-08"])}`);
+    expect(d["practice-09"].enemies === 2 && d["practice-09"].armoured === 1, `capture: ${JSON.stringify(d["practice-09"])}`);
+    return Object.entries(d).map(([id, x]) => `${id}: ${x.obstacles} rules`).join(", ");
+  });
+
+  await check("M3.1: The Toll shows the guard's question, never its answer", async () => {
+    await openLevel("practice-08", { fresh: true });
+    await challengeTab();
+    const goals = await b.evaluate(`document.querySelector('.objectives').innerText`);
+    expect(goals.includes('The guard asks: "How many gems did you collect?"') && goals.includes("Collect all 3 gems"), goals);
+  });
+
+  await check("M3.1: a run that falls into a pit reads Lost, says where, and marks the square", async () => {
+    await openLevel("practice-02", { fresh: true });
+    await setCode(withoutExpectLine(solution("practice-02", ".naive")));
+    const r = await run();
+    const board = await drawn();
+    expect(r.head === "Lost" && r.tone.includes("outcome-bad") && /fell into the pit on [a-d][1-4]\./.test(r.text), brief(r));
+    expect(board.lost && r.errorLine && r.stars === 0, `board lost: ${board.lost}, error line: ${r.errorLine}`);
+    return brief(r);
+  });
+
+  await check("M3.1: walking into the patrol, or a clockwork patrol catching up, is being caught", async () => {
+    const results = [];
+    for (const id of ["practice-04", "practice-05", "practice-06"]) {
+      await openLevel(id, { fresh: true });
+      await setCode(withoutExpectLine(solution(id, ".naive")));
+      const r = await run();
+      expect(r.head === "Lost" && /was caught by the (patrol|chaser) on [a-g][1-6]\./.test(r.text), `${id}: ${brief(r)}`);
+      results.push(`${id}: ${r.head}`);
+    }
+    return results.join(", ");
+  });
+
+  // Like Chapter 1's reference-solution checks, plus what the board should show at the end.
+  const afterwards = {
+    "practice-03": (board) => expect(board.crossed === 3, `waypoints ticked off: ${board.crossed}`),
+    "practice-08": (board) => expect(board.collected === 3, `gems collected: ${board.collected}`),
+    "practice-09": (board) => expect(board.gone === 1, `enemies captured: ${board.gone}`),
+    "practice-02": (board) => expect(board.bridged === 1 && board.planksTaken === 1, `pits bridged: ${board.bridged}, planks taken: ${board.planksTaken}`),
+    "practice-10": (board) => expect(board.gone === 1, `chasers gone: ${board.gone}`),
+  };
+  for (const id of PRACTICE) {
+    await check(`${id}: reference solution solves it`, async () => {
+      await openLevel(id, { fresh: true });
+      await setCode(solution(id));
+      const r = await run();
+      expect(r.head === "Solved!" && r.stars === 3, `${r.stars} of 3 stars: ${brief(r)}`);
+      afterwards[id]?.(await drawn());
+      return brief(r);
+    });
+  }
+
+  // -- QA-017: pits swallow chasers, and planks bridge them -------------------------------
+  await check("QA-017: in Pitfall, the chaser that steps into a pit falls in, and the console says so", async () => {
+    await openLevel("practice-10", { fresh: true });
+    await setCode(solution("practice-10"));
+    const r = await run();
+    const said = await gameMessages();
+    const fell = said.filter((text) => /^The chaser fell into the pit on [a-f][1-5]\.$/.test(text)).length;
+    expect(r.head === "Solved!" && fell === 1, `${r.head}, ${fell} falls in ${said.length} messages`);
+  });
+
+  await check("QA-017: in Stepping Stones, picking up the plank is announced, and bridging where there's no pit is an error", async () => {
+    await openLevel("practice-02", { fresh: true });
+    await setCode(solution("practice-02"));
+    await run();
+    const said = await gameMessages();
+    expect(said.includes("Your pawn picked up a plank. It's carrying 1 plank."), `no pick-up among ${said.length} messages`);
+    await setCode("pawn.bridge()");
+    const r = await run();
+    expect(r.head === "Python stopped" && r.text.includes("Planks only go over pits, and there's no open pit on c2."), brief(r));
+    return brief(r);
+  });
+
+  // -- QA-019 to QA-024: lesson boards, clockwork counts, crushing gates -----------------------
+  // Statuses, counts and the game's messages only: never a snippet's or a level's code.
+  const snippet = (index) => `document.querySelectorAll('.lesson .snippet')[${index}]`;
+  /** Run a lesson snippet (counting from 0), wait for it to end, and describe how it ended. */
+  async function runSnippet(index, { settle = false } = {}) {
+    await b.evaluate(`${snippet(index)}.querySelector('.btn').click()`);
+    await b.waitFor(`/Finished|Lost|stopped/i.test(${snippet(index)}.querySelector('.snippet-status').textContent)`, 20_000, "snippet ended");
+    if (settle) await sleep(1500); // the status shows as the last line starts; its moves animate just after
+    return snippetBoard(index);
+  }
+  const snippetBoard = (index) =>
+    b.evaluate(`(() => {
+      const s = ${snippet(index)};
+      return {
+        status: s.querySelector('.snippet-status').textContent,
+        said: [...s.querySelectorAll('.snippet-output .game-message')].map((e) => e.textContent),
+        enemies: [...s.querySelectorAll('.board .enemy:not(.gone)')].map((e) => e.style.transform),
+        badges: [...s.querySelectorAll('.board .badge-text')].map((e) => e.textContent),
+      };
+    })()`);
+  const gearCount = (text = "") => /^⚙\uFE0E? (\d+)$/.exec(text)?.[1];
+
+  await check("QA-019: Pursuit's lesson snippets have a chaser, and it moves as the code runs", async () => {
+    await openLevel("practice-05", { fresh: true });
+    await b.waitFor(`${snippet(1)}.querySelector('.board .enemy')`, 20_000, "the lesson board");
+    const before = await snippetBoard(1);
+    const after = await runSnippet(1, { settle: true });
+    expect(before.enemies.length === 1 && after.enemies.length === 1 && before.enemies[0] !== after.enemies[0], `chaser: ${JSON.stringify([before.enemies, after.enemies])}`);
+    expect(after.status.includes("Finished"), after.status);
+  });
+
+  await check("QA-019: snippets show the game's messages, and one meant to lose reads Lost", async () => {
+    await openLevel("practice-10", { fresh: true });
+    const pitfall = await runSnippet(0, { settle: true });
+    await openLevel("practice-02", { fresh: true });
+    const stones = await runSnippet(0);
+    expect(pitfall.said.includes("The chaser fell into the pit on c2.") && pitfall.enemies.length === 0, JSON.stringify(pitfall));
+    expect(stones.status.includes("Lost") && stones.said.includes("Your pawn fell into the pit on c1."), JSON.stringify(stones));
+    return `${pitfall.status} / ${stones.status}`;
+  });
+
+  await check("QA-021: a clockwork patrol's gear counts only the lines that run for the first time", async () => {
+    await openLevel("practice-06", { fresh: true });
+    const start = (await drawn()).badges;
+    await setCode("for i in range(5):\n    x = i\n"); // two new lines, the second run five times
+    await run();
+    const end = (await drawn()).badges;
+    const looped = await runSnippet(1, { settle: true }); // the lesson's loop of moves
+    expect(gearCount(start[0]) === "0" && gearCount(end[0]) === "2", `gear before and after: ${JSON.stringify([start, end])}`);
+    expect(gearCount(looped.badges[0]) === "2", `the lesson's loop: ${JSON.stringify(looped.badges)}`);
+    return `${start[0]} → ${end[0]}`;
+  });
+
+  await check("QA-024: Portcullis crushes a pawn under a shutting gate, and its lesson shows bump, crush and pass", async () => {
+    await openLevel("practice-07", { fresh: true });
+    await setCode("pawn.move(2)\n"); // into the first gate on its last open tick
+    const r = await run();
+    const lesson = [await runSnippet(0), await runSnippet(1), await runSnippet(2)].map((s) => s.status);
+    expect(r.head === "Lost" && r.text.includes("Your pawn was crushed by the gate on c1."), brief(r));
+    expect(/stopped/.test(lesson[0]) && lesson[1].includes("Lost") && lesson[2].includes("Finished"), JSON.stringify(lesson));
+    return lesson.join(" / ");
+  });
+
+  await check("QA-023: The Toll says it's a demo with nothing new to learn", async () => {
+    await levelCards();
+    const card = await b.evaluate(`document.querySelector('a[href="#/level/practice-08"]').innerText`);
+    expect(card.includes("A demo of gems and a guard who asks a question"), card);
+  });
+
   // -- QA-002: level 4's locked gate --------------------------------------------------------
   await check("QA-002: level 4 starts with the guard's comment, and the panels don't give the passphrase away", async () => {
     await openLevel("ch01-l04", { fresh: true });
@@ -324,7 +536,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await openLevel("ch01-l04");
     await setCode(withoutExpectLine(solution("ch01-l04", ".naive3"))); // passphrase printed with its quote marks
     const r = await run();
-    const guard = await b.evaluate(`[...document.querySelectorAll('.console .game-message')].map((e) => e.textContent)`);
+    const guard = await gameMessages();
     const open = await b.evaluate(`!!document.querySelector('.board .gate.open')`);
     expect(guard.join() === "The guard called your mother a hamster! The gate remains locked.", `guard said: ${JSON.stringify(guard)}`);
     expect(!open, "the gate opened");
@@ -342,7 +554,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await openLevel("ch01-l04");
     await setCode(withoutExpectLine(solution("ch01-l04", ".naive"))); // passphrase said far from the gate
     const r = await run();
-    const guard = await b.evaluate(`document.querySelectorAll('.console .game-message').length`);
+    const guard = (await gameMessages()).length;
     expect(guard === 0 && r.text.includes("elderberries"), `${brief(r)} | guard lines: ${guard}`);
     expect(!r.text.includes("didn't accept"), "QA-008: no pointer line when the guard never heard anything");
   });
@@ -497,7 +709,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     const text = await b.evaluate(`document.querySelector('.tab-panel:not([hidden])').innerText.replace(/\\s+/g, ' ')`);
     expect(text.includes("Reach the goal on b8") && text.includes("At most 2 lines"), text.slice(0, 160));
     // Headings are styled in capitals, and innerText returns them that way.
-    expect(/stars solve the level\. use \d+ lines? of code or fewer \(par\)\. solve it without opening a hint\./i.test(text), "the Stars section is missing or worded differently");
+    expect(/stars solve the level\. use \d+ lines? of code or fewer \(par\)\. solve it without opening a hint or seeing the solution\./i.test(text), "the Stars section is missing or worded differently");
     return text.slice(0, 120);
   });
 

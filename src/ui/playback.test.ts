@@ -2,13 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Step, WorldState } from "../py/protocol";
 import { BASE_STEP_MS, buildFrames, consoleAt, controlStates, frameDuration, Player, type Frame } from "./playback";
 
-const start: WorldState = { pos: [0, 0], facing: "north", opened: [] };
+const start: WorldState = { pos: [0, 0], facing: "north", opened: [], crossed: [], collected: [], planks: 0, bridged: [], enemies: [], tick: 0, lost: null };
+const at = (pos: [number, number], facing: WorldState["facing"] = "north"): WorldState => ({ ...start, pos, facing });
 
 function step(line: number, pos: [number, number] | null, output = ""): Step {
   return {
     line,
     scope: "<module>",
-    events: pos ? [{ kind: "move", state: { pos, facing: "north", opened: [] } }] : [],
+    events: pos ? [{ kind: "move", state: at(pos) }] : [],
     output,
     vars: [],
   };
@@ -33,11 +34,11 @@ describe("buildFrames", () => {
     const multi: Step = {
       ...step(1, null),
       events: [
-        { kind: "move", state: { pos: [0, 1], facing: "north", opened: [] } },
-        { kind: "turn", state: { pos: [0, 1], facing: "east", opened: [] } },
+        { kind: "move", state: at([0, 1]) },
+        { kind: "turn", state: at([0, 1], "east") },
       ],
     };
-    expect(buildFrames({ start, steps: [multi] })[1]!.state).toEqual({ pos: [0, 1], facing: "east", opened: [] });
+    expect(buildFrames({ start, steps: [multi] })[1]!.state).toEqual(at([0, 1], "east"));
   });
 
   it("puts a guard's reply in the console right after the line that caused it", () => {

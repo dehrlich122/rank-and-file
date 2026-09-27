@@ -22,13 +22,22 @@ export interface SnippetResult {
 
 export type Facing = "north" | "east" | "south" | "west";
 export type Pos = [number, number];
-export type TileKind = "floor" | "wall" | "sign" | "gate";
+export type TileKind = "floor" | "wall" | "sign" | "gate" | "pit" | "waypoint" | "gem" | "timed_gate" | "plank";
+export type Clock = "action" | "line" | "new_line";
 
-/** The world at one moment: where the piece is, and which gates are open. */
+/** The world at one moment: where the piece is, which gates are open, and the obstacles (M3.1). */
 export interface WorldState {
   pos: Pos;
   facing: Facing;
   opened: Pos[];
+  crossed: Pos[]; // waypoints passed over
+  collected: Pos[]; // gems and planks picked up
+  planks: number; // planks the piece is carrying (QA-017)
+  bridged: Pos[]; // pits with a plank over them
+  enemies: Array<Pos | null>; // where each of the level's enemies is; null once captured or fallen into a pit
+  tick: number; // ticks of the action clock so far (moves, turns and waits)
+  lost: Pos | null; // where the run was lost: a pit, or where the piece was caught
+  clock_ticks?: Partial<Record<Clock, number>>; // the code clocks' counts, on levels with clockwork (QA-021)
 }
 
 /** A level as the engine describes it (levels.Level.describe). */
@@ -43,28 +52,41 @@ export interface LevelInfo {
   height: number;
   tiles: TileKind[][]; // tiles[y][x]; y = 0 is the bottom rank
   signs: Array<{ pos: Pos; text: string }>;
+  questions: Array<{ pos: Pos; text: string }>; // what the guard asks, at gates that ask (never the answer)
+  timed_gates: Array<{ pos: Pos; every: number; open: number; clock: Clock; text: string }>; // open for the first `open` ticks of every `every` (QA-024); text: its rule in words
+  enemies: Enemy[]; // patrols and chasers; where they are is in each WorldState
   goal: Pos | null;
   goal_spots: Pos[]; // a hidden goal: the squares it might be on (drawn as ?)
   case_title: string; // the title of the row of cases above the board; "" for a single case
   start: WorldState;
-  objectives: { reach_goal: boolean; say: string[] };
+  objectives: { reach_goal: boolean; say: string[]; waypoints: boolean; collect: number | "all" | null; capture: number | "all" | null };
   api: string[];
   constraints: { max_lines: number | null; min_comments: number; require_nodes: string[]; ban_nodes: string[] };
   par: { lines: number | null };
   starter: string;
   goals: string[]; // what to do, in words (never a passphrase)
   rules: string[]; // the level's constraints, in words
+  obstacles: string[]; // each obstacle's rule, in words (M3.1)
   stars: string[]; // what each of the three stars asks for, in words
   hints: string[]; // tiered: nudge, concept reminder, partial example
+}
+
+/** A patrol or a chaser (levels.Enemy), as the board draws it. */
+export interface Enemy {
+  kind: "patrol" | "chaser";
+  route: Pos[]; // a patrol's corners (one square if it stands guard)
+  loop: boolean; // a patrol: round and round, instead of there and back
+  clock: Clock;
+  armoured: boolean;
 }
 
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };
 
 export interface GameEvent {
-  kind: "move" | "turn" | "bump" | "gate_open" | "guard";
+  kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "capture" | "tick" | "lost" | "pick_up" | "bridge" | "fall" | "crush";
   state: WorldState; // the whole world's state after the event
-  at?: Pos; // bump: the square bumped into; gate_open/guard: the gate
-  message?: string; // guard: what the guard said
+  at?: Pos; // bump: the square bumped into; gate_open/guard: the gate; capture, fall: the enemy's square; bridge: the pit; pick_up, lost: where
+  message?: string; // guard: what the guard said; pick_up, fall, crush, lost: what happened
 }
 
 export interface Var {
@@ -87,7 +109,7 @@ interface LintWarning {
   message: string;
 }
 
-type LevelStatus = "solved" | "incomplete" | "finished" | "error" | "timeout" | "constraint";
+type LevelStatus = "solved" | "incomplete" | "finished" | "lost" | "error" | "timeout" | "constraint";
 
 /** One of a solved run's three stars (runner.Star). */
 export interface Star {
@@ -137,9 +159,9 @@ interface ReplResult {
 export interface Requests {
   runSnippet: { args: { code: string }; result: SnippetResult };
   loadLevel: { args: { level: unknown }; result: LoadLevelResult };
-  loadSandbox: { args: { api: string[] }; result: LevelInfo };
-  runLevel: { args: { level: unknown; code: string; hintsUsed: number }; result: LevelResult };
-  runSandbox: { args: { code: string; api: string[] }; result: LevelResult };
+  loadSandbox: { args: { api: string[]; board?: unknown }; result: LevelInfo }; // board: a level's lesson_board (QA-019)
+  runLevel: { args: { level: unknown; code: string; hintsUsed: number; solutionSeen: boolean }; result: LevelResult };
+  runSandbox: { args: { code: string; api: string[]; board?: unknown }; result: LevelResult };
   replPush: { args: { line: string }; result: ReplResult };
   replReset: { args: Record<string, never>; result: { ok: true } };
 }

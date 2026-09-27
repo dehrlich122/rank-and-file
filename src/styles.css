@@ -51,6 +51,20 @@
   --gate-frame: light-dark(#c9b48e, #8a7658);
   --gate-bars: light-dark(#3f3a36, #211d1a);
   --gate-lock: light-dark(#c8961a, #e0b04a);
+  --pit-rim: light-dark(#5b4a3b, #3a2f26);
+  --pit-hole: light-dark(#1d1712, #0c0907);
+  --plank: light-dark(#b98a55, #9a6f40);
+  --plank-grain: light-dark(#8a6236, #6e4d2a);
+  --waypoint: light-dark(#2c6fb0, #7fb2e8);
+  --enemy: light-dark(#3b2f4a, #2a2233);
+  --enemy-rim: var(--bad);
+  --enemy-eye: light-dark(#ffd76a, #ffd76a);
+  --route: color-mix(in srgb, var(--bad) 60%, transparent);
+  --badge-bg: light-dark(#fffaf0, #2a2521);
+  --badge-border: light-dark(#8a7658, #c9b48e);
+  --badge-text: light-dark(#3f3a36, #f3e2c7);
+  --gem: light-dark(#1f9d8a, #5fd3c0);
+  --gem-facets: light-dark(#d9f5ef, #1b4f47);
   --game-message: light-dark(#8a4b00, #e6b555);
   --star: light-dark(#c8961a, #e0b04a);
 }
@@ -1008,7 +1022,7 @@ pre {
 }
 
 /* What the game says (e.g. the guard at a gate), as opposed to what the program printed. */
-.console .game-message {
+.game-message {
   display: block;
   margin: 2px 0;
   padding-left: 8px;
@@ -1187,6 +1201,18 @@ pre {
   opacity: 0;
 }
 
+/* a small label on a tile or an enemy, e.g. a timed gate's "every 3" (M3.1) */
+.badge {
+  fill: var(--badge-bg);
+  stroke: var(--badge-border);
+  stroke-width: 1;
+}
+
+.badge-text {
+  font: 700 10px var(--font-ui);
+  fill: var(--badge-text);
+}
+
 .gate.refusing .gate-frame {
   animation: refuse 650ms ease-out;
 }
@@ -1195,6 +1221,139 @@ pre {
   25% {
     fill: var(--bad);
   }
+}
+
+/* obstacles (M3.1, src/ui/board.ts) */
+.pit-rim {
+  fill: var(--pit-rim);
+}
+
+.pit-hole {
+  fill: var(--pit-hole);
+}
+
+.plank-wood {
+  fill: var(--plank);
+}
+
+.plank-grain {
+  fill: none;
+  stroke: var(--plank-grain);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+/* a plank on the floor vanishes once picked up; one over a pit appears once laid */
+.plank,
+.pit-plank {
+  transition: opacity 250ms ease-in-out;
+}
+
+.plank.collected,
+.pit:not(.bridged) .pit-plank {
+  opacity: 0;
+  pointer-events: none; /* so its tooltip doesn't show */
+}
+
+.waypoint-ring {
+  fill: none;
+  stroke: var(--waypoint);
+  stroke-width: 4;
+}
+
+.waypoint-tick {
+  font: 700 24px var(--font-ui);
+  fill: var(--waypoint);
+  opacity: 0;
+  transition: opacity 250ms ease-in-out;
+}
+
+.waypoint.crossed .waypoint-tick {
+  opacity: 1;
+}
+
+.waypoint.crossed .waypoint-ring {
+  fill: var(--waypoint);
+  fill-opacity: 0.15;
+}
+
+.gem {
+  transition: opacity 250ms ease-in-out, transform 250ms ease-in-out;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.gem-body {
+  fill: var(--gem);
+}
+
+.gem-facets {
+  fill: none;
+  stroke: var(--gem-facets);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.gem.collected {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.4);
+}
+
+.route {
+  fill: none;
+  stroke: var(--route);
+  stroke-width: 3;
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.enemy {
+  transition: transform var(--step-ms, 350ms) ease-in-out, opacity 250ms ease-in-out;
+}
+
+.enemy-body {
+  fill: var(--enemy);
+  stroke: var(--enemy-rim);
+  stroke-width: 3;
+}
+
+.enemy.armoured .enemy-body {
+  stroke-width: 5;
+  stroke-dasharray: 4 2;
+}
+
+.enemy-eye {
+  fill: var(--enemy-eye);
+}
+
+.enemy.gone {
+  opacity: 0;
+}
+
+.lost-mark {
+  display: none;
+  pointer-events: none;
+}
+
+.board.lost .lost-mark {
+  display: inline;
+}
+
+.lost-ring {
+  fill: none;
+  stroke: var(--bad);
+  stroke-width: 4;
+}
+
+.lost-cross {
+  font: 700 18px var(--font-ui);
+  fill: var(--bad);
+}
+
+.board.lost .pawn {
+  opacity: 0.45;
 }
 
 .bump-flash {
@@ -1225,7 +1384,7 @@ pre {
 
 /* Animations setting: "Reduced" always stops movement; "Match system" follows
    the OS preference; "Full" ignores it. (Colour flashes stay: they aren't motion.) */
-:root[data-motion="reduced"] :is(.piece, .piece-pointer, .gate-bars, .gate-lock, .level-left) {
+:root[data-motion="reduced"] :is(.piece, .piece-pointer, .enemy, .gate-bars, .gate-lock, .gem, .plank, .pit-plank, .waypoint-tick, .level-left) {
   transition: none;
 }
 
@@ -1234,7 +1393,7 @@ pre {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion="full"]) :is(.piece, .piece-pointer, .gate-bars, .gate-lock, .level-left) {
+  :root:not([data-motion="full"]) :is(.piece, .piece-pointer, .enemy, .gate-bars, .gate-lock, .gem, .plank, .pit-plank, .waypoint-tick, .level-left) {
     transition: none;
   }
 

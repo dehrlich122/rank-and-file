@@ -9,7 +9,8 @@ For each level (levels/<folder>/<id>.yaml: a chapter, chNN, or practice) it chec
 - the idiomatic-solution note (solutions/chNN/<id>.md) exists;
 - the lesson has at most 150 words of prose and 1-3 runnable snippets, each of
   which runs as expected (``` python run ``` must not fail; ``` python run error ```
-  must fail, on purpose).
+  must fail, and ``` python run lost ``` must lose the run, on purpose). They run
+  on the level's `lesson_board` if it has one.
 """
 
 import re
@@ -24,7 +25,7 @@ from rankfile.runner import run_level, run_sandbox
 ROOT = Path(__file__).resolve().parents[2]
 LEVEL_FILES = sorted((ROOT / "levels").glob("*/*.yaml"))
 MAX_LESSON_WORDS = 150
-SNIPPET = re.compile(r"^```python run( error)?\n(.*?)^```", re.MULTILINE | re.DOTALL)
+SNIPPET = re.compile(r"^```python run(?: (error|lost))?\n(.*?)^```", re.MULTILINE | re.DOTALL)
 FENCED = re.compile(r"^```.*?^```", re.MULTILINE | re.DOTALL)
 
 
@@ -109,9 +110,9 @@ def test_lesson_is_short_and_runnable(level_file):
 
     snippets = SNIPPET.findall(text)
     assert 1 <= len(snippets) <= 3, f"{level.lesson} needs 1-3 runnable snippets"
-    for flagged_error, code in snippets:
-        result = run_sandbox(code, level.api)
-        if flagged_error:
-            assert result.status == "error", f"snippet should fail on purpose:\n{code}"
+    for meant, code in snippets:
+        result = run_sandbox(code, level.api, lesson_board=level.lesson_board)
+        if meant:
+            assert result.status == meant, f"snippet should end in {meant} on purpose, not {result.status}:\n{code}"
         else:
             assert result.status == "finished", f"snippet failed ({result.summary}):\n{code}"

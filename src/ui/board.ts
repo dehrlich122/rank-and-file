@@ -1,5 +1,6 @@
-// The board, drawn as SVG: squares, tiles (walls, signposts, gates), the goal
-// and the piece.
+// The board, drawn as SVG: squares, tiles (walls, signposts, gates, pits,
+// waypoints, gems, timed gates, planks), the goal, the enemies and their
+// routes (M3.1) and the piece.
 //
 // The board never decides anything. It draws the states the engine reported:
 // `show()` jumps straight to a state, `animate()` plays a step's events in order.
@@ -7,7 +8,7 @@
 // Each tile type has its own draw function (TILE_ART below) and CSS classes, and
 // every colour comes from the CSS custom properties in styles.css, so a visual
 // redesign can reskin tiles without touching the logic.
-import type { Facing, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
+import type { Clock, Enemy, Facing, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
 
 const SVG = "http://www.w3.org/2000/svg";
 const S = 64; // size of one square, in SVG units
@@ -25,7 +26,10 @@ export class BoardView {
   private readonly body: SVGGElement; // shakes on a bump
   private readonly pointer: SVGGElement; // rotates to show the facing
   private readonly flash: SVGRectElement;
-  private readonly gates = new Map<string, SVGGElement>(); // "x,y" -> gate art
+  private readonly lostMark: SVGGElement; // where the run was lost (M3.1)
+  private readonly enemies: SVGGElement[]; // one per level.enemies, moved like the piece
+  private readonly counters: SVGGElement[]; // clockwork badges that count their clock's ticks (QA-021)
+  private readonly art = new Map<TileKind, Map<string, SVGGElement>>(); // tile kind -> "x,y" -> its art
   private angle = 0; // cumulative, so turns always take the short way round
   private timers: number[] = [];
 
@@ -51,9 +55,13 @@ export class BoardView {
         const [left, top] = corner([x, y], height);
         const light = (x + y) % 2 === 1;
         squares.append(svg("rect", { x: left, y: top, width: S, height: S, class: light ? "sq-light" : "sq-dark" }));
-        const art = TILE_ART[level.tiles[y]?.[x] ?? "floor"]?.(left, top, level, [x, y]);
-        if (art) squares.append(art);
-        if (art?.classList.contains("gate")) this.gates.set(`${x},${y}`, art);
+        const kind = level.tiles[y]?.[x] ?? "floor";
+        const art = TILE_ART[kind]?.(left, top, level, [x, y]);
+        if (art) {
+          squares.append(art);
+          if (!this.art.has(kind)) this.art.set(kind, new Map());
+          this.art.get(kind)!.set(`${x},${y}`, art);
+        }
       }
     }
     this.element.append(squares, labels(width, height));
@@ -70,8 +78,12 @@ export class BoardView {
       squares.append(flag(left, top));
     }
 
+    // Enemies (M3.1): every patrol's route, dotted, and the enemies themselves, under the piece.
+    for (const enemy of level.enemies) if (enemy.route.length > 1) squares.append(route(enemy, height));
+    this.enemies = level.enemies.map((enemy) => enemyPiece(enemy, level));
+
     this.flash = svg("rect", { class: "bump-flash", width: S, height: S, x: 0, y: 0 });
-    this.element.append(this.flash);
+    this.element.append(this.flash, ...this.enemies);
 
     this.piece = svg("g", { class: "piece" });
     this.body = svg("g", { class: "piece-body" });
@@ -81,19 +93,22 @@ export class BoardView {
     this.piece.append(this.body);
     this.element.append(this.piece);
 
+    this.lostMark = lostMark();
+    this.element.append(this.lostMark);
+    this.counters = [...this.element.querySelectorAll<SVGGElement>("[data-clock]")];
+
     this.show(level.start);
   }
 
   /** Jump straight to a state, with no animation. */
   show(state: WorldState): void {
     this.cancel();
-    this.piece.style.transition = "none";
-    this.pointer.style.transition = "none";
+    const moving = [this.piece, this.pointer, ...this.enemies];
+    for (const element of moving) element.style.transition = "none";
     this.angle = FACING_ANGLE[state.facing];
     this.place(state);
     this.element.getBoundingClientRect(); // apply now, before transitions come back
-    this.piece.style.transition = "";
-    this.pointer.style.transition = "";
+    for (const element of moving) element.style.transition = "";
     this.setCelebrating(false);
   }
 
@@ -121,17 +136,43 @@ export class BoardView {
     this.place(event.state);
     if (event.kind === "bump" && event.at) this.bump(event.state.pos, event.at);
     if (event.kind === "guard" && event.at) {
-      const gate = this.gates.get(`${event.at[0]},${event.at[1]}`);
+      const gate = this.art.get("gate")?.get(`${event.at[0]},${event.at[1]}`);
       if (gate) restartAnimation(gate, "refusing");
     }
   }
 
   private place(state: WorldState): void {
-    const [left, top] = corner(state.pos, this.level.height);
-    this.piece.style.transform = `translate(${left + S / 2}px, ${top + S / 2}px)`;
+    this.piece.style.transform = centre(state.pos, this.level.height);
     this.pointer.style.transform = `rotate(${this.angle}deg)`;
-    const opened = new Set((state.opened ?? []).map(([x, y]) => `${x},${y}`));
-    for (const [key, gate] of this.gates) gate.classList.toggle("open", opened.has(key));
+    this.mark("gate", "open", state.opened);
+    this.mark("timed_gate", "open", state.opened);
+    this.mark("waypoint", "crossed", state.crossed);
+    this.mark("gem", "collected", state.collected);
+    this.mark("plank", "collected", state.collected);
+    this.mark("pit", "bridged", state.bridged);
+    (state.enemies ?? []).forEach((pos, i) => {
+      const enemy = this.enemies[i];
+      if (!enemy) return;
+      enemy.classList.toggle("gone", pos === null);
+      if (pos) enemy.style.transform = centre(pos, this.level.height);
+    });
+    for (const counter of this.counters) {
+      const ticks = state.clock_ticks?.[counter.dataset.clock as Clock] ?? 0;
+      setBadgeText(counter, counter.dataset.template!.replace("{n}", String(ticks)));
+    }
+    this.element.classList.toggle("lost", Boolean(state.lost));
+    if (state.lost) {
+      const [lostLeft, lostTop] = corner(state.lost, this.level.height);
+      this.lostMark.setAttribute("transform", `translate(${lostLeft} ${lostTop})`);
+    }
+  }
+
+  /** Set `className` on the art of each `kind` tile that's in `where`, and clear it from the rest. */
+  private mark(kind: TileKind, className: string, where: Pos[] = []): void {
+    const tiles = this.art.get(kind);
+    if (!tiles) return;
+    const on = new Set(where.map(([x, y]) => `${x},${y}`));
+    for (const [key, art] of tiles) art.classList.toggle(className, on.has(key));
   }
 
   private bump(from: Pos, at: Pos): void {
@@ -154,6 +195,12 @@ export class BoardView {
   dispose(): void {
     this.cancel();
   }
+}
+
+/** The CSS transform that centres a piece (drawn around (0, 0)) on a square. */
+function centre(pos: Pos, height: number): string {
+  const [left, top] = corner(pos, height);
+  return `translate(${left + S / 2}px, ${top + S / 2}px)`;
 }
 
 /** Top-left corner of a square in SVG units. Rank 1 is at the bottom. */
@@ -183,9 +230,21 @@ type TileArt = (left: number, top: number, level: LevelInfo, pos: Pos) => SVGGEl
 const TILE_ART: Record<TileKind, TileArt | null> = {
   floor: null,
   wall: (left, top) => wall(left, top),
-  sign: (left, top, level, [x, y]) =>
-    signpost(left, top, level.signs.find((sign) => sign.pos[0] === x && sign.pos[1] === y)?.text ?? ""),
-  gate: (left, top) => gate(left, top),
+  sign: (left, top, level, pos) => signpost(left, top, find(level.signs, pos)?.text ?? ""),
+  gate: (left, top, level, pos) => {
+    const question = find(level.questions, pos)?.text;
+    return question ? gate(left, top, `The guard asks: "${question}"`, "?") : gate(left, top, "A locked gate. A guard keeps it shut.");
+  },
+  timed_gate: (left, top, level, pos) => {
+    const timer = find(level.timed_gates, pos);
+    const counted = counts(level, timer?.clock);
+    const label = `${counted ? `${GEAR} {n} · ` : ""}${timer?.open ?? 0} of ${timer?.every ?? 0}`;
+    return gate(left, top, timer?.text ?? "A timed gate.", label, true, counted ? timer?.clock : undefined);
+  },
+  pit: (left, top) => pit(left, top),
+  plank: (left, top) => plank(left, top, "plank", "A plank. Walk over it to pick it up; bridge() lays it over a pit."),
+  waypoint: (left, top) => waypoint(left, top),
+  gem: (left, top) => gem(left, top),
 };
 
 function wall(left: number, top: number): SVGGElement {
@@ -199,8 +258,7 @@ function wall(left: number, top: number): SVGGElement {
 
 function signpost(left: number, top: number, text: string): SVGGElement {
   const group = svg("g", { class: "signpost" });
-  const title = svg("title", {});
-  title.textContent = text;
+  const title = tooltip(text);
   group.append(
     title,
     svg("rect", { x: left + S / 2 - 3, y: top + S * 0.35, width: 6, height: S * 0.55, class: "sign-post" }),
@@ -210,11 +268,29 @@ function signpost(left: number, top: number, text: string): SVGGElement {
   return group;
 }
 
-/** A barred gate with a padlock. The `open` class lifts the bars (see styles.css). */
-function gate(left: number, top: number): SVGGElement {
-  const group = svg("g", { class: "gate" });
-  const title = svg("title", {});
-  title.textContent = "A locked gate. A guard keeps it shut.";
+/** The entry for the square `pos`, from one of the level's lists of details. */
+function find<T extends { pos: Pos }>(items: T[], [x, y]: Pos): T | undefined {
+  return items.find((item) => item.pos[0] === x && item.pos[1] === y);
+}
+
+/**
+ * Whether `clock` keeps time with the code rather than the piece: shown with a
+ * gear that counts its ticks (M3.1, QA-021). The engine reports these clocks'
+ * counts in every state on such levels, so the board takes the list from there.
+ */
+function counts(level: LevelInfo, clock: Clock | undefined): boolean {
+  return clock !== undefined && clock in (level.start.clock_ticks ?? {});
+}
+
+/**
+ * A barred gate. The `open` class lifts the bars (see styles.css). A guarded
+ * gate has a padlock; a timed one (M3.1) has none. `label`: a short badge
+ * along the bottom, e.g. a timed gate's "2 of 3", or "?" for a guard's question;
+ * `clock`: the clock whose count fills its "{n}".
+ */
+function gate(left: number, top: number, text: string, label = "", timed = false, clock?: Clock): SVGGElement {
+  const group = svg("g", { class: timed ? "gate timed-gate" : "gate" });
+  const title = tooltip(text);
   const bars = svg("g", { class: "gate-bars" });
   for (let i = 0; i < 5; i++) {
     bars.append(svg("rect", { x: left + 9 + i * 10.5, y: top + 6, width: 4, height: S - 12, rx: 1.5 }));
@@ -226,7 +302,92 @@ function gate(left: number, top: number): SVGGElement {
     svg("path", { d: `M ${left + S / 2 - 6} ${top + S / 2 - 2} v -5 a 6 6 0 0 1 12 0 v 5`, class: "gate-shackle" }),
     svg("rect", { x: left + S / 2 - 9, y: top + S / 2 - 2, width: 18, height: 14, rx: 2.5, class: "gate-padlock" }),
   );
-  group.append(title, svg("rect", { x: left + 2, y: top + 2, width: S - 4, height: S - 4, rx: 3, class: "gate-frame" }), bars, lock);
+  group.append(title, svg("rect", { x: left + 2, y: top + 2, width: S - 4, height: S - 4, rx: 3, class: "gate-frame" }), bars);
+  if (!timed) group.append(lock);
+  if (label) group.append(badge(left + S / 2, top + S - 16, label, clock));
+  return group;
+}
+
+/** A plank (QA-017), lying on the floor or laid over a pit (`className` "pit-plank"). */
+function plank(left: number, top: number, className: string, text: string): SVGGElement {
+  const group = svg("g", { class: className });
+  group.append(
+    tooltip(text),
+    svg("rect", { x: left + 8, y: top + S / 2 - 9, width: S - 16, height: 18, rx: 3, class: "plank-wood" }),
+    svg("path", { d: `M ${left + 12} ${top + S / 2 - 3} h ${S - 24} M ${left + 12} ${top + S / 2 + 3} h ${S - 30}`, class: "plank-grain" }),
+  );
+  return group;
+}
+
+/** A pit (M3.1): stepping in loses the run. The `bridged` class shows a plank laid over it (QA-017). */
+function pit(left: number, top: number): SVGGElement {
+  const group = svg("g", { class: "pit" });
+  const title = tooltip("A pit. Step in and the run is lost.");
+  group.append(
+    title,
+    svg("ellipse", { cx: left + S / 2, cy: top + S / 2, rx: S * 0.42, ry: S * 0.38, class: "pit-rim" }),
+    svg("ellipse", { cx: left + S / 2, cy: top + S / 2 + 3, rx: S * 0.33, ry: S * 0.28, class: "pit-hole" }),
+    plank(left, top, "pit-plank", "A pit with a plank over it: safe to cross."),
+  );
+  return group;
+}
+
+/** A waypoint (M3.1): a ring to pass over on the way to the goal; ✓ once crossed. */
+function waypoint(left: number, top: number): SVGGElement {
+  const group = svg("g", { class: "waypoint" });
+  const title = tooltip("A waypoint. Pass over it on the way to the goal.");
+  const tick = svg("text", { x: left + S / 2, y: top + S / 2 + 8, "text-anchor": "middle", class: "waypoint-tick" });
+  tick.textContent = "✓";
+  group.append(title, svg("circle", { cx: left + S / 2, cy: top + S / 2, r: S * 0.3, class: "waypoint-ring" }), tick);
+  return group;
+}
+
+/** A gem (M3.1): picked up by walking over it, so it vanishes once collected. */
+function gem(left: number, top: number): SVGGElement {
+  const group = svg("g", { class: "gem" });
+  const title = tooltip("A gem. Walk over it to collect it.");
+  const [cx, cy] = [left + S / 2, top + S / 2];
+  group.append(
+    title,
+    svg("path", { d: `M ${cx - 13} ${cy - 5} L ${cx - 6} ${cy - 13} L ${cx + 6} ${cy - 13} L ${cx + 13} ${cy - 5} L ${cx} ${cy + 14} Z`, class: "gem-body" }),
+    svg("path", { d: `M ${cx - 13} ${cy - 5} H ${cx + 13} M ${cx - 6} ${cy - 13} L ${cx - 3} ${cy - 5} L ${cx} ${cy + 14} M ${cx + 6} ${cy - 13} L ${cx + 3} ${cy - 5}`, class: "gem-facets" }),
+  );
+  return group;
+}
+
+/** A patrol's route (M3.1): a dotted line through its corners, closed for a loop. */
+function route(enemy: Enemy, height: number): SVGPathElement {
+  const points = enemy.route.map((pos) => corner(pos, height).map((n) => n + S / 2).join(" "));
+  return svg("path", { d: `M ${points.join(" L ")}${enemy.loop ? " Z" : ""}`, class: "route" });
+}
+
+/**
+ * An enemy (M3.1), centred on (0, 0) and moved by `place()`. Its badges: a
+ * chaser's "chases", a gear for clockwork (it keeps time with the code), and
+ * "armoured".
+ */
+function enemyPiece(enemy: Enemy, level: LevelInfo): SVGGElement {
+  const group = svg("g", { class: `enemy enemy-${enemy.kind}${enemy.armoured ? " armoured" : ""}` });
+  const counted = counts(level, enemy.clock);
+  const clock = counted ? ", keeping time with your code" : "";
+  const title = tooltip(`A ${enemy.kind}${clock}${enemy.armoured ? ". It's armoured" : ""}.`);
+  group.append(
+    title,
+    svg("circle", { cx: 0, cy: 2, r: S * 0.3, class: "enemy-body" }),
+    svg("circle", { cx: -6, cy: -2, r: 3.2, class: "enemy-eye" }),
+    svg("circle", { cx: 6, cy: -2, r: 3.2, class: "enemy-eye" }),
+  );
+  const badges = [enemy.kind === "chaser" ? "chases" : "", counted ? `${GEAR} {n}` : "", enemy.armoured ? "armoured" : ""].filter(Boolean);
+  if (badges.length) group.append(badge(0, -S * 0.3 - 12, badges.join(" "), counted ? enemy.clock : undefined));
+  return group;
+}
+
+/** The ring that marks where a run was lost, moved onto that square (M3.1). */
+function lostMark(): SVGGElement {
+  const group = svg("g", { class: "lost-mark", "aria-hidden": "true" });
+  const cross = svg("text", { x: S - 10, y: 18, "text-anchor": "middle", class: "lost-cross" });
+  cross.textContent = "✗";
+  group.append(svg("rect", { x: 2, y: 2, width: S - 4, height: S - 4, rx: 6, class: "lost-ring" }), cross);
   return group;
 }
 
@@ -246,8 +407,7 @@ function flag(left: number, top: number): SVGGElement {
 /** A square a hidden goal might be on: a dashed ring with ?, or after a run ✓ or ✗ (`passed`). */
 function spot(left: number, top: number, passed?: boolean): SVGGElement {
   const group = svg("g", { class: passed === undefined ? "spot" : passed ? "spot spot-pass" : "spot spot-fail" });
-  const title = svg("title", {});
-  title.textContent = passed === undefined ? "The goal might be here." : passed ? "Your code reached the goal here." : "Your code missed the goal here.";
+  const title = tooltip(passed === undefined ? "The goal might be here." : passed ? "Your code reached the goal here." : "Your code missed the goal here.");
   const mark = svg("text", { x: left + S / 2, y: top + S / 2 + 9, "text-anchor": "middle", class: "spot-mark" });
   mark.textContent = passed === undefined ? "?" : passed ? "✓" : "✗";
   group.append(title, svg("circle", { cx: left + S / 2, cy: top + S / 2, r: S * 0.36, class: "spot-ring" }), mark);
@@ -266,6 +426,40 @@ function pawnShape(): SVGGElement {
     svg("circle", { cx: 0, cy: -14, r: 9, class: "pawn-fill" }),
   );
   return group;
+}
+
+// The gear badge for clockwork, drawn as text (U+FE0E), never as a colour emoji, so it follows the theme.
+const GEAR = "⚙\uFE0E";
+
+/**
+ * A small rounded label, centred on `cx` with its top at `y`: a timed gate's
+ * "2 of 3", an enemy's "chases" (M3.1). With a `clock`, its text is a
+ * template: `place()` fills in "{n}" with that clock's ticks (QA-021).
+ */
+function badge(cx: number, y: number, text: string, clock?: Clock): SVGGElement {
+  const group = svg("g", { class: "badge-group" });
+  group.dataset.template = text;
+  if (clock) group.dataset.clock = clock;
+  group.append(svg("rect", { y, height: 14, rx: 7, class: "badge" }), svg("text", { x: cx, y: y + 10.5, "text-anchor": "middle", class: "badge-text" }));
+  setBadgeText(group, text.replace("{n}", "0"));
+  return group;
+}
+
+/** Change a badge's text, resizing its pill to fit. */
+function setBadgeText(group: SVGGElement, text: string): void {
+  const [pill, label] = [group.querySelector("rect")!, group.querySelector("text")!];
+  if (label.textContent === text) return;
+  label.textContent = text;
+  const width = Math.max(16, text.length * 6.5 + 8);
+  pill.setAttribute("width", String(width));
+  pill.setAttribute("x", String(Number(label.getAttribute("x")) - width / 2));
+}
+
+/** An SVG <title>: the text a browser shows on hover. */
+function tooltip(text: string): SVGTitleElement {
+  const title = svg("title", {});
+  title.textContent = text;
+  return title;
 }
 
 function restartAnimation(element: Element, className: string): void {

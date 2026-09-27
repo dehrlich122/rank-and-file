@@ -1,0 +1,33 @@
+id: practice-07
+chapter: 0
+title: "Portcullis"
+trains: "Counting ticks to pass under a timed gate while it's open"
+brief: "Two portcullises rise and fall on their own timers. Pass under each while it's up, or be crushed."
+piece: pawn
+map: |
+  # # # # # G
+  . . . . . U
+  . # # # # .
+  P . T . . .
+legend:
+  "T": {"tile": "timed_gate", "every": 3}
+  "U": {"tile": "timed_gate", "every": 4}
+start: {"facing": "east"}
+api:
+- move
+- turn_left
+- turn_right
+- wait
+par:
+  lines: 8
+hints:
+- "Each gate is open for its first few ticks, then shut. Count the ticks along your route, and arrive just as a gate opens."
+- "Stepping in and stepping out take a tick each, and a gate that shuts on you crushes you. `pawn.wait()` adds a tick without moving."
+- "One way to start: `pawn.turn_left()`, then `pawn.turn_left()`."
+lesson: practice/practice-07.md
+lesson_board:
+  map: |
+    . . . . .
+    P . T . .
+  legend: {"T": {"tile": "timed_gate", "every": 3}}
+  start: {"facing": "east"}

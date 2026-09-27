@@ -33,5 +33,5 @@ known-first-party = ["rankfile", "conftest"]
 # vulture: unused functions, classes and variables. Things only used from
 # JavaScript, from player code or through serialisation are in the allowlist.
 [tool.vulture]
-paths = ["engine/rankfile", "scripts/gen_solutions.py", "scripts/vulture_allowlist.py"]
+paths = ["engine/rankfile", "scripts/gen_solutions.py", "scripts/solve.py", "scripts/vulture_allowlist.py"]
 min_confidence = 60

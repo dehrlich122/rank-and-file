@@ -12,13 +12,25 @@ import type { LevelInfo, LevelResult } from "../py/protocol";
 import { BoardView } from "./board";
 import { h } from "./dom";
 import { createEditor, getCode, setActiveLine, setErrorLine } from "./editor";
-import { errorCard } from "./panels";
-import { Player, buildFrames } from "./playback";
+import { errorCard, logNodes } from "./panels";
+import { Player, buildFrames, consoleAt } from "./playback";
 import { settings } from "../settings";
+
+/** How a snippet's run ended, beside its Run button. (Snippets are never judged: see runner.run_sandbox.) */
+const SNIPPET_STATUS: Record<LevelResult["status"], string> = {
+  finished: "✓ Finished",
+  solved: "✓ Finished",
+  incomplete: "✓ Finished",
+  lost: "✗ Lost",
+  error: "✗ Python stopped",
+  timeout: "⏱ Stopped",
+  constraint: "✗ Python stopped",
+};
 
 export interface LessonContext {
   client: PyClient;
   api: string[]; // the level's abilities; snippets can use exactly these
+  board?: unknown; // the level's lesson_board, as its file gives it; snippets run on a small open board without one (QA-019)
 }
 
 export interface Lesson {
@@ -48,7 +60,7 @@ export function renderLesson(markdown: string, context: LessonContext): Lesson {
   const snippets: Snippet[] = [];
   let sandbox: Promise<LevelInfo> | null = null;
   const loadSandbox = () =>
-    (sandbox ??= context.client.ready().then(() => context.client.call("loadSandbox", { api: context.api })));
+    (sandbox ??= context.client.ready().then(() => context.client.call("loadSandbox", { api: context.api, board: context.board })));
 
   const tokens = marked.lexer(markdown);
   const stepElements = splitIntoSteps(tokens).map((stepTokens) => {
@@ -147,7 +159,7 @@ class Snippet {
     try {
       const level = await this.loadSandbox();
       const board = this.showBoard(level);
-      const result = await this.context.client.call("runSandbox", { code: getCode(this.editor), api: this.context.api });
+      const result = await this.context.client.call("runSandbox", { code: getCode(this.editor), api: this.context.api, board: this.context.board });
       this.play(result, board);
     } catch (error) {
       this.status.textContent =
@@ -166,8 +178,10 @@ class Snippet {
       if (animate && frame.step) board.animate(frame.step.events, durationMs);
       else board.show(frame.state);
       setActiveLine(this.editor, frame.step?.line ?? null);
-      this.output.textContent = frame.output;
-      this.output.hidden = frame.output === "";
+      // What the program printed, and what the game said (e.g. a chaser falling), as in the level's console.
+      const log = consoleAt(frame);
+      this.output.replaceChildren(...logNodes(log));
+      this.output.hidden = log.length === 0;
       if (index === last) this.finish(result);
       else this.status.textContent = `Line ${frame.step?.line ?? "–"}`;
     }, undefined, settings.get().speed);
@@ -177,12 +191,10 @@ class Snippet {
 
   private finish(result: LevelResult): void {
     setActiveLine(this.editor, null);
+    this.status.textContent = SNIPPET_STATUS[result.status];
     if (result.error) {
-      this.status.textContent = result.status === "timeout" ? "⏱ Stopped" : "✗ Python stopped";
       setErrorLine(this.editor, result.error.line);
       this.errorHost.replaceChildren(errorCard(result.error));
-    } else {
-      this.status.textContent = "✓ Finished";
     }
   }
 
