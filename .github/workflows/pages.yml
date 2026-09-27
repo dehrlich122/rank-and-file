@@ -1,0 +1,53 @@
+# Publishes the game to GitHub Pages: https://dehrlich122.github.io/rank-and-file/
+#
+# Every merge to main goes live. A pull request only builds, to prove the build
+# still works; it never publishes. "Run workflow" on the Actions tab republishes
+# main by hand.
+name: Publish to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One publish at a time. A publish that has started always finishes.
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      # Also copies the Pyodide runtime into public/pyodide/ (postinstall).
+      - run: npm ci
+      # The site is served under /rank-and-file/, not at the root, so the build
+      # is told its base path (Pages reports it, so a custom domain would work too).
+      - id: pages
+        uses: actions/configure-pages@v6
+      - run: npx vite build --base="${{ steps.pages.outputs.base_path }}/"
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
