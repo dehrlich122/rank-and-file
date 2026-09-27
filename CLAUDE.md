@@ -57,8 +57,11 @@ npm run e2e -- http://localhost:4173/ --only=app   # against `npm run play`, one
   - When a tool flags something used by name (worker-loaded engine files,
     `bridge.py`), allowlist it; don't delete it.
   - Python tools run from `.venv` via `node scripts/venv.mjs <module> ...`.
-- At the end of every round of fixes, run `/simplify` before committing
-  (docs/QA.md → Queued work).
+- **Once per PR, just before it's merged** *(Designer, 2026-09-27)*: run
+  `/simplify` on the branch, write e2e checks for the user-visible fixes
+  since the last pass, and run the full `npm run e2e`. Don't do these after
+  each QA fix: they cost too many tokens. Between merges, `npm run check`
+  (before every commit) is the safety net.
 - `npm run e2e` (`scripts/e2e/`) drives the real app over the Chrome DevTools
   protocol. The suites are `harness.check.mjs`, `app.check.mjs` and
   `ui.check.mjs`, with shared helpers (`openLevel`, `setCode`, `solution`) in
@@ -66,7 +69,8 @@ npm run e2e -- http://localhost:4173/ --only=app   # against `npm run play`, one
   `expect`. It writes
   `e2e-results/report.json` plus failure screenshots with spoilers blurred
   (editors, opened hints, solution notes: `SPOILERS` in `suite.mjs`).
-  Add a check for every user-visible fix. Solutions are read from
+  Every user-visible fix gets a check, written in the pre-merge pass
+  (above). Solutions are read from
   `solutions/`, never written into a check. **Never put editor contents
   into a check's message or return value.** Earlier checks type reference
   solutions, and the app saves each level's code (`src/progress.ts`), so an

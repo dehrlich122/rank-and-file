@@ -1065,6 +1065,10 @@ Planned tasks that aren't QA findings, in the order they should happen.
      something rebuilt where an existing helper would do.
   4. From then on, run `/simplify` at the end of every round of fixes,
      before committing.
+     - **Changed** *(Designer, 2026-09-27)*: `/simplify` and the e2e
+       checks (writing and running them) now happen once per PR, just
+       before it's merged, not after each QA fix. They cost too many
+       tokens. See `CLAUDE.md`.
 - **Done when:** `npm run check` runs all three tools and passes, and
   `CLAUDE.md` lists them under Commands. Its line "No linter or formatter is
   configured" gets updated too.
