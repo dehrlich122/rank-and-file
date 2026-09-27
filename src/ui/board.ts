@@ -140,8 +140,7 @@ export class BoardView {
   }
 
   private place(state: WorldState): void {
-    const [left, top] = corner(state.pos, this.level.height);
-    this.piece.style.transform = `translate(${left + S / 2}px, ${top + S / 2}px)`;
+    this.piece.style.transform = centre(state.pos, this.level.height);
     this.pointer.style.transform = `rotate(${this.angle}deg)`;
     this.mark("gate", "open", state.opened);
     this.mark("timed_gate", "open", state.opened);
@@ -151,10 +150,7 @@ export class BoardView {
       const enemy = this.enemies[i];
       if (!enemy) return;
       enemy.classList.toggle("captured", pos === null);
-      if (pos) {
-        const [enemyLeft, enemyTop] = corner(pos, this.level.height);
-        enemy.style.transform = `translate(${enemyLeft + S / 2}px, ${enemyTop + S / 2}px)`;
-      }
+      if (pos) enemy.style.transform = centre(pos, this.level.height);
     });
     this.element.classList.toggle("lost", Boolean(state.lost));
     if (state.lost) {
@@ -165,8 +161,10 @@ export class BoardView {
 
   /** Set `className` on the art of each `kind` tile that's in `where`, and clear it from the rest. */
   private mark(kind: TileKind, className: string, where: Pos[] = []): void {
+    const tiles = this.art.get(kind);
+    if (!tiles) return;
     const on = new Set(where.map(([x, y]) => `${x},${y}`));
-    for (const [key, art] of this.art.get(kind) ?? []) art.classList.toggle(className, on.has(key));
+    for (const [key, art] of tiles) art.classList.toggle(className, on.has(key));
   }
 
   private bump(from: Pos, at: Pos): void {
@@ -189,6 +187,12 @@ export class BoardView {
   dispose(): void {
     this.cancel();
   }
+}
+
+/** The CSS transform that centres a piece (drawn around (0, 0)) on a square. */
+function centre(pos: Pos, height: number): string {
+  const [left, top] = corner(pos, height);
+  return `translate(${left + S / 2}px, ${top + S / 2}px)`;
 }
 
 /** Top-left corner of a square in SVG units. Rank 1 is at the bottom. */
@@ -227,7 +231,7 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
     const timer = find(level.timed_gates, pos);
     const every = timer?.every ?? 0;
     const title = `A timed gate: open at the start, then every ${every} ticks.`;
-    return gate(left, top, title, `${clockwork(timer?.clock) ? "⚙ " : ""}every ${every}`, "timed-gate");
+    return gate(left, top, title, `${clockwork(timer?.clock) ? `${GEAR} ` : ""}every ${every}`, true);
   },
   pit: (left, top) => pit(left, top),
   waypoint: (left, top) => waypoint(left, top),
@@ -245,8 +249,7 @@ function wall(left: number, top: number): SVGGElement {
 
 function signpost(left: number, top: number, text: string): SVGGElement {
   const group = svg("g", { class: "signpost" });
-  const title = svg("title", {});
-  title.textContent = text;
+  const title = tooltip(text);
   group.append(
     title,
     svg("rect", { x: left + S / 2 - 3, y: top + S * 0.35, width: 6, height: S * 0.55, class: "sign-post" }),
@@ -268,13 +271,12 @@ function clockwork(clock: Clock | undefined): boolean {
 
 /**
  * A barred gate. The `open` class lifts the bars (see styles.css). A guarded
- * gate has a padlock; a timed one (M3.1) has none. `badge`: a short label
+ * gate has a padlock; a timed one (M3.1) has none. `label`: a short badge
  * along the bottom, e.g. a timed gate's "every 3", or "?" for a guard's question.
  */
-function gate(left: number, top: number, text: string, badge = "", kind = "guarded"): SVGGElement {
-  const group = svg("g", { class: kind === "guarded" ? "gate" : "gate timed-gate" });
-  const title = svg("title", {});
-  title.textContent = text;
+function gate(left: number, top: number, text: string, label = "", timed = false): SVGGElement {
+  const group = svg("g", { class: timed ? "gate timed-gate" : "gate" });
+  const title = tooltip(text);
   const bars = svg("g", { class: "gate-bars" });
   for (let i = 0; i < 5; i++) {
     bars.append(svg("rect", { x: left + 9 + i * 10.5, y: top + 6, width: 4, height: S - 12, rx: 1.5 }));
@@ -287,21 +289,15 @@ function gate(left: number, top: number, text: string, badge = "", kind = "guard
     svg("rect", { x: left + S / 2 - 9, y: top + S / 2 - 2, width: 18, height: 14, rx: 2.5, class: "gate-padlock" }),
   );
   group.append(title, svg("rect", { x: left + 2, y: top + 2, width: S - 4, height: S - 4, rx: 3, class: "gate-frame" }), bars);
-  if (kind === "guarded") group.append(lock);
-  if (badge) {
-    const width = Math.max(16, badge.length * 6.5 + 8);
-    const label = svg("text", { x: left + S / 2, y: top + S - 5.5, "text-anchor": "middle", class: "badge-text" });
-    label.textContent = badge;
-    group.append(svg("rect", { x: left + S / 2 - width / 2, y: top + S - 16, width, height: 14, rx: 7, class: "badge" }), label);
-  }
+  if (!timed) group.append(lock);
+  if (label) group.append(badge(left + S / 2, top + S - 16, label));
   return group;
 }
 
 /** A pit (M3.1): stepping in loses the run. */
 function pit(left: number, top: number): SVGGElement {
   const group = svg("g", { class: "pit" });
-  const title = svg("title", {});
-  title.textContent = "A pit. Step in and the run is lost.";
+  const title = tooltip("A pit. Step in and the run is lost.");
   group.append(
     title,
     svg("ellipse", { cx: left + S / 2, cy: top + S / 2, rx: S * 0.42, ry: S * 0.38, class: "pit-rim" }),
@@ -313,8 +309,7 @@ function pit(left: number, top: number): SVGGElement {
 /** A waypoint (M3.1): a ring to pass over on the way to the goal; ✓ once crossed. */
 function waypoint(left: number, top: number): SVGGElement {
   const group = svg("g", { class: "waypoint" });
-  const title = svg("title", {});
-  title.textContent = "A waypoint. Pass over it on the way to the goal.";
+  const title = tooltip("A waypoint. Pass over it on the way to the goal.");
   const tick = svg("text", { x: left + S / 2, y: top + S / 2 + 8, "text-anchor": "middle", class: "waypoint-tick" });
   tick.textContent = "✓";
   group.append(title, svg("circle", { cx: left + S / 2, cy: top + S / 2, r: S * 0.3, class: "waypoint-ring" }), tick);
@@ -324,8 +319,7 @@ function waypoint(left: number, top: number): SVGGElement {
 /** A gem (M3.1): picked up by walking over it, so it vanishes once collected. */
 function gem(left: number, top: number): SVGGElement {
   const group = svg("g", { class: "gem" });
-  const title = svg("title", {});
-  title.textContent = "A gem. Walk over it to collect it.";
+  const title = tooltip("A gem. Walk over it to collect it.");
   const [cx, cy] = [left + S / 2, top + S / 2];
   group.append(
     title,
@@ -343,28 +337,21 @@ function route(enemy: Enemy, height: number): SVGPathElement {
 
 /**
  * An enemy (M3.1), centred on (0, 0) and moved by `place()`. Its badges: a
- * chaser's "chases", a gear for clockwork (it keeps time with the code), and a
- * shield when it's armoured.
+ * chaser's "chases", a gear for clockwork (it keeps time with the code), and
+ * "armoured".
  */
 function enemyPiece(enemy: Enemy): SVGGElement {
   const group = svg("g", { class: `enemy enemy-${enemy.kind}${enemy.armoured ? " armoured" : ""}` });
-  const title = svg("title", {});
   const clock = clockwork(enemy.clock) ? ", keeping time with your code" : "";
-  title.textContent = `A ${enemy.kind}${clock}${enemy.armoured ? ". It's armoured" : ""}.`;
+  const title = tooltip(`A ${enemy.kind}${clock}${enemy.armoured ? ". It's armoured" : ""}.`);
   group.append(
     title,
     svg("circle", { cx: 0, cy: 2, r: S * 0.3, class: "enemy-body" }),
     svg("circle", { cx: -6, cy: -2, r: 3.2, class: "enemy-eye" }),
     svg("circle", { cx: 6, cy: -2, r: 3.2, class: "enemy-eye" }),
   );
-  const badges = [enemy.kind === "chaser" ? "chases" : "", clockwork(enemy.clock) ? "⚙" : "", enemy.armoured ? "🛡" : ""].filter(Boolean);
-  if (badges.length) {
-    const text = badges.join(" ");
-    const width = text.length * 6 + 10;
-    const label = svg("text", { x: 0, y: -S * 0.3 - 1.5, "text-anchor": "middle", class: "badge-text" });
-    label.textContent = text;
-    group.append(svg("rect", { x: -width / 2, y: -S * 0.3 - 12, width, height: 14, rx: 7, class: "badge" }), label);
-  }
+  const badges = [enemy.kind === "chaser" ? "chases" : "", clockwork(enemy.clock) ? GEAR : "", enemy.armoured ? "armoured" : ""].filter(Boolean);
+  if (badges.length) group.append(badge(0, -S * 0.3 - 12, badges.join(" ")));
   return group;
 }
 
@@ -393,8 +380,7 @@ function flag(left: number, top: number): SVGGElement {
 /** A square a hidden goal might be on: a dashed ring with ?, or after a run ✓ or ✗ (`passed`). */
 function spot(left: number, top: number, passed?: boolean): SVGGElement {
   const group = svg("g", { class: passed === undefined ? "spot" : passed ? "spot spot-pass" : "spot spot-fail" });
-  const title = svg("title", {});
-  title.textContent = passed === undefined ? "The goal might be here." : passed ? "Your code reached the goal here." : "Your code missed the goal here.";
+  const title = tooltip(passed === undefined ? "The goal might be here." : passed ? "Your code reached the goal here." : "Your code missed the goal here.");
   const mark = svg("text", { x: left + S / 2, y: top + S / 2 + 9, "text-anchor": "middle", class: "spot-mark" });
   mark.textContent = passed === undefined ? "?" : passed ? "✓" : "✗";
   group.append(title, svg("circle", { cx: left + S / 2, cy: top + S / 2, r: S * 0.36, class: "spot-ring" }), mark);
@@ -413,6 +399,26 @@ function pawnShape(): SVGGElement {
     svg("circle", { cx: 0, cy: -14, r: 9, class: "pawn-fill" }),
   );
   return group;
+}
+
+// The gear badge for clockwork, drawn as text (U+FE0E), never as a colour emoji, so it follows the theme.
+const GEAR = "⚙\uFE0E";
+
+/** A small rounded label, centred on `cx` with its top at `y`: a timed gate's "every 3", an enemy's "chases" (M3.1). */
+function badge(cx: number, y: number, text: string): SVGGElement {
+  const width = Math.max(16, text.length * 6.5 + 8);
+  const label = svg("text", { x: cx, y: y + 10.5, "text-anchor": "middle", class: "badge-text" });
+  label.textContent = text;
+  const group = svg("g", {});
+  group.append(svg("rect", { x: cx - width / 2, y, width, height: 14, rx: 7, class: "badge" }), label);
+  return group;
+}
+
+/** An SVG <title>: the text a browser shows on hover. */
+function tooltip(text: string): SVGTitleElement {
+  const title = svg("title", {});
+  title.textContent = text;
+  return title;
 }
 
 function restartAnimation(element: Element, className: string): void {

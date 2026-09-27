@@ -55,9 +55,9 @@
   --pit-hole: light-dark(#1d1712, #0c0907);
   --waypoint: light-dark(#2c6fb0, #7fb2e8);
   --enemy: light-dark(#3b2f4a, #2a2233);
-  --enemy-rim: light-dark(#b3261e, #f08a80);
+  --enemy-rim: var(--bad);
   --enemy-eye: light-dark(#ffd76a, #ffd76a);
-  --route: light-dark(rgb(179 38 30 / 0.55), rgb(240 138 128 / 0.6));
+  --route: color-mix(in srgb, var(--bad) 60%, transparent);
   --badge-bg: light-dark(#fffaf0, #2a2521);
   --badge-border: light-dark(#8a7658, #c9b48e);
   --badge-text: light-dark(#3f3a36, #f3e2c7);

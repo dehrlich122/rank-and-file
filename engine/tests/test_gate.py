@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from conftest import basics, make_level
+from conftest import basics, events, make_level
 from rankfile.runner import run_level
 from rankfile.world import GUARD_GATE_LOCKED, GUARD_WRONG_PHRASE
 
@@ -18,10 +18,6 @@ def gated():
         "# G #\n. X .\n. . .\n. P .\n",
         legend={"X": {"tile": "gate", "passphrase": PHRASE}},
     )
-
-
-def events(result, kind):
-    return [event for step in result.steps for event in step["events"] if event["kind"] == kind]
 
 
 def test_the_passphrase_from_next_to_the_gate_opens_it(gated):

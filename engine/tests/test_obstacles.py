@@ -2,15 +2,11 @@
 
 import pytest
 
-from conftest import make_level
+from conftest import events, make_level
 from rankfile.levels import LevelError
 from rankfile.runner import run_level
 
 API = ["move", "turn_left", "turn_right", "at_goal", "wait"]
-
-
-def events(result, kind=None):
-    return [event for step in result.steps for event in step["events"] if kind is None or event["kind"] == kind]
 
 
 @pytest.fixture
@@ -106,7 +102,8 @@ def waypoints():
 
 
 def test_waypoints_are_an_objective_whenever_the_map_has_any(waypoints):
-    assert waypoints.objectives.waypoints
+    assert not waypoints.objectives.waypoints  # not listed, and still an objective
+    assert not waypoints.nothing_to_do
     assert "Cross all 2 waypoints on the way: a2 and c2. Passing over them is enough." in waypoints.goals()
 
 

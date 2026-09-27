@@ -23,6 +23,11 @@ def basics(state: dict) -> dict:
     return {key: state[key] for key in ("pos", "facing", "opened")}
 
 
+def events(result, kind: str | None = None) -> list[dict]:
+    """A run's world events, in order (only those of one `kind`, if given)."""
+    return [event for step in result.steps for event in step["events"] if kind is None or event["kind"] == kind]
+
+
 @pytest.fixture
 def corridor():
     """Pawn on b1 facing north, goal on b4, walls on both sides."""

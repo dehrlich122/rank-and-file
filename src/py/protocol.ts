@@ -56,7 +56,7 @@ export interface LevelInfo {
   goal_spots: Pos[]; // a hidden goal: the squares it might be on (drawn as ?)
   case_title: string; // the title of the row of cases above the board; "" for a single case
   start: WorldState;
-  objectives: { reach_goal: boolean; say: string[]; waypoints: boolean; collect: number | "all" | null };
+  objectives: { reach_goal: boolean; say: string[]; waypoints: boolean; collect: number | "all" | null; capture: number | "all" | null };
   api: string[];
   constraints: { max_lines: number | null; min_comments: number; require_nodes: string[]; ban_nodes: string[] };
   par: { lines: number | null };
@@ -84,7 +84,6 @@ export interface GameEvent {
   state: WorldState; // the whole world's state after the event
   at?: Pos; // bump: the square bumped into; gate_open/guard: the gate; capture: the enemy's square; lost: where
   message?: string; // guard: what the guard said; lost: what happened
-  clock?: Clock; // tick: the clock that ticked
 }
 
 export interface Var {

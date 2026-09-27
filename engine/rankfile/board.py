@@ -38,6 +38,11 @@ _DELTAS = {
 }
 
 
+def sign(n: int) -> int:
+    """-1, 0 or 1: which way along an axis `n` points."""
+    return (n > 0) - (n < 0)
+
+
 def step(pos: Pos, direction: Direction) -> Pos:
     dx, dy = direction.delta
     return (pos[0] + dx, pos[1] + dy)

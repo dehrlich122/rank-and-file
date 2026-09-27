@@ -27,7 +27,7 @@ from .levels import Case, Level, names, sandbox_level
 from .pieces import PIECES
 from .tracer import PLAYER_FILENAME, StepBudgetExceeded, Tracer
 from .words import and_list, count
-from .world import World
+from .world import CODE_CLOCKS, World
 
 DEFAULT_LINE_BUDGET = 100_000
 
@@ -179,7 +179,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
         info = explain(run.error, namespace)
         status = "timeout" if isinstance(run.error, StepBudgetExceeded) else "error"
         return outcome(status, info.friendly, error=info, **recording)
-    if level.objectives.empty:
+    if level.nothing_to_do:
         return outcome("finished", "Finished.", **recording)
     unmet = unmet_objectives(level, world, run.output)
     if unmet:
@@ -215,16 +215,19 @@ def unmet_objectives(level: Level, world: World, output: str) -> list[str]:
     missed = names([pos for pos in level.board.squares(Tile.WAYPOINT) if pos not in world.crossed])
     if missed:
         unmet.append(f"you didn't cross the {'waypoint' if len(missed) == 1 else 'waypoints'} on {and_list(missed)}.")
-    captured, capture = sum(foe.captured for foe in world.foes), level.captures_needed()
-    if captured < capture:
-        takeable = sum(not enemy.armoured for enemy in level.enemies)
-        unmet.append(f"you captured {captured} of the {takeable} {'enemy' if takeable == 1 else 'enemies'} that can be taken." if capture == takeable else f"you captured {captured}, and the level needs {capture}.")
-    needed, collected, gems = level.gems_needed(), len(world.collected), len(level.board.squares(Tile.GEM))
+    captured = sum(foe.captured for foe in world.foes)
+    needed = level.captures_needed()
+    if captured < needed and needed == level.capturable:
+        unmet.append(f"you captured {captured} of the {count(needed, 'enemy', 'enemies')} that can be taken.")
+    elif captured < needed:
+        unmet.append(f"you captured {captured}, and the level needs {needed}.")
+    collected = len(world.collected)
+    needed = level.gems_needed()
     if collected < needed:
-        if gems == 1:
+        if level.gems == 1:
             unmet.append("you didn't collect the gem.")
-        elif needed == gems:
-            unmet.append(f"you collected {collected} of the {gems} gems.")
+        elif needed == level.gems:
+            unmet.append(f"you collected {collected} of the {level.gems} gems.")
         else:
             unmet.append(f"you collected {count(collected, 'gem')}, and the level needs {needed}.")
     printed = [line.strip() for line in output.splitlines()]
@@ -259,7 +262,9 @@ def execute(
 ) -> Execution:
     """Run compiled player code under the tracer, capturing everything it prints."""
     remember_source(source)
-    tracer = Tracer(line_budget, record=record, on_line=world.on_line if world is not None else None)
+    # The code's own clocks only matter when something keeps time with them.
+    keeps_time = world is not None and world.clocked & CODE_CLOCKS
+    tracer = Tracer(line_budget, record=record, on_line=world.on_line if keeps_time else None)
     output = _StepOutput(tracer, world)
     if world is not None:
         world.listeners.append(tracer.add_event)

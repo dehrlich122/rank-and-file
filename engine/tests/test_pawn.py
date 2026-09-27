@@ -1,9 +1,5 @@
-from conftest import basics, make_level
+from conftest import basics, events, make_level
 from rankfile.runner import run_level
-
-
-def events(result):
-    return [event for step in result.steps for event in step["events"]]
 
 
 def test_move_with_an_argument_emits_one_event_per_square(corridor):

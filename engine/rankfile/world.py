@@ -23,11 +23,13 @@ an enemy), ends the run: the World raises `Lost`, and remembers it in `lost`,
 so the run stays lost even if the player's code catches the exception.
 """
 
+import copy
+import functools
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .board import Pos, Tile, square_name, step
+from .board import Pos, Tile, sign, square_name, step
 from .exceptions import BlockedError, CaptureError, GateLockedError, Lost
 
 if TYPE_CHECKING:
@@ -42,6 +44,7 @@ GUARD_GATE_LOCKED = "Does your father really smell of elderberries? Maybe try th
 GUARD_WRONG_ANSWER = '"Wrong!" says the guard. The gate remains locked.'
 
 CLOCKS = ("action", "line", "new_line")
+CODE_CLOCKS = {"line", "new_line"}  # the clocks that keep time with the code, not the piece
 
 
 @dataclass
@@ -53,6 +56,20 @@ class Foe:
     index: int = 0  # a patrol: where it is along its path
     heading: int = 1  # a patrol that walks back and forth: 1 along its path, -1 back
     captured: bool = False
+
+
+
+def _acts(method: Callable) -> Callable:
+    """A piece's action (a move, turn, wait or capture). A lost piece can't act
+    again, and every action is one tick of the `action` clock once it's done."""
+
+    @functools.wraps(method)
+    def act(world: World, *args) -> None:
+        world._still_playing()
+        method(world, *args)
+        world.tick("action")
+
+    return act
 
 
 class World:
@@ -73,11 +90,22 @@ class World:
         self.lost: Lost | None = None
         self.listeners: list[Callable[[Event], None]] = []
 
+    def copy(self) -> World:
+        """An independent copy, with no listeners, for trying moves out (scripts/solve.py)."""
+        twin = copy.copy(self)
+        twin.opened, twin.refused = set(self.opened), dict(self.refused)
+        twin.crossed, twin.collected = set(self.crossed), set(self.collected)
+        twin.ticks, twin.lines_seen = dict(self.ticks), set(self.lines_seen)
+        twin.foes = [copy.copy(foe) for foe in self.foes]
+        twin.listeners = []
+        return twin
+
     def state(self) -> dict:
+        opened = self.opened | self._open_timed_gates() if self.board.timers else self.opened
         return {
             "pos": list(self.pos),
             "facing": self.facing.value,
-            "opened": [list(pos) for pos in sorted(self.opened | self._open_timed_gates())],
+            "opened": [list(pos) for pos in sorted(opened)],
             "crossed": [list(pos) for pos in sorted(self.crossed)],
             "collected": [list(pos) for pos in sorted(self.collected)],
             "enemies": [None if foe.captured else list(foe.pos) for foe in self.foes],  # None once captured
@@ -85,75 +113,63 @@ class World:
             "lost": list(self.lost.at) if self.lost else None,  # where the run was lost
         }
 
+    @_acts
     def move_forward(self) -> None:
-        self._still_playing()
         target = step(self.pos, self.facing)
-        if self.board.blocked(target):
+        if self.board.blocked(target) or self._shut(target):
             self._emit("bump", at=list(target))
             raise BlockedError(self._bump_message(target), at=target)
         if self._locked_gate(target):
             self._emit("bump", at=list(target))
             raise GateLockedError(self._gate_locked_message(target), at=target)
-        if self._shut(target):
-            self._emit("bump", at=list(target))
-            every = self.board.timers[target].every
-            raise BlockedError(
-                f"Your {self.level.piece} bumped into the gate on {square_name(target)}. It's shut right now: it opens every {every} ticks.",
-                at=target,
-            )
-        self.pos = target
-        self._pass_over(target)
+        self._step_onto(target)
         self._emit("move")
         if self.board.tile(target) is Tile.PIT:
             self._lose(f"Your {self.level.piece} fell into the pit on {square_name(target)}.", target)
         self._check_caught()
-        self.tick("action")
 
     def at_goal(self) -> bool:
         return self.level.goal is not None and self.pos == self.level.goal
 
+    @_acts
     def turn_left(self) -> None:
-        self._still_playing()
         self.facing = self.facing.turned_left()
         self._emit("turn")
-        self.tick("action")
 
+    @_acts
     def turn_right(self) -> None:
-        self._still_playing()
         self.facing = self.facing.turned_right()
         self._emit("turn")
-        self.tick("action")
 
+    @_acts
     def wait(self) -> None:
         """Stand still for one tick of the `action` clock."""
-        self._still_playing()
         self._emit("wait")
-        self.tick("action")
 
+    @_acts
     def capture(self, side: str) -> None:
         """Take the enemy diagonally forward on `side` ("left" or "right"), chess style, and move onto its square."""
-        self._still_playing()
         across = self.facing.turned_left() if side == "left" else self.facing.turned_right()
         target = step(step(self.pos, self.facing), across)
-        foe = next((foe for foe in self.foes if not foe.captured and foe.pos == target), None)
+        foe = self._foe_at(target)
         if foe is None or foe.enemy.armoured:
             self._emit("bump", at=list(target))
-            raise CaptureError(self._capture_message(target, foe), at=target)
+            raise CaptureError(self._capture_message(target, foe))
         foe.captured = True
-        self.pos = target
-        self._pass_over(target)
+        self._step_onto(target)
         self._emit("capture", at=list(target))
-        self.tick("action")
+        self._check_caught()
 
     def tick(self, clock: str) -> None:
         """One tick of `clock`: everything that keeps time with it takes its turn."""
         self.ticks[clock] += 1
-        for foe in self.foes:
-            if foe.enemy.clock == clock and not foe.captured:
-                self._advance(foe)
+        moving = [foe for foe in self.foes if foe.enemy.clock == clock and not foe.captured]
+        for foe in moving:
+            self._advance(foe)
         if clock in self.clocked:
-            self._emit("tick", clock=clock)
-        self._check_caught()
+            self._emit("tick")
+        if moving:
+            self._check_caught()
 
     def on_line(self, line: int) -> None:
         """A line of the player's code is starting to run: the code's own clocks tick."""
@@ -184,8 +200,9 @@ class World:
                 reply = GUARD_WRONG_ANSWER if gate in self.board.questions else GUARD_WRONG_PHRASE
                 self._emit("guard", at=list(gate), message=reply)
 
-    def _pass_over(self, pos: Pos) -> None:
-        """Crossing a waypoint or a gem counts even when the piece walks straight on."""
+    def _step_onto(self, pos: Pos) -> None:
+        """Move the piece. Crossing a waypoint or a gem counts even when it walks straight on."""
+        self.pos = pos
         tile = self.board.tile(pos)
         if tile is Tile.WAYPOINT:
             self.crossed.add(pos)
@@ -196,7 +213,7 @@ class World:
         """An enemy's turn: a chaser steps toward the piece, a patrol along its route."""
         enemy = foe.enemy
         if enemy.kind == "chaser":
-            foe.pos = self._chase(foe.pos)
+            foe.pos = CHASERS[enemy.strategy](self, foe.pos)
             return
         if len(enemy.path) == 1:
             return  # it stands guard
@@ -208,12 +225,12 @@ class World:
             foe.index += foe.heading
         foe.pos = enemy.path[foe.index]
 
-    def _chase(self, pos: Pos) -> Pos:
+    def _chase_simply(self, pos: Pos) -> Pos:
         """The simple chaser's step: toward the piece along the bigger gap (east or
         west on a tie). If that's blocked it tries the other way; if both are, it waits."""
         dx, dy = self.pos[0] - pos[0], self.pos[1] - pos[1]
-        across = (_sign(dx), 0) if dx else None
-        along = (0, _sign(dy)) if dy else None
+        across = (sign(dx), 0) if dx else None
+        along = (0, sign(dy)) if dy else None
         for delta in (across, along) if abs(dx) >= abs(dy) else (along, across):
             if delta is not None:
                 target = (pos[0] + delta[0], pos[1] + delta[1])
@@ -224,12 +241,15 @@ class World:
     def _enemy_can_enter(self, pos: Pos) -> bool:
         if self.board.blocked(pos) or self.board.tile(pos) is Tile.PIT or self._locked_gate(pos) or self._shut(pos):
             return False
-        return all(foe.captured or foe.pos != pos for foe in self.foes)
+        return self._foe_at(pos) is None
+
+    def _foe_at(self, pos: Pos) -> Foe | None:
+        """The enemy on `pos`, if one is there (captured ones are gone)."""
+        return next((foe for foe in self.foes if not foe.captured and foe.pos == pos), None)
 
     def _check_caught(self) -> None:
-        for foe in self.foes:
-            if not foe.captured and foe.pos == self.pos:
-                self._lose(f"Your {self.level.piece} was caught by the {foe.enemy.kind} on {square_name(self.pos)}.", self.pos)
+        if foe := self._foe_at(self.pos):
+            self._lose(f"Your {self.level.piece} was caught by the {foe.enemy.kind} on {square_name(self.pos)}.", self.pos)
 
     def _capture_message(self, target: Pos, foe: Foe | None) -> str:
         if not self.board.contains(target):
@@ -264,15 +284,19 @@ class World:
         return f"{locked}\nThe guard didn't accept {said}."
 
     def _open_timed_gates(self) -> set[Pos]:
-        return {pos for pos, timer in self.board.timers.items() if self.ticks[timer.clock] % timer.every == 0}
+        return {pos for pos in self.board.timers if not self._shut(pos)}
 
     def _shut(self, pos: Pos) -> bool:
-        return self.board.tile(pos) is Tile.TIMED_GATE and pos not in self._open_timed_gates()
+        """A timed gate is shut except when its clock's ticks are a multiple of `every`."""
+        timer = self.board.timers.get(pos)
+        return timer is not None and self.ticks[timer.clock] % timer.every != 0
 
     def _locked_gate(self, pos: Pos) -> bool:
         return self.board.tile(pos) is Tile.GATE and pos not in self.opened
 
     def _emit(self, kind: str, **details) -> None:
+        if not self.listeners:
+            return  # nobody is recording (e.g. scripts/solve.py's search)
         event = {"kind": kind, "state": self.state(), **details}
         for listener in self.listeners:
             listener(event)
@@ -282,9 +306,12 @@ class World:
         here = square_name(self.pos)
         if not self.board.contains(target):
             return f"Your {piece} can't walk off the edge of the board. It's on {here}, facing {self.facing.value}."
+        if target in self.board.timers:
+            every = self.board.timers[target].every
+            return f"Your {piece} bumped into the gate on {square_name(target)}. It's shut right now: it opens every {every} ticks."
         what = "a signpost" if self.board.tile(target) is Tile.SIGN else "a wall"
         return f"Your {piece} bumped into {what} on {square_name(target)}."
 
 
-def _sign(n: int) -> int:
-    return (n > 0) - (n < 0)
+# How each kind of chaser picks its step (a level's `strategy`). Cleverer ones come later.
+CHASERS: dict[str, Callable[[World, Pos], Pos]] = {"simple": World._chase_simply}

@@ -26,10 +26,6 @@ class GateLockedError(BlockedError):
 class CaptureError(GameError):
     """The piece tried to capture where there's nothing it can take (M3.1)."""
 
-    def __init__(self, message: str, at: tuple[int, int]):
-        super().__init__(message)
-        self.at = at
-
 
 class LockedAbilityError(GameError, AttributeError):
     """The level hasn't unlocked this ability yet."""
