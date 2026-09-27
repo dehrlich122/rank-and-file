@@ -297,6 +297,87 @@ export default async function appChecks({ browser: b, base, root, check }) {
     return brief(r);
   });
 
+  // -- M3.1: the obstacle toolkit (the Testing ground's practice-02 to practice-09) ------------
+  // Counts, labels and outcomes only: never code, never the console (it can hold an answer).
+  const PRACTICE = ["practice-02", "practice-03", "practice-04", "practice-05", "practice-06", "practice-07", "practice-08", "practice-09"];
+  const drawn = () =>
+    b.evaluate(`(() => {
+      const board = document.querySelector('.board-host .board');
+      const count = (selector) => board.querySelectorAll(selector).length;
+      return {
+        pits: count('.pit'), waypoints: count('.waypoint'), gems: count('.gem'), timed: count('.timed-gate'),
+        enemies: count('.enemy'), armoured: count('.enemy.armoured'), routes: count('.route'),
+        crossed: count('.waypoint.crossed'), collected: count('.gem.collected'), captured: count('.enemy.captured'),
+        badges: [...board.querySelectorAll('.badge-text')].map((e) => e.textContent),
+        lost: board.classList.contains('lost'),
+      };
+    })()`);
+
+  await check("M3.1: each obstacle is drawn, and the Challenge panel says its rule", async () => {
+    const seen = {};
+    for (const id of PRACTICE) {
+      await openLevel(id, { fresh: true });
+      await challengeTab();
+      const obstacles = await b.evaluate(`document.querySelector('ul.obstacles')?.innerText ?? ''`);
+      seen[id] = { ...(await drawn()), obstacles: obstacles.split("\n").filter(Boolean).length };
+    }
+    const d = seen;
+    expect(d["practice-02"].pits === 4 && d["practice-02"].obstacles === 1, `pits: ${JSON.stringify(d["practice-02"])}`);
+    expect(d["practice-03"].waypoints === 3, `waypoints: ${JSON.stringify(d["practice-03"])}`);
+    expect(d["practice-04"].enemies === 1 && d["practice-04"].routes === 1 && d["practice-04"].obstacles === 2, `patrol: ${JSON.stringify(d["practice-04"])}`);
+    expect(d["practice-05"].badges.includes("chases") && d["practice-05"].routes === 0, `chaser: ${JSON.stringify(d["practice-05"])}`);
+    expect(d["practice-06"].badges.includes("⚙"), `clockwork: ${JSON.stringify(d["practice-06"])}`);
+    expect(d["practice-07"].timed === 2 && d["practice-07"].badges.join() === "every 3,every 4", `timed gates: ${JSON.stringify(d["practice-07"])}`);
+    expect(d["practice-08"].gems === 3 && d["practice-08"].badges.includes("?"), `gems and the guard: ${JSON.stringify(d["practice-08"])}`);
+    expect(d["practice-09"].enemies === 2 && d["practice-09"].armoured === 1, `capture: ${JSON.stringify(d["practice-09"])}`);
+    return Object.entries(d).map(([id, x]) => `${id}: ${x.obstacles} rules`).join(", ");
+  });
+
+  await check("M3.1: The Toll shows the guard's question, never its answer", async () => {
+    await openLevel("practice-08", { fresh: true });
+    await challengeTab();
+    const goals = await b.evaluate(`document.querySelector('.objectives').innerText`);
+    expect(goals.includes('The guard asks: "How many gems did you collect?"') && goals.includes("Collect all 3 gems"), goals);
+  });
+
+  await check("M3.1: a run that falls into a pit reads Lost, says where, and marks the square", async () => {
+    await openLevel("practice-02", { fresh: true });
+    await setCode(withoutExpectLine(solution("practice-02", ".naive")));
+    const r = await run();
+    const board = await drawn();
+    expect(r.head === "Lost" && r.tone.includes("outcome-bad") && /fell into the pit on [a-d][1-4]\./.test(r.text), brief(r));
+    expect(board.lost && r.errorLine && r.stars === 0, `board lost: ${board.lost}, error line: ${r.errorLine}`);
+    return brief(r);
+  });
+
+  await check("M3.1: walking into the patrol, or a clockwork patrol catching up, is being caught", async () => {
+    const results = [];
+    for (const id of ["practice-04", "practice-05", "practice-06"]) {
+      await openLevel(id, { fresh: true });
+      await setCode(withoutExpectLine(solution(id, ".naive")));
+      const r = await run();
+      expect(r.head === "Lost" && /was caught by the (patrol|chaser) on [a-g][1-6]\./.test(r.text), `${id}: ${brief(r)}`);
+      results.push(`${id}: ${r.head}`);
+    }
+    return results.join(", ");
+  });
+
+  await check("M3.1: every practice level's reference solution earns three stars", async () => {
+    const results = [];
+    for (const id of PRACTICE) {
+      await openLevel(id, { fresh: true });
+      await setCode(solution(id));
+      const r = await run();
+      expect(r.head === "Solved!" && r.stars === 3, `${id}: ${r.stars} stars: ${brief(r)}`);
+      const board = await drawn();
+      if (id === "practice-03") expect(board.crossed === 3, `waypoints ticked off: ${board.crossed}`);
+      if (id === "practice-08") expect(board.collected === 3, `gems collected: ${board.collected}`);
+      if (id === "practice-09") expect(board.captured === 1, `enemies captured: ${board.captured}`);
+      results.push(id);
+    }
+    return `${results.length} solved`;
+  });
+
   // -- QA-002: level 4's locked gate --------------------------------------------------------
   await check("QA-002: level 4 starts with the guard's comment, and the panels don't give the passphrase away", async () => {
     await openLevel("ch01-l04", { fresh: true });

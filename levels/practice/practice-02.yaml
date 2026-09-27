@@ -1,0 +1,25 @@
+id: practice-02
+chapter: 0
+title: "Stepping Stones"
+trains: "Planning a route around pits"
+brief: "The floor here is more hole than floor. One wrong step and your pawn is gone."
+piece: pawn
+map: |
+  O . . G
+  . . O .
+  . O . .
+  P . . O
+legend:
+  "O": "pit"
+start: {"facing": "north"}
+api:
+- move
+- turn_left
+- turn_right
+par:
+  lines: 7
+hints:
+- "Trace a safe path with your finger before you write any code."
+- "A pit anywhere along a long move ends the run, so check every square the move crosses."
+- "One way to start: `pawn.move(2)`, then `pawn.turn_right()`."
+lesson: practice/practice-02.md

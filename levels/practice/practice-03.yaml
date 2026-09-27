@@ -1,0 +1,26 @@
+id: practice-03
+chapter: 0
+title: "Checkpoints"
+trains: "Passing over waypoints on the way to the goal"
+brief: "A courier's round: touch every checkpoint, then report to the centre."
+piece: pawn
+map: |
+  W . . . W
+  . . . . .
+  . . G . .
+  . . . . .
+  P . . . W
+legend:
+  "W": "waypoint"
+start: {"facing": "north"}
+api:
+- move
+- turn_left
+- turn_right
+par:
+  lines: 9
+hints:
+- "You don't have to stop on a waypoint: passing over it counts."
+- "Plan the order of the waypoints before your first move. One lap can cross several."
+- "One way to start: `pawn.move(4)`, then `pawn.turn_right()`, then `pawn.move(4)`."
+lesson: practice/practice-03.md

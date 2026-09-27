@@ -1,0 +1,27 @@
+id: practice-04
+chapter: 0
+title: "The Sentry's Round"
+trains: "Timing moves around a patrol"
+brief: "A sentry marches across the hall, back and forth. Cross behind it."
+piece: pawn
+map: |
+  # # G # #
+  # . . . #
+  . . . . .
+  # . . . #
+  # # P # #
+enemies:
+- {"kind": "patrol", "route": ["a3", "e3"]}
+start: {"facing": "north"}
+api:
+- move
+- turn_left
+- turn_right
+- wait
+par:
+  lines: 3
+hints:
+- "The patrol moves one square every time you move a square, turn or wait. Where will it be when you step onto its path?"
+- "`pawn.wait()` stands still for one tick while the patrol walks on."
+- "One way to start: `pawn.turn_left()`, then `pawn.turn_right()`."
+lesson: practice/practice-04.md

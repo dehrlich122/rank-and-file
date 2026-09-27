@@ -1,0 +1,6 @@
+pawn.move(2)
+pawn.turn_right()
+pawn.move(3)
+pawn.turn_left()
+print('3')
+pawn.move(2)

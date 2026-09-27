@@ -1,0 +1,30 @@
+id: practice-08
+chapter: 0
+title: "The Toll"
+trains: "Collecting gems, then answering a guard's question"
+brief: "The toll keeper wants to know how much you're carrying."
+piece: pawn
+map: |
+  # # # G
+  # # # X
+  $ . $ .
+  $ # # #
+  P # # #
+legend:
+  "$": "gem"
+  "X": {"tile": "gate", "question": "How many gems did you collect?", "passphrase": "3"}
+start: {"facing": "north"}
+objectives:
+- "reach_goal"
+- {"collect": "all"}
+api:
+- move
+- turn_left
+- turn_right
+par:
+  lines: 6
+hints:
+- "Count the gems on your route as you plan it: that's the guard's answer."
+- "The guard only hears you from a square next to the gate, so print the answer there."
+- "One way to start: `pawn.move(2)`, then `pawn.turn_right()`."
+lesson: practice/practice-08.md

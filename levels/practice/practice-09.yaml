@@ -1,0 +1,33 @@
+id: practice-09
+chapter: 0
+title: "The Capture"
+trains: "Capturing diagonally, and keeping clear of an armoured enemy"
+brief: "Pawns capture on the diagonal. One patrol is fair game; the other wears armour."
+piece: pawn
+map: |
+  . . . G . .
+  . . . . . .
+  . . . . . .
+  . . . . . .
+  . . . P . .
+enemies:
+- {"kind": "patrol", "start": "a2", "route": ["a2", "f2"]}
+- {"kind": "patrol", "start": "f4", "route": ["a4", "f4"], "armoured": true}
+start: {"facing": "north"}
+objectives:
+- "reach_goal"
+- {"capture": "all"}
+api:
+- move
+- turn_left
+- turn_right
+- wait
+- capture_left
+- capture_right
+par:
+  lines: 5
+hints:
+- "`capture_left()` and `capture_right()` take an enemy one square diagonally forward. When will the patrol be there?"
+- "The armoured patrol can't be taken, and walking into it is being caught. Plan around it."
+- "One way to start: `pawn.turn_left()`, then `pawn.move()`."
+lesson: practice/practice-09.md

@@ -1,0 +1,5 @@
+pawn.turn_left()
+pawn.move()
+pawn.turn_right()
+pawn.capture_right()
+pawn.move(3)
