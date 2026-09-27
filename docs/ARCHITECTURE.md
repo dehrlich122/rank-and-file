@@ -188,7 +188,7 @@ legend:                      # optional: extra symbols beyond the built-ins
   S: {tile: sign, text: "Words written on the signpost"}
   X: {tile: gate, passphrase: Open sesame}
   Q: {tile: gate, question: "How many gems did you collect?", passphrase: "4"}
-  T: {tile: timed_gate, every: 3, clock: action}      # clock is optional
+  T: {tile: timed_gate, every: 3, open: 2}           # open and clock (action) are optional
   O: pit
   W: waypoint
   $: gem
@@ -239,8 +239,10 @@ must reach the goal whichever `?` it's on). Legend tiles:
     answer gets its own reply.
   - The guard lines live in `world.py`.
   - `describe()` never includes the passphrase.
-- `timed_gate` *(M3.1)*: open when its clock's tick count is a multiple of
-  `every` (2 or more), so it starts open. Shut, it blocks like a wall.
+- `timed_gate` *(M3.1)*: open for the first `open` ticks (default 2) of every
+  `every` ticks of its clock, starting open; `every` must be more than
+  `open`. Shut, it blocks like a wall. Anything under it when it shuts is
+  crushed *(QA-024)*: the piece loses the run, and a chaser is gone.
 - `pit` *(M3.1)*: stepping in loses the run. `pawn.bridge()` lays a plank
   over the pit ahead *(QA-017)*, which makes it floor for everyone. A chaser
   whose step lands on an open pit falls in and is gone.

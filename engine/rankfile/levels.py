@@ -30,7 +30,7 @@ BUILTIN_SYMBOLS = {".": Tile.FLOOR, "#": Tile.WALL, START: Tile.FLOOR, GOAL: Til
 TILE_DETAILS: dict[Tile, tuple[set[str], set[str]]] = {
     Tile.SIGN: ({"text"}, set()),
     Tile.GATE: ({"passphrase"}, {"question"}),
-    Tile.TIMED_GATE: ({"every"}, {"clock"}),
+    Tile.TIMED_GATE: ({"every"}, {"clock", "open"}),
 }
 
 # Enemies (M3.1): the keys each kind takes, and the ground they can walk on.
@@ -241,8 +241,9 @@ class Level:
                 obstacles.append("A chaser doesn't see pits: if its step lands on one, it falls in and is gone.")
         for pos, timer in sorted(self.board.timers.items()):
             obstacles.append(
-                f"The gate on {square_name(pos)} is open at the start, then shut for {count(timer.every - 1, 'tick')}, "
-                f"then open again, over and over. It ticks once for {CLOCK_TICKS[timer.clock]}."
+                f"The gate on {square_name(pos)} is open for {count(timer.open, 'tick')}, then shut for "
+                f"{count(timer.every - timer.open, 'tick')}, over and over, starting open. It ticks once for "
+                f"{CLOCK_TICKS[timer.clock]}. Anything under it when it shuts is crushed: if that's you, the run is lost."
             )
         obstacles.extend(enemy.describe() for enemy in self.enemies)
         if self.enemies:
@@ -428,13 +429,15 @@ def _parse_details(symbol: str, tile: Tile, meaning: dict) -> dict:
     details = {key: value for key, value in meaning.items() if key != "tile"}
     for key in needs | set(details):
         value = details.get(key)
-        if key == "every":
-            if not (_positive(value) and value >= 2):
-                raise LevelError(f"legend {symbol!r}: a timed gate needs every: a whole number of ticks, 2 or more")
+        if key in ("every", "open"):
+            if not _positive(value):
+                raise LevelError(f"legend {symbol!r}: a timed gate needs {key}: a whole number of ticks")
         elif key == "clock":
             _check_clock(f"legend {symbol!r}", value)
         elif not isinstance(value, str) or not value:
             raise LevelError(f"legend {symbol!r}: a {tile.value} needs {key}")
+    if tile is Tile.TIMED_GATE and details["every"] <= details.get("open", Timer.open):
+        raise LevelError(f"legend {symbol!r}: a timed gate's every must be more than its open ({details.get('open', Timer.open)}), or it would never shut")
     return details
 
 

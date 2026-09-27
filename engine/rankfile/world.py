@@ -187,6 +187,7 @@ class World:
             if foe.enemy.kind == "chaser" and self._open_pit(foe.pos):  # a patrol's route never crosses a pit
                 foe.gone = True
                 self._emit("fall", at=list(foe.pos), message=f"The {foe.enemy.kind} fell into the pit on {square_name(foe.pos)}.")
+        self._crush(clock)
         if moving:
             self._check_caught()
 
@@ -258,6 +259,18 @@ class World:
                 foe.heading = -foe.heading  # the end of its route: back the other way
             foe.index += foe.heading
         foe.pos = enemy.path[foe.index]
+
+    def _crush(self, clock: str) -> None:
+        """Anything under a timed gate on `clock` that is now shut is crushed (QA-024):
+        a chaser is gone, and the piece loses the run."""
+        for pos, timer in self.board.timers.items():
+            if timer.clock != clock or not self._shut(pos):
+                continue
+            if foe := self._foe_at(pos):  # only a chaser can be under a gate: patrol routes avoid them
+                foe.gone = True
+                self._emit("crush", at=list(pos), message=f"The {foe.enemy.kind} was crushed by the gate on {square_name(pos)}.")
+            if self.pos == pos:
+                self._lose(f"Your {self.level.piece} was crushed by the gate on {square_name(pos)}.", pos)
 
     def _chase_simply(self, pos: Pos) -> Pos:
         """The simple chaser's step: toward the piece along the bigger gap (east or
@@ -333,9 +346,9 @@ class World:
         return {pos for pos in self.board.timers if not self._shut(pos)}
 
     def _shut(self, pos: Pos) -> bool:
-        """A timed gate is shut except when its clock's ticks are a multiple of `every`."""
+        """A timed gate is shut for the rest of each cycle after its `open` ticks."""
         timer = self.board.timers.get(pos)
-        return timer is not None and self.ticks[timer.clock] % timer.every != 0
+        return timer is not None and not timer.is_open(self.ticks[timer.clock])
 
     def _locked_gate(self, pos: Pos) -> bool:
         return self.board.tile(pos) is Tile.GATE and pos not in self.opened
@@ -353,8 +366,11 @@ class World:
         if not self.board.contains(target):
             return f"Your {piece} can't walk off the edge of the board. It's on {here}, facing {self.facing.value}."
         if target in self.board.timers:
-            every = self.board.timers[target].every
-            return f"Your {piece} bumped into the gate on {square_name(target)}. It's shut right now: it opens every {every} ticks."
+            timer = self.board.timers[target]
+            return (
+                f"Your {piece} bumped into the gate on {square_name(target)}. It's shut right now: "
+                f"it's open for {count(timer.open, 'tick')} out of every {timer.every}."
+            )
         what = "a signpost" if self.board.tile(target) is Tile.SIGN else "a wall"
         return f"Your {piece} bumped into {what} on {square_name(target)}."
 

@@ -237,9 +237,9 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
   },
   timed_gate: (left, top, level, pos) => {
     const timer = find(level.timed_gates, pos);
-    const every = timer?.every ?? 0;
-    const title = `A timed gate: open at the start, then every ${every} ticks.`;
-    const label = gate(left, top, title, `${clockwork(timer?.clock) ? `${GEAR} {n} · ` : ""}every ${every}`, true);
+    const [open, every] = [timer?.open ?? 0, timer?.every ?? 0];
+    const title = `A timed gate: open for ${open} ticks, then shut for ${every - open}, over and over. Anything under it when it shuts is crushed.`;
+    const label = gate(left, top, title, `${clockwork(timer?.clock) ? `${GEAR} {n} · ` : ""}${open} of ${every}`, true);
     if (timer && clockwork(timer.clock)) label.querySelector<SVGGElement>(".badge-group")!.dataset.clock = timer.clock;
     return label;
   },

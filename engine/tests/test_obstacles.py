@@ -170,42 +170,68 @@ def test_pits_are_listed_as_obstacles():
     assert level.describe()["obstacles"] == ["Pits on a1, a3 and c3: step in and the run is lost."]
 
 
-# -- timed gates -------------------------------------------------------------------------
+# -- timed gates ---------------------------------------------------------------------------
 
 
 @pytest.fixture
 def portcullis():
-    """Pawn on a1 facing east; a gate on c1 open every 3 ticks; the goal on d1."""
+    """Pawn on a1 facing east; a gate on c1, open for 2 ticks of every 3; the goal on d1."""
     return make_level("P . T G\n", legend={"T": {"tile": "timed_gate", "every": 3}}, api=API, start={"facing": "east"})
 
 
-def test_a_timed_gate_is_open_on_every_nth_tick(portcullis):
+def test_a_timed_gate_is_open_for_its_first_ticks_of_each_cycle(portcullis):
     result = run_level(portcullis, "pawn.wait()\npawn.wait()\npawn.wait()\npawn.wait()")
     ticks = [(event["state"]["tick"], event["state"]["opened"]) for event in events(result, "tick")]
-    assert ticks == [(1, []), (2, []), (3, [[2, 0]]), (4, [])]
-    assert portcullis.describe()["start"]["opened"] == [[2, 0]]  # open at the start
+    assert ticks == [(1, [[2, 0]]), (2, []), (3, [[2, 0]]), (4, [[2, 0]])]  # open 2 of every 3, starting open
+    assert portcullis.describe()["start"]["opened"] == [[2, 0]]
 
 
 def test_a_shut_timed_gate_blocks_like_a_wall(portcullis):
-    result = run_level(portcullis, "pawn.move(3)")  # reaches the gate on tick 1
+    result = run_level(portcullis, "pawn.move()\npawn.wait()\npawn.move()")  # reaches the gate on tick 2
     assert result.status == "error"
-    assert result.error.friendly == "Your pawn bumped into the gate on c1. It's shut right now: it opens every 3 ticks."
+    assert result.error.friendly == "Your pawn bumped into the gate on c1. It's shut right now: it's open for 2 ticks out of every 3."
     assert events(result, "bump")[-1]["at"] == [2, 0]
 
 
-def test_arriving_while_it_is_open_goes_through(portcullis):
+def test_a_gate_that_shuts_on_the_pawn_crushes_it(portcullis):
+    result = run_level(portcullis, "pawn.move(3)")  # into the gate on its last open tick
+    assert result.status == "lost"
+    assert result.summary == "Your pawn was crushed by the gate on c1."
+    assert result.final["lost"] == [2, 0]
+    waiting = run_level(portcullis, "pawn.move()\npawn.wait()\npawn.wait()\npawn.move()\npawn.wait()")
+    assert waiting.summary == "Your pawn was crushed by the gate on c1."  # in as it opened, but it stayed too long
+
+
+def test_arriving_as_it_opens_goes_through(portcullis):
     result = run_level(portcullis, "pawn.move()\npawn.wait()\npawn.wait()\npawn.move(2)")
     assert result.status == "solved"
 
 
+def test_a_gate_that_shuts_on_a_chaser_crushes_it():
+    level = make_level("P # T .\n", legend={"T": {"tile": "timed_gate", "every": 3}}, api=API, start={"facing": "east"},
+                       objectives=[{"say": "x"}], enemies=[{"kind": "chaser", "start": "d1"}])
+    # The chaser steps into the open gate on tick 1; the wall stops it going on, and the gate shuts on tick 2.
+    result = run_level(level, "pawn.wait()")
+    assert events(result, "crush") == []
+    result = run_level(level, "pawn.wait()\npawn.wait()")
+    assert [(event["at"], event["message"]) for event in events(result, "crush")] == [([2, 0], "The chaser was crushed by the gate on c1.")]
+    assert result.final["enemies"] == [None]
+
+
+def test_a_level_sets_how_long_a_gate_stays_open():
+    level = make_level("P T G\n", legend={"T": {"tile": "timed_gate", "every": 5, "open": 3}}, api=API, start={"facing": "east"})
+    assert level.describe()["timed_gates"] == [{"pos": [1, 0], "every": 5, "clock": "action", "open": 3}]
+    assert run_level(level, "pawn.wait()\npawn.move(2)").status == "solved"  # in on tick 1, out on tick 2: still open
+
+
 def test_a_timed_gate_can_keep_time_with_the_code():
-    level = make_level("P T G\n", legend={"T": {"tile": "timed_gate", "every": 2, "clock": "line"}}, start={"facing": "east"})
+    level = make_level("P T G\n", legend={"T": {"tile": "timed_gate", "every": 2, "open": 1, "clock": "line"}}, start={"facing": "east"})
     assert run_level(level, "pawn.move(2)").status == "error"  # line 1 ticks it shut
-    assert run_level(level, "x = 1\npawn.move(2)").status == "solved"  # two lines: open again
+    assert run_level(level, "x = 1\npawn.move(2)").status == "solved"  # two lines: open again, and no line runs while the pawn is under it
 
 
 def test_the_new_line_clock_ticks_once_per_line():
-    level = make_level("P T G\n", legend={"T": {"tile": "timed_gate", "every": 2, "clock": "new_line"}}, start={"facing": "east"})
+    level = make_level("P T G\n", legend={"T": {"tile": "timed_gate", "every": 2, "open": 1, "clock": "new_line"}}, start={"facing": "east"})
     looped = "for i in range(3):\n    x = i\npawn.move(2)"  # 3 new lines: shut
     assert run_level(level, looped).status == "error"
     copied = "x = 0\nx = 1\nx = 2\npawn.move(2)"  # 4 new lines: open
@@ -215,10 +241,11 @@ def test_the_new_line_clock_ticks_once_per_line():
 def test_timed_gates_are_described():
     level = make_level("P T G\n", legend={"T": {"tile": "timed_gate", "every": 3}}, start={"facing": "east"})
     described = level.describe()
-    assert described["timed_gates"] == [{"pos": [1, 0], "every": 3, "clock": "action"}]
+    assert described["timed_gates"] == [{"pos": [1, 0], "every": 3, "clock": "action", "open": 2}]
     assert described["obstacles"] == [
-        "The gate on b1 is open at the start, then shut for 2 ticks, then open again, over and over. "
-        "It ticks once for each square you move, each turn and each wait."
+        "The gate on b1 is open for 2 ticks, then shut for 1 tick, over and over, starting open. "
+        "It ticks once for each square you move, each turn and each wait. "
+        "Anything under it when it shuts is crushed: if that's you, the run is lost."
     ]
 
 
@@ -226,7 +253,8 @@ def test_timed_gates_are_described():
     ("meaning", "message"),
     [
         ({"tile": "timed_gate"}, "needs every"),
-        ({"tile": "timed_gate", "every": 1}, "2 or more"),
+        ({"tile": "timed_gate", "every": 2}, "every must be more than its open \\(2\\)"),
+        ({"tile": "timed_gate", "every": 4, "open": 0}, "needs open"),
         ({"tile": "timed_gate", "every": 3, "clock": "sometimes"}, "clock must be one of"),
         ({"tile": "timed_gate", "every": 3, "passphrase": "x"}, "doesn't take passphrase"),
         ({"tile": "gate", "passphrase": "4", "question": ""}, "needs question"),

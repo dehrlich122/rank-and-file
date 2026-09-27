@@ -1192,6 +1192,21 @@ Item 6 (hidden boards) became QA-016.
   - This is the same kind of gap as QA-017 (pits were walls with a
     different message).
 
+
+### QA-024 · Portcullis: a gate that shuts on the pawn should crush it · Open
+
+- **Area:** timed gates (M3.1 step 3), Testing ground 7 (Portcullis)
+- **Asked** *(Designer, 2026-09-27)*: can the gate open before the move and
+  close after it, so that a pawn on the gate square at any time the gate is
+  shut is lost?
+- **Answer** *(Claude)*: yes, with one catch.
+  - Today a timed gate is open for a single tick of each cycle ("every 3" is
+    open on ticks 0, 3, 6, …).
+  - Stepping onto the gate square takes a tick, and stepping off takes
+    another. So a one-tick opening would always shut with the pawn on it.
+  - For the rule to work, a gate has to stay open long enough to pass
+    through: at least two ticks.
+
 ---
 
 ## Queued work

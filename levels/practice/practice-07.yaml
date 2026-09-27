@@ -1,8 +1,8 @@
 id: practice-07
 chapter: 0
 title: "Portcullis"
-trains: "Counting ticks to arrive when a timed gate is open"
-brief: "Two portcullises rise and fall on their own timers. Arrive at the right moment."
+trains: "Counting ticks to pass under a timed gate while it's open"
+brief: "Two portcullises rise and fall on their own timers. Pass under each while it's up, or be crushed."
 piece: pawn
 map: |
   # # # # # G
@@ -19,11 +19,11 @@ api:
 - turn_right
 - wait
 par:
-  lines: 6
+  lines: 8
 hints:
-- "A timed gate is open when the tick count is a multiple of its number. Count the ticks before you reach it."
-- "Every square moved, every turn and every wait is a tick. `pawn.wait()` adds one without moving."
-- "One way to start: `pawn.turn_left()`, then `pawn.move(2)`."
+- "Each gate is open for its first few ticks, then shut. Count the ticks along your route, and arrive just as a gate opens."
+- "Stepping in and stepping out take a tick each, and a gate that shuts on you crushes you. `pawn.wait()` adds a tick without moving."
+- "One way to start: `pawn.turn_left()`, then `pawn.turn_left()`."
 lesson: practice/practice-07.md
 lesson_board:
   map: |

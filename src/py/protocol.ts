@@ -53,7 +53,7 @@ export interface LevelInfo {
   tiles: TileKind[][]; // tiles[y][x]; y = 0 is the bottom rank
   signs: Array<{ pos: Pos; text: string }>;
   questions: Array<{ pos: Pos; text: string }>; // what the guard asks, at gates that ask (never the answer)
-  timed_gates: Array<{ pos: Pos; every: number; clock: Clock }>; // open when the clock's ticks are a multiple of `every`
+  timed_gates: Array<{ pos: Pos; every: number; open: number; clock: Clock }>; // open for the first `open` ticks of every `every` (QA-024)
   enemies: Enemy[]; // patrols and chasers; where they are is in each WorldState
   goal: Pos | null;
   goal_spots: Pos[]; // a hidden goal: the squares it might be on (drawn as ?)
@@ -83,10 +83,10 @@ export interface Enemy {
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };
 
 export interface GameEvent {
-  kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "capture" | "tick" | "lost" | "pick_up" | "bridge" | "fall";
+  kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "capture" | "tick" | "lost" | "pick_up" | "bridge" | "fall" | "crush";
   state: WorldState; // the whole world's state after the event
   at?: Pos; // bump: the square bumped into; gate_open/guard: the gate; capture, fall: the enemy's square; bridge: the pit; pick_up, lost: where
-  message?: string; // guard: what the guard said; pick_up, fall, lost: what happened
+  message?: string; // guard: what the guard said; pick_up, fall, crush, lost: what happened
 }
 
 export interface Var {

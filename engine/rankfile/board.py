@@ -73,10 +73,15 @@ class Tile(Enum):
 
 @dataclass
 class Timer:
-    """When a timed gate is open: whenever its clock's tick count is a multiple of `every`."""
+    """When a timed gate is open: for the first `open` ticks of every `every`
+    ticks of its clock, starting open (QA-024)."""
 
     every: int
     clock: str = "action"
+    open: int = 2  # long enough to step in, then out, arriving as it opens
+
+    def is_open(self, ticks: int) -> bool:
+        return ticks % self.every < self.open
 
 
 @dataclass
