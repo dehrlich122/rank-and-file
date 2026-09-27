@@ -26,3 +26,9 @@ hints:
 - "Walk over the plank to pick it up. Then face a pit and call `pawn.bridge()`."
 - "One way to start: `pawn.turn_right()`, then `pawn.move(2)`, then `pawn.turn_left()`."
 lesson: practice/practice-02.md
+lesson_board:
+  map: |
+    . . . . .
+    P L O . .
+  legend: {"L": "plank", "O": "pit"}
+  start: {"facing": "east"}

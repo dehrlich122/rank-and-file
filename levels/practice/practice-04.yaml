@@ -25,3 +25,11 @@ hints:
 - "`pawn.wait()` stands still for one tick while the patrol walks on."
 - "One way to start: `pawn.turn_left()`, then `pawn.turn_right()`."
 lesson: practice/practice-04.md
+lesson_board:
+  map: |
+    . . . . .
+    . . . . .
+    . . . . .
+    . . P . .
+  enemies:
+  - {"kind": "patrol", "route": ["a2", "e2"]}

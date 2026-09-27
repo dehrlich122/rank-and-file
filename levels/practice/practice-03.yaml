@@ -24,3 +24,10 @@ hints:
 - "Plan the order of the waypoints before your first move. One lap can cross several."
 - "One way to start: `pawn.move(4)`, then `pawn.turn_right()`, then `pawn.move(4)`."
 lesson: practice/practice-03.md
+lesson_board:
+  map: |
+    . . . . .
+    . . W . .
+    . . . . .
+    . . P . .
+  legend: {"W": "waypoint"}

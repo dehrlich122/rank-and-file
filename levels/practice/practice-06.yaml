@@ -25,3 +25,12 @@ hints:
 - "A `for` loop runs the same lines again, and a line running again doesn't wind the patrol."
 - "One way to start: `for _ in range(5):`, then `pawn.move()`."
 lesson: practice/practice-06.md
+lesson_board:
+  map: |
+    . . . . .
+    . . . . .
+    . . . . .
+    P . . . .
+  start: {"facing": "east"}
+  enemies:
+  - {"kind": "patrol", "route": ["a3", "e3"], "clock": "new_line"}

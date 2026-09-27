@@ -31,3 +31,11 @@ hints:
 - "The armoured patrol can't be taken, and walking into it is being caught. Plan around it."
 - "One way to start: `pawn.turn_left()`, then `pawn.move()`."
 lesson: practice/practice-09.md
+lesson_board:
+  map: |
+    . . . . .
+    . . . . .
+    . . P . .
+  enemies:
+  - {"kind": "patrol", "start": "b2"}
+  - {"kind": "patrol", "start": "d2", "armoured": true}

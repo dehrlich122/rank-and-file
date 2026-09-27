@@ -25,3 +25,9 @@ hints:
 - "Every square moved, every turn and every wait is a tick. `pawn.wait()` adds one without moving."
 - "One way to start: `pawn.turn_left()`, then `pawn.move(2)`."
 lesson: practice/practice-07.md
+lesson_board:
+  map: |
+    . . . . .
+    P . T . .
+  legend: {"T": {"tile": "timed_gate", "every": 3}}
+  start: {"facing": "east"}

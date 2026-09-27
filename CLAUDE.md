@@ -156,6 +156,11 @@ and set `__module__ = "builtins"` so tracebacks don't show engine paths. New
 error translations belong in `errors.py`, with a case in
 `engine/tests/test_errors.py`.
 
+**Every new obstacle or interaction is shown in its lesson's sample code**
+*(Designer, 2026-09-27)*. When a level brings in something new (a pit, a
+patrol, a gate…), its lesson's snippets run on a `lesson_board` that has it,
+so the player sees it at work, including how it loses a run (```` ```python run lost ````).
+
 **Levels are data.** YAML in `levels/chNN/`, lesson in `lessons/chNN/`,
 solutions in `solutions/chNN/`. The Testing ground (outside the curriculum:
 `curriculum: false` in `levels/chapters.yaml`) uses `practice/` folders. The format is documented in

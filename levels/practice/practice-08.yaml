@@ -28,3 +28,9 @@ hints:
 - "The guard only hears you from a square next to the gate, so print the answer there."
 - "One way to start: `pawn.move(2)`, then `pawn.turn_right()`."
 lesson: practice/practice-08.md
+lesson_board:
+  map: |
+    . . . . .
+    P $ $ . X
+  legend: {"$": "gem", "X": {"tile": "gate", "question": "How many gems did you collect?", "passphrase": "2"}}
+  start: {"facing": "east"}
