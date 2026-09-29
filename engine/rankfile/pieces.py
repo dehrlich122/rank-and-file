@@ -9,7 +9,7 @@ error says why.
 from typing import TYPE_CHECKING
 
 from .board import square_name
-from .exceptions import CantChangePieceError, GameArgumentError, LockedAbilityError
+from .exceptions import CantChangePieceError, GameArgumentError, LockedAbilityError, NoBoardError
 
 if TYPE_CHECKING:
     from .world import World
@@ -45,54 +45,154 @@ class Piece:
 
     def __repr__(self) -> str:
         world = self._world
-        return f"{type(self).NAME} at {square_name(world.pos)} facing {world.facing.value}"
+        name = type(self).NAME
+        try:
+            return f"{name} at {square_name(world.pos)} facing {world.facing.value}"
+        except NoBoardError:  # Scratch Python's stand-in piece (repl.py)
+            return f"{name} (Scratch Python has no board: help({name}) shows what it knows)"
 
 
 class Pawn(Piece):
     NAME = "pawn"
     ABILITIES = ("move", "turn_left", "turn_right", "at_goal", "position", "facing", "wait", "capture_left", "capture_right", "bridge")
 
+    # These docstrings are the Codex's entries for the pawn (codex.py): the
+    # Codex tab, the editor's hover tooltips and help() all show them.
+
     def move(self, squares=1):
-        """Walk forward. `pawn.move()` takes one step; `pawn.move(3)` takes three."""
+        """Walk forward, one square at a time.
+
+        `pawn.move()` takes one step, and `pawn.move(3)` takes three. A wall or
+        the edge of the board in the way stops your program with an error.
+
+        Args:
+            squares: how many squares to walk, a whole number (int), 1 or more.
+                Leave it out to walk 1.
+
+        Returns:
+            Nothing.
+
+        Example:
+            pawn.move(3)
+        """
         for _ in range(_check_squares(squares)):
             self._world.move_forward()
 
     def turn_left(self):
-        """Turn a quarter turn to the left, staying on the same square."""
+        """Turn a quarter turn to the left, staying on the same square.
+
+        Returns:
+            Nothing.
+
+        Example:
+            pawn.turn_left()
+        """
         self._world.turn_left()
 
     def turn_right(self):
-        """Turn a quarter turn to the right, staying on the same square."""
+        """Turn a quarter turn to the right, staying on the same square.
+
+        Returns:
+            Nothing.
+
+        Example:
+            pawn.turn_right()
+        """
         self._world.turn_right()
 
     def wait(self):
-        """Stand still for one tick, while everything else takes its turn."""
+        """Stand still for one tick, while everything else on the board takes its turn.
+
+        It takes no number: to wait longer, call it again.
+
+        Returns:
+            Nothing.
+
+        Example:
+            pawn.wait()
+        """
         self._world.wait()
 
     def capture_left(self):
-        """Take the enemy one square diagonally forward and to the left, and move onto its square."""
+        """Take the enemy one square diagonally forward and to the left, and move onto its square.
+
+        That's how a chess pawn captures. With nothing there to take, it's an
+        error.
+
+        Returns:
+            Nothing.
+
+        Example:
+            pawn.capture_left()
+        """
         self._world.capture("left")
 
     def capture_right(self):
-        """Take the enemy one square diagonally forward and to the right, and move onto its square."""
+        """Take the enemy one square diagonally forward and to the right, and move onto its square.
+
+        That's how a chess pawn captures. With nothing there to take, it's an
+        error.
+
+        Returns:
+            Nothing.
+
+        Example:
+            pawn.capture_right()
+        """
         self._world.capture("right")
 
     def bridge(self):
-        """Lay a plank over the pit straight ahead, so it can be walked across."""
+        """Lay a plank over the pit straight ahead, so you can walk across it.
+
+        Your pawn needs to be carrying a plank: walking over one picks it up.
+
+        Returns:
+            Nothing.
+
+        Example:
+            pawn.bridge()
+        """
         self._world.bridge()
 
     def at_goal(self) -> bool:
-        """True when the pawn is standing on the goal square."""
+        """Check whether your pawn is standing on the goal square.
+
+        Returns:
+            True if it is, False if it isn't (a bool).
+
+        Example:
+            print(pawn.at_goal())
+        """
         return self._world.at_goal()
 
     @property
     def position(self) -> tuple[int, int]:
-        """Where the pawn is, as (x, y). The bottom-left square a1 is (0, 0)."""
+        """Where your pawn is, as (x, y).
+
+        No parentheses: it's something your pawn has, not something it does.
+        The bottom-left square, a1, is (0, 0). x counts squares to the right,
+        and y counts squares up.
+
+        Returns:
+            Two whole numbers in brackets (a tuple), like (2, 0).
+
+        Example:
+            print(pawn.position)
+        """
         return self._world.pos
 
     @property
     def facing(self) -> str:
-        """Which way the pawn is facing: "north", "east", "south" or "west"."""
+        """Which way your pawn is facing.
+
+        No parentheses: it's something your pawn has, not something it does.
+
+        Returns:
+            "north", "east", "south" or "west" (text, a str).
+
+        Example:
+            print(pawn.facing)
+        """
         return self._world.facing.value
 
 

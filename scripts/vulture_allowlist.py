@@ -3,9 +3,10 @@
 Vulture only follows Python calls. These are used from elsewhere:
 """
 
-from rankfile import bridge, exceptions, levels, pieces, runner, tracer
+from rankfile import bridge, codex, exceptions, levels, pieces, runner, tracer
 
 # Called from JavaScript by the Web Worker (src/py/worker.ts), by name.
+bridge.codex
 bridge.load_level
 bridge.load_sandbox
 bridge.repl_push
@@ -22,6 +23,7 @@ pieces.Pawn.capture_right
 levels.Level.lesson
 
 # Dataclass fields that are serialised to JSON (asdict) for the UI.
+codex.Entry.new
 runner.SnippetResult.duration_ms
 runner.LevelResult.final
 runner.LevelResult.duration_ms

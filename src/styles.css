@@ -678,7 +678,8 @@ pre {
   font-weight: 550;
 }
 
-.trains-label {
+.trains-label,
+.codex-new {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -711,6 +712,146 @@ pre {
   flex-wrap: wrap;
   gap: 6px;
   margin: 6px 0 0;
+}
+
+/* The Codex (src/ui/codex.ts, docs/Codex.md) ------------------------------------ */
+
+/* The Challenge panel's chips: hover for the entry, click to open it in the Codex tab */
+.codex-chip {
+  font: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.codex-chip code {
+  display: inline-block;
+  border: 1px solid transparent;
+}
+
+.codex-chip:hover code,
+.codex-chip:focus-visible code {
+  border-color: var(--accent);
+}
+
+.codex .codex-entry {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-top: 8px;
+}
+
+.codex-entry > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.codex-entry > summary::marker {
+  color: var(--muted);
+}
+
+.codex-entry[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.codex-gist {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.codex-entry[open] .codex-gist {
+  color: var(--text);
+}
+
+.codex-body {
+  display: grid;
+  gap: 8px;
+  padding: 8px 12px 10px;
+  font-size: 14px;
+}
+
+.codex-body p,
+.codex-card p {
+  margin: 0;
+}
+
+.codex-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.codex-args dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  margin: 4px 0 0;
+}
+
+.codex-args dd {
+  margin: 0;
+}
+
+.codex-example pre {
+  margin-top: 4px;
+  padding: 6px 10px;
+  background: var(--code-bg);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.codex-example pre code {
+  padding: 0;
+  background: none;
+}
+
+/* An entry as a tooltip: in the editors (CodeMirror's .cm-tooltip) or beside a chip */
+.codex-card {
+  display: grid;
+  gap: 6px;
+  max-width: 380px;
+  padding: 8px 10px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.codex-call {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.codex-call code {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.codex-card > .codex-call {
+  justify-self: start;
+}
+
+/* a popover (ChipTooltip), placed by script beside its chip */
+.codex-tooltip {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+  pointer-events: none;
 }
 
 /* hints (src/ui/hints.ts), opened one at a time */

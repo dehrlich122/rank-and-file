@@ -102,8 +102,8 @@ live in Python.** The UI only renders what the engine reports.
 1. `src/py/client.ts` (`PyClient`, UI thread) queues requests one at a time.
 2. `src/py/worker.ts` receives them.
 3. It calls `engine/rankfile/bridge.py`, which takes strings and returns JSON strings.
-4. The bridge calls `runner.py` (`run_level`, `run_sandbox`, `run_snippet`) or
-   `repl.py`.
+4. The bridge calls `runner.py` (`run_level`, `run_sandbox`, `run_snippet`),
+   `repl.py`, or `codex.py` (the Codex's entries).
 5. `runner.py` checks the code (`constraints.py`), builds a `World` and the
    piece (`pieces.py`), and runs the code under `tracer.py`, which records one
    step per player line. World events and printed output are attached to the
@@ -211,6 +211,17 @@ names.
 - A level's help (hints, "Show me a solution", the comparison) is
   `ui/help.ts`. It records each run's result once, from `run()` in
   `levelView.ts`, never from playback, which can reach the end many times.
+- The Codex (`ui/codex.ts`, `docs/Codex.md`) is the dictionary of functions
+  the player knows.
+  - It appears as a third tab, as hover tooltips in every editor, and on the
+    Challenge panel's chips. Player code's `help()` shows the same entries.
+  - Entries are Google-style docstrings: abilities in `pieces.py`, built-ins
+    in `codex.BUILTINS`. A new ability or taught built-in needs one.
+  - The engine decides what's "taught so far" (`codex.history`). The UI
+    sends every chapter's levels and lessons (`content.codexChapters`).
+  - The level checker fails if a lesson calls an undocumented built-in, or a
+    reference calls one no lesson has taught by then.
+  - Scratch Python gets a stand-in piece with no board (`repl.NoBoard`).
 - Dialogs and confirm steps share `ui/dialog.ts` (`modal`, `dialogHead`,
   `confirmStep`). Confirm steps are always inside the page. Never use browser
   `confirm()`/`alert()`, which block the page and the e2e checks.

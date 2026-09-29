@@ -11,15 +11,19 @@ For each level (levels/<folder>/<id>.yaml: a chapter, chNN, or practice) it chec
 - the lesson has at most 150 words of prose and 1-3 runnable snippets, each of
   which runs as expected (``` python run ``` must not fail; ``` python run error ```
   must fail, and ``` python run lost ``` must lose the run, on purpose). They run
-  on the level's `lesson_board` if it has one.
+  on the level's `lesson_board` if it has one;
+- the Codex (docs/Codex.md) documents every built-in a lesson calls, and the
+  reference only calls built-ins that a lesson up to its level teaches.
 """
 
+import functools
 import re
 from pathlib import Path
 
 import pytest
 import yaml
 
+from rankfile import codex
 from rankfile.board import Direction
 from rankfile.levels import parse_level
 from rankfile.runner import run_level, run_sandbox
@@ -27,7 +31,6 @@ from rankfile.runner import run_level, run_sandbox
 ROOT = Path(__file__).resolve().parents[2]
 LEVEL_FILES = sorted((ROOT / "levels").glob("*/*.yaml"))
 MAX_LESSON_WORDS = 150
-SNIPPET = re.compile(r"^```python run(?: (error|lost))?\n(.*?)^```", re.MULTILINE | re.DOTALL)
 FENCED = re.compile(r"^```.*?^```", re.MULTILINE | re.DOTALL)
 FACING_ACTIONS = {"move", "capture", "bridge"}  # the actions that go the way the piece faces
 
@@ -140,7 +143,7 @@ def test_lesson_is_short_and_runnable(level_file):
     words = re.findall(r"[A-Za-z0-9_']+", prose)
     assert len(words) <= MAX_LESSON_WORDS, f"{level.lesson} has {len(words)} words of prose"
 
-    snippets = SNIPPET.findall(text)
+    snippets = codex.SNIPPET.findall(text)
     assert 1 <= len(snippets) <= 3, f"{level.lesson} needs 1-3 runnable snippets"
     for meant, code in snippets:
         result = run_sandbox(code, level.api, lesson_board=level.lesson_board)
@@ -148,3 +151,40 @@ def test_lesson_is_short_and_runnable(level_file):
             assert result.status == meant, f"snippet should end in {meant} on purpose, not {result.status}:\n{code}"
         else:
             assert result.status == "finished", f"snippet failed ({result.summary}):\n{code}"
+
+
+# -- the Codex (docs/Codex.md) -------------------------------------------------------
+
+
+@functools.cache
+def chapters_in_play_order() -> list[dict]:
+    """Every chapter's levels and lessons, as the UI sends them for a level's Codex:
+    chapters.yaml's order, then each chapter's levels by id (content.ts)."""
+    data = {path: yaml.safe_load(path.read_text(encoding="utf-8")) for path in LEVEL_FILES}
+    return [
+        {
+            "curriculum": entry.get("curriculum", True),
+            "levels": [
+                {"id": path.stem, "data": data[path], "lesson": (ROOT / "lessons" / data[path]["lesson"]).read_text(encoding="utf-8")}
+                for path in LEVEL_FILES
+                if data[path]["chapter"] == entry["chapter"]
+            ],
+        }
+        for entry in yaml.safe_load((ROOT / "levels" / "chapters.yaml").read_text("utf-8"))
+    ]
+
+
+def test_lesson_builtins_have_codex_entries(level_file):
+    """Every built-in a lesson calls is documented, so the Codex can list it."""
+    lesson = (ROOT / "lessons" / load(level_file).lesson).read_text(encoding="utf-8")
+    missing = set().union(*map(codex.builtins_called, codex.lesson_snippets(lesson))) - set(codex.BUILTINS)
+    assert not missing, f"{load(level_file).lesson} calls {sorted(missing)}: document them in codex.BUILTINS"
+
+
+def test_reference_solution_only_calls_builtins_taught_by_then(level_file):
+    """What a level expects is already in its Codex: its reference only calls
+    built-ins that a lesson up to it teaches (docs/Codex.md)."""
+    taught = set().union(*(codex.taught(item["lesson"]) for item in codex.history(level_file.stem, chapters_in_play_order())))
+    reference = (solutions_dir(level_file) / f"{level_file.stem}.py").read_text(encoding="utf-8")
+    missing = codex.builtins_called(reference) - taught
+    assert not missing, f"{level_file.stem}: its reference calls {sorted(missing)}, which no lesson up to it teaches"

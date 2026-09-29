@@ -15,7 +15,7 @@ import { progress } from "../progress";
 import type { LevelResult } from "../py/protocol";
 import { openComparison } from "./compare";
 import { confirmStep } from "./dialog";
-import { h } from "./dom";
+import { h, withCode } from "./dom";
 
 const GIVE_UP_AFTER = 3; // failed runs after the last hint
 
@@ -183,9 +183,4 @@ export class HelpPanel {
     this.render();
     this.solutionSection.querySelector<HTMLElement>("button")?.focus();
   }
-}
-
-/** Text with `backtick` spans shown as code. Always text nodes, never HTML. */
-function withCode(text: string): Array<string | HTMLElement> {
-  return text.split("`").map((part, i) => (i % 2 === 1 ? h("code", {}, part) : part));
 }

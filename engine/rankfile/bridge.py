@@ -9,6 +9,7 @@ ordinary Python.
 import json
 
 from . import runner
+from .codex import entries as codex_entries
 from .levels import LevelError, parse_level, sandbox_level
 from .repl import Repl
 
@@ -42,8 +43,14 @@ def run_sandbox(code: str, api_json: str, board_json: str = "null") -> str:
     return json.dumps(runner.run_sandbox(code, json.loads(api_json), lesson_board=json.loads(board_json)).to_dict())
 
 
-def repl_push(line: str) -> str:
-    return json.dumps(_repl.push(line))
+def codex(level_id: str, chapters_json: str) -> str:
+    """A level's Codex entries (docs/Codex.md). `chapters`: every chapter's levels and lessons, in play order."""
+    return json.dumps([entry.to_dict() for entry in codex_entries(level_id, json.loads(chapters_json))])
+
+
+def repl_push(line: str, level_json: str) -> str:
+    """One line for the scratch REPL. `level` is {"piece", "api"} for the session's stand-in piece, or null."""
+    return json.dumps(_repl.push(line, **(json.loads(level_json) or {})))
 
 
 def repl_reset() -> str:

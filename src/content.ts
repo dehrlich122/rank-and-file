@@ -3,6 +3,7 @@
 // The YAML is parsed here only to list levels and read titles; the engine
 // (levels.parse_level) is what actually checks and interprets a level.
 import { parse } from "yaml";
+import type { CodexChapter } from "./py/protocol";
 
 const levelFiles = import.meta.glob<string>("/levels/*/*.yaml", { query: "?raw", import: "default", eager: true });
 const lessonFiles = import.meta.glob<string>("/lessons/**/*.md", { query: "?raw", import: "default", eager: true });
@@ -86,6 +87,27 @@ export async function loadSolution(id: string): Promise<Solution | null> {
     Object.entries(files).find(([path]) => path.endsWith(`/${id}${extension}`))?.[1]();
   const [code, note] = await Promise.all([load(solutionFiles, ".py"), load(noteFiles, ".md")]);
   return code === undefined ? null : { code, note: note ?? "" };
+}
+
+/**
+ * Every chapter's levels and lessons, in play order: what the engine needs to
+ * work out which functions a level's Codex lists (codex.history, docs/Codex.md).
+ */
+export function codexChapters(): CodexChapter[] {
+  return chapters.map((chapter) => ({
+    curriculum: chapter.curriculum,
+    levels: chapter.levels.map((level) => ({ id: level.id, data: level.data, lesson: level.lesson })),
+  }));
+}
+
+/** A level's name where another screen mentions it: "1.4 The Password", or "Testing ground: Clockwork" outside the curriculum. */
+export function levelLabel(id: string): string {
+  for (const chapter of chapters) {
+    const index = chapter.levels.findIndex((level) => level.id === id);
+    const level = chapter.levels[index];
+    if (level) return chapter.curriculum ? `${chapter.chapter}.${index + 1} ${level.title}` : `${chapter.title}: ${level.title}`;
+  }
+  return id;
 }
 
 /** The level after `id` in play order (chapters.yaml), within the curriculum only. */

@@ -790,6 +790,111 @@ export default async function appChecks({ browser: b, base, root, check }) {
     return log.slice(0, 120);
   });
 
+  // -- The Codex (docs/Codex.md) ---------------------------------------------------------------
+  // Entries are documentation, not spoilers; the code typed here is test code, never a solution.
+  const codexTab = () => b.evaluate(`[...document.querySelectorAll('.tab')].find((t) => t.textContent === 'Codex').click()`);
+  const codexEntries = async () => {
+    await codexTab();
+    await b.waitFor(`document.querySelector('.codex')`, 20_000, "the Codex");
+    return b.evaluate(`[...document.querySelectorAll('.codex-entry')].map((e) => ({
+      name: e.dataset.codex, open: e.open, isNew: !!e.querySelector('.codex-new'),
+      introduced: e.querySelector('.codex-body > p.muted')?.textContent ?? '' }))`);
+  };
+  /** The centre of the first `word` in an editor's text, for hovering. */
+  const wordAt = (word, editor = ".level-right .cm-content") =>
+    b.evaluate(`(() => {
+      const walker = document.createTreeWalker(document.querySelector(${JSON.stringify(editor)}), NodeFilter.SHOW_TEXT);
+      for (let node; (node = walker.nextNode()); ) {
+        const i = node.textContent.indexOf(${JSON.stringify(word)});
+        if (i < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, i + 1);
+        range.setEnd(node, i + 2);
+        const r = range.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      }
+      return null;
+    })()`);
+  const hover = ({ x, y }) => b.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+  const hoverAway = async () => {
+    await hover({ x: 5, y: 5 });
+    await sleep(400);
+  };
+
+  await check("Codex: the tab lists the level's abilities, then the built-ins taught so far, and marks what's new", async () => {
+    await openLevel("ch01-l04", { fresh: true });
+    const entries = await codexEntries();
+    const names = entries.map((e) => e.name).join(",");
+    const newOnes = entries.filter((e) => e.isNew && e.open).map((e) => e.name).join(",");
+    expect(names === "pawn.move,pawn.turn_left,pawn.turn_right,print" && newOnes === "print", JSON.stringify(entries));
+    expect(entries[0].introduced.startsWith("Introduced in 1.1 "), entries[0].introduced);
+    return `${names}; new: ${newOnes}`;
+  });
+
+  await check("Codex: the Testing ground counts Chapter 1 as taught, and Clockwork brings in range()", async () => {
+    await openLevel("practice-06", { fresh: true });
+    const entries = await codexEntries();
+    const print = entries.find((e) => e.name === "print");
+    const range = entries.find((e) => e.name === "range");
+    expect(print && !print.isNew && range?.isNew && range.introduced.includes("Clockwork"), JSON.stringify(entries));
+  });
+
+  await check("Codex: hovering a function in the editor shows its entry; other names show nothing", async () => {
+    await openLevel("ch01-l04", { fresh: true });
+    await setCode("pawn.move(2)\nprint(3)\nsteps = 1\n");
+    await sleep(300);
+    const shown = {};
+    for (const word of ["move", "print", "steps"]) {
+      await hover(await wordAt(word));
+      await sleep(900); // longer than the hover delay
+      shown[word] = await b.evaluate(`document.querySelector('.cm-tooltip .codex-card .codex-call')?.textContent ?? null`);
+      await hoverAway();
+    }
+    expect(shown.move === "pawn.move(squares=1)" && shown.print === "print(value, ...)" && shown.steps === null, JSON.stringify(shown));
+  });
+
+  await check("Codex: a chip shows its entry on hover, and opens it in the Codex tab on click", async () => {
+    await openLevel("ch01-l04", { fresh: true });
+    await challengeTab();
+    await b.waitFor(`document.querySelector('.codex')`, 20_000, "the Codex"); // entries load after the level
+    const chip = await b.evaluate(`(() => { const r = document.querySelector('.codex-chip').getBoundingClientRect(); return { x: r.x + 5, y: r.y + 5 }; })()`);
+    await hover(chip);
+    const tip = await b.waitFor(`document.querySelector('.codex-tooltip:popover-open .codex-call')?.textContent`, 3000, "chip tooltip");
+    await b.evaluate(`document.querySelector('.codex-chip').click()`);
+    const after = await b.evaluate(`({
+      tab: document.querySelector('.tab.active').textContent,
+      open: document.querySelector('.codex-entry[data-codex="pawn.move"]').open,
+      tooltipGone: !document.querySelector('.codex-tooltip:popover-open'),
+    })`);
+    expect(tip === "pawn.move(squares=1)" && after.tab === "Codex" && after.open && after.tooltipGone, JSON.stringify({ tip, after }));
+  });
+
+  await check("Codex: help() works in Scratch Python, whose stand-in pawn has no board", async () => {
+    await openLevel("ch01-l03", { fresh: true });
+    await b.evaluate(`document.querySelector('.repl-drawer').open = true`);
+    for (const line of ["help(pawn.turn_left)", "pawn.move()", "help(len)"]) {
+      await b.evaluate(`document.querySelector('.repl-editor .cm-content').focus()`);
+      await b.send("Input.insertText", { text: line });
+      await b.key("Enter");
+      await sleep(line === "help(len)" ? 1500 : 400); // Python's own help loads pydoc the first time
+    }
+    const log = await b.evaluate(`document.querySelector('.repl-log').innerText.replace(/\\s+/g, ' ')`);
+    const facts = {
+      entry: log.includes("Help on pawn.turn_left:"),
+      noBoard: log.includes("Scratch Python has no board"),
+      pythonsOwn: log.includes("len(obj"),
+    };
+    expect(Object.values(facts).every(Boolean), JSON.stringify(facts));
+  });
+
+  await check("Codex: help is a built-in, never one of the Variables", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    await setCode("steps = 1\n");
+    await run();
+    const vars = await b.evaluate(`[...document.querySelectorAll('.inspector tr')].map((r) => r.innerText.split(/\\s/)[0])`);
+    expect(vars.includes("steps") && !vars.includes("help"), JSON.stringify(vars));
+  });
+
   await check("no console errors during the app checks", async () => {
     const errors = b.logs.filter((line) => /exception|error/i.test(line));
     expect(errors.length === 0, errors.join(" | "));
