@@ -23,7 +23,7 @@ par:
 hints:
 - "The patrol moves one square every time you move a square, turn or wait. Where will it be when you step onto its path?"
 - "`pawn.wait()` stands still for one tick while the patrol walks on."
-- "One way to start: `pawn.turn_left()`, then `pawn.turn_right()`."
+- "One way to start: `pawn.wait()`, then `pawn.wait()`."
 lesson: practice/practice-04.md
 lesson_board:
   map: |

@@ -22,7 +22,9 @@ The designer is also the target learner.
   that approach for new levels. `scripts/solve.py` searches any level,
   obstacles included, with the real World, and prints only counts (fewest
   lines, ticks). Its `fewest_lines`/`write_code` write reference solutions
-  blind.
+  blind. Among the shortest programs it takes the one with the fewest turns,
+  so references pass time with `wait()`, not by spinning (QA-026). A level
+  test enforces this wherever `wait()` is unlocked.
 - After each milestone, stop, list what the designer should test manually, and
   wait for feedback (`DESIGN.md` §7).
 

@@ -1237,6 +1237,111 @@ Item 6 (hidden boards) became QA-016.
   - For the rule to work, a gate has to stay open long enough to pass
     through: at least two ticks.
 
+## Session 6 — 2026-09-29 · Testing-ground hints (`tg-hints`, PR #10)
+
+The designer's answer to PR #8's question: are the Testing-ground hints good
+enough, or should they be rewritten?
+
+### QA-025 · Stepping Stones: hint 2 gives too much away · Fixed
+
+- **Fixed** in `05221bc` (2026-09-29); awaiting the designer's retest.
+  - Hint 2 only explains the plank: walk over it to pick it up, and lay it
+    over a pit as a bridge you can walk on. It has no code.
+  - Hint 3 shows the code for bridging (`pawn.bridge()`, then
+    `pawn.move()`) instead of the first lines of the route.
+  - Hint 1, the reference solution and par are unchanged.
+- **Retest:** Testing ground → Stepping Stones. Open hints 2 and 3: hint 2
+  explains, and hint 3 shows the code.
+
+- **Area:** Testing ground 2 (Stepping Stones), its hints
+- **Observed** *(Designer, 2026-09-29)*: hint 2 is a little on the nose.
+- **Wanted** *(Designer, 2026-09-29)*: hint 2 could just explain that the
+  plank can be used to build a bridge over pits. The code for building the
+  bridge could then come in hint 3.
+
+
+### QA-026 · The Sentry's Round turns, in the level that brings in `wait()` · Fixed
+
+- **Fixed** in `03c75c5` (2026-09-29), with a level test in `b9f4034`;
+  awaiting the designer's retest.
+  - `scripts/solve.py` now weighs a solution by lines, then turns. Among
+    the shortest programs it takes the one that turns least, so idle ticks
+    go to `wait()`.
+  - The Sentry's Round is regenerated. Par is still 3, and the reference
+    and hint 3 wait instead of turning.
+  - The fix changed three references: this one, Pursuit (QA-027) and
+    Portcullis (QA-028). The other Testing-ground levels already turned
+    only where they had to.
+  - New level test: where `wait()` is unlocked, a reference never turns
+    more than it needs to between one step and the next, and never after
+    its last step.
+- **Retest:** Testing ground → The Sentry's Round. Hint 3 uses `wait()`,
+  with no turns. After solving, the solution in the comparison waits too.
+
+- **Area:** Testing ground 4 (The Sentry's Round), its reference solution and
+  hint 3; `scripts/solve.py`
+- **Observed** *(Designer, 2026-09-29)*: the idiomatic solution uses
+  `turn_left()` and `turn_right()`, and so does hint 3. That feels odd in the
+  level where `wait()` is introduced.
+- **Cause** *(Claude)*:
+  - Hint 3 on the M3.1 levels is "One way to start:" plus the first lines
+    of the reference solution, and `scripts/solve.py` finds the reference.
+  - A turn spends a tick just like `wait()`. The search only counted lines,
+    and it tried turns before `wait()`, so it passed time by turning away
+    and back.
+
+
+### QA-027 · Pursuit: hint 3 turns on the spot · Fixed
+
+- **Fixed** in `c522931` (2026-09-29); awaiting the designer's retest.
+  - `wait()` is unlocked. The reference takes the same route as before, but
+    waits one tick where it spun for two, so par goes from 5 to 4.
+  - Hint 3 is regenerated, and it waits. Hints 1 and 2 are unchanged.
+  - The lesson's first snippet waits two ticks instead of turning on the
+    spot.
+- **Decided** *(Designer, 2026-09-29)*: unlock `wait()` in Pursuit, and
+  accept par 4.
+  - Not chosen: keep Pursuit without `wait()`, and reword hint 3 to explain
+    turning on the spot.
+- **Retest:** Testing ground → Pursuit.
+  - The Challenge panel lists `wait()`, and par is 4.
+  - Hint 3 uses `wait()`.
+  - Learn tab: the first snippet waits two ticks, and the chaser stays
+    behind its wall.
+
+- **Area:** Testing ground 5 (Pursuit), its reference solution and hint 3
+- **Observed** *(Designer, 2026-09-29)*: hint 3 is another odd one, with
+  `turn_left()` and `turn_right()` in it. Hints 1 and 2 are good.
+- **Cause** *(Claude)*: the same as QA-026. Pursuit has no `wait()`, so
+  turning away and back is the only way it can pass time.
+
+
+### QA-028 · Portcullis: hint 3 starts oddly, and the gates' cycle could be a hint · Fixed
+
+- **Fixed** in `9721bc1` (2026-09-29); awaiting the designer's retest.
+  - Hint 2 ends with the designer's reminder: "Don't forget: the gates keep
+    cycling on every tick, so time your loops carefully!" ("run for every
+    tick" became "keep cycling on every tick".)
+  - The reference is regenerated with the QA-026 search, and its longest
+    run of waits is a `for` loop. Par goes from 8 to 7.
+  - Hint 3 is regenerated from it, and it only waits: no turns, and the
+    pawn never faces the edge. The note says a loop does the longest wait.
+- **Decided** *(Designer, 2026-09-29)*: the reference uses the loop, par 7.
+  - Not chosen: one `wait()` per line, par 8.
+- **Retest:** Testing ground → Portcullis.
+  - Hint 2 ends with the reminder.
+  - Hint 3 only waits.
+  - Par is 7. After solving, the comparison's solution uses a loop.
+
+- **Area:** Testing ground 7 (Portcullis), its hints
+- **Observed** *(Designer, 2026-09-29)*: basically fine, except the weird
+  "One way to start" hint, which has you run your pawn into a wall.
+- **Wanted** *(Designer, 2026-09-29)*: if the gates run on loops, mention it
+  in a hint, e.g. "Don't forget, gates run for every tick, so time your loops
+  carefully!"
+- **Cause** *(Claude)*: the same as QA-026. The reference passed time with
+  turns, so its opening lines turned the pawn toward the edge of the board.
+
 ---
 
 ## Queued work
@@ -1327,6 +1432,14 @@ Deferred on purpose. Not bugs, but don't lose them.
 - **Bottom layout, the empty space right of the board** (design pass). One idea: Variables move there, and Console takes the whole area under the playback slider beside the editor. *(Designer, 2026-09-26; QA-012)*
 - **The outcome/error card, reworked in the design pass.** It works for testing functionality now. *(Designer, 2026-09-26; QA-012)*
 - **Make it obvious a lesson has more steps** (design pass). For example, the Next button could name what's coming ("Step 2 →", "Step 3 →") instead of a plain "Next →". *(Designer, 2026-09-26; QA-010)*
+- **Saving progress across devices.** Progress is saved per browser
+  (localStorage), so a phone and a computer each keep their own; the
+  designer's testing confirmed it. *(Designer, 2026-09-29)*
+  - Real syncing needs a server and a sign-in. Accounts are out of scope in
+    `DESIGN.md` §7, so it pairs with the mobile phase below.
+  - A server-free step, if wanted sooner: Export/Import progress in
+    Settings (a file). It doubles as a backup: Safari on iPhone can clear a
+    site's data after about a week without a visit.
 - **Mobile UI.** Phones need a different UI entirely, not a squeezed
   desktop layout. Not in this milestone, and it may become a phase 2 build.
   `DESIGN.md` §7 already lists mobile layout as out of scope for now.
