@@ -2,7 +2,8 @@
 
 For each level (levels/<folder>/<id>.yaml: a chapter, chNN, or practice) it checks that:
 - the level file is valid and its id matches its file name;
-- the reference solution (solutions/chNN/<id>.py) solves it;
+- the reference solution (solutions/chNN/<id>.py) solves it, and where
+  `wait()` is unlocked it passes time with it, never by turning on the spot;
 - every naive solution (solutions/chNN/<id>.naive*.py) fails the way its
   first line says it should (`# expect: <status>`, optionally followed by the
   error type, e.g. `# expect: error GateLockedError`);
@@ -27,6 +28,8 @@ LEVEL_FILES = sorted((ROOT / "levels").glob("*/*.yaml"))
 MAX_LESSON_WORDS = 150
 SNIPPET = re.compile(r"^```python run(?: (error|lost))?\n(.*?)^```", re.MULTILINE | re.DOTALL)
 FENCED = re.compile(r"^```.*?^```", re.MULTILINE | re.DOTALL)
+COMPASS = ["north", "east", "south", "west"]  # clockwise, so a right turn is +1
+FACING_ACTIONS = {"move", "capture", "bridge"}  # the actions that go the way the piece faces
 
 
 def load(path: Path):
@@ -79,6 +82,27 @@ def test_reference_solution_solves_it(level_file):
     assert result.status == "solved", f"{level.id}: {result.summary}"
     # ...and it earns every star, so each level's par is reachable.
     assert all(star.earned for star in result.stars), f"{level.id}: {[star.label for star in result.stars]}"
+
+
+def test_reference_solution_waits_rather_than_spinning(level_file):
+    """A turn spends a tick just like `wait()`, so a solution can pass time by
+    turning away and back. Where `wait()` is unlocked, the reference never
+    turns more than it needs to between one step and the next (QA-026)."""
+    level = load(level_file)
+    if "wait" not in level.api:
+        pytest.skip("wait() isn't unlocked on this level")
+    result = run_level(level, (solutions_dir(level_file) / f"{level.id}.py").read_text(encoding="utf-8"))
+    facing, turns = level.facing.value, []
+    for event in (event for step in result.steps for event in step["events"]):
+        if event["kind"] == "turn":
+            turned = event["state"]["facing"]
+            turns.append((COMPASS.index(turned) - COMPASS.index(facing)) % 4)
+            facing = turned
+        elif event["kind"] in FACING_ACTIONS:
+            net = sum(turns) % 4
+            assert len(turns) == min(net, 4 - net), f"{level.id}: the reference turns more than it needs to"
+            turns = []
+    assert not turns, f"{level.id}: the reference turns after its last step"
 
 
 def test_naive_solutions_fail_as_intended(level_file):
