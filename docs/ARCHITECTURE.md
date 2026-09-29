@@ -159,7 +159,8 @@ bridge function takes strings and returns a JSON string.
 | `loadLevel` | Validate a level (the parsed YAML) and describe it for drawing |
 | `runLevel` | Run code against a level (with the number of hints opened, for scoring); returns the full recording |
 | `loadSandbox` / `runSandbox` | The small open board lesson snippets run on |
-| `replPush` / `replReset` | The scratch REPL (a session that lives in the worker) |
+| `codex` | A level's Codex entries: its abilities and the built-ins taught so far ([Codex.md](Codex.md)) |
+| `replPush` / `replReset` | The scratch REPL (a session that lives in the worker). Each line carries the level's piece and abilities, for the session's stand-in piece |
 | `runSnippet` | Plain Python with no board (the `#/harness` page) |
 
 The UI parses YAML only to list levels; `levels.parse_level` in Python is what
@@ -314,6 +315,7 @@ engine/rankfile/   the Python game engine (no third-party dependencies)
   exceptions.py errors.py     game errors; plain-language error translation
   tracer.py runner.py         line tracing and recording; running code and judging outcomes
   constraints.py repl.py      ast rules and lint warnings; the scratch REPL
+  codex.py                    the Codex: entries from docstrings, a level's list, help()
   bridge.py                   JSON functions the worker calls
 engine/tests/      pytest suite, including the level checker (test_levels.py)
 levels/ lessons/ solutions/   level content (chNN/ folders, plus practice/)
@@ -321,7 +323,7 @@ src/app.ts         shell and routes (#/, #/level/<id>, #/harness)
 src/content.ts     bundles level YAML and lesson Markdown; loads solutions lazily
 src/settings.ts src/progress.ts src/storage.ts   saved settings and progress (localStorage)
 src/py/            worker, client and protocol
-src/ui/            board, editor, playback, panels, lesson, repl, levelView, levelSelect,
+src/ui/            board, editor, playback, panels, lesson, repl, levelView, levelSelect, codex,
                    help (hints, giving up, the comparison), compare, dialog, settingsDialog
 scripts/           copy-pyodide.mjs (runs after npm install), venv.mjs, check-bundle.mjs, e2e/
 public/pyodide/    Pyodide runtime, copied from node_modules (not committed)
