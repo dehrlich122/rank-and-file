@@ -4,6 +4,10 @@
   title: First Moves
   tier: pawn
   summary: Calling functions, arguments, sequencing, comments and print().
+- chapter: 2
+  title: Counting Steps
+  tier: pawn
+  summary: Variables, whole numbers, arithmetic and f-strings, and a pawn that can count.
 - chapter: 0
   title: Testing ground
   tier: practice

@@ -1,0 +1,63 @@
+id: ch02-l05
+chapter: 2
+title: "Keeping Time"
+trains: "The remainder operator (%): working with cycles"
+brief: "A portcullis rises and falls on a steady beat: open for 2 ticks, shut for 2. How long to wait depends on how far you've walked."
+piece: pawn
+map: |
+  # G #
+  # T #
+  # . #
+  # . #
+  # . #
+  # P #
+legend:
+  "T": {"tile": "timed_gate", "every": 4, "open": 2}
+start: {"facing": "north"}
+api:
+- move
+- turn_left
+- turn_right
+- squares_ahead
+- wait
+par:
+  lines: 4
+hints:
+- "Watch the gate's badge during a run: it counts every tick, and every square walked and every tick waited is one."
+- "% gives the remainder: with a gate that repeats every 4 ticks, ticks % 4 says where in its cycle you are. The gate opens again when that remainder is 0."
+- "One way to write the line that matters most: `pawn.wait((4 - ahead % 4) % 4)`"
+lesson: ch02/ch02-l05.md
+lesson_board:
+  map: |
+    . . . . .
+    P . T . .
+  legend: {"T": {"tile": "timed_gate", "every": 4, "open": 2}}
+  start: {"facing": "east"}
+variants:
+- map: |
+    # G #
+    # T #
+    # . #
+    # . #
+    # . #
+    # . #
+    # . #
+    # . #
+    # P #
+- map: |
+    # G #
+    # T #
+    # . #
+    # . #
+    # . #
+    # . #
+    # P #
+- map: |
+    # G #
+    # T #
+    # . #
+    # . #
+    # . #
+    # . #
+    # . #
+    # P #

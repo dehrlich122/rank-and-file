@@ -1,0 +1,49 @@
+id: ch02-l04
+chapter: 2
+title: "Halt!"
+trains: "f-strings: putting values into text"
+brief: "A guard blocks the gallery and wants to know how far you've come, as a proper sentence. The distance is different on every board."
+piece: pawn
+map: |
+  # # # # # # #
+  . . . . . X G
+  . # # # # # #
+  . # # # # # #
+  P # # # # # #
+legend:
+  "X": {"tile": "gate", "question": "Halt! How far have you come? Answer like this: I walked 5 squares.", "passphrase": "I walked 7 squares."}
+start: {"facing": "north"}
+api:
+- move
+- turn_left
+- turn_right
+- squares_ahead
+constraints: {"require_nodes": ["FormattedValue"]}
+par:
+  lines: 7
+hints:
+- "The answer is different on every board, so your code has to work it out as it goes."
+- "An f-string puts values into text: f\"I have {gems} gems\". The braces can hold a sum as well as a name."
+- "One way to write the line that matters most: `print(f\"I walked {hall + gallery} squares.\")`"
+lesson: ch02/ch02-l04.md
+lesson_board:
+  map: |
+    . . .
+    P X .
+  legend: {"X": {"tile": "gate", "question": "What's six times seven? Answer like this: It's 10", "passphrase": "It's 42"}}
+  start: {"facing": "east"}
+variants:
+- map: |
+    # # # # # # # #
+    . . . . . . X G
+    P # # # # # # #
+  legend: {"X": {"tile": "gate", "question": "Halt! How far have you come? Answer like this: I walked 5 squares.", "passphrase": "I walked 6 squares."}}
+- map: |
+    # # # # # #
+    . . . . X G
+    . # # # # #
+    . # # # # #
+    . # # # # #
+    . # # # # #
+    P # # # # #
+  legend: {"X": {"tile": "gate", "question": "Halt! How far have you come? Answer like this: I walked 5 squares.", "passphrase": "I walked 8 squares."}}
