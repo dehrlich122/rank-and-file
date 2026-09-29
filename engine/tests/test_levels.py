@@ -10,15 +10,20 @@ For each level (levels/<folder>/<id>.yaml: a chapter, chNN, or practice) it chec
 - the lesson has at most 150 words of prose and 1-3 runnable snippets, each of
   which runs as expected (``` python run ``` must not fail; ``` python run error ```
   must fail, and ``` python run lost ``` must lose the run, on purpose). They run
-  on the level's `lesson_board` if it has one.
+  on the level's `lesson_board` if it has one;
+- the Codex (docs/Codex.md) documents every built-in a lesson calls, and the
+  reference only calls built-ins that a lesson up to its level teaches.
 """
 
+import ast
+import builtins
 import re
 from pathlib import Path
 
 import pytest
 import yaml
 
+from rankfile import codex
 from rankfile.levels import parse_level
 from rankfile.runner import run_level, run_sandbox
 
@@ -116,3 +121,53 @@ def test_lesson_is_short_and_runnable(level_file):
             assert result.status == meant, f"snippet should end in {meant} on purpose, not {result.status}:\n{code}"
         else:
             assert result.status == "finished", f"snippet failed ({result.summary}):\n{code}"
+
+
+# -- the Codex (docs/Codex.md) -------------------------------------------------------
+
+
+def lesson_snippets(level) -> list[str]:
+    return [code for _, code in SNIPPET.findall((ROOT / "lessons" / level.lesson).read_text(encoding="utf-8"))]
+
+
+def builtins_called(code: str) -> set[str]:
+    """The Python built-ins `code` calls by name (print, range, ...)."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return set()  # a lesson snippet that's meant to be a syntax error
+    return {node.func.id for node in ast.walk(tree) if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and hasattr(builtins, node.func.id)}
+
+
+def codex_history(level_file: Path) -> list[Path]:
+    """The level files that count towards a level's Codex, "taught so far". Mirrors
+    content.codexHistory: every curriculum level before it in play order
+    (chapters.yaml, then each chapter's levels by id), then its own chapter's
+    levels up to it."""
+    chapters = yaml.safe_load((ROOT / "levels" / "chapters.yaml").read_text("utf-8"))
+    levels_of = {entry["chapter"]: sorted((path for path in LEVEL_FILES if load(path).chapter == entry["chapter"]), key=lambda path: path.stem) for entry in chapters}
+    own = load(level_file).chapter
+    counted: list[Path] = []
+    for entry in chapters:
+        if entry["chapter"] == own:
+            return counted + levels_of[own][: levels_of[own].index(level_file) + 1]
+        if entry.get("curriculum", True):
+            counted += levels_of[entry["chapter"]]
+    return counted
+
+
+def test_lesson_builtins_have_codex_entries(level_file):
+    """Every built-in a lesson calls is documented, so the Codex can list it."""
+    level = load(level_file)
+    missing = set().union(*map(builtins_called, lesson_snippets(level))) - set(codex.BUILTINS)
+    assert not missing, f"{level.lesson} calls {sorted(missing)}: document them in codex.BUILTINS"
+
+
+def test_reference_solution_only_calls_builtins_taught_by_then(level_file):
+    """What a level expects is already in its Codex: its reference only calls
+    built-ins that a lesson up to it teaches (docs/Codex.md)."""
+    level = load(level_file)
+    taught = {name for path in codex_history(level_file) for name in codex.taught(lesson_snippets(load(path)))}
+    reference = (solutions_dir(level_file) / f"{level.id}.py").read_text(encoding="utf-8")
+    missing = builtins_called(reference) - taught
+    assert not missing, f"{level.id}: its reference calls {sorted(missing)}, which no lesson up to it teaches"

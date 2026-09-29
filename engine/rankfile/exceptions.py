@@ -52,6 +52,10 @@ class CantChangePieceError(GameError, AttributeError):
     """Player code tried to set an attribute on a piece, e.g. pawn.position = (0, 7)."""
 
 
+class NoBoardError(GameError):
+    """Scratch Python's stand-in piece was asked to act or say where it is (docs/Codex.md)."""
+
+
 class Lost(BaseException):
     """The run is over and lost: the piece fell into a pit or was caught (M3.1).
 
