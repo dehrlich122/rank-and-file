@@ -1237,7 +1237,7 @@ Item 6 (hidden boards) became QA-016.
   - For the rule to work, a gate has to stay open long enough to pass
     through: at least two ticks.
 
-## Session 6 — 2026-09-29 · Testing-ground hints (`tg-hints`)
+## Session 6 — 2026-09-29 · Testing-ground hints (`tg-hints`, PR #10)
 
 The designer's answer to PR #8's question: are the Testing-ground hints good
 enough, or should they be rewritten?
