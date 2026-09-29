@@ -23,8 +23,8 @@ par:
   lines: 9
 hints:
 - "This row of pits can't be walked around. Is there anything on the board that could get you across?"
-- "Walk over the plank to pick it up. Then face a pit and call `pawn.bridge()`."
-- "One way to start: `pawn.turn_right()`, then `pawn.move(2)`, then `pawn.turn_left()`."
+- "The plank is your way over. Walk across it to pick it up, and you can lay it over a pit as a bridge that you can walk on."
+- "With the plank picked up, stand facing a pit and call `pawn.bridge()`. It lays the plank over the pit straight ahead, and `pawn.move()` then walks you onto it."
 lesson: practice/practice-02.md
 lesson_board:
   map: |
