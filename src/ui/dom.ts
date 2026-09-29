@@ -24,3 +24,8 @@ export function h<K extends keyof HTMLElementTagNameMap>(
   }
   return element;
 }
+
+/** Text with `backtick` spans shown as code (hints, Codex entries). Always text nodes, never HTML. */
+export function withCode(text: string): Array<string | HTMLElement> {
+  return text.split("`").map((part, i) => (i % 2 === 1 ? h("code", {}, part) : part));
+}

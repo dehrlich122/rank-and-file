@@ -27,8 +27,8 @@ interface Bridge {
   load_sandbox(apiJson: string, boardJson: string): string;
   run_level(levelJson: string, code: string, hintsUsed: number, solutionSeen: boolean): string;
   run_sandbox(code: string, apiJson: string, boardJson: string): string;
-  codex(piece: string, apiJson: string, historyJson: string): string;
-  repl_push(line: string, piece: string, apiJson: string): string;
+  codex(levelId: string, chaptersJson: string): string;
+  repl_push(line: string, levelJson: string): string;
   repl_reset(): string;
 }
 
@@ -66,8 +66,8 @@ const handlers: { [K in RequestKind]: (bridge: Bridge, args: Requests[K]["args"]
   loadSandbox: (bridge, { api, board }) => JSON.parse(bridge.load_sandbox(JSON.stringify(api), JSON.stringify(board ?? null))),
   runLevel: (bridge, { level, code, hintsUsed, solutionSeen }) => JSON.parse(bridge.run_level(JSON.stringify(level), code, hintsUsed, solutionSeen)),
   runSandbox: (bridge, { code, api, board }) => JSON.parse(bridge.run_sandbox(code, JSON.stringify(api), JSON.stringify(board ?? null))),
-  codex: (bridge, { piece, api, history }) => JSON.parse(bridge.codex(piece, JSON.stringify(api), JSON.stringify(history))),
-  replPush: (bridge, { line, piece, api }) => JSON.parse(bridge.repl_push(line, piece ?? "", JSON.stringify(api ?? []))),
+  codex: (bridge, { levelId, chapters }) => JSON.parse(bridge.codex(levelId, JSON.stringify(chapters))),
+  replPush: (bridge, { line, level }) => JSON.parse(bridge.repl_push(line, JSON.stringify(level))),
   replReset: (bridge) => JSON.parse(bridge.repl_reset()),
 };
 

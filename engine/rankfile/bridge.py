@@ -43,14 +43,14 @@ def run_sandbox(code: str, api_json: str, board_json: str = "null") -> str:
     return json.dumps(runner.run_sandbox(code, json.loads(api_json), lesson_board=json.loads(board_json)).to_dict())
 
 
-def codex(piece: str, api_json: str, history_json: str) -> str:
-    """A level's Codex entries (docs/Codex.md). `history` is the levels that count, ending with this one."""
-    return json.dumps([entry.to_dict() for entry in codex_entries(piece, json.loads(api_json), json.loads(history_json))])
+def codex(level_id: str, chapters_json: str) -> str:
+    """A level's Codex entries (docs/Codex.md). `chapters`: every chapter's levels and lessons, in play order."""
+    return json.dumps([entry.to_dict() for entry in codex_entries(level_id, json.loads(chapters_json))])
 
 
-def repl_push(line: str, piece: str = "", api_json: str = "[]") -> str:
-    """One line for the scratch REPL. `piece` and `api` are the level's, for the session's stand-in piece."""
-    return json.dumps(_repl.push(line, piece or None, json.loads(api_json)))
+def repl_push(line: str, level_json: str) -> str:
+    """One line for the scratch REPL. `level` is {"piece", "api"} for the session's stand-in piece, or null."""
+    return json.dumps(_repl.push(line, **(json.loads(level_json) or {})))
 
 
 def repl_reset() -> str:

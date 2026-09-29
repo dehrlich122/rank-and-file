@@ -68,19 +68,26 @@ Example:
 
 ## "Taught so far"
 
-- The UI lists the levels that count, in play order (`chapters.yaml`, then
-  each chapter's levels):
-  - every curriculum level before this one
-  - the levels of this level's own chapter, up to and including it
+The engine owns this rule (`codex.history`), like every other game rule. The
+level checker calls the same function, so the Codex and the checks can't
+disagree.
+
+- The UI sends every chapter's levels in play order (`chapters.yaml`, then
+  each chapter's levels by id), with each level's file and lesson.
+- The levels that count for a level:
+  - every curriculum level before it
+  - the levels of its own chapter, up to and including it
   - So a Testing-ground level counts Chapter 1 and the Testing-ground levels
     before it.
-- For each counted level it sends its abilities and its lesson snippets.
-- The engine finds the built-ins each snippet calls with `ast`, never by
-  matching strings. A snippet that is meant to be a syntax error is skipped.
+- The engine finds the built-ins each lesson snippet calls with `ast`, never
+  by matching strings. A snippet that is meant to be a syntax error is
+  skipped.
 - The pawn's entries are exactly this level's abilities, since a locked
   ability can't be used.
-- The built-ins' entries are every documented built-in taught so far, since
-  Python's built-ins always work.
+- The built-ins' entries are every documented built-in taught so far, in the
+  order `codex.BUILTINS` lists them, since Python's built-ins always work.
+- Each entry names the id of the level that brought it in. The UI turns that
+  into "1.4 The Password" or "Testing ground: Clockwork".
 
 ## `help()`
 
@@ -91,7 +98,9 @@ internals (`rankfile.pieces`), and its interactive mode can't run here.
 |---|---|
 | `help(pawn.move)`, `help(print)`, `help("pawn.move")` | That entry, laid out like Python's `help()` |
 | `help(pawn)` | What the pawn knows in this level, one line each |
+| `help(pawn.position)`, or any other plain value | A line saying it's a value, and what to try instead |
 | `help(my_function)` or anything else | Python's own help text (`pydoc`), so your own docstrings show |
+| `help("text")` that isn't found | A line saying so, and what to try instead |
 | `help()` | How to use `help()` |
 
 **Scratch Python has no board,** so its session gets a stand-in `pawn` with the

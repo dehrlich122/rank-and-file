@@ -7,7 +7,6 @@
 // at a time, so a snippet's code, board and output survive flipping pages.
 import { marked, type Token, type TokensList } from "marked";
 import type { EditorView } from "@codemirror/view";
-import { isSnippet } from "../content";
 import { PythonHungError, type PyClient } from "../py/client";
 import type { LevelInfo, LevelResult } from "../py/protocol";
 import { BoardView } from "./board";
@@ -44,6 +43,8 @@ export interface Lesson {
   show(step: number): void;
   dispose(): void;
 }
+
+const isSnippet = (token: Token): boolean => token.type === "code" && /^python run\b/.test(token.lang ?? "");
 
 /** Split a lesson's Markdown tokens into steps: each step ends with a runnable snippet. */
 export function splitIntoSteps(tokens: Token[]): Token[][] {

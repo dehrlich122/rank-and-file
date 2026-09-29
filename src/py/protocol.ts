@@ -159,20 +159,19 @@ interface ReplResult {
 export interface CodexEntry {
   name: string; // as code writes it: "pawn.move", "print"
   kind: "ability" | "property" | "builtin"; // a property is used without parentheses (pawn.position)
-  call: string; // how to use it: "pawn.move(squares=1)"
-  summary: string; // what it does; paragraphs are separated by a blank line, `code` is in backticks
+  calls: string[]; // how to use it: ["pawn.move(squares=1)"]; some built-ins have more than one form
+  paragraphs: string[]; // what it does; `code` is in backticks
   args: Array<{ name: string; about: string }>;
   returns: string;
   example: string;
-  introduced: string; // the level that first unlocked or taught it
+  introduced: string; // the id of the level that first unlocked or taught it
   new: boolean; // ...when that's this level
 }
 
-/** A level that counts towards "taught so far": its label, abilities and lesson snippets (content.codexHistory). */
-export interface CodexLevel {
-  label: string;
-  api: string[];
-  snippets: string[];
+/** A chapter as the engine needs it to work out "taught so far" (codex.history): its levels' files and lessons. */
+export interface CodexChapter {
+  curriculum: boolean;
+  levels: Array<{ id: string; data: unknown; lesson: string }>;
 }
 
 /** Every request the worker understands: its arguments and its result. */
@@ -182,9 +181,9 @@ export interface Requests {
   loadSandbox: { args: { api: string[]; board?: unknown }; result: LevelInfo }; // board: a level's lesson_board (QA-019)
   runLevel: { args: { level: unknown; code: string; hintsUsed: number; solutionSeen: boolean }; result: LevelResult };
   runSandbox: { args: { code: string; api: string[]; board?: unknown }; result: LevelResult };
-  codex: { args: { piece: string; api: string[]; history: CodexLevel[] }; result: CodexEntry[] }; // history ends with this level
-  // piece, api: the level's, for the session's stand-in piece (Scratch Python has no board)
-  replPush: { args: { line: string; piece?: string; api?: string[] }; result: ReplResult };
+  codex: { args: { levelId: string; chapters: CodexChapter[] }; result: CodexEntry[] }; // chapters: all of them, in play order
+  // level: the one on screen, for the session's stand-in piece (Scratch Python has no board)
+  replPush: { args: { line: string; level: { piece: string; api: string[] } | null }; result: ReplResult };
   replReset: { args: Record<string, never>; result: { ok: true } };
 }
 

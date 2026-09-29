@@ -40,9 +40,9 @@ class Repl:
         self.reset()
 
     def reset(self) -> None:
-        self.namespace: dict = {"__name__": "__main__", "__builtins__": codex.player_builtins()}
+        self.namespace = codex.player_namespace()
         self.pending: list[str] = []
-        self.piece: tuple[str, tuple[str, ...]] | None = None  # the stand-in's piece and abilities
+        self.stand_in: tuple[str, tuple[str, ...]] | None = None  # the stand-in piece: its name and abilities
 
     def push(self, line: str, piece: str | None = None, api: list[str] | None = None) -> dict:
         """Add one line. Returns {"more": bool, "output": str, "error": ErrorInfo-dict | None}.
@@ -50,7 +50,7 @@ class Repl:
         `piece` and `api` are the level's, sent with every line, so the
         stand-in follows the level and comes back after Python restarts.
         """
-        self._stand_in(piece, api or [])
+        self._set_stand_in(piece, api or [])
         self.pending.append(line)
         source = "\n".join(self.pending)
         try:
@@ -68,9 +68,9 @@ class Repl:
         error = asdict(explain(run.error, self.namespace)) if run.error else None
         return {"more": False, "output": run.output, "error": error}
 
-    def _stand_in(self, piece: str | None, api: list[str]) -> None:
+    def _set_stand_in(self, piece: str | None, api: list[str]) -> None:
         """Give the session a stand-in for the level's piece, unless it already has this one."""
-        if piece is None or (piece, tuple(api)) == self.piece:
+        if piece is None or (piece, tuple(api)) == self.stand_in:
             return
-        self.piece = (piece, tuple(api))
+        self.stand_in = (piece, tuple(api))
         self.namespace[piece] = PIECES[piece](NoBoard(piece), api)

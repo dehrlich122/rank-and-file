@@ -1,7 +1,7 @@
 import { python } from "@codemirror/lang-python";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
-import { chapters, codexHistory } from "../content";
+import { chapters, codexChapters, levelLabel } from "../content";
 import { codexNameAt } from "./codex";
 
 describe("codexNameAt: what a hover over code looks up", () => {
@@ -24,29 +24,19 @@ describe("codexNameAt: what a hover over code looks up", () => {
   });
 });
 
-describe("codexHistory: the levels that count as taught so far (docs/Codex.md)", () => {
-  const curriculum = chapters.filter((chapter) => chapter.curriculum);
-  const first = curriculum[0]!;
+describe("what the Codex is told about levels", () => {
+  const curriculum = chapters.find((chapter) => chapter.curriculum)!;
   const practice = chapters.find((chapter) => !chapter.curriculum)!;
 
-  it("counts a curriculum level and the levels before it, numbered", () => {
-    const third = first.levels[2]!;
-    const history = codexHistory(third.id);
-    expect(history.map((level) => level.label)).toEqual(first.levels.slice(0, 3).map((level, i) => `${first.chapter}.${i + 1} ${level.title}`));
-    expect(history.at(-1)!.api).toEqual(third.data.api);
+  it("names a curriculum level by its number, and a Testing-ground level by its chapter", () => {
+    const third = curriculum.levels[2]!;
+    expect(levelLabel(third.id)).toBe(`${curriculum.chapter}.3 ${third.title}`);
+    expect(levelLabel(practice.levels[0]!.id)).toBe(`${practice.title}: ${practice.levels[0]!.title}`);
   });
 
-  it("counts the curriculum listed before the Testing ground, then its own levels up to this one", () => {
-    const level = practice.levels[3]!;
-    const history = codexHistory(level.id);
-    const before = chapters.slice(0, chapters.indexOf(practice)).filter((chapter) => chapter.curriculum);
-    expect(history).toHaveLength(before.reduce((sum, chapter) => sum + chapter.levels.length, 0) + 4);
-    expect(history.at(-1)!.label).toBe(`${practice.title}: ${level.title}`);
-  });
-
-  it("sends each level's runnable snippets, and no other code blocks", () => {
-    const lessons = codexHistory(first.levels.at(-1)!.id).flatMap((level) => level.snippets);
-    expect(lessons.length).toBeGreaterThan(0);
-    expect(lessons.every((code) => !code.startsWith("```"))).toBe(true);
+  it("sends every chapter in play order, with each level's file and lesson", () => {
+    const sent = codexChapters();
+    expect(sent.map((chapter) => chapter.levels.map((level) => level.id))).toEqual(chapters.map((chapter) => chapter.levels.map((level) => level.id)));
+    expect(sent.every((chapter) => chapter.levels.every((level) => level.lesson.length > 0 && level.data))).toBe(true);
   });
 });

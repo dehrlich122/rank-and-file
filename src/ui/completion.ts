@@ -97,18 +97,21 @@ export function callsTouched(state: EditorState, ranges: Array<[number, number]>
       const touches = ([start, end]: [number, number]) =>
         start === end ? start >= from && start <= to : start < to && end > from; // a deletion leaves an empty range
       if (!ranges.some(touches)) return;
-      if (callee.name === "VariableName") {
-        found.push(state.sliceDoc(callee.from, callee.to));
-      } else if (callee.name === "MemberExpression") {
-        const object = callee.firstChild;
-        const property = callee.getChild("PropertyName");
-        if (object?.name === "VariableName" && property) {
-          found.push(`${state.sliceDoc(object.from, object.to)}.${state.sliceDoc(property.from, property.to)}`);
-        }
-      }
+      const name = callee.name === "VariableName" ? state.sliceDoc(callee.from, callee.to) : memberName(state, callee);
+      if (name) found.push(name);
     },
   });
   return found;
+}
+
+type SyntaxNode = ReturnType<typeof syntaxTree>["topNode"];
+
+/** "pawn.move" for the member expression `pawn.move`, or null if it's anything else. The Codex's hover uses it too. */
+export function memberName(state: EditorState, node: SyntaxNode): string | null {
+  const object = node.firstChild;
+  const property = node.getChild("PropertyName");
+  if (node.name !== "MemberExpression" || object?.name !== "VariableName" || !property) return null;
+  return `${state.sliceDoc(object.from, object.to)}.${state.sliceDoc(property.from, property.to)}`;
 }
 
 /** The completion source: known, real calls that start with what's typed. */

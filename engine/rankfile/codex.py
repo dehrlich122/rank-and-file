@@ -22,6 +22,10 @@ A piece's abilities are documented where they're defined (pieces.py).
 Python's built-ins that the lessons teach are documented here, in the same
 style, because Python's own help text is written for experienced
 programmers.
+
+Which entries a level lists ("taught so far") is decided here too, from
+every level's abilities and lesson snippets: the UI sends them, and the
+level checker uses the same rule.
 """
 
 import ast
@@ -29,35 +33,42 @@ import builtins
 import contextlib
 import inspect
 import io
+import re
 import textwrap
 from dataclasses import asdict, dataclass, field
 
+from .levels import parse_level
 from .pieces import PIECES, Piece
 
 SECTIONS = ("Args", "Returns", "Example")
+
+# A lesson's runnable snippets: ```python run``` blocks, optionally `run error` or `run lost`.
+SNIPPET = re.compile(r"^```python run(?: (error|lost))?\n(.*?)^```", re.MULTILINE | re.DOTALL)
 
 
 @dataclass
 class Entry:
     name: str  # as code writes it: "pawn.move", "print"
     kind: str  # "ability", "property" (used without parentheses) or "builtin"
-    call: str  # how to use it: "pawn.move(squares=1)", "pawn.position"
-    summary: str  # what it does; paragraphs are separated by a blank line
+    calls: list[str]  # how to use it: ["pawn.move(squares=1)"]; some built-ins have more than one form
+    paragraphs: list[str]  # what it does
     args: list[dict] = field(default_factory=list)  # {"name", "about"} for each argument
     returns: str = ""
     example: str = ""
-    introduced: str = ""  # the level that first unlocked or taught it (set by `entries`)
+    introduced: str = ""  # the id of the level that first unlocked or taught it (set by `entries`)
     new: bool = False  # ...when that's the level being played
 
     def to_dict(self) -> dict:
         return asdict(self)
 
 
-# Python's built-ins that the lessons teach: how each is called, and its entry.
-# The level checker fails if a lesson calls a built-in that isn't here.
-BUILTINS: dict[str, tuple[str, str]] = {
+# Python's built-ins that the lessons teach: the ways to call each, and its
+# entry, in the order the curriculum teaches them (the Codex lists them in
+# this order). The level checker fails if a lesson calls a built-in that
+# isn't here.
+BUILTINS: dict[str, tuple[list[str], str]] = {
     "print": (
-        "print(value, ...)",
+        ["print(value, ...)"],
         """Show values in the console, then start a new line.
 
         Give it several values, separated by commas, and it shows them on one
@@ -77,7 +88,7 @@ BUILTINS: dict[str, tuple[str, str]] = {
         """,
     ),
     "range": (
-        "range(stop) or range(start, stop)",
+        ["range(stop)", "range(start, stop)"],
         """Count whole numbers, most often to repeat something with `for`.
 
         `range(3)` counts 0, 1, 2: three numbers, starting at 0 and stopping
@@ -101,7 +112,7 @@ BUILTINS: dict[str, tuple[str, str]] = {
 
 
 def parse_docstring(doc: str) -> dict:
-    """Split a Google-style docstring into its summary, args, returns and example."""
+    """Split a Google-style docstring into its paragraphs, args, returns and example."""
     sections: dict[str, list[str]] = {"": []}
     current = ""
     for line in inspect.cleandoc(doc).splitlines():
@@ -112,7 +123,7 @@ def parse_docstring(doc: str) -> dict:
             sections[current].append(line)
     paragraphs = "\n".join(sections[""]).split("\n\n")
     return {
-        "summary": "\n\n".join(" ".join(paragraph.split()) for paragraph in paragraphs if paragraph.strip()),
+        "paragraphs": [" ".join(paragraph.split()) for paragraph in paragraphs if paragraph.strip()],
         "args": _parse_args(textwrap.dedent("\n".join(sections.get("Args", [])))),
         "returns": " ".join(" ".join(sections.get("Returns", [])).split()),
         "example": textwrap.dedent("\n".join(sections.get("Example", []))).strip("\n"),
@@ -141,53 +152,82 @@ def ability_entry(piece: type[Piece], name: str) -> Entry:
     else:
         parameters = list(inspect.signature(member).parameters.values())[1:]  # all but self
         kind, call, doc = "ability", f"{piece.NAME}.{name}({', '.join(map(str, parameters))})", member.__doc__
-    return Entry(f"{piece.NAME}.{name}", kind, call, **parse_docstring(doc or ""))
+    return Entry(f"{piece.NAME}.{name}", kind, [call], **parse_docstring(doc or ""))
 
 
 def builtin_entry(name: str) -> Entry:
-    call, doc = BUILTINS[name]
-    return Entry(name, "builtin", call, **parse_docstring(doc))
+    calls, doc = BUILTINS[name]
+    return Entry(name, "builtin", calls, **parse_docstring(doc))
 
 
-def taught(snippets: list[str]) -> list[str]:
-    """The documented built-ins these lesson snippets call, in the order they first appear."""
-    names: list[str] = []
-    for code in snippets:
-        try:
-            tree = ast.parse(code)
-        except SyntaxError:
-            continue  # a snippet that's meant to be a syntax error
-        calls = sorted(
-            (node.lineno, node.col_offset, node.func.id)
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in BUILTINS
-        )
-        for *_, name in calls:
-            if name not in names:
-                names.append(name)
-    return names
+# -- which entries a level lists: "taught so far" ---------------------------------
 
 
-def entries(piece: str, api: list[str], history: list[dict]) -> list[Entry]:
-    """A level's Codex: its piece's abilities, then the built-ins taught so far.
+def builtins_called(code: str) -> set[str]:
+    """The Python built-ins `code` calls by name (print, range, ...). The level checker uses it too."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return set()  # a lesson snippet that's meant to be a syntax error
+    return {
+        node.func.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and hasattr(builtins, node.func.id)
+    }
 
-    `history` is the levels that count, in play order and ending with this
-    one, each as {"label", "api", "snippets"} (docs/Codex.md, "Taught so
-    far"). The piece's entries are exactly this level's abilities, since a
-    locked one can't be used; Python's built-ins always work, so every one
-    taught so far is listed.
+
+def lesson_snippets(markdown: str) -> list[str]:
+    """The code of a lesson's runnable snippets, in order."""
+    return [code for _, code in SNIPPET.findall(markdown)]
+
+
+def taught(markdown: str) -> set[str]:
+    """The documented built-ins a lesson's snippets call."""
+    return {name for code in lesson_snippets(markdown) for name in builtins_called(code) if name in BUILTINS}
+
+
+def history(level_id: str, chapters: list[dict]) -> list[dict]:
+    """The levels that count towards a level's Codex, "taught so far", in play
+    order and ending with the level itself: every curriculum level before it,
+    then its own chapter's levels up to it. So a Testing-ground level counts
+    the chapters listed before the Testing ground, then the Testing-ground
+    levels up to it.
+
+    `chapters` is every chapter in play order, as the UI lists them:
+    {"curriculum": bool, "levels": [{"id", "data" (the level file), "lesson" (Markdown)}]}.
     """
+    counted: list[dict] = []
+    for chapter in chapters:
+        ids = [level["id"] for level in chapter["levels"]]
+        if level_id in ids:
+            return counted + chapter["levels"][: ids.index(level_id) + 1]
+        if chapter["curriculum"]:
+            counted += chapter["levels"]
+    return []
+
+
+def entries(level_id: str, chapters: list[dict]) -> list[Entry]:
+    """A level's Codex: its piece's abilities, then every built-in taught so far.
+
+    The piece's entries are exactly this level's abilities, since a locked one
+    can't be used. Python's built-ins always work, so every one taught so far
+    is listed, in BUILTINS' order. Each says which level brought it in.
+    """
+    counted = history(level_id, chapters)
+    if not counted:
+        return []
     introduced: dict[str, str] = {}
-    for level in history:
-        for name in [f"{piece}.{ability}" for ability in level["api"]] + taught(level["snippets"]):
-            introduced.setdefault(name, level["label"])
-    here = history[-1]["label"] if history else ""
-    piece_class = PIECES[piece]
-    found = [ability_entry(piece_class, name) for name in piece_class.ABILITIES if name in api]
-    found += [builtin_entry(name) for name in introduced if name in BUILTINS]
+    for item in counted:
+        level = parse_level(item["data"])
+        for name in [f"{level.piece}.{ability}" for ability in level.api] + sorted(taught(item["lesson"])):
+            introduced.setdefault(name, item["id"])
+    here = parse_level(counted[-1]["data"])
+    piece = PIECES[here.piece]
+    found = [ability_entry(piece, name) for name in piece.ABILITIES if name in here.api]
+    found += [builtin_entry(name) for name in BUILTINS if name in introduced]
     for entry in found:
-        entry.introduced = introduced.get(entry.name, here)
-        entry.new = entry.introduced == here
+        entry.introduced = introduced[entry.name]
+        entry.new = entry.introduced == level_id
     return found
 
 
@@ -203,6 +243,9 @@ INTRO = """help(something) shows what it does and how to use it. For example:
 
 The Codex tab lists everything you've learned so far."""
 
+# Plain values: help(pawn.position) is help((2, 0)) by the time help sees it.
+_VALUES = (int, float, bool, tuple, list, dict, set, type(None))
+
 
 def help(thing=_NOTHING) -> None:
     """Show what something does and how to use it, like Python's own help().
@@ -213,13 +256,15 @@ def help(thing=_NOTHING) -> None:
     print(describe(thing), end="\n\n")  # a blank line after, as Python's own help() leaves
 
 
-def player_builtins() -> dict:
-    """Python's built-ins for player code, with the Codex's help() in place of Python's.
+def player_namespace(**names) -> dict:
+    """A fresh namespace for player code (a run, a snippet, the REPL), with `names` in it (e.g. the piece).
 
-    It goes in as the namespace's `__builtins__`, so `help` is a built-in there,
-    as in real Python, and never shows up among the player's variables.
+    Its built-ins are Python's, with the Codex's help() in place of Python's:
+    so `help` is a built-in there, as in real Python, and never shows up
+    among the player's variables. Each namespace gets its own copy, so one
+    run's changes to them can't reach the next.
     """
-    return {**vars(builtins), "help": help}
+    return {"__name__": "__main__", "__builtins__": {**vars(builtins), "help": help}, **names}
 
 
 def describe(thing) -> str:
@@ -231,7 +276,15 @@ def describe(thing) -> str:
         return format_entry(entry)
     if isinstance(thing, Piece):
         return _overview(thing)
-    return _python_help(thing)
+    if isinstance(thing, _VALUES):
+        return (
+            f"{thing!r} is a value (a {type(thing).__name__}), and help() explains what things do. "
+            'Try help(print), help(pawn) for what your pawn knows, or help("pawn.position") for one of them.'
+        )
+    text = _python_help(thing)
+    if isinstance(thing, str) and text.startswith("No Python documentation found"):
+        return f"There's no help on {thing!r}. Try help(print), or help(pawn) for what your pawn knows."
+    return text
 
 
 def _entry_for(thing) -> Entry | None:
@@ -250,8 +303,8 @@ def _entry_for(thing) -> Entry | None:
 
 def format_entry(entry: Entry) -> str:
     """An entry laid out the way Python's help() lays out a function."""
-    lines = [f"Help on {entry.name}:", "", entry.call]
-    for paragraph in entry.summary.split("\n\n"):
+    lines = [f"Help on {entry.name}:", "", " or ".join(entry.calls)]
+    for paragraph in entry.paragraphs:
         lines += [*_fill(paragraph, 4), ""]
     if entry.args:
         lines.append("    Args:")
@@ -267,15 +320,13 @@ def format_entry(entry: Entry) -> str:
 
 def _overview(piece: Piece) -> str:
     """help(pawn): what the piece knows in this level, one line each."""
-    piece_class = type(piece)
-    name = piece_class.NAME
-    unlocked = dir(piece)  # what the level unlocked (sorted, so the piece's own order is used below)
-    known = [ability_entry(piece_class, ability) for ability in piece_class.ABILITIES if ability in unlocked]
+    name = type(piece).NAME
+    known = [ability_entry(type(piece), ability) for ability in piece._unlocked]  # in the piece's own order
     if not known:
         return f"Help on {name}: your piece. It doesn't know anything yet."
     lines = [f"Help on {name}: your piece. In this level it knows:", ""]
     for entry in known:
-        lines += [f"    {entry.call}", *_fill(entry.summary.split("\n\n")[0], 8), ""]
+        lines += [f"    {entry.calls[0]}", *_fill(entry.paragraphs[0], 8), ""]
     lines.append(f"help({known[0].name}) tells you more about one of them.")
     return "\n".join(lines)
 

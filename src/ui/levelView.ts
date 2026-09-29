@@ -1,11 +1,11 @@
 // A level: the lesson and challenge on the left, the board in the middle, the
 // code editor and what the program is doing on the right.
 import type { EditorView } from "@codemirror/view";
-import { codexHistory, nextLevel, type LevelSource } from "../content";
+import { codexChapters, nextLevel, type LevelSource } from "../content";
 import { PythonHungError, StoppedError, type PyClient } from "../py/client";
-import type { CodexEntry, LevelInfo, LevelResult } from "../py/protocol";
+import type { LevelInfo, LevelResult } from "../py/protocol";
 import { BoardView, squareName } from "./board";
-import { closeCodexTooltips, codexHover, codexLookup, renderCodex, withCodexTooltip, type CodexLookup, type CodexView } from "./codex";
+import { ChipTooltip, codexHover, renderCodex, type CodexLookup, type CodexView } from "./codex";
 import { h } from "./dom";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
@@ -41,8 +41,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   let running = false;
   let lastResult: LevelResult | null = null; // the recording on show: the run itself, or one of its cases
   let recordedCode: string | null = null; // the code the current (or last) recording was made from
-  let codex: CodexLookup | null = null; // the Codex's entries, for hover tooltips, once the engine has sent them
-  let codexView: CodexView | null = null;
+  let codex: CodexView | null = null; // the Codex tab, and the entries hover tooltips use, once the engine has sent them
 
   // -- left: Learn / Challenge / Codex ----------------------------------------------
   const learnPanel = h("div", { class: "tab-panel" });
@@ -52,11 +51,13 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const challengeTab = h("button", { class: "tab", onClick: () => showTab("challenge") }, "Challenge");
   const codexTab = h("button", { class: "tab", onClick: () => showTab("codex") }, "Codex");
   const replDrawer = h("details", { class: "repl-drawer" }, h("summary", {}, "Scratch Python"), context.repl.element);
-  const api = (source.data.api as string[] | undefined) ?? [];
-  // Scratch Python gets a stand-in for this level's piece, and its tooltips follow this level's Codex.
-  context.repl.setLevel({ piece: String(source.data.piece ?? "pawn"), api, codex: () => codex });
 
-  lesson = renderLesson(source.lesson, { client, api, board: source.data.lesson_board, codex: () => codex });
+  lesson = renderLesson(source.lesson, {
+    client,
+    api: (source.data.api as string[] | undefined) ?? [],
+    board: source.data.lesson_board,
+    codex: () => codex,
+  });
   learnPanel.append(h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), source.trains), lesson.element);
 
   // The lesson is paged, one step per runnable snippet (QA-010). The pager sits
@@ -102,7 +103,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   /** A chip in the Challenge panel was clicked: open its Codex entry. */
   function openCodexEntry(name: string): void {
     showTab("codex");
-    codexView?.show(name);
+    codex?.show(name);
   }
 
   // -- middle: board, playback controls, outcome -----------------------------------
@@ -209,6 +210,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       ),
   );
   root.replaceChildren(layout);
+  const chipTooltip = new ChipTooltip(layout); // inside the level screen, so it goes when the screen does
 
   // With the code at the bottom, the playback bar and outcome card sit beside
   // the editor with Variables and Console, so the board has its row to itself
@@ -257,8 +259,10 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       board = new BoardView(level);
       boardHost.replaceChildren(board.element);
       help = new HelpPanel(source.id, level.hints, () => getCode(editor));
-      challengePanel.replaceChildren(...describeChallenge(level, openCodexEntry, (name) => codex?.entries.get(name)), help.element);
+      challengePanel.replaceChildren(...describeChallenge(level, openCodexEntry, chipTooltip, () => codex), help.element);
       updateControls();
+      // Scratch Python gets a stand-in for this level's piece, and its tooltips follow this level's Codex.
+      context.repl.setLevel({ piece: level.piece, api: level.api, codex: () => codex });
       void loadCodex(level);
     } catch (error) {
       boardHost.replaceChildren(noticeCard("bad", "Python couldn't start", String(error)));
@@ -268,10 +272,9 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   /** The Codex tab and the hover tooltips: everything taught so far (docs/Codex.md). */
   async function loadCodex(loaded: LevelInfo): Promise<void> {
     try {
-      const entries = await client.call("codex", { piece: loaded.piece, api: loaded.api, history: codexHistory(source.id) });
-      codex = codexLookup(loaded.piece, entries);
-      codexView = renderCodex(entries, loaded.piece);
-      codexPanel.replaceChildren(codexView.element);
+      const entries = await client.call("codex", { levelId: source.id, chapters: codexChapters() });
+      codex = renderCodex(entries, loaded.piece);
+      codexPanel.replaceChildren(codex.element);
     } catch (error) {
       codexPanel.replaceChildren(noticeCard("bad", "The Codex couldn't load", String(error)));
     }
@@ -472,11 +475,11 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     caseBoard?.dispose();
     lesson?.dispose();
     editor.destroy();
-    closeCodexTooltips();
+    context.repl.setLevel(null); // so Scratch Python doesn't keep this screen alive
   };
 }
 
-function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, entry: (name: string) => CodexEntry | undefined): HTMLElement[] {
+function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, tooltip: ChipTooltip, codex: () => CodexLookup | null): HTMLElement[] {
   const parts: HTMLElement[] = [
     h("h2", { class: "challenge-title" }, level.title),
     h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), level.trains),
@@ -497,7 +500,7 @@ function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, 
   // Each ability is a way into the Codex: hover for its entry, click to open it there.
   const chip = (name: string) => {
     const button = h("button", { class: "codex-chip", onClick: () => openEntry(name) }, h("code", {}, name));
-    withCodexTooltip(button, () => entry(name));
+    tooltip.attach(button, () => codex()?.entries.get(name));
     return button;
   };
   parts.push(

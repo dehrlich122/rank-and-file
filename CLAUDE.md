@@ -217,6 +217,8 @@ names.
     Challenge panel's chips. Player code's `help()` shows the same entries.
   - Entries are Google-style docstrings: abilities in `pieces.py`, built-ins
     in `codex.BUILTINS`. A new ability or taught built-in needs one.
+  - The engine decides what's "taught so far" (`codex.history`). The UI
+    sends every chapter's levels and lessons (`content.codexChapters`).
   - The level checker fails if a lesson calls an undocumented built-in, or a
     reference calls one no lesson has taught by then.
   - Scratch Python gets a stand-in piece with no board (`repl.NoBoard`).

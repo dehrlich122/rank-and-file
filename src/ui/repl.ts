@@ -61,8 +61,8 @@ export class ReplPanel {
     this.log.addEventListener("click", () => this.input.focus());
   }
 
-  /** The level now on screen: its piece and abilities go with every line, for the session's stand-in. */
-  setLevel(level: ReplLevel): void {
+  /** The level now on screen, or null when it closes: its piece and abilities go with every line, for the session's stand-in. */
+  setLevel(level: ReplLevel | null): void {
     this.level = level;
   }
 
@@ -79,7 +79,8 @@ export class ReplPanel {
     this.historyIndex = this.history.length;
     this.write("repl-echo", `${this.prompt.textContent} ${line}`);
     try {
-      const result = await this.client.call("replPush", { line, piece: this.level?.piece, api: this.level?.api });
+      const level = this.level && { piece: this.level.piece, api: this.level.api };
+      const result = await this.client.call("replPush", { line, level });
       if (result.output) this.write("repl-out", result.output.replace(/\n$/, ""));
       if (result.error) this.log.append(errorCard(result.error));
       this.prompt.textContent = result.more ? "..." : ">>>";

@@ -678,7 +678,8 @@ pre {
   font-weight: 550;
 }
 
-.trains-label {
+.trains-label,
+.codex-new {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -768,17 +769,6 @@ pre {
   color: var(--text);
 }
 
-.codex-new {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent-text);
-  background: var(--accent);
-  padding: 1px 7px;
-  border-radius: 4px;
-}
-
 .codex-body {
   display: grid;
   gap: 8px;
@@ -849,9 +839,13 @@ pre {
   justify-self: start;
 }
 
+/* a popover (ChipTooltip), placed by script beside its chip */
 .codex-tooltip {
   position: fixed;
-  z-index: 50;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--border);

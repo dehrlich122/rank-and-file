@@ -87,7 +87,7 @@ class LevelResult:
 def run_snippet(code: str, *, namespace: dict | None = None, line_budget: int = DEFAULT_LINE_BUDGET) -> SnippetResult:
     """Run `code` as a standalone program. Reuse `namespace` to keep variables between runs."""
     started = time.perf_counter()
-    namespace = {"__name__": "__main__", "__builtins__": codex.player_builtins()} if namespace is None else namespace
+    namespace = codex.player_namespace() if namespace is None else namespace
     try:
         compiled = compile(code, PLAYER_FILENAME, "exec")
     except (SyntaxError, ValueError) as exc:
@@ -143,7 +143,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
     started = time.perf_counter()
     world = World(level)
     piece = PIECES[level.piece](world, level.api)
-    namespace = {"__name__": "__main__", "__builtins__": codex.player_builtins(), level.piece: piece}  # help(): the Codex (codex.py)
+    namespace = codex.player_namespace(**{level.piece: piece})
     start = world.state()
 
     def outcome(status: str, summary: str, **details) -> LevelResult:
