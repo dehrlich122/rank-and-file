@@ -1,5 +1,4 @@
-pawn.turn_left()
-pawn.turn_right()
+pawn.wait()
 pawn.move(4)
 pawn.turn_right()
 pawn.move(6)
