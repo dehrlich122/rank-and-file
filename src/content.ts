@@ -2,7 +2,9 @@
 //
 // The YAML is parsed here only to list levels and read titles; the engine
 // (levels.parse_level) is what actually checks and interprets a level.
+import { marked, type Token } from "marked";
 import { parse } from "yaml";
+import type { CodexLevel } from "./py/protocol";
 
 const levelFiles = import.meta.glob<string>("/levels/*/*.yaml", { query: "?raw", import: "default", eager: true });
 const lessonFiles = import.meta.glob<string>("/lessons/**/*.md", { query: "?raw", import: "default", eager: true });
@@ -86,6 +88,39 @@ export async function loadSolution(id: string): Promise<Solution | null> {
     Object.entries(files).find(([path]) => path.endsWith(`/${id}${extension}`))?.[1]();
   const [code, note] = await Promise.all([load(solutionFiles, ".py"), load(noteFiles, ".md")]);
   return code === undefined ? null : { code, note: note ?? "" };
+}
+
+/** A lesson's runnable snippet: a ```python run``` code block (optionally `run error` or `run lost`). */
+export const isSnippet = (token: Token): boolean => token.type === "code" && /^python run\b/.test(token.lang ?? "");
+
+/** The code of a lesson's runnable snippets, in order. */
+function lessonSnippets(markdown: string): string[] {
+  return marked.lexer(markdown).filter(isSnippet).map((token) => (token as { text: string }).text);
+}
+
+/**
+ * The levels that count towards a level's Codex, "taught so far" (docs/Codex.md),
+ * in play order and ending with the level itself: every curriculum level before
+ * it, then its own chapter's levels up to it. So a Testing-ground level counts
+ * the chapters listed before the Testing ground, then the Testing-ground levels
+ * up to it. engine/tests/test_levels.py follows the same rule.
+ */
+export function codexHistory(id: string): CodexLevel[] {
+  const index = chapters.findIndex((chapter) => chapter.levels.some((level) => level.id === id));
+  const chapter = chapters[index];
+  if (!chapter) return [];
+  const label = (owner: Chapter, level: LevelSource) =>
+    owner.curriculum ? `${owner.chapter}.${owner.levels.indexOf(level) + 1} ${level.title}` : `${owner.title}: ${level.title}`;
+  const earlier = chapters.slice(0, index).filter((owner) => owner.curriculum);
+  const counted = [
+    ...earlier.flatMap((owner) => owner.levels.map((level) => [owner, level] as const)),
+    ...chapter.levels.slice(0, chapter.levels.findIndex((level) => level.id === id) + 1).map((level) => [chapter, level] as const),
+  ];
+  return counted.map(([owner, level]) => ({
+    label: label(owner, level),
+    api: (level.data.api as string[] | undefined) ?? [],
+    snippets: lessonSnippets(level.lesson),
+  }));
 }
 
 /** The level after `id` in play order (chapters.yaml), within the curriculum only. */

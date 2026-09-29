@@ -155,6 +155,26 @@ interface ReplResult {
   error: ErrorInfo | null;
 }
 
+/** One entry of the Codex, the dictionary of functions the player knows (codex.Entry; docs/Codex.md). */
+export interface CodexEntry {
+  name: string; // as code writes it: "pawn.move", "print"
+  kind: "ability" | "property" | "builtin"; // a property is used without parentheses (pawn.position)
+  call: string; // how to use it: "pawn.move(squares=1)"
+  summary: string; // what it does; paragraphs are separated by a blank line, `code` is in backticks
+  args: Array<{ name: string; about: string }>;
+  returns: string;
+  example: string;
+  introduced: string; // the level that first unlocked or taught it
+  new: boolean; // ...when that's this level
+}
+
+/** A level that counts towards "taught so far": its label, abilities and lesson snippets (content.codexHistory). */
+export interface CodexLevel {
+  label: string;
+  api: string[];
+  snippets: string[];
+}
+
 /** Every request the worker understands: its arguments and its result. */
 export interface Requests {
   runSnippet: { args: { code: string }; result: SnippetResult };
@@ -162,7 +182,9 @@ export interface Requests {
   loadSandbox: { args: { api: string[]; board?: unknown }; result: LevelInfo }; // board: a level's lesson_board (QA-019)
   runLevel: { args: { level: unknown; code: string; hintsUsed: number; solutionSeen: boolean }; result: LevelResult };
   runSandbox: { args: { code: string; api: string[]; board?: unknown }; result: LevelResult };
-  replPush: { args: { line: string }; result: ReplResult };
+  codex: { args: { piece: string; api: string[]; history: CodexLevel[] }; result: CodexEntry[] }; // history ends with this level
+  // piece, api: the level's, for the session's stand-in piece (Scratch Python has no board)
+  replPush: { args: { line: string; piece?: string; api?: string[] }; result: ReplResult };
   replReset: { args: Record<string, never>; result: { ok: true } };
 }
 

@@ -7,9 +7,11 @@
 // at a time, so a snippet's code, board and output survive flipping pages.
 import { marked, type Token, type TokensList } from "marked";
 import type { EditorView } from "@codemirror/view";
+import { isSnippet } from "../content";
 import { PythonHungError, type PyClient } from "../py/client";
 import type { LevelInfo, LevelResult } from "../py/protocol";
 import { BoardView } from "./board";
+import { codexHover, type CodexLookup } from "./codex";
 import { h } from "./dom";
 import { createEditor, getCode, setActiveLine, setErrorLine } from "./editor";
 import { errorCard, logNodes } from "./panels";
@@ -31,6 +33,7 @@ export interface LessonContext {
   client: PyClient;
   api: string[]; // the level's abilities; snippets can use exactly these
   board?: unknown; // the level's lesson_board, as its file gives it; snippets run on a small open board without one (QA-019)
+  codex: () => CodexLookup | null; // for hover tooltips, once the level's Codex has loaded
 }
 
 export interface Lesson {
@@ -41,8 +44,6 @@ export interface Lesson {
   show(step: number): void;
   dispose(): void;
 }
-
-const isSnippet = (token: Token): boolean => token.type === "code" && /^python run\b/.test(token.lang ?? "");
 
 /** Split a lesson's Markdown tokens into steps: each step ends with a runnable snippet. */
 export function splitIntoSteps(tokens: Token[]): Token[][] {
@@ -135,7 +136,13 @@ class Snippet {
         this.boardHost,
       ),
     );
-    this.editor = createEditor({ parent: editorHost, code: code.trimEnd(), compact: true, onRun: () => void this.run() });
+    this.editor = createEditor({
+      parent: editorHost,
+      code: code.trimEnd(),
+      compact: true,
+      onRun: () => void this.run(),
+      extensions: [codexHover(context.codex)],
+    });
     void this.loadSandbox().then(
       (level) => this.showBoard(level),
       () => {},
