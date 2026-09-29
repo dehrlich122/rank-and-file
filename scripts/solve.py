@@ -16,8 +16,8 @@ route, so levels with clockwork obstacles are beyond it.
 """
 
 import sys
-from collections import deque
-from itertools import groupby
+from heapq import heappop, heappush
+from itertools import count, groupby
 from pathlib import Path
 
 import yaml
@@ -34,24 +34,29 @@ from rankfile.world import World  # noqa: E402
 
 MAX_STATES = 400_000
 CALLS = ("move", "turn_left", "turn_right", "wait", "capture_left", "capture_right", "bridge")
+TURNS = ("turn_left", "turn_right")
 
 
 def fewest_lines(level: Level) -> list[tuple] | None:
     """The actions of a solution with the fewest lines of code, or None.
 
-    Consecutive steps share one line (`pawn.move(3)`), so it's a 0-1 search:
-    a step right after a step is free, anything else costs a line.
+    Consecutive steps share one line (`pawn.move(3)`): a step right after a
+    step is free, anything else costs a line. Among the shortest programs it
+    takes one with the fewest turns. A turn spends a tick just like `wait()`,
+    so without that the search would sometimes pass time by spinning on the
+    spot (QA-026).
     """
     start = World(level)
     if start.code_clocked:
         raise ValueError(f"{level.id}: clockwork obstacles depend on how the code is written; solve it by hand")
     actions = _actions(level)
     first = _key(start, "", "")
-    queue = deque([(0, first, start, (), "")])
-    best = {first: 0}  # the fewest lines that reach each state
+    order = count()  # breaks ties between equal costs, so worlds are never compared
+    queue = [((0, 0), next(order), first, start, (), "")]
+    best = {first: (0, 0)}  # the cheapest (lines, turns) that reach each state
     while queue:
-        lines, key, world, path, said = queue.popleft()
-        if best[key] < lines:
+        cost, _, key, world, path, said = heappop(queue)
+        if best[key] < cost:
             continue  # reached more cheaply since
         if not level.nothing_to_do and not unmet_objectives(level, world, said):
             return list(path)
@@ -61,15 +66,15 @@ def fewest_lines(level: Level) -> list[tuple] | None:
                 continue
             spoken = said + action[1] + "\n" if action[0] == "say" else said
             free = action[0] == "move" and bool(path) and path[-1][0] == "move"
-            cost = lines + (0 if free else 1)
+            lines, turns = cost
+            next_cost = (lines + (0 if free else 1), turns + (action[0] in TURNS))
             next_key = _key(after, action[0], spoken)
-            if best.get(next_key, cost + 1) <= cost:
+            if next_key in best and best[next_key] <= next_cost:
                 continue
-            best[next_key] = cost
+            best[next_key] = next_cost
             if len(best) > MAX_STATES:
                 return None
-            item = (cost, next_key, after, (*path, action), spoken)
-            queue.appendleft(item) if free else queue.append(item)
+            heappush(queue, (next_cost, next(order), next_key, after, (*path, action), spoken))
     return None
 
 
