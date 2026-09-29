@@ -503,6 +503,60 @@ export default async function appChecks({ browser: b, base, root, check }) {
     return lesson.join(" / ");
   });
 
+  // -- QA-025 to QA-028: the Testing ground's hints ------------------------------------------
+  // Hints are spoilers: these checks ask the page yes/no questions about them, never for their text.
+  /** Open a level's three hints and answer `questions`, JS expressions over `hints` (their texts), in the page. */
+  async function aboutHints(id, questions) {
+    await openLevel(id, { fresh: true });
+    await challengeTab();
+    for (let i = 0; i < 3; i++) await b.evaluate(`document.querySelector('.hints .hint-button').click()`);
+    return b.evaluate(`(() => {
+      const hints = [...document.querySelectorAll('.hints .hint-list li')].map((li) => li.textContent);
+      return { ${Object.entries(questions).map(([name, test]) => `${name}: Boolean(${test})`).join(", ")} };
+    })()`);
+  }
+  const allTrue = (facts) => Object.values(facts).every(Boolean);
+
+  await check("QA-025: Stepping Stones' hint 2 explains planks without code, and hint 3 shows pawn.bridge()", async () => {
+    const facts = await aboutHints("practice-02", {
+      three: "hints.length === 3",
+      explains: "hints[1].includes('plank') && !/pawn\\.|\\(\\)/.test(hints[1])",
+      showsTheCode: "hints[2].includes('pawn.bridge()')",
+    });
+    expect(allTrue(facts), JSON.stringify(facts));
+  });
+
+  await check("QA-026, QA-027: the third hints of The Sentry's Round and Pursuit wait, and never turn on the spot", async () => {
+    const facts = {};
+    for (const id of ["practice-04", "practice-05"]) {
+      facts[id] = await aboutHints(id, { waits: "hints[2].includes('wait()')", noTurns: "!hints[2].includes('turn_')" });
+    }
+    expect(Object.values(facts).every(allTrue), JSON.stringify(facts));
+  });
+
+  await check("QA-027: Pursuit unlocks wait() with par 4, and its first lesson snippet waits while the chaser stays behind its wall", async () => {
+    await openLevel("practice-05", { fresh: true });
+    await b.waitFor(`${snippet(0)}.querySelector('.board .enemy')`, 20_000, "the lesson board");
+    const before = await snippetBoard(0);
+    const after = await runSnippet(0, { settle: true });
+    await challengeTab();
+    const panel = await b.evaluate(`({
+      knowsWait: [...document.querySelectorAll('.abilities code')].some((e) => e.textContent === 'pawn.wait'),
+      par4: document.querySelector('.star-goals').textContent.includes('Use 4 lines of code or fewer'),
+    })`);
+    expect(after.status.includes("Finished") && before.enemies[0] === after.enemies[0], `chaser: ${JSON.stringify([before.enemies, after.enemies])}, ${after.status}`);
+    expect(allTrue(panel), JSON.stringify(panel));
+  });
+
+  await check("QA-028: Portcullis' hint 2 says the gates keep cycling, hint 3 only waits, and par is 7", async () => {
+    const facts = await aboutHints("practice-07", {
+      reminder: "hints[1].includes('the gates keep cycling on every tick')",
+      waits: "hints[2].includes('wait()') && !hints[2].includes('turn_')",
+      par7: "document.querySelector('.star-goals').textContent.includes('Use 7 lines of code or fewer')",
+    });
+    expect(allTrue(facts), JSON.stringify(facts));
+  });
+
   await check("QA-023: The Toll says it's a demo with nothing new to learn", async () => {
     await levelCards();
     const card = await b.evaluate(`document.querySelector('a[href="#/level/practice-08"]').innerText`);

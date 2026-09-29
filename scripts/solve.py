@@ -55,8 +55,8 @@ def fewest_lines(level: Level) -> list[tuple] | None:
     queue = [((0, 0), next(order), first, start, (), "")]
     best = {first: (0, 0)}  # the cheapest (lines, turns) that reach each state
     while queue:
-        cost, _, key, world, path, said = heappop(queue)
-        if best[key] < cost:
+        (lines, turns), _, key, world, path, said = heappop(queue)
+        if best[key] < (lines, turns):
             continue  # reached more cheaply since
         if not level.nothing_to_do and not unmet_objectives(level, world, said):
             return list(path)
@@ -66,7 +66,6 @@ def fewest_lines(level: Level) -> list[tuple] | None:
                 continue
             spoken = said + action[1] + "\n" if action[0] == "say" else said
             free = action[0] == "move" and bool(path) and path[-1][0] == "move"
-            lines, turns = cost
             next_cost = (lines + (0 if free else 1), turns + (action[0] in TURNS))
             next_key = _key(after, action[0], spoken)
             if next_key in best and best[next_key] <= next_cost:

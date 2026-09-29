@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from rankfile.board import Direction
 from rankfile.levels import parse_level
 from rankfile.runner import run_level, run_sandbox
 
@@ -28,7 +29,6 @@ LEVEL_FILES = sorted((ROOT / "levels").glob("*/*.yaml"))
 MAX_LESSON_WORDS = 150
 SNIPPET = re.compile(r"^```python run(?: (error|lost))?\n(.*?)^```", re.MULTILINE | re.DOTALL)
 FENCED = re.compile(r"^```.*?^```", re.MULTILINE | re.DOTALL)
-COMPASS = ["north", "east", "south", "west"]  # clockwise, so a right turn is +1
 FACING_ACTIONS = {"move", "capture", "bridge"}  # the actions that go the way the piece faces
 
 
@@ -74,11 +74,14 @@ def test_level_file_is_valid(level_file):
     assert level.par.lines, "every level needs a line par, for its par star"
 
 
+def run_reference(level, level_file: Path):
+    """Run the level's reference solution. (Never printed: the checker must never spoil it.)"""
+    return run_level(level, (solutions_dir(level_file) / f"{level.id}.py").read_text(encoding="utf-8"))
+
+
 def test_reference_solution_solves_it(level_file):
     level = load(level_file)
-    solution = solutions_dir(level_file) / f"{level.id}.py"
-    result = run_level(level, solution.read_text(encoding="utf-8"))
-    # Deliberately not printing the solution: the checker must never spoil it.
+    result = run_reference(level, level_file)
     assert result.status == "solved", f"{level.id}: {result.summary}"
     # ...and it earns every star, so each level's par is reachable.
     assert all(star.earned for star in result.stars), f"{level.id}: {[star.label for star in result.stars]}"
@@ -91,18 +94,23 @@ def test_reference_solution_waits_rather_than_spinning(level_file):
     level = load(level_file)
     if "wait" not in level.api:
         pytest.skip("wait() isn't unlocked on this level")
-    result = run_level(level, (solutions_dir(level_file) / f"{level.id}.py").read_text(encoding="utf-8"))
-    facing, turns = level.facing.value, []
-    for event in (event for step in result.steps for event in step["events"]):
-        if event["kind"] == "turn":
-            turned = event["state"]["facing"]
-            turns.append((COMPASS.index(turned) - COMPASS.index(facing)) % 4)
-            facing = turned
-        elif event["kind"] in FACING_ACTIONS:
-            net = sum(turns) % 4
-            assert len(turns) == min(net, 4 - net), f"{level.id}: the reference turns more than it needs to"
-            turns = []
-    assert not turns, f"{level.id}: the reference turns after its last step"
+    result = run_reference(level, level_file)
+    # A level with several cases records each one separately, and the run itself has no steps.
+    for steps in [case["steps"] for case in result.cases] or [result.steps]:
+        stepped = facing = level.facing  # the facing at the last step, and now
+        turns = 0  # since the last step
+        for event in (event for step in steps for event in step["events"]):
+            if event["kind"] == "turn":
+                facing, turns = Direction(event["state"]["facing"]), turns + 1
+            elif event["kind"] in FACING_ACTIONS:
+                assert turns == quarter_turns(stepped, facing), f"{level.id}: the reference turns more than it needs to"
+                stepped, turns = facing, 0
+        assert turns == 0, f"{level.id}: the reference turns after its last step"
+
+
+def quarter_turns(start: Direction, end: Direction) -> int:
+    """The fewest quarter turns from facing `start` to facing `end`."""
+    return 0 if start is end else 2 if start.turned_left().turned_left() is end else 1
 
 
 def test_naive_solutions_fail_as_intended(level_file):

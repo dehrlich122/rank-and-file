@@ -1432,6 +1432,14 @@ Deferred on purpose. Not bugs, but don't lose them.
 - **Bottom layout, the empty space right of the board** (design pass). One idea: Variables move there, and Console takes the whole area under the playback slider beside the editor. *(Designer, 2026-09-26; QA-012)*
 - **The outcome/error card, reworked in the design pass.** It works for testing functionality now. *(Designer, 2026-09-26; QA-012)*
 - **Make it obvious a lesson has more steps** (design pass). For example, the Next button could name what's coming ("Step 2 →", "Step 3 →") instead of a plain "Next →". *(Designer, 2026-09-26; QA-010)*
+- **Saving progress across devices.** Progress is saved per browser
+  (localStorage), so a phone and a computer each keep their own; the
+  designer's testing confirmed it. *(Designer, 2026-09-29)*
+  - Real syncing needs a server and a sign-in. Accounts are out of scope in
+    `DESIGN.md` §7, so it pairs with the mobile phase below.
+  - A server-free step, if wanted sooner: Export/Import progress in
+    Settings (a file). It doubles as a backup: Safari on iPhone can clear a
+    site's data after about a week without a visit.
 - **Mobile UI.** Phones need a different UI entirely, not a squeezed
   desktop layout. Not in this milestone, and it may become a phase 2 build.
   `DESIGN.md` §7 already lists mobile layout as out of scope for now.
