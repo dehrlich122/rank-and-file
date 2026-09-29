@@ -123,10 +123,32 @@ def test_other_maps_share_the_level_but_not_its_map():
     level = make_level("P . G\n", variants=[{"map": "P G .\n"}], api=["move", "at_goal"])
     [other] = level.variants
     assert (other.goal, other.api, other.variants) == ((1, 0), ["move", "at_goal"], [])
-    assert [case.label for case in level.cases()] == ["your board", "board 2"]
-    assert level.describe()["goals"][-1] == "Your code is also checked on 1 other board."
+    assert [case.label for case in level.cases()] == ["board 1", "board 2"]
+    assert level.describe()["goals"][-1] == "Your code has to work on all 2 boards: see them in the tabs above the board."
     with pytest.raises(LevelError, match="only for the level's own map"):
         make_level("P . G\n", variants=[{"map": "P ? .\n"}])
+
+
+def test_another_board_can_give_a_symbol_its_own_legend_entry():
+    # M3.2: a guard whose answer differs on each board.
+    guard = {"X": {"tile": "gate", "question": "How far?", "passphrase": "2"}}
+    level = make_level("P . X G\n", legend=guard, variants=[{"map": "P . . X G\n", "legend": {"X": {**guard["X"], "passphrase": "3"}}}])
+    assert [case.level.board.gates for case in level.cases()] == [{(2, 0): "2"}, {(3, 0): "3"}]
+    with pytest.raises(LevelError, match="optionally a legend"):
+        make_level("P G\n", variants=[{"map": "P G\n", "enemies": []}])
+
+
+def test_every_board_is_described_for_the_tabs():
+    boards = make_level("P . G\n", variants=[{"map": "P G\n"}]).describe()["boards"]
+    assert [(board["width"], board["goal"]) for board in boards] == [(3, [2, 0]), (2, [1, 0])]
+    assert make_level("P G\n").describe()["boards"] == []  # one board: no tabs
+
+
+def test_a_mastery_challenge_is_marked():
+    assert make_level("P G\n", mastery=True).describe()["mastery"] is True
+    assert make_level("P G\n").mastery is False
+    with pytest.raises(LevelError, match="mastery is true or false"):
+        make_level("P G\n", mastery="yes")
 
 
 def test_say_goals_point_to_the_sign_when_the_phrase_is_written_there():

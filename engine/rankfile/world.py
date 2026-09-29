@@ -137,6 +137,19 @@ class World:
     def at_goal(self) -> bool:
         return self.level.goal is not None and self.pos == self.level.goal
 
+    def squares_ahead(self) -> int:
+        """How many squares the piece can walk straight ahead before something
+        could stop it (M3.2): a wall, the board's edge, a signpost, or a gate
+        that isn't open for good. That's every timed gate, even while it's
+        open, so the count doesn't depend on when you ask, and a guard's gate
+        until it's opened. Pits and enemies don't stop the count."""
+        ahead, pos = 0, self.pos
+        while True:
+            target = step(pos, self.facing)
+            if self.board.blocked(target) or target in self.board.timers or self._locked_gate(target):
+                return ahead
+            ahead, pos = ahead + 1, target
+
     @_acts
     def turn_left(self) -> None:
         self.facing = self.facing.turned_left()
