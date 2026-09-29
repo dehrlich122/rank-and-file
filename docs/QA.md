@@ -1237,6 +1237,55 @@ Item 6 (hidden boards) became QA-016.
   - For the rule to work, a gate has to stay open long enough to pass
     through: at least two ticks.
 
+## Session 6 — 2026-09-29 · Testing-ground hints (`tg-hints`)
+
+The designer's answer to PR #8's question: are the Testing-ground hints good
+enough, or should they be rewritten?
+
+### QA-025 · Stepping Stones: hint 2 gives too much away · Open
+
+- **Area:** Testing ground 2 (Stepping Stones), its hints
+- **Observed** *(Designer, 2026-09-29)*: hint 2 is a little on the nose.
+- **Wanted** *(Designer, 2026-09-29)*: hint 2 could just explain that the
+  plank can be used to build a bridge over pits. The code for building the
+  bridge could then come in hint 3.
+
+
+### QA-026 · The Sentry's Round turns, in the level that brings in `wait()` · Open
+
+- **Area:** Testing ground 4 (The Sentry's Round), its reference solution and
+  hint 3; `scripts/solve.py`
+- **Observed** *(Designer, 2026-09-29)*: the idiomatic solution uses
+  `turn_left()` and `turn_right()`, and so does hint 3. That feels odd in the
+  level where `wait()` is introduced.
+- **Cause** *(Claude)*:
+  - Hint 3 on the M3.1 levels is "One way to start:" plus the first lines
+    of the reference solution, and `scripts/solve.py` finds the reference.
+  - A turn spends a tick just like `wait()`. The search only counted lines,
+    and it tried turns before `wait()`, so it passed time by turning away
+    and back.
+
+
+### QA-027 · Pursuit: hint 3 turns on the spot · Open
+
+- **Area:** Testing ground 5 (Pursuit), its reference solution and hint 3
+- **Observed** *(Designer, 2026-09-29)*: hint 3 is another odd one, with
+  `turn_left()` and `turn_right()` in it. Hints 1 and 2 are good.
+- **Cause** *(Claude)*: the same as QA-026. Pursuit has no `wait()`, so
+  turning away and back is the only way it can pass time.
+
+
+### QA-028 · Portcullis: hint 3 starts oddly, and the gates' cycle could be a hint · Open
+
+- **Area:** Testing ground 7 (Portcullis), its hints
+- **Observed** *(Designer, 2026-09-29)*: basically fine, except the weird
+  "One way to start" hint, which has you run your pawn into a wall.
+- **Wanted** *(Designer, 2026-09-29)*: if the gates run on loops, mention it
+  in a hint, e.g. "Don't forget, gates run for every tick, so time your loops
+  carefully!"
+- **Cause** *(Claude)*: the same as QA-026. The reference passed time with
+  turns, so its opening lines turned the pawn toward the edge of the board.
+
 ---
 
 ## Queued work
