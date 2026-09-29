@@ -19,11 +19,11 @@ api:
 - turn_right
 - wait
 par:
-  lines: 8
+  lines: 7
 hints:
 - "Each gate is open for its first few ticks, then shut. Count the ticks along your route, and arrive just as a gate opens."
-- "Stepping in and stepping out take a tick each, and a gate that shuts on you crushes you. `pawn.wait()` adds a tick without moving."
-- "One way to start: `pawn.turn_left()`, then `pawn.turn_left()`."
+- "Stepping in and stepping out take a tick each, and a gate that shuts on you crushes you. `pawn.wait()` adds a tick without moving. Don't forget: the gates keep cycling on every tick, so time your loops carefully!"
+- "One way to start: `pawn.wait()`, then `pawn.wait()`."
 lesson: practice/practice-07.md
 lesson_board:
   map: |
