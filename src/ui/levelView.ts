@@ -257,7 +257,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       }
       level = loaded.level;
       board = new BoardView(level);
-      boardHost.replaceChildren(board.element);
+      if (level.boards.length) previewBoard(0); // the tabs for its other boards (M3.2)
+      else boardHost.replaceChildren(board.element);
       help = new HelpPanel(source.id, level.hints, () => getCode(editor));
       challengePanel.replaceChildren(...describeChallenge(level, openCodexEntry, chipTooltip, () => codex), help.element);
       updateControls();
@@ -389,28 +390,41 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   // -- several cases (M2): a hidden goal's ? squares, other maps ------------------------
   // A run comes back with every case's result. The board shows the case being
   // replayed (its goal, and ✓ or ✗ on each ? square), and a row of buttons
-  // above it replays any other case.
+  // above it replays any other case. A level with other maps (M3.2) shows the
+  // row before a run too, as tabs: each one shows its board.
   function showCaseBoard(run: LevelResult, index: number): void {
     caseBoard?.dispose();
     // ✓ or ✗ on each ? square: whether the code reached a goal hidden there.
     const spots = new Map(run.cases.flatMap((c) => (c.level.goal ? [[squareName(c.level.goal), c.status === "solved"] as const] : [])));
     caseBoard = new BoardView(run.cases[index]!.level, { spots });
-    const buttons = run.cases.map((c, i) =>
-      h(
-        "button",
-        { class: "btn btn-small btn-toggle", "aria-pressed": String(i === index), onClick: () => showCase(i, "play") },
-        `${c.label} ${c.status === "solved" ? "✓" : "✗"}`,
-      ),
-    );
+    const labels = run.cases.map((c, i) => `${level?.boards.length ? `Board ${i + 1}` : c.label} ${c.status === "solved" ? "✓" : "✗"}`);
+    boardHost.replaceChildren(caseRow(labels, index, (i) => showCase(i, "play")), caseBoard.element);
+  }
+
+  /** Before a run, on a level with other maps: show board `index`, as it starts. */
+  function previewBoard(index: number): void {
+    if (!level || !board) return;
+    caseBoard?.dispose();
+    caseBoard = index > 0 ? new BoardView(level.boards[index]!) : null;
+    const labels = level.boards.map((_, i) => `Board ${i + 1}`);
+    boardHost.replaceChildren(caseRow(labels, index, previewBoard), (caseBoard ?? board).element);
+  }
+
+  /** The row above the board: one button per case, `selected` pressed. */
+  function caseRow(labels: string[], selected: number, pick: (index: number) => void): HTMLElement {
     const title = level?.case_title ?? "";
-    boardHost.replaceChildren(h("div", { class: "case-row", role: "group", "aria-label": title }, h("span", { class: "muted small" }, `${title}:`), ...buttons), caseBoard.element);
+    const buttons = labels.map((text, i) =>
+      h("button", { class: "btn btn-small btn-toggle", "aria-pressed": String(i === selected), onClick: () => pick(i) }, text),
+    );
+    return h("div", { class: "case-row", role: "group", "aria-label": title }, h("span", { class: "muted small" }, `${title}:`), ...buttons);
   }
 
   /** No recording, and the level's own board at the start: before every run. */
   function resetStage(): void {
     player?.dispose();
     player = null;
-    if (caseBoard && board) {
+    if (level?.boards.length) previewBoard(0);
+    else if (caseBoard && board) {
       caseBoard.dispose();
       caseBoard = null;
       boardHost.replaceChildren(board.element);
@@ -484,6 +498,11 @@ function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, 
     h("h2", { class: "challenge-title" }, level.title),
     h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), level.trains),
   ];
+  if (level.mastery) {
+    parts.push(
+      h("p", { class: "mastery-note" }, h("span", { class: "mastery-tag" }, "Mastery · optional"), " A harder challenge for the whole chapter, played for par."),
+    );
+  }
   if (level.brief) parts.push(h("p", {}, level.brief));
 
   // The goals and rules come worded from the engine (Level.describe), which owns

@@ -61,7 +61,15 @@ export interface LevelInfo {
   start: WorldState;
   objectives: { reach_goal: boolean; say: string[]; waypoints: boolean; collect: number | "all" | null; capture: number | "all" | null };
   api: string[];
-  constraints: { max_lines: number | null; min_comments: number; require_nodes: string[]; ban_nodes: string[] };
+  constraints: {
+    max_lines: number | null;
+    min_comments: number;
+    require_nodes: string[];
+    ban_nodes: string[];
+    numbers_from_signs: boolean; // the signpost rules (M3.2)
+    numbers_once: boolean;
+    sign_numbers: number[];
+  };
   par: { lines: number | null };
   starter: string;
   goals: string[]; // what to do, in words (never a passphrase)
@@ -69,6 +77,8 @@ export interface LevelInfo {
   obstacles: string[]; // each obstacle's rule, in words (M3.1)
   stars: string[]; // what each of the three stars asks for, in words
   hints: string[]; // tiered: nudge, concept reminder, partial example
+  mastery: boolean; // a chapter's optional mastery challenge (M3.2)
+  boards: LevelInfo[]; // a level with other maps (M3.2): every board, first to last, for the tabs; otherwise empty
 }
 
 /** A patrol or a chaser (levels.Enemy), as the board draws it. */

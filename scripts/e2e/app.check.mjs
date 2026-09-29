@@ -364,7 +364,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(d["practice-04"].enemies === 1 && d["practice-04"].routes === 1 && d["practice-04"].obstacles === 2, `patrol: ${JSON.stringify(d["practice-04"])}`);
     expect(d["practice-05"].badges.includes("chases") && d["practice-05"].routes === 0, `chaser: ${JSON.stringify(d["practice-05"])}`);
     expect(d["practice-06"].badges.some((text) => text.startsWith("⚙")), `clockwork: ${JSON.stringify(d["practice-06"])}`);
-    expect(d["practice-07"].timed === 2 && d["practice-07"].badges.join() === "2 of 3,2 of 4", `timed gates: ${JSON.stringify(d["practice-07"])}`);
+    expect(d["practice-07"].timed === 2 && d["practice-07"].badges.join() === "2 of 3 · tick 0,2 of 4 · tick 0", `timed gates: ${JSON.stringify(d["practice-07"])}`);
     expect(d["practice-08"].gems === 3 && d["practice-08"].badges.includes("?"), `gems and the guard: ${JSON.stringify(d["practice-08"])}`);
     expect(d["practice-09"].enemies === 2 && d["practice-09"].armoured === 1, `capture: ${JSON.stringify(d["practice-09"])}`);
     return Object.entries(d).map(([id, x]) => `${id}: ${x.obstacles} rules`).join(", ");

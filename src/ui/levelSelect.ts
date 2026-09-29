@@ -13,7 +13,12 @@ export function renderLevelSelect(chapters: Chapter[], progress: ProgressStore):
       "a",
       { href: `#/level/${level.id}`, class: solved ? "level-card solved" : "level-card" },
       h("span", { class: "level-number" }, solved ? "✓" : String(number)),
-      h("span", { class: "level-text" }, h("strong", {}, level.title), h("span", { class: "muted small" }, level.trains)),
+      h(
+        "span",
+        { class: "level-text" },
+        h("strong", {}, level.title, level.data.mastery === true ? h("span", { class: "mastery-tag" }, "Mastery · optional") : null),
+        h("span", { class: "muted small" }, level.trains),
+      ),
       solved
         ? h(
             "span",
