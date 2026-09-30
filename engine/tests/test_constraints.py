@@ -19,6 +19,39 @@ def test_a_statement_split_over_lines_counts_every_line():
     assert code_lines("pawn.move(\n    3\n)\n") == 3
 
 
+@pytest.mark.parametrize(
+    "squeezed, spread",
+    [
+        ("pawn.move(); pawn.turn_left(); pawn.move()\n", "pawn.move()\npawn.turn_left()\npawn.move()\n"),
+        ("for _ in range(3): pawn.move(); pawn.turn_left()\n", "for _ in range(3):\n    pawn.move()\n    pawn.turn_left()\n"),
+        ("if x: a()\nelif y: b()\nelse: c()\n", "if x:\n    a()\nelif y:\n    b()\nelse:\n    c()\n"),
+        ("while x: a()\nelse: b()\n", "while x:\n    a()\nelse:\n    b()\n"),
+        ("try: a()\nexcept ValueError: b()\nfinally: c()\n", "try:\n    a()\nexcept ValueError:\n    b()\nfinally:\n    c()\n"),
+        ("match x:\n    case 1: a()\n    case _: b()\n", "match x:\n    case 1:\n        a()\n    case _:\n        b()\n"),
+        ("def f(): return 3\n", "def f():\n    return 3\n"),
+        ("@d\ndef f(): return 3\n", "@d\ndef f():\n    return 3\n"),
+        ("class C: x = 1; y = 2\n", "class C:\n    x = 1\n    y = 2\n"),
+        ("with x: a()\n", "with x:\n    a()\n"),
+        ("try: a()\nexcept* ValueError: b()\n", "try:\n    a()\nexcept* ValueError:\n    b()\n"),
+    ],
+)
+def test_squeezing_statements_onto_one_line_saves_no_lines(squeezed, spread):
+    """Each statement counts as a line however it's laid out (M3.3), so `;`
+    can't dodge a line limit."""
+    assert code_lines(squeezed) == code_lines(spread)
+
+
+def test_else_inside_an_expression_is_not_a_clause():
+    assert code_lines("x = (1 if y\n     else 2)\n") == 2
+
+
+def test_the_line_limit_says_why_a_squeezed_line_counts_twice():
+    level = make_level("G\n.\n.\nP\n", constraints={"max_lines": 2})
+    result = run_level(level, "pawn.move(); pawn.move(); pawn.move()")
+    assert result.status == "constraint"
+    assert result.summary == "This level allows at most 2 lines of code, and yours has 3. Two statements on one line count as two."
+
+
 def test_max_lines_blocks_the_run():
     level = make_level("G\n.\n.\nP\n", constraints={"max_lines": 2})
     result = run_level(level, "pawn.move()\npawn.move()\npawn.move()")

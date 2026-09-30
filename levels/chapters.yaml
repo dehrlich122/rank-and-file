@@ -8,6 +8,10 @@
   title: Counting Steps
   tier: pawn
   summary: Variables, whole numbers, arithmetic and f-strings, and a pawn that can count.
+- chapter: 3
+  title: Marching Orders
+  tier: pawn
+  summary: for loops and range(), the loop's variable, loops inside loops, and clockwork that counts your lines.
 - chapter: 0
   title: Testing ground
   tier: practice

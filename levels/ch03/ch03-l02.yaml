@@ -1,0 +1,53 @@
+id: ch03-l02
+chapter: 3
+title: "The Crooked Stair"
+trains: "A loop's lines run afresh each round, so a count inside the loop gets a new answer every time"
+brief: "Three crooked staircases, no two steps alike, and one program for all of them. There's only room for 7 lines of code."
+piece: pawn
+map: |
+  # # # # # # # . . G
+  # # # # # # # . # #
+  # # # # # # . . # #
+  # # # . . . . # # #
+  # # . . # # # # # #
+  # # . # # # # # # #
+  . . . # # # # # # #
+  P # # # # # # # # #
+  
+start: {"facing": "east"}
+api: ["move", "turn_left", "turn_right", "squares_ahead", "wait"]
+constraints: {"max_lines": 7}
+par: {"lines": 5}
+hints:
+- "No two steps are the same size, and no two boards are the same, so no number you type will fit them all."
+- "The loop runs its lines again every round, so a count taken inside the loop is taken again at every step. Let each move go as far as the pawn can see."
+- "One way to write each move:\npawn.move(pawn.squares_ahead())"
+lesson: ch03/ch03-l02.md
+lesson_board:
+  map: |
+    . . .
+    . # .
+    . # #
+    P # #
+  start: {"facing": "north"}
+variants:
+- map: |
+    # # # # # # # . . G
+    # # # # # . . . # #
+    # # # # # . # # # #
+    # # # # . . # # # #
+    # . . . . # # # # #
+    . . # # # # # # # #
+    . # # # # # # # # #
+    P # # # # # # # # #
+    
+- map: |
+    # # # # # # # # . G
+    # # # # # # # # . #
+    # # # # # # . . . #
+    # # # # . . . # # #
+    # # # # . # # # # #
+    # # # . . # # # # #
+    . . . . # # # # # #
+    P # # # # # # # # #
+    

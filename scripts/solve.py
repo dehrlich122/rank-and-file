@@ -82,11 +82,15 @@ def write_code(level: Level, actions: list[tuple]) -> list[str]:
     lines, piece = [], level.piece
     for name, run in groupby(actions, key=lambda action: action[0] if action[0] == "move" else action):
         if name == "move":
-            squares = len(list(run))
-            lines.append(f"{piece}.move({squares if squares > 1 else ''})")
+            lines.append(move_call(piece, len(list(run))))
         else:
             lines.extend(f"print({action[1]!r})" if action[0] == "say" else f"{piece}.{action[0]}()" for action in run)
     return lines
+
+
+def move_call(piece: str, squares: int) -> str:
+    """A call walking `squares` squares: `pawn.move()` for one, `pawn.move(3)` for more."""
+    return f"{piece}.move({squares if squares > 1 else ''})"
 
 
 def _actions(level: Level) -> list[tuple]:

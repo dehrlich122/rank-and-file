@@ -295,7 +295,11 @@ Enemies *(M3.1)* move one square per tick of their clock:
 Unknown keys, symbols,
 abilities or `ast` node names are errors, so typos fail in the level checker.
 `max_lines` counts lines containing code (blank and comment-only lines don't
-count); `require_nodes`/`ban_nodes` name `ast` node classes.
+count), as if every statement had its own line *(M3.3)*: a second statement
+after `;`, a loop's body on the loop's own line, or `else:` with its body
+beside it counts as another line, so squeezing code together can't dodge a
+limit. The par star counts the same way. `require_nodes`/`ban_nodes` name
+`ast` node classes.
 
 Alongside each level:
 
@@ -343,7 +347,8 @@ src/settings.ts src/progress.ts src/storage.ts   saved settings and progress (lo
 src/py/            worker, client and protocol
 src/ui/            board, editor, playback, panels, lesson, repl, levelView, levelSelect, codex,
                    help (hints, giving up, the comparison), compare, dialog, settingsDialog
-scripts/           copy-pyodide.mjs (runs after npm install), venv.mjs, check-bundle.mjs, e2e/
+scripts/           copy-pyodide.mjs (runs after npm install), venv.mjs, check-bundle.mjs, e2e/,
+                   solve.py gen_solutions.py gen_loops.py (search levels and write solutions blind)
 public/pyodide/    Pyodide runtime, copied from node_modules (not committed)
 ```
 

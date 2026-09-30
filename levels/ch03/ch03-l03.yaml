@@ -1,0 +1,33 @@
+id: ch03-l03
+chapter: 3
+title: "The Spiral Walk"
+trains: "The loop's variable, and range(start, stop, step)"
+brief: "A walkway spirals in over a bottomless pit, each stretch one square shorter than the last. Step off it and you fall. There's only room for 5 lines of code."
+piece: pawn
+map: |
+  P . . . . . . .
+  O O O O O O O .
+  O O . . . . O .
+  O O . O O . O .
+  O O . O G . O .
+  O O . O O O O .
+  O O . . . . . .
+  
+legend: {"O": "pit"}
+start: {"facing": "north"}
+api: ["move", "turn_left", "turn_right", "squares_ahead", "wait"]
+constraints: {"max_lines": 5}
+par: {"lines": 3}
+hints:
+- "Each stretch is one square shorter than the one before. Counting won't help: the pawn sees straight over the pits."
+- "The loop's variable changes every round. If it counts down one at a time, starting from the first stretch's length, it's exactly how far to walk each round."
+- "One way to start:\nfor length in range(7, 0, -1):"
+lesson: ch03/ch03-l03.md
+lesson_board:
+  map: |
+    O O O . . . .
+    O . . . O O O
+    . . O O O O O
+    P O O O O O O
+  legend: {"O": "pit"}
+  start: {"facing": "north"}

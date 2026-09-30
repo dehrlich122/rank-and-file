@@ -13,6 +13,7 @@ import ast
 import inspect
 import io
 import tokenize
+from collections import Counter
 from dataclasses import dataclass
 
 from .pieces import Piece
@@ -51,13 +52,39 @@ class LintWarning:
     message: str
 
 
-def code_lines(code: str) -> int:
-    """Lines that contain code (blank lines and comment-only lines don't count)."""
+def code_lines(code: str, tree: ast.Module | None = None) -> int:
+    """Lines of code, counted as if each statement had a line of its own (M3.3).
+
+    Blank lines and comment-only lines don't count, and a statement split over
+    several lines counts each of them. Squeezing statements together doesn't
+    save lines: a second statement after `;`, a loop's body on the loop's own
+    line, or `else:` with its body beside it each count as another line.
+    Pass the parsed `tree` if there is one, to save parsing the code again.
+    """
+    return _line_count(code, tree)[0]
+
+
+def _line_count(code: str, tree: ast.Module | None) -> tuple[int, bool]:
+    """The count `code_lines` gives, and whether any line holds more than one statement."""
     lines: set[int] = set()
+    starts: set[tuple[int, int]] = set()  # where each statement or clause (`else:`, `except ...:`) begins
+    at_start = True  # a clause header always begins a logical line
     for token in _tokens(code):
-        if token.type not in _IGNORED_TOKENS:
+        if token.type == tokenize.NEWLINE:
+            at_start = True
+        elif token.type not in _IGNORED_TOKENS:
             lines.update(range(token.start[0], token.end[0] + 1))
-    return len(lines)
+            if at_start:
+                starts.add(token.start)
+                at_start = False
+    if tree is None:
+        try:
+            tree = ast.parse(code)
+        except (SyntaxError, ValueError):
+            tree = ast.Module(body=[], type_ignores=[])
+    starts.update((node.lineno, node.col_offset) for node in ast.walk(tree) if isinstance(node, ast.stmt))
+    per_line = Counter(line for line, _ in starts)
+    return sum(max(1, per_line[line]) for line in lines), any(n > 1 for n in per_line.values())
 
 
 def comment_count(code: str) -> int:
@@ -68,11 +95,11 @@ def check_constraints(tree: ast.Module, code: str, constraints) -> list[str]:
     """Every way `code` breaks the level's rules, as messages for the player."""
     problems = []
     if constraints.max_lines is not None:
-        used = code_lines(code)
+        used, shared = _line_count(code, tree)
         if used > constraints.max_lines:
+            why = "Two statements on one line count as two." if shared else "(Blank lines and comments don't count.)"
             problems.append(
-                f"This level allows at most {count(constraints.max_lines, 'line')} of code, and yours has {used}. "
-                "(Blank lines and comments don't count.)"
+                f"This level allows at most {count(constraints.max_lines, 'line')} of code, and yours has {used}. {why}"
             )
     if constraints.min_comments and comment_count(code) < constraints.min_comments:
         wanted = "a comment" if constraints.min_comments == 1 else f"{constraints.min_comments} comments"
@@ -139,7 +166,10 @@ def describe_rules(constraints) -> list[str]:
     """The level's rules as the Challenge panel lists them, one sentence each."""
     rules = []
     if constraints.max_lines is not None:
-        rules.append(f"At most {count(constraints.max_lines, "line")} of code. Blank lines and comments don't count.")
+        rules.append(
+            f"At most {count(constraints.max_lines, "line")} of code. Blank lines and comments don't count; "
+            "two statements on one line count as two."
+        )
     if constraints.min_comments:
         rules.append(f"At least {count(constraints.min_comments, 'comment')} (a note starting with #).")
     rules += [f"Must use {describe_node(name)}." for name in constraints.require_nodes]

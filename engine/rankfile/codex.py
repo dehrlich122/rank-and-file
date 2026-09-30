@@ -88,17 +88,21 @@ BUILTINS: dict[str, tuple[list[str], str]] = {
         """,
     ),
     "range": (
-        ["range(stop)", "range(start, stop)"],
+        ["range(stop)", "range(start, stop)", "range(start, stop, step)"],
         """Count whole numbers, most often to repeat something with `for`.
 
         `range(3)` counts 0, 1, 2: three numbers, starting at 0 and stopping
-        just before 3. `range(2, 5)` starts at 2 instead: 2, 3, 4.
+        just before 3. `range(2, 5)` starts at 2 instead: 2, 3, 4. A step
+        counts in bigger jumps, or backwards: `range(0, 10, 3)` counts 0, 3,
+        6, 9, and `range(3, 0, -1)` counts down 3, 2, 1.
 
         Args:
             start: where to start counting, a whole number (int). Leave it
                 out to start at 0.
             stop: where to stop, a whole number (int). The count stops just
                 before it.
+            step: how much to add each time, a whole number (int). Leave it
+                out to add 1. A negative step counts down.
 
         Returns:
             The numbers, ready for a `for` loop to go through one at a time.
