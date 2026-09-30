@@ -1402,6 +1402,36 @@ enough, or should they be rewritten?
     gap as QA-023: code only needs to work something out when the answer
     can't be known ahead of time.
 
+
+### QA-030 · 2.4: a typo in the guard's answer, and the guard only says "Wrong!" · Fixed
+
+- **Fixed** in `3afd893` (2026-09-30); awaiting the designer's retest.
+  - 2.4 and 2.6 start with the comment `# Tell the guard "I walked X
+    squares."`, to copy from instead of retyping.
+  - A guard who asks a question now answers a wrong line one of two ways:
+    - the answer's words with a different number: "Do you not know how to
+      count!?"
+    - anything else, such as a typo: "I can't understand you!", with a
+      pointer to say it exactly the way the question shows
+  - It used to say "Wrong!" every time. The Testing ground's The Toll gets
+    the same replies.
+  - 2.4's lesson now shows the miscount reply before the right answer.
+- **Retest:**
+  - 2.4: the editor starts with the comment.
+  - Print the sentence with a wrong number, then with a typo, next to the
+    gate. Each gets its own reply in the console.
+  - The Learn tab's guard snippet shows "Do you not know how to count!?".
+
+- **Area:** 2.4 Halt! (and 2.6, which has the same guard), and guard replies
+- **Observed** *(Designer, 2026-09-30)*: the f-string seemed to print
+  correctly and the count was right, but the guard refused. The cause was a
+  typo in the sentence. The guard's only reply was "Wrong!".
+- **Wanted** *(Designer, 2026-09-30)*:
+  - Put the guard's sentence in the code as a comment, e.g. Tell the guard
+    "I walked X steps.", so it can be copied without typos.
+  - Better guard feedback in the console: "Do you not know how to count!?"
+    for a calculation error, and "I can't understand you!" for a typo.
+
 ---
 
 ## Queued work
