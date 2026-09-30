@@ -27,6 +27,7 @@ hints:
 - "Add up every tick before you reach the gate: every square walked and every turn. Then the remainder works just as it did in Keeping Time."
 - "One way to write the line that matters most: `pawn.wait((4 - ticks % 4) % 4)`"
 lesson: ch02/ch02-l06.md
+starter: "# Tell the guard \"I walked X squares.\"\n"
 mastery: true
 lesson_board:
   map: |

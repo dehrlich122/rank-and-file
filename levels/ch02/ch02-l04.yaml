@@ -26,6 +26,7 @@ hints:
 - "An f-string puts values into text: f\"I have {gems} gems\". The braces can hold a sum as well as a name."
 - "One way to write the line that matters most: `print(f\"I walked {hall + gallery} squares.\")`"
 lesson: ch02/ch02-l04.md
+starter: "# Tell the guard \"I walked X squares.\"\n"
 lesson_board:
   map: |
     . . .

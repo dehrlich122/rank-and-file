@@ -240,7 +240,9 @@ must reach the goal whichever `?` it's on). Legend tiles:
     move, as it would be in Python.
   - With a `question` *(M3.1)*, the guard asks it: the question is shown in
     the goals and on the gate, and the passphrase is its answer. A wrong
-    answer gets its own reply.
+    answer gets one of two replies *(QA-030)*. The answer's words with
+    another number get "Do you not know how to count!?". Anything else,
+    such as a typo, gets "I can't understand you!".
   - The guard lines live in `world.py`.
   - `describe()` never includes the passphrase.
 - `timed_gate` *(M3.1)*: open for the first `open` ticks (default 2) of every

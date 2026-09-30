@@ -5,6 +5,7 @@ import pytest
 from conftest import events, make_level
 from rankfile.levels import LevelError
 from rankfile.runner import run_level
+from rankfile.world import GUARD_MISCOUNTED, GUARD_NOT_UNDERSTOOD
 
 API = ["move", "turn_left", "turn_right", "at_goal", "wait"]
 
@@ -284,8 +285,18 @@ def test_the_right_answer_opens_the_gate(toll):
 
 def test_a_wrong_answer_gets_the_guards_reply(toll):
     result = run_level(toll, "pawn.move()\nprint(5)\npawn.move(2)")
-    assert [event["message"] for event in events(result, "guard")] == ['"Wrong!" says the guard. The gate remains locked.']
+    assert [event["message"] for event in events(result, "guard")] == [GUARD_MISCOUNTED]
     assert result.error.friendly == "The guard won't open the gate until you answer: \"What is two plus two?\"\nThe guard didn't accept what line 2 printed."
+
+
+def test_the_guard_tells_a_miscount_from_words_it_cant_follow():
+    # QA-030: the right words with the wrong number are a miscount; anything else, such as a typo, isn't understood.
+    legend = {"X": {"tile": "gate", "question": "How far? Answer like this: I walked 5 squares.", "passphrase": "I walked 2 squares."}}
+    level = make_level("G\nX\n.\nP\n", legend=legend, api=API)
+    code = "pawn.move()\nprint('I walked 3 squares.')\nprint('I walked 2 steps.')\nprint('I walked 2 squares.')\npawn.move(2)"
+    result = run_level(level, code)
+    assert [event["message"] for event in events(result, "guard")] == [GUARD_MISCOUNTED, GUARD_NOT_UNDERSTOOD]
+    assert result.status == "solved"
 
 
 def test_the_question_is_shown_and_the_answer_is_not(toll):
