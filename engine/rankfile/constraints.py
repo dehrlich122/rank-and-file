@@ -86,7 +86,7 @@ def check_constraints(tree: ast.Module, code: str, constraints) -> list[str]:
     for name in constraints.ban_nodes:
         if name in used:
             problems.append(f"This level doesn't allow {describe_node(name)}.")
-    return problems + _number_problems(numbers_written(tree), constraints)
+    return problems + _number_problems(tree, constraints)
 
 
 def numbers_written(tree: ast.Module) -> list[int | float]:
@@ -94,14 +94,21 @@ def numbers_written(tree: ast.Module) -> list[int | float]:
     return [node.value for node in ast.walk(tree) if isinstance(node, ast.Constant) and type(node.value) in (int, float)]
 
 
-def _number_problems(numbers: list[int | float], constraints) -> list[str]:
+# max_numbers: 1, in words (the Challenge panel's rule, and the message when it's broken)
+ONE_NUMBER = "only one number, written once"
+
+
+def _number_problems(tree: ast.Module, constraints) -> list[str]:
     """max_numbers (M3.2, QA-029): how many numbers the code may write."""
     limit = constraints.max_numbers
-    if limit is None or len(numbers) <= limit:
+    if limit is None:
+        return []
+    numbers = numbers_written(tree)
+    if len(numbers) <= limit:
         return []
     written = f"Your code writes {count(len(numbers), 'number')}: {and_list([str(number) for number in sorted(numbers)])}."
     if limit == 1:
-        return [f"{written} It may contain only one number, written once: give it a name, and use the name."]
+        return [f"{written} It may contain {ONE_NUMBER}: give it a name, and use the name."]
     return [f"{written} This level allows at most {limit}."]
 
 
@@ -138,7 +145,7 @@ def describe_rules(constraints) -> list[str]:
     rules += [f"Must use {describe_node(name)}." for name in constraints.require_nodes]
     rules += [f"Not allowed: {describe_node(name)}." for name in constraints.ban_nodes]
     if constraints.max_numbers == 1:
-        rules.append("Your code may contain only one number, written once.")
+        rules.append(f"Your code may contain {ONE_NUMBER}.")
     elif constraints.max_numbers:
         rules.append(f"Your code may contain at most {count(constraints.max_numbers, 'number')}.")
     return rules

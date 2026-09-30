@@ -9,6 +9,7 @@ import { ChipTooltip, codexHover, renderCodex, type CodexLookup, type CodexView 
 import { h } from "./dom";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
+import { masteryTag } from "./levelSelect";
 import { Console, Inspector, noticeCard, outcomeCard } from "./panels";
 import { callCompletion, KnownCalls } from "./completion";
 import { HelpPanel } from "./help";
@@ -27,6 +28,9 @@ export interface LevelContext {
 }
 
 const AUTOPLAY_LIMIT = 150; // longer runs open at the end instead of playing
+
+/** ✓ or ✗: how one case of a run ended. */
+const verdict = (c: LevelResult) => (c.status === "solved" ? "✓" : "✗");
 
 export function mountLevel(root: HTMLElement, context: LevelContext, source: LevelSource): () => void {
   const { client } = context;
@@ -400,11 +404,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     caseBoard = new BoardView(run.cases[index]!.level, { spots });
     const title = level?.case_title ?? "";
     const buttons = run.cases.map((c, i) =>
-      h(
-        "button",
-        { class: "btn btn-small btn-toggle", "aria-pressed": String(i === index), onClick: () => showCase(i, "play") },
-        `${c.label} ${c.status === "solved" ? "✓" : "✗"}`,
-      ),
+      h("button", { class: "btn btn-small btn-toggle", "aria-pressed": String(i === index), onClick: () => showCase(i, "play") }, `${c.label} ${verdict(c)}`),
     );
     boardHost.replaceChildren(h("div", { class: "case-row", role: "group", "aria-label": title }, h("span", { class: "muted small" }, `${title}:`), ...buttons), caseBoard.element);
   }
@@ -417,9 +417,9 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     if (!level || !board) return;
     caseBoard?.dispose();
     for (const thumb of thumbs) thumb.dispose();
-    const boards = run ? run.cases.map((c) => c.level) : level.boards;
-    caseBoard = run || shown > 0 ? new BoardView(boards[shown]!) : null;
-    const mark = (i: number) => (run ? (run.cases[i]!.status === "solved" ? " ✓" : " ✗") : "");
+    const boards = level.boards; // the same boards a run's cases come back with
+    caseBoard = shown > 0 ? new BoardView(boards[shown]!) : null; // board 1 is the level's own
+    const mark = (i: number) => (run ? ` ${verdict(run.cases[i]!)}` : "");
     thumbs = [];
     const others = boards.flatMap((info, i) => {
       if (i === shown) return [];
@@ -430,7 +430,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       return [
         h(
           "button",
-          { class: "board-thumb", title, "aria-label": title, onClick: () => (run ? showCase(i, "play") : showBoards(i, null)) },
+          { class: "btn board-thumb", title, "aria-label": title, onClick: () => (run ? showCase(i, "play") : showBoards(i, null)) },
           h("span", { class: "board-thumb-label" }, `Board ${i + 1}${mark(i)}`),
           thumb.element,
         ),
@@ -529,7 +529,7 @@ function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, 
   ];
   if (level.mastery) {
     parts.push(
-      h("p", { class: "mastery-note" }, h("span", { class: "mastery-tag" }, "Mastery · optional"), " A harder challenge for the whole chapter, played for par."),
+      h("p", { class: "mastery-note" }, masteryTag(), " A harder challenge for the whole chapter, played for par."),
     );
   }
   if (level.brief) parts.push(h("p", {}, level.brief));

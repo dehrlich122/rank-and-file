@@ -1344,10 +1344,11 @@ enough, or should they be rewritten?
 
 ## Session 7 — 2026-09-30 · M3.2 play-test (`m3-2-chapter-2`, PR #12)
 
-### QA-029 · Signposts on 2.1 and 2.2 teach nothing · Fixed
+### QA-029 · Signposts on 2.1 and 2.2 teach nothing · Verified
 
 (The designer filed this as QA-025, which was taken, so it's QA-029.)
 
+- **Verified** *(Designer, 2026-09-30)*: all of that looks good.
 - **Fixed** in `2d7ceec` (2026-09-30); awaiting the designer's retest.
   - **2.1:**
     - The signpost is gone.
@@ -1403,8 +1404,9 @@ enough, or should they be rewritten?
     can't be known ahead of time.
 
 
-### QA-030 · 2.4: a typo in the guard's answer, and the guard only says "Wrong!" · Fixed
+### QA-030 · 2.4: a typo in the guard's answer, and the guard only says "Wrong!" · Verified
 
+- **Verified** *(Designer, 2026-09-30)*: all of that looks good.
 - **Fixed** in `3afd893` (2026-09-30); awaiting the designer's retest.
   - 2.4 and 2.6 start with the comment `# Tell the guard "I walked X
     squares."`, to copy from instead of retyping.
@@ -1434,8 +1436,9 @@ enough, or should they be rewritten?
 
 
 
-### QA-031 · The wait's second remainder is unnecessary · Fixed
+### QA-031 · The wait's second remainder is unnecessary · Verified
 
+- **Verified** *(Designer, 2026-09-30)*: all of that looks good.
 - **Fixed** in `7bc114e` (2026-09-30); awaiting the designer's retest.
   - 2.5's and 2.6's reference solutions take the remainder once. Their
     third hints quote the new line.
@@ -1458,8 +1461,9 @@ enough, or should they be rewritten?
     shortest wait on each board.
 
 
-### QA-032 · Several boards are hard to follow · Fixed
+### QA-032 · Several boards are hard to follow · Verified
 
+- **Verified** *(Designer, 2026-09-30)*: all of that looks good.
 - **Fixed** in `22ff6bf` (2026-09-30); awaiting the designer's retest.
   - The board on show is large, and the level's other boards sit small
     beside it, in the space narrow boards leave (below it on narrow

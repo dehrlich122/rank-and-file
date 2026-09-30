@@ -65,6 +65,7 @@ def test_wait_takes_a_number_of_ticks(code, ticks):
         ("pawn.wait('2')", "quote marks"),
         ("pawn.wait(1.5)", "whole number of ticks"),
         ("pawn.wait(-1)", "The fewest is 0"),
+        ("pawn.wait(101)", "The most is 100"),
         ("pawn.wait(True)", "needs a number of ticks"),
     ],
 )

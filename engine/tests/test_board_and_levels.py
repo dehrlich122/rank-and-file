@@ -124,7 +124,7 @@ def test_other_maps_share_the_level_but_not_its_map():
     [other] = level.variants
     assert (other.goal, other.api, other.variants) == ((1, 0), ["move", "at_goal"], [])
     assert [case.label for case in level.cases()] == ["board 1", "board 2"]
-    assert level.describe()["goals"][-1] == "Your code has to work on all 2 boards: see them in the tabs above the board."
+    assert level.describe()["goals"][-1] == "Your code has to work on all 2 boards."
     with pytest.raises(LevelError, match="only for the level's own map"):
         make_level("P . G\n", variants=[{"map": "P ? .\n"}])
 
@@ -138,10 +138,10 @@ def test_another_board_can_give_a_symbol_its_own_legend_entry():
         make_level("P G\n", variants=[{"map": "P G\n", "enemies": []}])
 
 
-def test_every_board_is_described_for_the_tabs():
+def test_every_board_is_described_for_showing_side_by_side():
     boards = make_level("P . G\n", variants=[{"map": "P G\n"}]).describe()["boards"]
     assert [(board["width"], board["goal"]) for board in boards] == [(3, [2, 0]), (2, [1, 0])]
-    assert make_level("P G\n").describe()["boards"] == []  # one board: no tabs
+    assert make_level("P G\n").describe()["boards"] == []  # one board: nothing beside it
 
 
 def test_a_mastery_challenge_is_marked():

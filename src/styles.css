@@ -554,10 +554,20 @@ pre {
     min-height: 0;
   }
 
-  :root[data-code-panel="bottom"] .level-middle .board {
+  :root[data-code-panel="bottom"] .level-middle .board:not(.board-mini) {
     width: 100%;
     height: 100%;
     max-height: none;
+  }
+
+  /* a level with other maps (QA-032): the board on show fills what its caption leaves */
+  :root[data-code-panel="bottom"] :is(.boards, .boards-main) {
+    height: 100%;
+  }
+
+  :root[data-code-panel="bottom"] .boards-main .board {
+    flex: 1 1 0;
+    min-height: 0;
   }
 
   :root[data-code-panel="bottom"] .level-right {
@@ -678,27 +688,9 @@ pre {
   font-weight: 550;
 }
 
-/* a chapter's optional mastery challenge (M3.2): on its level card and in the Challenge panel */
-.mastery-tag {
-  display: inline-block;
-  margin-left: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--warn);
-  background: var(--warn-bg);
-  border: 1px solid var(--warn);
-  padding: 0 7px;
-  border-radius: 4px;
-  vertical-align: 1px;
-}
-
-.mastery-note .mastery-tag {
-  margin-left: 0;
-}
-
 .trains-label,
-.codex-new {
+.codex-new,
+.mastery-tag {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -707,6 +699,22 @@ pre {
   background: var(--accent);
   padding: 1px 7px;
   border-radius: 4px;
+}
+
+/* a chapter's optional mastery challenge (M3.2): on its level card and in the Challenge panel */
+.mastery-tag {
+  display: inline-block;
+  text-transform: none;
+  letter-spacing: 0.04em;
+  color: var(--warn);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn);
+  padding-block: 0;
+  vertical-align: 1px;
+}
+
+.level-card .mastery-tag {
+  margin-left: 8px;
 }
 
 .challenge-title {
@@ -977,20 +985,14 @@ pre {
   padding-top: 28px; /* level with the main board, below its caption */
 }
 
+/* a .btn laid out around its small board */
 .board-thumb {
-  font: inherit;
-  color: var(--text);
   display: grid;
   justify-items: center;
-  gap: 4px;
   padding: 6px 8px 8px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
 }
 
-.board-thumb:hover,
+.board-thumb:hover:not(:disabled),
 .board-thumb:focus-visible {
   border-color: var(--accent);
 }
@@ -1001,10 +1003,9 @@ pre {
 }
 
 /* every small board fits the same square, whatever its shape */
-.board-thumb .board {
+.board-thumb .board-mini {
   width: 112px;
   height: 112px;
-  max-height: none;
 }
 
 @media (max-width: 700px) {

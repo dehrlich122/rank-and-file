@@ -212,7 +212,7 @@ constraints: {max_lines: 4, min_comments: 1, require_nodes: [For], ban_nodes: []
 par: {lines: 3}              # the par star: this many lines of code or fewer
 hints: ["nudge", "concept reminder", "partial example"]   # opened one at a time, on request
 variants:                    # optional: the same level on other maps, which it must also solve
-  - map: |                   # shown as tabs above the board, before and after a run (M3.2)
+  - map: |                   # shown small beside the level's board, before and after a run (M3.2, QA-032)
       ...
     legend: {X: {...}}       # optional (M3.2): this board's own entry for a symbol, e.g. a guard's answer
 mastery: true                # optional (M3.2): the chapter's optional mastery challenge
@@ -264,7 +264,8 @@ The piece's counting and waiting *(M3.2)*:
   ahead. It stops before a wall, the board's edge, a signpost, any timed gate
   (even an open one), and a guard's gate that isn't open yet. Pits and
   enemies don't stop it. It costs no tick.
-- `wait(ticks=1)` waits a whole number of ticks, 0 or more.
+- `wait(ticks=1)` waits a whole number of ticks, from 0 to 100. The ceiling
+  keeps one line from recording a flood of ticks.
 
 `max_numbers` *(M3.2, QA-029)*: how many numbers the code may write, counted
 with `ast`. With 1, "Your code may contain only one number, written once".

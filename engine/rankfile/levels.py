@@ -209,7 +209,7 @@ class Level:
             else:
                 goals.append(f"Get past the locked gate on {square_name(gate)}. A guard keeps it shut.")
         if self.variants:
-            goals.append(f"Your code has to work on all {len(self.variants) + 1} boards: see them in the tabs above the board.")
+            goals.append(f"Your code has to work on all {len(self.variants) + 1} boards.")
         return goals
 
     @property
@@ -283,7 +283,7 @@ class Level:
             ],  # where each one is comes with the world's state
             "goal": list(self.goal) if self.goal else None,
             "goal_spots": [list(spot) for spot in self.goal_spots],
-            "case_title": self.case_words[0] if self.goal_spots or self.variants else "",
+            "case_title": self.case_words[0] if self.goal_spots else "",  # other maps show their boards instead
             # Gates appear in `tiles`; their passphrases are deliberately left out.
             "start": World(self).state(),
             "objectives": asdict(self.objectives),
@@ -301,7 +301,7 @@ class Level:
             # reveals them one at a time, and only when asked.
             "hints": self.hints,
             "mastery": self.mastery,
-            # With other maps (M3.2): every board, first to last, for the tabs above the board.
+            # With other maps (M3.2): every board, first to last, shown beside the one on show (QA-032).
             "boards": [case.level.describe() for case in self.cases()] if self.variants else [],
         }
 

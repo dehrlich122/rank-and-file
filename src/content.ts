@@ -14,6 +14,7 @@ export interface LevelSource {
   chapter: number;
   title: string;
   trains: string;
+  mastery: boolean; // the chapter's optional mastery challenge (M3.2)
   lesson: string; // Markdown
   data: Record<string, unknown>; // the parsed YAML, sent to the engine as-is
 }
@@ -41,6 +42,7 @@ function loadLevels(): LevelSource[] {
         chapter: Number(data.chapter),
         title: String(data.title),
         trains: String(data.trains),
+        mastery: data.mastery === true,
         lesson: lessonFiles[lessonPath] ?? `*Lesson file ${lessonPath} is missing (level file ${path}).*`,
         data,
       };

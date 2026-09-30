@@ -57,7 +57,7 @@ export interface LevelInfo {
   enemies: Enemy[]; // patrols and chasers; where they are is in each WorldState
   goal: Pos | null;
   goal_spots: Pos[]; // a hidden goal: the squares it might be on (drawn as ?)
-  case_title: string; // the title of the row of cases above the board; "" for a single case
+  case_title: string; // a hidden goal's row of cases above the board: its title; "" otherwise
   start: WorldState;
   objectives: { reach_goal: boolean; say: string[]; waypoints: boolean; collect: number | "all" | null; capture: number | "all" | null };
   api: string[];
@@ -76,7 +76,7 @@ export interface LevelInfo {
   stars: string[]; // what each of the three stars asks for, in words
   hints: string[]; // tiered: nudge, concept reminder, partial example
   mastery: boolean; // a chapter's optional mastery challenge (M3.2)
-  boards: LevelInfo[]; // a level with other maps (M3.2): every board, first to last, for the tabs; otherwise empty
+  boards: LevelInfo[]; // a level with other maps (M3.2): every board, first to last, the others shown small beside it (QA-032); otherwise empty
 }
 
 /** A patrol or a chaser (levels.Enemy), as the board draws it. */

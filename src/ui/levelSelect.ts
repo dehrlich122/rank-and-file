@@ -4,6 +4,9 @@ import type { ProgressStore } from "../progress";
 import { h } from "./dom";
 import { icon } from "./icons";
 
+/** The tag on a chapter's optional mastery challenge (M3.2): on its card, and in its Challenge panel. */
+export const masteryTag = () => h("span", { class: "mastery-tag" }, "Mastery · optional");
+
 export function renderLevelSelect(chapters: Chapter[], progress: ProgressStore): HTMLElement {
   /** A level's card: its number (✓ once solved), what it trains, and its best stars or "Solution seen". */
   const card = (level: Chapter["levels"][number], number: number) => {
@@ -16,7 +19,7 @@ export function renderLevelSelect(chapters: Chapter[], progress: ProgressStore):
       h(
         "span",
         { class: "level-text" },
-        h("strong", {}, level.title, level.data.mastery === true ? h("span", { class: "mastery-tag" }, "Mastery · optional") : null),
+        h("strong", {}, level.title, level.mastery ? masteryTag() : null),
         h("span", { class: "muted small" }, level.trains),
       ),
       solved

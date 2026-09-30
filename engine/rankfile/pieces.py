@@ -126,8 +126,8 @@ class Pawn(Piece):
         `pawn.wait(0)` doesn't wait at all.
 
         Args:
-            ticks: how many ticks to wait, a whole number (int), 0 or more.
-                Leave it out to wait 1.
+            ticks: how many ticks to wait, a whole number (int) from 0 to
+                100. Leave it out to wait 1.
 
         Returns:
             Nothing.
@@ -230,10 +230,15 @@ def _check_squares(squares) -> int:
     return squares
 
 
+MOST_TICKS = 100  # one wait's ceiling: each tick is recorded, so wait(10**6) would swamp the run
+
+
 def _check_ticks(ticks) -> int:
     """wait()'s number: 0 is fine, since a computed wait can come out as 0 (M3.2)."""
     if _whole_number(ticks, "wait", "ticks") < 0:
         raise GameArgumentError(f"wait() can't wait {ticks} ticks. The fewest is 0, which doesn't wait at all.")
+    if ticks > MOST_TICKS:
+        raise GameArgumentError(f"wait() can't wait {ticks} ticks. The most is {MOST_TICKS}: nothing on a board takes that long to come round.")
     return ticks
 
 
