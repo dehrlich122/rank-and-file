@@ -1342,6 +1342,66 @@ enough, or should they be rewritten?
 - **Cause** *(Claude)*: the same as QA-026. The reference passed time with
   turns, so its opening lines turned the pawn toward the edge of the board.
 
+## Session 7 — 2026-09-30 · M3.2 play-test (`m3-2-chapter-2`, PR #12)
+
+### QA-029 · Signposts on 2.1 and 2.2 teach nothing · Fixed
+
+(The designer filed this as QA-025, which was taken, so it's QA-029.)
+
+- **Fixed** in `2d7ceec` (2026-09-30); awaiting the designer's retest.
+  - **2.1:**
+    - The signpost is gone.
+    - The one rule is "Your code may contain only one number, written
+      once" (`max_numbers: 1`), plus the 10-line limit.
+    - Par 8, as before.
+  - **2.2** brings in `squares_ahead()` and does `+`, `-` and `*` on what the
+    pawn counts, on three boards:
+    - Walk up the hall to the door, one square before its end, then twice
+      as far along the gallery.
+    - The halls differ, so the numbers can't be known ahead of time. Par 4.
+    - Its lesson brings in counting together with the sums.
+  - **2.3** is only about `//` now. Its lesson and second hint changed.
+  - `max_numbers` replaces the two signpost rules, which are removed from
+    the engine. Signposts as tiles are unchanged.
+  - References, wrong attempts and third hints were regenerated blind.
+- **Decided** *(Designer, 2026-09-30)*:
+  - 2.1's rule: only one number, written once. That's the designer's "write
+    the number once", with the loophole closed: each stretch could otherwise
+    be a different sum.
+  - 2.2: count, then do the sums.
+  - Not chosen: 2.1 with "each number only once"; 2.2 built on one number
+    with a rule.
+- **Retest:**
+  - **2.1:** no signpost, and the Challenge panel lists the one-number rule.
+    Writing the number twice, or two different numbers, gets a message
+    that says why.
+  - **2.2:**
+    - Three board tabs, and the Codex marks `squares_ahead` as New.
+    - The lesson counts, then does sums.
+    - Numbers typed for board 1 fail on another board.
+  - **2.3:** the lesson is about `/` and `//`, and `squares_ahead` isn't New
+    any more.
+
+- **Area:** 2.1 The Surveyor's Road and 2.2 Doing the Sums: their signposts
+  and the "numbers must come from the signposts" rule
+- **Observed** *(Designer, 2026-09-30)*:
+  - **2.1:** why is there a signpost? There's no information to be gleaned
+    from it. It feels like a red herring, and makes the challenge less
+    clear. The rule to write the number only once is enough to teach how
+    to assign a variable.
+  - **2.2:** there are no numbers on the signpost, and no obvious function
+    to read it. Signs are fine, but this isn't teaching the skill it claims
+    to.
+- **Why** *(Claude)*:
+  - The numbers were there, but only in the Challenge panel's signpost
+    quotes and in a hover tooltip on the sign. Nothing on the board shows
+    them.
+  - Even when found, they tell you nothing the board doesn't already show:
+    you can count the squares. So "numbers must come from the signposts" is
+    an arbitrary rule, not a reason to do the sums in code. It's the same
+    gap as QA-023: code only needs to work something out when the answer
+    can't be known ahead of time.
+
 ---
 
 ## Queued work
