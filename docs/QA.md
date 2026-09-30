@@ -1501,6 +1501,16 @@ enough, or should they be rewritten?
   - Or use the negative space: a main board front and centre, and the
     other boards smaller off to the side, where they can be selected.
 
+
+## Session 8 — 2026-09-30 · M3.3 play-test (`m3-3-chapter-3`, PR #13)
+
+No findings. *(Designer, 2026-09-30)*: "that was a very good set of
+levels." The designer called Chapter 3 feature-complete, which started the
+pre-merge pass.
+
+The pass reworded two older error messages to name types the beginner way.
+The designer skipped their retest *(Designer, 2026-09-30)*: unit tests check the exact wording.
+
 ---
 
 ## Queued work
@@ -1560,6 +1570,10 @@ Planned tasks that aren't QA findings, in the order they should happen.
        checks (writing and running them) now happen once per PR, just
        before it's merged, not after each QA fix. They cost too many
        tokens. See `CLAUDE.md`.
+     - **Changed** *(Designer, 2026-09-30)*: the pass starts when the
+       milestone is feature-complete, and the designer retests what it
+       changed before the merge. The M3.2 pass had shipped player-visible
+       changes that were never played. See `CLAUDE.md`.
 - **Done when:** `npm run check` runs all three tools and passes, and
   `CLAUDE.md` lists them under Commands. Its line "No linter or formatter is
   configured" gets updated too.

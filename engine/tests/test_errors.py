@@ -23,6 +23,8 @@ from rankfile.runner import run_level
         ("pawn.move(1, 2)", "`move()` takes at most 1 value inside its parentheses, but got 2.", 1),
         ("pawn.move()()", "You used parentheses to call something that isn't a function", 1),
         ('print("steps: " + 3)', "You can only join text to text with +.", 1),
+        ("x = 3 - 'a'", "Python can't use - between a whole number (an int) and text (a str).", 1),
+        ("x = 3\nx()", "isn't a function: it's a whole number (an int). Is there an extra pair of parentheses?", 2),
         ("x = 1 / 0", "You divided by zero.", 1),
         # loops (M3.3)
         ("for step in 3:\n    pawn.move()", "Python can't go through a whole number (an int) one item at a time", 1),

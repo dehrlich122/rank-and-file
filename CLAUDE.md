@@ -24,7 +24,9 @@ The designer is also the target learner.
   lines, ticks). Its `fewest_lines`/`write_code` write reference solutions
   blind. Among the shortest programs it takes the one with the fewest turns,
   so references pass time with `wait()`, not by spinning (QA-026). A level
-  test enforces this wherever `wait()` is unlocked.
+  test enforces this wherever `wait()` is unlocked. Chapter 3's levels and
+  solutions come from `scripts/gen_loops.py`, which replays solve.py's route
+  with the fewest lines of `for` loops (M3.3).
 - After each milestone, stop, list what the designer should test manually, and
   wait for feedback (`DESIGN.md` §7).
 
@@ -59,11 +61,20 @@ npm run e2e -- http://localhost:4173/ --only=app   # against `npm run play`, one
   - When a tool flags something used by name (worker-loaded engine files,
     `bridge.py`), allowlist it; don't delete it.
   - Python tools run from `.venv` via `node scripts/venv.mjs <module> ...`.
-- **Once per PR, just before it's merged** *(Designer, 2026-09-27)*: run
-  `/simplify` on the branch, write e2e checks for the user-visible fixes
-  since the last pass, and run the full `npm run e2e`. Don't do these after
-  each QA fix: they cost too many tokens. Between merges, `npm run check`
-  (before every commit) is the safety net.
+- **Once per PR, when the milestone is feature-complete** *(Designer,
+  2026-09-27; timing changed 2026-09-30)*: run `/simplify` on the branch,
+  write e2e checks for the user-visible fixes since the last pass, and run
+  the full `npm run e2e`. Don't do these after each QA fix: they cost too
+  many tokens. Between merges, `npm run check` (before every commit) is the
+  safety net.
+  - Start the pass when the designer calls the milestone feature-complete,
+    not when they ask to merge. The pass can change what a player sees, so
+    it shouldn't reach the site untested.
+  - Afterwards, post a retest list: anything the pass changed that a player
+    could notice, with steps, like a QA fix. Merge only after the designer
+    has checked it.
+  - Fixes from that retest follow the usual QA-fix path; they don't trigger
+    another pass.
 - `npm run e2e` (`scripts/e2e/`) drives the real app over the Chrome DevTools
   protocol. The suites are `harness.check.mjs`, `app.check.mjs` and
   `ui.check.mjs`, with shared helpers (`openLevel`, `setCode`, `solution`) in

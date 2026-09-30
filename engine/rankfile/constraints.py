@@ -52,52 +52,39 @@ class LintWarning:
     message: str
 
 
-def code_lines(code: str) -> int:
+def code_lines(code: str, tree: ast.Module | None = None) -> int:
     """Lines of code, counted as if each statement had a line of its own (M3.3).
 
     Blank lines and comment-only lines don't count, and a statement split over
     several lines counts each of them. Squeezing statements together doesn't
     save lines: a second statement after `;`, a loop's body on the loop's own
     line, or `else:` with its body beside it each count as another line.
+    Pass the parsed `tree` if there is one, to save parsing the code again.
     """
-    lines = _lines_with_code(code)
-    starts = _statement_starts(code)
-    return sum(max(1, starts[line]) for line in lines)
+    return _line_count(code, tree)[0]
 
 
-def shares_lines(code: str) -> bool:
-    """Whether any line holds more than one statement."""
-    return any(n > 1 for n in _statement_starts(code).values())
-
-
-def _lines_with_code(code: str) -> set[int]:
+def _line_count(code: str, tree: ast.Module | None) -> tuple[int, bool]:
+    """The count `code_lines` gives, and whether any line holds more than one statement."""
     lines: set[int] = set()
+    starts: set[tuple[int, int]] = set()  # where each statement or clause (`else:`, `except ...:`) begins
+    at_start = True  # a clause header always begins a logical line
     for token in _tokens(code):
-        if token.type not in _IGNORED_TOKENS:
+        if token.type == tokenize.NEWLINE:
+            at_start = True
+        elif token.type not in _IGNORED_TOKENS:
             lines.update(range(token.start[0], token.end[0] + 1))
-    return lines
-
-
-def _statement_starts(code: str) -> Counter[int]:
-    """How many statements, and clauses such as `else:`, start on each line."""
-    try:
-        tree = ast.parse(code)
-    except (SyntaxError, ValueError):
-        return Counter()
-    starts = Counter(
-        node.lineno for node in ast.walk(tree) if isinstance(node, (ast.stmt, ast.ExceptHandler))
-    )
-    starts.update(case.pattern.lineno for node in ast.walk(tree) if isinstance(node, ast.Match) for case in node.cases)
-    # `else:` and `finally:` have no node of their own; find their keywords where a line of code begins.
-    line_start = True
-    for token in _tokens(code):
-        if token.type in (tokenize.NEWLINE, tokenize.INDENT, tokenize.DEDENT, tokenize.ENCODING):
-            line_start = True
-        elif token.type not in (tokenize.COMMENT, tokenize.NL):
-            if line_start and token.type == tokenize.NAME and token.string in ("else", "finally"):
-                starts[token.start[0]] += 1
-            line_start = False
-    return starts
+            if at_start:
+                starts.add(token.start)
+                at_start = False
+    if tree is None:
+        try:
+            tree = ast.parse(code)
+        except (SyntaxError, ValueError):
+            tree = ast.Module(body=[], type_ignores=[])
+    starts.update((node.lineno, node.col_offset) for node in ast.walk(tree) if isinstance(node, ast.stmt))
+    per_line = Counter(line for line, _ in starts)
+    return sum(max(1, per_line[line]) for line in lines), any(n > 1 for n in per_line.values())
 
 
 def comment_count(code: str) -> int:
@@ -108,13 +95,9 @@ def check_constraints(tree: ast.Module, code: str, constraints) -> list[str]:
     """Every way `code` breaks the level's rules, as messages for the player."""
     problems = []
     if constraints.max_lines is not None:
-        used = code_lines(code)
+        used, shared = _line_count(code, tree)
         if used > constraints.max_lines:
-            why = (
-                "Two statements on one line count as two."
-                if shares_lines(code)
-                else "(Blank lines and comments don't count.)"
-            )
+            why = "Two statements on one line count as two." if shared else "(Blank lines and comments don't count.)"
             problems.append(
                 f"This level allows at most {count(constraints.max_lines, 'line')} of code, and yours has {used}. {why}"
             )

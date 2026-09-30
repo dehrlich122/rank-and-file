@@ -157,7 +157,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
         info = explain(exc)
         return outcome("error", info.friendly, error=info)
     warnings = [asdict(warning) for warning in lint(tree, namespace)]
-    counted = code_lines(code)
+    counted = code_lines(code, tree)
     if enforce_constraints:
         problems = check_constraints(tree, code, level.constraints)
         if problems:

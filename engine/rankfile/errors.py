@@ -174,6 +174,12 @@ _KINDS = {
     "NoneType": "None",
 }
 
+
+def _kind(type_name: str) -> str:
+    """A type's name as a beginner reads it: "text (a str)", or "a list"."""
+    return _KINDS.get(type_name, f"a {type_name}")
+
+
 def _explain_type(exc: TypeError) -> str:
     msg = str(exc)
     pattern = r"([\w.]+)\(\) takes (?:from (\d+) to )?(\d+) positional arguments? but (\d+) (?:were|was) given"
@@ -193,17 +199,17 @@ def _explain_type(exc: TypeError) -> str:
         return f"`{name}()` needs more inside its parentheses: a value for {match.group(2).replace(chr(39), '`')}."
     if match := re.match(r"'(\w+)' object is not callable", msg):
         return (
-            f"You used parentheses to call something that isn't a function (it's a {match.group(1)}). "
+            f"You used parentheses to call something that isn't a function: it's {_kind(match.group(1))}. "
             "Is there an extra pair of parentheses?"
         )
     if msg.startswith("can only concatenate str"):
         return "You can only join text to text with +. To join a number to text, turn it into text first with str()."
     if match := re.match(r"unsupported operand type\(s\) for (.+): '(\w+)' and '(\w+)'", msg):
         op, left, right = match.groups()
-        return f"Python can't use {op} between a {left} and a {right}."
+        return f"Python can't use {op} between {_kind(left)} and {_kind(right)}."
     if match := re.match(r"'(\w+)' object is not iterable", msg):
         return (
-            f"Python can't go through {_KINDS.get(match.group(1), 'a ' + match.group(1))} one item at a time, "
+            f"Python can't go through {_kind(match.group(1))} one item at a time, "
             "the way a for loop needs. To repeat something a number of times, give the number to range(): "
             "for step in range(5):"
         )
@@ -213,7 +219,7 @@ def _explain_type(exc: TypeError) -> str:
             "float": " If it came from dividing with /, use // instead: it gives a whole number.",
             "str": " Numbers in quotes are text.",
         }.get(kind, "")
-        return f"This needs a whole number (an int), but got {_KINDS.get(kind, 'a ' + kind)}.{hint}"
+        return f"This needs a whole number (an int), but got {_kind(kind)}.{hint}"
     return f"Python stopped with a TypeError: {msg}"
 
 

@@ -337,6 +337,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
   // Counts, labels and outcomes only: never code, never the console (it can hold an answer).
   const PRACTICE = ["practice-02", "practice-03", "practice-04", "practice-05", "practice-06", "practice-07", "practice-08", "practice-09", "practice-10"];
   const CH02 = ["ch02-l01", "ch02-l02", "ch02-l03", "ch02-l04", "ch02-l05", "ch02-l06"]; // Chapter 2 (M3.2)
+  const CH03 = ["ch03-l01", "ch03-l02", "ch03-l03", "ch03-l04", "ch03-l05", "ch03-l06"]; // Chapter 3 (M3.3)
   const drawn = () =>
     b.evaluate(`(() => {
       const board = document.querySelector('.board-host .board');
@@ -408,7 +409,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     "practice-02": (board) => expect(board.bridged === 1 && board.planksTaken === 1, `pits bridged: ${board.bridged}, planks taken: ${board.planksTaken}`),
     "practice-10": (board) => expect(board.gone === 1, `chasers gone: ${board.gone}`),
   };
-  for (const id of [...PRACTICE, ...CH02]) {
+  for (const id of [...PRACTICE, ...CH02, ...CH03]) {
     await check(`${id}: reference solution solves it`, async () => {
       await openLevel(id, { fresh: true });
       await setCode(solution(id));
@@ -832,12 +833,12 @@ export default async function appChecks({ browser: b, base, root, check }) {
     return `${names}; new: ${newOnes}`;
   });
 
-  await check("Codex: the Testing ground counts Chapter 1 as taught, and Clockwork brings in range()", async () => {
+  await check("Codex: the Testing ground counts the chapters as taught, so range() comes from 3.1, not Clockwork", async () => {
     await openLevel("practice-06", { fresh: true });
     const entries = await codexEntries();
     const print = entries.find((e) => e.name === "print");
     const range = entries.find((e) => e.name === "range");
-    expect(print && !print.isNew && range?.isNew && range.introduced.includes("Clockwork"), JSON.stringify(entries));
+    expect(print && !print.isNew && range && !range.isNew && range.introduced.includes("3.1 The Grand Staircase"), JSON.stringify(entries));
   });
 
   await check("Codex: hovering a function in the editor shows its entry; other names show nothing", async () => {
@@ -982,6 +983,84 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await challengeTab();
     const panel = await b.evaluate(`document.querySelector('.mastery-note .mastery-tag')?.textContent ?? null`);
     expect(card === "Mastery · optional" && panel === card, JSON.stringify({ card, panel }));
+  });
+
+  // -- M3.3: Chapter 3 --------------------------------------------------------------------------
+  // Labels, counts and outcomes. The code typed is test code, or a wrong attempt read from solutions/.
+
+  await check("M3.3: Chapter 3 is listed after Chapter 2, and The Clocktower is its optional mastery challenge", async () => {
+    await levelCards();
+    const list = await b.evaluate(`({
+      chapters: [...document.querySelectorAll('.chapter h2')].map((e) => e.textContent),
+      cards: ${JSON.stringify(CH03)}.map((id) => !!document.querySelector('a[href="#/level/' + id + '"]')),
+      mastery: document.querySelector('a[href="#/level/ch03-l06"] .mastery-tag')?.textContent ?? null,
+    })`);
+    const third = list.chapters.indexOf("Chapter 3 · Marching Orders");
+    expect(third > list.chapters.indexOf("Chapter 2 · Counting Steps") && list.cards.every(Boolean), JSON.stringify(list));
+    expect(list.mastery === "Mastery · optional", JSON.stringify(list));
+  });
+
+  await check("M3.3: a statement squeezed onto a shared line still counts as a line (3.1)", async () => {
+    await openLevel("ch03-l01", { fresh: true });
+    await challengeTab();
+    const rules = await b.evaluate(`[...document.querySelectorAll('ul.rules li')].map((e) => e.textContent)`);
+    await setCode(`${"pawn.wait(); ".repeat(7)}pawn.wait()\n`); // test code: eight statements on one line
+    const r = await run();
+    expect(rules.includes("At most 7 lines of code. Blank lines and comments don't count; two statements on one line count as two."), JSON.stringify(rules));
+    expect(r.head === "Check the rules" && r.text.includes("yours has 8. Two statements on one line count as two."), brief(r));
+    return brief(r);
+  });
+
+  await check("M3.3: loop mistakes are explained: a number with no range(), and a misspelled loop variable", async () => {
+    await openLevel("ch03-l01", { fresh: true });
+    await setCode("for step in 3:\n    pawn.wait()\n");
+    const noRange = await run();
+    await setCode("for step in range(2):\n    print(stpe)\n");
+    const typo = await run();
+    expect(noRange.head === "Python stopped" && noRange.text.includes("give the number to range(): for step in range(5):"), brief(noRange));
+    expect(typo.head === "Python stopped" && typo.text.includes("Did you mean `step`?"), brief(typo));
+  });
+
+  await check("M3.3: range()'s Codex entry counts in steps, and it's New in 3.1", async () => {
+    await openLevel("ch03-l01", { fresh: true });
+    const entry = (await codexEntries()).find((e) => e.name === "range");
+    const calls = await b.evaluate(`[...document.querySelectorAll('.codex-entry[data-codex="range"] .codex-call code')].map((e) => e.textContent)`);
+    expect(entry?.isNew === true && calls.includes("range(start, stop, step)"), JSON.stringify({ entry, calls }));
+  });
+
+  await check("M3.3: The Spiral Walk is over pits, and stepping off the walkway reads Lost", async () => {
+    await openLevel("ch03-l03", { fresh: true });
+    const board = await drawn();
+    await setCode("pawn.turn_right()\npawn.turn_right()\npawn.move()\n"); // test code: straight off the edge of the walkway
+    const r = await run();
+    expect(board.pits > 0 && r.head === "Lost" && r.text.includes("fell into the pit on a6."), `${board.pits} pits | ${brief(r)}`);
+  });
+
+  await check("M3.3: The Clockwork Sentry's gear counts only new lines, and the moves copied out get caught", async () => {
+    await openLevel("ch03-l04", { fresh: true });
+    const gear = async () => gearCount((await drawn()).badges.find((text) => text.startsWith("⚙")));
+    const before = await gear();
+    const reference = solution("ch03-l04");
+    await setCode(reference);
+    const solved = await run();
+    const after = await gear();
+    const lines = reference.split("\n").filter((line) => line.trim()).length; // every line runs, each is new once
+    await setCode(withoutExpectLine(solution("ch03-l04", ".naive")));
+    const copied = await run();
+    expect(before === "0" && solved.head === "Solved!" && after === String(lines), JSON.stringify({ before, after }));
+    expect(copied.head === "Lost" && /was caught by the patrol on [a-i][1-7]\./.test(copied.text), brief(copied));
+    return `gear ${before} → ${after} | copied out: ${copied.head}`;
+  });
+
+  await check("M3.3: the lessons show a pit and a clockwork patrol at work", async () => {
+    await openLevel("ch03-l03", { fresh: true });
+    const pit = await runSnippet(2);
+    await openLevel("ch03-l04", { fresh: true });
+    const looped = await runSnippet(0, { settle: true });
+    const copied = await runSnippet(1);
+    expect(/Lost/i.test(pit.status), `3.3's fixed-length steps: ${pit.status}`);
+    expect(/Finished/i.test(looped.status) && gearCount(looped.badges.find((text) => text.startsWith("⚙"))) === "2", JSON.stringify(looped));
+    expect(/Lost/i.test(copied.status), `3.4's copied-out moves: ${copied.status}`);
   });
 
   await check("no console errors during the app checks", async () => {

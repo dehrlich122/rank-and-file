@@ -29,6 +29,10 @@ def test_a_statement_split_over_lines_counts_every_line():
         ("try: a()\nexcept ValueError: b()\nfinally: c()\n", "try:\n    a()\nexcept ValueError:\n    b()\nfinally:\n    c()\n"),
         ("match x:\n    case 1: a()\n    case _: b()\n", "match x:\n    case 1:\n        a()\n    case _:\n        b()\n"),
         ("def f(): return 3\n", "def f():\n    return 3\n"),
+        ("@d\ndef f(): return 3\n", "@d\ndef f():\n    return 3\n"),
+        ("class C: x = 1; y = 2\n", "class C:\n    x = 1\n    y = 2\n"),
+        ("with x: a()\n", "with x:\n    a()\n"),
+        ("try: a()\nexcept* ValueError: b()\n", "try:\n    a()\nexcept* ValueError:\n    b()\n"),
     ],
 )
 def test_squeezing_statements_onto_one_line_saves_no_lines(squeezed, spread):

@@ -14,8 +14,8 @@ shortest program that replays it exactly with `for` loops:
 - loops can sit inside loops, including one whose count is the outer loop's
   variable.
 Because the replay is exact, the reference never turns more than it needs to
-(QA-026). Features can be switched off, which is how the wrong attempts are
-made and how the checks show what each level forces.
+(QA-026). Loops inside loops can be switched off, which is how the "flat"
+wrong attempt is made.
 
 It writes each level's YAML (with par taken from the reference, and hint 3
 taken from its first lines), the reference, the wrong attempts (each starting
@@ -28,6 +28,7 @@ import json
 import sys
 from dataclasses import dataclass, replace
 from functools import cache
+from itertools import groupby, product
 from pathlib import Path
 
 import yaml
@@ -36,7 +37,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "engine"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from solve import fewest_lines, write_code  # noqa: E402
+from solve import fewest_lines, move_call, write_code  # noqa: E402
 
 from rankfile.constraints import code_lines  # noqa: E402
 from rankfile.levels import Level, parse_level  # noqa: E402
@@ -68,39 +69,31 @@ def without_clockwork(level: Level) -> Level:
     return replace(level, enemies=[]) if World(level).code_clocked else level
 
 
-def route(level: Level) -> tuple[list, list] | None:
-    """Board-by-board: the plain-call route, and that route as moves and calls."""
+def route_tokens(level: Level) -> list | None:
+    """One board's plain-call route, as moves (merged, like `pawn.move(3)`) and calls."""
     level = without_clockwork(level)
     actions = fewest_lines(level)
     if actions is None:
         return None
     piece = PIECES[level.piece](World(level), [*level.api, "squares_ahead"])
-    tokens, i = [], 0
-    while i < len(actions):
-        if actions[i][0] == "move":
-            j = i
-            while j < len(actions) and actions[j][0] == "move":
-                j += 1
-            ahead = piece.squares_ahead()
-            piece.move(j - i)
-            tokens.append(Move((j - i,), ahead == j - i, sample=j - i))
-            i = j
+    tokens = []
+    for name, run in groupby(actions, key=lambda action: action[0]):
+        if name == "move":
+            squares = len(list(run))
+            counted = piece.squares_ahead() == squares
+            piece.move(squares)
+            tokens.append(Move((squares,), counted, sample=squares))
         else:
-            getattr(piece, actions[i][0])()
-            tokens.append(Call(actions[i][0]))
-            i += 1
-    return actions, tokens
+            for _ in run:
+                getattr(piece, name)()
+                tokens.append(Call(name))
+    return tokens
 
 
 def merged_tokens(level: Level) -> list | None:
     """One token list that suits every board, or None if the routes differ in shape."""
-    per_board = []
-    for case in level.cases():
-        found = route(case.level)
-        if found is None:
-            return None
-        per_board.append(found[1])
-    if len({len(tokens) for tokens in per_board}) != 1:
+    per_board = [route_tokens(case.level) for case in level.cases()]
+    if None in per_board or len({len(tokens) for tokens in per_board}) != 1:
         return None
     merged = []
     for group in zip(*per_board, strict=True):
@@ -116,109 +109,112 @@ def merged_tokens(level: Level) -> list | None:
 
 # -- the shortest program that replays the route --------------------------------
 
+# A program is a tuple of items: ("call", token), or ("loop", rounds, var, body).
+# `var` is None, or (start, step) for a loop whose variable the body uses.
+# `rounds` is a number, or an outer loop's `var`: repeat as many times as its value.
 
-def shortest(tokens: list, *, nesting=True, variable=True, counting=True):
-    """(lines, loops, program) for the shortest exact replay of `tokens`, or None.
 
-    A program is a tuple of items: ("call", token), ("loop", rounds, var,
-    body), or ("grow", rounds, var, body, tail) for an outer loop whose inner
-    loop repeats `body` as many times as the outer loop's variable.
-    """
+@cache
+def cost(program: tuple) -> tuple:
+    """What `shortest` minimises: fewest lines; then count only where a typed length
+    won't do; then fewest loops; then inner loops first in a loop's body, so it
+    reads "flight, then landing"."""
+    lines = counted = loops = 0
+    leads = next((k for k, item in enumerate(program) if item[0] == "loop"), 0)
+    for item in program:
+        if item[0] == "call":
+            token = item[1]
+            lines += 1
+            counted += isinstance(token, Move) and token.squares is None and token.var is None
+        else:
+            inner = cost(item[3])
+            lines, counted, loops, leads = lines + 1 + inner[0], counted + inner[1], loops + 1 + inner[2], leads + inner[3]
+    return lines, counted, loops, leads
+
+
+def depth(program: tuple) -> int:
+    return max((1 + depth(item[3]) for item in program if item[0] == "loop"), default=0)
+
+
+def shortest(tokens: list, *, nesting=True) -> tuple | None:
+    """The program with the lowest `cost` that replays `tokens` exactly, or None."""
     boards = max((len(t.squares) for t in tokens if isinstance(t, Move) and t.squares), default=1)
 
     def writable(token) -> bool:
-        return not isinstance(token, Move) or token.squares is not None or token.var is not None or (counting and token.counted)
+        return not isinstance(token, Move) or token.squares is not None or token.var is not None or token.counted
 
     def keys(stretch):
         return tuple(("M", t.squares, t.var) if isinstance(t, Move) else t.name for t in stretch)
 
-    def counts(program) -> int:
-        """How many moves ask squares_ahead()."""
-        total = 0
-        for item in program:
-            if item[0] == "call":
-                token = item[1]
-                total += isinstance(token, Move) and token.squares is None and token.var is None
-            else:
-                total += sum(counts(part) for part in item[3:])
-        return total
-
-    def leads(program) -> int:
-        """Lines before the first loop, here and in every loop's body."""
-        total = next((k for k, part in enumerate(program) if part[0] != "call"), 0)
-        return total + sum(leads(item[3]) for item in program if item[0] != "call")
-
     @cache
-    def best(seq: tuple, depth: int):
-        n = len(seq)
-        if n == 0:
-            return (0, 0, ())
+    def best(seq: tuple, level: int):
+        if not seq:
+            return ()
         table = {}
-        for length in range(1, n + 1):
-            for i in range(0, n - length + 1):
+        for length in range(1, len(seq) + 1):
+            for i in range(0, len(seq) - length + 1):
                 j = i + length
                 options = []
                 if length == 1:
                     if writable(seq[i]):
-                        options.append((1, 0, (("call", seq[i]),)))
+                        options.append((("call", seq[i]),))
                 else:
-                    for k in range(i + 1, j):
-                        if (i, k) in table and (k, j) in table:
-                            a, b = table[(i, k)], table[(k, j)]
-                            options.append((a[0] + b[0], a[1] + b[1], a[2] + b[2]))
-                    if nesting or depth == 0:
-                        options += repeats(seq[i:j], depth)
-                    if nesting and variable and depth == 0:
+                    options += [table[(i, k)] + table[(k, j)] for k in range(i + 1, j) if (i, k) in table and (k, j) in table]
+                    if nesting or level == 0:
+                        options += repeats(seq[i:j], level)
+                    if nesting and level == 0:
                         options += growing(seq[i:j])
                 if options:
-                    # Fewest lines; then count only where a typed length won't do; then fewest
-                    # loops; then inner loops first in a loop's body, so it reads "flight, then landing".
-                    table[(i, j)] = min(options, key=lambda option: (option[0], counts(option[2]), option[1], leads(option[2])))
-        return table.get((0, n))
+                    table[(i, j)] = min(options, key=cost)
+        return table.get((0, len(seq)))
 
-    def repeats(stretch: tuple, depth: int) -> list:
+    def repeats(stretch: tuple, level: int) -> list:
         found = []
         for period in range(1, len(stretch) // 2 + 1):
             if len(stretch) % period:
                 continue
             rounds = len(stretch) // period
-            body = generalise(stretch, period, rounds)
-            if body is None:
+            shared = generalise(stretch, period, rounds)
+            if shared is None:
                 continue
-            inner = best(body[0], depth + 1)
-            if inner is not None:
-                found.append((1 + inner[0], 1 + inner[1], (("loop", rounds, body[1], inner[2]),)))
+            body = best(shared[0], level + 1)
+            if body is not None:
+                found.append((("loop", rounds, shared[1], body),))
         return found
 
     def growing(stretch: tuple) -> list:
+        """An outer loop whose inner loop repeats as many times as the outer loop's
+        variable, then a tail: rounds of `body` repeated first, first + step, ... times."""
         found = []
-        for period in range(1, 7):
-            body = stretch[:period]
-            for tail_length in range(0, 5):
-                for first in range(1, 7):
-                    for step in (1, -1, 2):
-                        pos, rounds, tail = 0, 0, None
-                        while pos < len(stretch):
-                            times = first + rounds * step
-                            end = pos + times * period + tail_length
-                            if times < 1 or end > len(stretch):
-                                break
-                            if any(keys(stretch[pos + k * period : pos + (k + 1) * period]) != keys(body) for k in range(times)):
-                                break
-                            this_tail = stretch[end - tail_length : end]
-                            if tail is not None and keys(this_tail) != keys(tail):
-                                break
-                            tail, pos, rounds = this_tail, end, rounds + 1
-                        if pos != len(stretch) or rounds < 2:
-                            continue
-                        inner, rest = best(tuple(body), 2), best(tuple(tail), 1)
-                        if inner is not None and rest is not None:
-                            item = ("grow", rounds, (first, step), inner[2], rest[2])
-                            found.append((2 + inner[0] + rest[0], 2 + inner[1] + rest[1], (item,)))
+        for period, tail_length, first, step in product(range(1, 7), range(5), range(1, 7), (1, -1, 2)):
+            matched = grow_rounds(stretch, stretch[:period], tail_length, first, step)
+            if matched is None:
+                continue
+            rounds, tail = matched
+            body, rest = best(stretch[:period], 2), best(tail, 1)
+            if body is not None and rest is not None:
+                var = (first, step)
+                found.append((("loop", rounds, var, (("loop", var, None, body), *rest)),))
         return found
 
+    def grow_rounds(stretch: tuple, body: tuple, tail_length: int, first: int, step: int):
+        """(rounds, tail) if `stretch` is such rounds, or None."""
+        pos, rounds, tail = 0, 0, None
+        while pos < len(stretch):
+            times = first + rounds * step
+            end = pos + times * len(body) + tail_length
+            if times < 1 or end > len(stretch):
+                return None
+            if any(keys(stretch[pos + k * len(body) : pos + (k + 1) * len(body)]) != keys(body) for k in range(times)):
+                return None
+            this_tail = stretch[end - tail_length : end]
+            if tail is not None and keys(this_tail) != keys(tail):
+                return None
+            tail, pos, rounds = this_tail, end, rounds + 1
+        return (rounds, tail) if rounds >= 2 else None
+
     def generalise(stretch: tuple, period: int, rounds: int):
-        """The body shared by every round, or None: each place in it must match across rounds."""
+        """The body shared by every round, and its variable, or None: each place in it must match across rounds."""
         body, var = [], None
         for q in range(period):
             group = [stretch[r * period + q] for r in range(rounds)]
@@ -230,7 +226,7 @@ def shortest(tokens: list, *, nesting=True, variable=True, counting=True):
                 continue
             if any(not isinstance(t, Move) for t in group):
                 return None
-            if first.var is not None or any(t.var is not None for t in group):
+            if any(t.var is not None for t in group):
                 if all(t.var == first.var for t in group):
                     body.append(first)  # an outer loop's variable, the same in every round
                     continue
@@ -240,14 +236,14 @@ def shortest(tokens: list, *, nesting=True, variable=True, counting=True):
             if all(s is not None and s == squares[0] for s in squares):
                 body.append(Move(squares[0], counted, sample=first.sample))
                 continue
-            if variable and boards == 1 and all(s is not None for s in squares):
+            if boards == 1 and all(s is not None for s in squares):
                 values = [s[0] for s in squares]
                 step = values[1] - values[0]
                 if step and all(v == values[0] + r * step for r, v in enumerate(values)) and var in (None, (values[0], step)):
                     var = (values[0], step)
                     body.append(Move(None, counted, var=var, sample=first.sample))
                     continue
-            if counting and counted:
+            if counted:
                 body.append(Move(None, True, sample=first.sample))
                 continue
             return None
@@ -256,7 +252,7 @@ def shortest(tokens: list, *, nesting=True, variable=True, counting=True):
     return best(tuple(tokens), 0)
 
 
-def render(program, piece: str, names: list[str], *, typed=False) -> str:
+def render(program: tuple, piece: str, names: list[str], *, typed=False) -> str:
     """The program as Python. `names` are the loop variables' names, outer first;
     a loop whose variable isn't used gets `_`. With `typed`, every counted or
     variable move uses board 1's first-round length instead (a wrong attempt)."""
@@ -264,56 +260,35 @@ def render(program, piece: str, names: list[str], *, typed=False) -> str:
 
     def move(token, scope) -> str:
         if typed and token.squares is None:
-            squares = token.sample
-        elif token.var is not None:
+            return move_call(piece, token.sample)
+        if token.var is not None:
             return f"{piece}.move({scope[token.var]})"
-        elif token.squares is not None:
-            squares = token.squares[0]
-        else:
-            return f"{piece}.move({piece}.squares_ahead())"
-        return f"{piece}.move({squares if squares > 1 else ''})"
+        if token.squares is not None:
+            return move_call(piece, token.squares[0])
+        return f"{piece}.move({piece}.squares_ahead())"
 
-    def emit(items, depth: int, scope: dict):
-        pad = "    " * depth
+    def emit(items: tuple, indent: int, scope: dict):
+        pad = "    " * indent
         for item in items:
             if item[0] == "call":
                 token = item[1]
                 lines.append(pad + (f"{piece}.{token.name}()" if isinstance(token, Call) else move(token, scope)))
-            elif item[0] == "loop":
-                _, rounds, var, body = item
-                if var is None:
-                    lines.append(f"{pad}for _ in range({rounds}):")
-                    emit(body, depth + 1, scope)
-                else:
-                    name = next(names)
-                    lines.append(f"{pad}for {name} in {_range(var, rounds)}:")
-                    emit(body, depth + 1, {**scope, var: name})
+                continue
+            _, rounds, var, body = item
+            inner = scope
+            if var is None:
+                count = scope[rounds] if isinstance(rounds, tuple) else rounds
+                lines.append(f"{pad}for _ in range({count}):")
             else:
-                _, rounds, var, body, tail = item
-                name = next(names)
-                lines.append(f"{pad}for {name} in {_range(var, rounds)}:")
-                lines.append(f"{pad}    for _ in range({name}):")
-                emit(body, depth + 2, scope)
-                emit(tail, depth + 1, scope)
+                inner = {**scope, var: next(names)}
+                start, step = var
+                stop = start + rounds * step
+                args = f"{start}, {stop}" if step == 1 else f"{start}, {stop}, {step}"
+                lines.append(f"{pad}for {inner[var]} in range({args}):")
+            emit(body, indent + 1, inner)
 
     emit(program, 0, {})
     return "\n".join(lines) + "\n"
-
-
-def _range(var: tuple, rounds: int) -> str:
-    start, step = var
-    stop = start + rounds * step
-    return f"range({start}, {stop})" if step == 1 else f"range({start}, {stop}, {step})"
-
-
-def depth(program) -> int:
-    deepest = 0
-    for item in program:
-        if item[0] == "loop":
-            deepest = max(deepest, 1 + depth(item[3]))
-        elif item[0] == "grow":
-            deepest = max(deepest, 2 + depth(item[3]))
-    return deepest
 
 
 # -- the levels -----------------------------------------------------------------
@@ -649,46 +624,45 @@ def generate(spec: dict) -> list[str]:
     problems = []
     draft = parse_level(yaml.safe_load(yaml_text(spec, 99, ["", "", ""])))
     tokens = merged_tokens(draft)
-    found = tokens and shortest(tokens)
-    if not found:
+    program = shortest(tokens) if tokens else None
+    if program is None:
         return [f"{spec['id']}: no loop program replays the route"]
-    reference = render(found[2], "pawn", spec["names"])
+    reference = render(program, "pawn", spec["names"])
     par = code_lines(reference)
     if par != spec["par"]:
         problems.append(f"{spec['id']}: the reference has {par} lines, the spec's par is {spec['par']}")
     hints = [*spec["hints"], third_hint(spec, reference)]
-    level = parse_level(yaml.safe_load(yaml_text(spec, par, hints)))
+    text = yaml_text(spec, par, hints)
+    level = parse_level(yaml.safe_load(text))
     result = run_level(level, reference)
     stars = sum(star.earned for star in result.stars) if result.stars else 0
-    print(f"{spec['id']} ({spec['title']}): par {par}, loops {depth(found[2])} deep, reference {result.status}, {stars} stars")
+    print(f"{spec['id']} ({spec['title']}): par {par}, loops {depth(program)} deep, reference {result.status}, {stars} stars")
     if result.status != "solved" or stars != 3:
         return [*problems, f"{spec['id']}: the reference isn't a three-star solve ({result.status})"]
 
     counts = {"lines": par}
-    wrong = {}
+    wrong = []
     for kind in spec["wrong"]:
         if kind == "copied":
-            actions, _ = route(without_clockwork(level.cases()[0].level))
-            code = "\n".join(write_code(level, actions)) + "\n"
+            code = "\n".join(write_code(level, fewest_lines(without_clockwork(level.cases()[0].level)))) + "\n"
         elif kind == "typed":
-            code = render(found[2], "pawn", spec["names"], typed=True)
+            code = render(program, "pawn", spec["names"], typed=True)
         else:  # flat
-            flat = shortest(tokens, nesting=False)
-            code = render(flat[2], "pawn", spec["names"])
+            code = render(shortest(tokens, nesting=False), "pawn", spec["names"])
         counts[kind] = code_lines(code)
         expect = expect_line(level, code)
         print(f"  wrong attempt '{kind}': {counts[kind]} lines, {expect or 'SOLVED (a problem)'}")
         if expect is None:
             problems.append(f"{spec['id']}: the '{kind}' attempt solves the level")
             continue
-        wrong[kind] = f"{expect}\n{code}"
+        wrong.append(f"{expect}\n{code}")
 
     folder = ROOT / "solutions" / "ch03"
-    save(ROOT / "levels" / "ch03" / f"{spec['id']}.yaml", yaml_text(spec, par, hints))
+    save(ROOT / "levels" / "ch03" / f"{spec['id']}.yaml", text)
     save(folder / f"{spec['id']}.py", reference)
     for old in folder.glob(f"{spec['id']}.naive*.py"):
         old.unlink()
-    for number, code in enumerate(wrong.values(), start=1):
+    for number, code in enumerate(wrong, start=1):
         save(folder / f"{spec['id']}.naive{'' if number == 1 else number}.py", code)
     save(folder / f"{spec['id']}.md", spec["note"].format(**counts) + "\n")
     return problems
