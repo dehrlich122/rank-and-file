@@ -923,6 +923,7 @@ pre {
   display: flex;
   justify-content: center;
   min-height: 200px;
+  flex-shrink: 0; /* never squeezed under the controls and outcome: the column scrolls instead */
 }
 
 /* above the board after a run with several cases (M2): one button per case */
@@ -938,6 +939,90 @@ pre {
   align-items: center;
   justify-content: center;
   gap: 6px 8px;
+}
+
+/* A level with other maps (QA-032): the board on show large, the others small beside it */
+.boards {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.boards-main {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.boards-caption {
+  margin: 0;
+  font-weight: 550;
+  text-align: center;
+}
+
+.boards-main .board {
+  max-height: calc(var(--board-max-height, 60vh) - 34px); /* room for the caption above it */
+}
+
+.boards-side {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 28px; /* level with the main board, below its caption */
+}
+
+.board-thumb {
+  font: inherit;
+  color: var(--text);
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 6px 8px 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.board-thumb:hover,
+.board-thumb:focus-visible {
+  border-color: var(--accent);
+}
+
+.board-thumb-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* every small board fits the same square, whatever its shape */
+.board-thumb .board {
+  width: 112px;
+  height: 112px;
+  max-height: none;
+}
+
+@media (max-width: 700px) {
+  .boards {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .boards-main {
+    width: 100%;
+  }
+
+  .boards-side {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding-top: 0;
+  }
 }
 
 .case-note {

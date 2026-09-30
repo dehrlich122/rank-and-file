@@ -33,6 +33,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   let level: LevelInfo | null = null;
   let board: BoardView | null = null;
   let caseBoard: BoardView | null = null; // the board of the case being replayed (M2), shown instead
+  let thumbs: BoardView[] = []; // a level's other boards, small, beside the one on show (QA-032)
   const shownBoard = () => caseBoard ?? board;
   let runResult: LevelResult | null = null; // the last run as a whole: its verdict, stars and cases
   let player: Player | null = null;
@@ -257,7 +258,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       }
       level = loaded.level;
       board = new BoardView(level);
-      if (level.boards.length) previewBoard(0); // the tabs for its other boards (M3.2)
+      if (level.boards.length) showBoards(0, null); // with its other boards beside it (QA-032)
       else boardHost.replaceChildren(board.element);
       help = new HelpPanel(source.id, level.hints, () => getCode(editor));
       challengePanel.replaceChildren(...describeChallenge(level, openCodexEntry, chipTooltip, () => codex), help.element);
@@ -387,43 +388,70 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     outcomeHost.replaceChildren(outcomeCard(run, result, actions));
   }
 
-  // -- several cases (M2): a hidden goal's ? squares, other maps ------------------------
+  // -- several cases (M2): a hidden goal's ? squares ----------------------------------------
   // A run comes back with every case's result. The board shows the case being
   // replayed (its goal, and ✓ or ✗ on each ? square), and a row of buttons
-  // above it replays any other case. A level with other maps (M3.2) shows the
-  // row before a run too, as tabs: each one shows its board.
+  // above it replays any other case.
   function showCaseBoard(run: LevelResult, index: number): void {
+    if (level?.boards.length) return showBoards(index, run);
     caseBoard?.dispose();
     // ✓ or ✗ on each ? square: whether the code reached a goal hidden there.
     const spots = new Map(run.cases.flatMap((c) => (c.level.goal ? [[squareName(c.level.goal), c.status === "solved"] as const] : [])));
     caseBoard = new BoardView(run.cases[index]!.level, { spots });
-    const labels = run.cases.map((c, i) => `${level?.boards.length ? `Board ${i + 1}` : c.label} ${c.status === "solved" ? "✓" : "✗"}`);
-    boardHost.replaceChildren(caseRow(labels, index, (i) => showCase(i, "play")), caseBoard.element);
+    const title = level?.case_title ?? "";
+    const buttons = run.cases.map((c, i) =>
+      h(
+        "button",
+        { class: "btn btn-small btn-toggle", "aria-pressed": String(i === index), onClick: () => showCase(i, "play") },
+        `${c.label} ${c.status === "solved" ? "✓" : "✗"}`,
+      ),
+    );
+    boardHost.replaceChildren(h("div", { class: "case-row", role: "group", "aria-label": title }, h("span", { class: "muted small" }, `${title}:`), ...buttons), caseBoard.element);
   }
 
-  /** Before a run, on a level with other maps: show board `index`, as it starts. */
-  function previewBoard(index: number): void {
+  // -- other maps (M3.2, QA-032) ---------------------------------------------------------
+  // The board on show is large, and the level's other boards sit small beside
+  // it: before a run as they start, after one as they ended, with ✓ or ✗.
+  // Clicking a small board puts it on show, and replays it after a run.
+  function showBoards(shown: number, run: LevelResult | null): void {
     if (!level || !board) return;
     caseBoard?.dispose();
-    caseBoard = index > 0 ? new BoardView(level.boards[index]!) : null;
-    const labels = level.boards.map((_, i) => `Board ${i + 1}`);
-    boardHost.replaceChildren(caseRow(labels, index, previewBoard), (caseBoard ?? board).element);
-  }
-
-  /** The row above the board: one button per case, `selected` pressed. */
-  function caseRow(labels: string[], selected: number, pick: (index: number) => void): HTMLElement {
-    const title = level?.case_title ?? "";
-    const buttons = labels.map((text, i) =>
-      h("button", { class: "btn btn-small btn-toggle", "aria-pressed": String(i === selected), onClick: () => pick(i) }, text),
+    for (const thumb of thumbs) thumb.dispose();
+    const boards = run ? run.cases.map((c) => c.level) : level.boards;
+    caseBoard = run || shown > 0 ? new BoardView(boards[shown]!) : null;
+    const mark = (i: number) => (run ? (run.cases[i]!.status === "solved" ? " ✓" : " ✗") : "");
+    thumbs = [];
+    const others = boards.flatMap((info, i) => {
+      if (i === shown) return [];
+      const thumb = new BoardView(info, { mini: true });
+      if (run) thumb.show(run.cases[i]!.final);
+      thumbs.push(thumb);
+      const title = run ? `Replay board ${i + 1}` : `Look at board ${i + 1}`;
+      return [
+        h(
+          "button",
+          { class: "board-thumb", title, "aria-label": title, onClick: () => (run ? showCase(i, "play") : showBoards(i, null)) },
+          h("span", { class: "board-thumb-label" }, `Board ${i + 1}${mark(i)}`),
+          thumb.element,
+        ),
+      ];
+    });
+    const caption = run ? `Board ${shown + 1}${mark(shown)}` : `Board ${shown + 1} of ${boards.length}. Your code has to work on every board.`;
+    boardHost.replaceChildren(
+      h(
+        "div",
+        { class: "boards" },
+        h("div", { class: "boards-main" }, h("p", { class: "boards-caption" }, caption), (caseBoard ?? board).element),
+        h("div", { class: "boards-side", role: "group", "aria-label": "The other boards" }, ...others),
+      ),
     );
-    return h("div", { class: "case-row", role: "group", "aria-label": title }, h("span", { class: "muted small" }, `${title}:`), ...buttons);
   }
 
   /** No recording, and the level's own board at the start: before every run. */
   function resetStage(): void {
     player?.dispose();
     player = null;
-    if (level?.boards.length) previewBoard(0);
+    if (level?.boards.length) showBoards(0, null);
     else if (caseBoard && board) {
       caseBoard.dispose();
       caseBoard = null;
@@ -487,6 +515,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     player?.dispose();
     board?.dispose();
     caseBoard?.dispose();
+    for (const thumb of thumbs) thumb.dispose();
     lesson?.dispose();
     editor.destroy();
     context.repl.setLevel(null); // so Scratch Python doesn't keep this screen alive
