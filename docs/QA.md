@@ -1432,6 +1432,71 @@ enough, or should they be rewritten?
   - Better guard feedback in the console: "Do you not know how to count!?"
     for a calculation error, and "I can't understand you!" for a typo.
 
+
+
+### QA-031 · The wait's second remainder is unnecessary · Fixed
+
+- **Fixed** in `7bc114e` (2026-09-30); awaiting the designer's retest.
+  - 2.5's and 2.6's reference solutions take the remainder once. Their
+    third hints quote the new line.
+  - 2.5's solution note says why a whole extra cycle is fine.
+  - The generator now accepts any wait that gets through on each board,
+    not just the shortest.
+- **Retest:** 2.5 and 2.6: hint 3 and the solution after solving have one
+  `%` in the wait. Both still solve every board.
+
+- **Area:** 2.5 Keeping Time and 2.6 The Gauntlet: the reference solution
+  and hint 3
+- **Observed** *(Designer, 2026-09-30)*: the second remainder operator seems
+  unnecessary; taking the remainder again gives the same result. It's an
+  extra bit of code that muddles both the hint and the idiomatic solution.
+- **Why** *(Claude)*:
+  - Without it, a pawn that would arrive exactly as the gate opens waits
+    a whole cycle instead of none. That's harmless, since the gate opens
+    again, so the simpler expression works on every board.
+  - The generator only kept the outer remainder because it looked for the
+    shortest wait on each board.
+
+
+### QA-032 · Several boards are hard to follow · Fixed
+
+- **Fixed** in `22ff6bf` (2026-09-30); awaiting the designer's retest.
+  - The board on show is large, and the level's other boards sit small
+    beside it, in the space narrow boards leave (below it on narrow
+    windows).
+  - **Before a run:** "Board 1 of 3. Your code has to work on every board.",
+    with every other board visible as it starts.
+  - **After a run:** the first board that failed is on show and replays.
+    Each small board shows how it ended, with ✓ or ✗ (a crushed or caught
+    pawn shows as lost).
+  - Clicking a small board puts it on show, and replays it after a run.
+  - The hidden-goal levels (the ? squares) keep their row of buttons.
+  - The board area no longer shrinks under the controls and outcome, so a
+    tall board can't overlap the playback bar.
+- **Decided** *(Designer, 2026-09-30)*: a main board plus small boards
+  beside it. The small ones show how each board ended; they don't play
+  along.
+  - Not chosen: small boards that play along, playing each board in turn,
+    or all boards side by side.
+- **Retest:**
+  - 2.3 (or any multi-board level): before running, the caption and the
+    small boards. Click one to put it on show.
+  - Run code that works on some boards but not others: the failing board
+    is on show, and the small boards show ✓ and ✗.
+  - Click a ✓ board to replay it.
+  - 2.5: the tall corridor fits above the playback controls.
+
+- **Area:** the board tabs on levels with other boards (2.2 to 2.6)
+- **Observed** *(Designer, 2026-09-30)*: the idea of multiple boards is
+  great, but the display makes it hard to understand for someone who
+  didn't work on the project.
+- **Ideas** *(Designer, 2026-09-30)*:
+  - Run all the boards in succession automatically, to show why the code
+    failed on some but worked on others.
+  - All boards visible at once, though that takes a lot of screen space.
+  - Or use the negative space: a main board front and centre, and the
+    other boards smaller off to the side, where they can be selected.
+
 ---
 
 ## Queued work
