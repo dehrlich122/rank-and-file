@@ -17,12 +17,18 @@ from rankfile.runner import run_level
         ("pawn.move()\nPrint('hi')", "Python doesn't know the name `Print`. Did you mean `print`?", 2),
         ("x = true", "Python doesn't know the name `true`. Did you mean `True`?", 1),
         ("print(hello)", 'If you meant it as text, put it in quotes: "hello".', 1),
+        ("for step in range(1):\n    print(stpe)", "Python doesn't know the name `stpe`. Did you mean `step`?", 2),
         # wrong number or kind of arguments
         ("pawn.turn_left(2)", "`turn_left()` doesn't take anything inside its parentheses.", 1),
         ("pawn.move(1, 2)", "`move()` takes at most 1 value inside its parentheses, but got 2.", 1),
         ("pawn.move()()", "You used parentheses to call something that isn't a function", 1),
         ('print("steps: " + 3)', "You can only join text to text with +.", 1),
         ("x = 1 / 0", "You divided by zero.", 1),
+        # loops (M3.3)
+        ("for step in 3:\n    pawn.move()", "Python can't go through a whole number (an int) one item at a time", 1),
+        ("for step in 3:\n    pawn.move()", "give the number to range(): for step in range(5):", 1),
+        ("for step in range(7 / 2):\n    pawn.move()", "This needs a whole number (an int), but got a number with a decimal point (a float). If it came from dividing with /, use // instead", 1),
+        ('for step in range("3"):\n    pawn.move()', "This needs a whole number (an int), but got text (a str). Numbers in quotes are text.", 1),
         # syntax errors
         ('pawn.move(\nprint("hi")', "The bracket ( opened on this line is never closed. Add the matching ).", 1),
         ('print("hi)', "This text is missing its closing quote mark.", 1),

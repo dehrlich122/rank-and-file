@@ -165,6 +165,14 @@ def _explain_attribute(exc: AttributeError) -> str:
 
 # -- type errors: the right thing used the wrong way -----------------------------
 
+# How to name a value's type to a beginner.
+_KINDS = {
+    "int": "a whole number (an int)",
+    "float": "a number with a decimal point (a float)",
+    "str": "text (a str)",
+    "bool": "True or False (a bool)",
+    "NoneType": "None",
+}
 
 def _explain_type(exc: TypeError) -> str:
     msg = str(exc)
@@ -193,6 +201,19 @@ def _explain_type(exc: TypeError) -> str:
     if match := re.match(r"unsupported operand type\(s\) for (.+): '(\w+)' and '(\w+)'", msg):
         op, left, right = match.groups()
         return f"Python can't use {op} between a {left} and a {right}."
+    if match := re.match(r"'(\w+)' object is not iterable", msg):
+        return (
+            f"Python can't go through {_KINDS.get(match.group(1), 'a ' + match.group(1))} one item at a time, "
+            "the way a for loop needs. To repeat something a number of times, give the number to range(): "
+            "for step in range(5):"
+        )
+    if match := re.match(r"'(\w+)' object cannot be interpreted as an integer", msg):
+        kind = match.group(1)
+        hint = {
+            "float": " If it came from dividing with /, use // instead: it gives a whole number.",
+            "str": " Numbers in quotes are text.",
+        }.get(kind, "")
+        return f"This needs a whole number (an int), but got {_KINDS.get(kind, 'a ' + kind)}.{hint}"
     return f"Python stopped with a TypeError: {msg}"
 
 
@@ -206,8 +227,11 @@ def closest(word: str | None, options: list[str]) -> str | None:
     for option in options:  # same word, different capitals: true -> True
         if option.lower() == word.lower() and option != word:
             return option
-    matches = difflib.get_close_matches(word, options, n=1, cutoff=0.75)
-    return matches[0] if matches else None
+    # Like difflib.get_close_matches, but a tie goes to the earlier option, so
+    # the player's own names beat built-ins (`stpe` is `step`, not `type`).
+    scores = [difflib.SequenceMatcher(None, option, word).ratio() for option in options]
+    best = max(scores, default=0)
+    return options[scores.index(best)] if best >= 0.75 else None
 
 
 def _keep_player_frames(tb: traceback.TracebackException) -> None:

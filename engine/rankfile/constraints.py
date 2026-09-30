@@ -13,6 +13,7 @@ import ast
 import inspect
 import io
 import tokenize
+from collections import Counter
 from dataclasses import dataclass
 
 from .pieces import Piece
@@ -52,12 +53,51 @@ class LintWarning:
 
 
 def code_lines(code: str) -> int:
-    """Lines that contain code (blank lines and comment-only lines don't count)."""
+    """Lines of code, counted as if each statement had a line of its own (M3.3).
+
+    Blank lines and comment-only lines don't count, and a statement split over
+    several lines counts each of them. Squeezing statements together doesn't
+    save lines: a second statement after `;`, a loop's body on the loop's own
+    line, or `else:` with its body beside it each count as another line.
+    """
+    lines = _lines_with_code(code)
+    starts = _statement_starts(code)
+    return sum(max(1, starts[line]) for line in lines)
+
+
+def shares_lines(code: str) -> bool:
+    """Whether any line holds more than one statement."""
+    return any(n > 1 for n in _statement_starts(code).values())
+
+
+def _lines_with_code(code: str) -> set[int]:
     lines: set[int] = set()
     for token in _tokens(code):
         if token.type not in _IGNORED_TOKENS:
             lines.update(range(token.start[0], token.end[0] + 1))
-    return len(lines)
+    return lines
+
+
+def _statement_starts(code: str) -> Counter[int]:
+    """How many statements, and clauses such as `else:`, start on each line."""
+    try:
+        tree = ast.parse(code)
+    except (SyntaxError, ValueError):
+        return Counter()
+    starts = Counter(
+        node.lineno for node in ast.walk(tree) if isinstance(node, (ast.stmt, ast.ExceptHandler))
+    )
+    starts.update(case.pattern.lineno for node in ast.walk(tree) if isinstance(node, ast.Match) for case in node.cases)
+    # `else:` and `finally:` have no node of their own; find their keywords where a line of code begins.
+    line_start = True
+    for token in _tokens(code):
+        if token.type in (tokenize.NEWLINE, tokenize.INDENT, tokenize.DEDENT, tokenize.ENCODING):
+            line_start = True
+        elif token.type not in (tokenize.COMMENT, tokenize.NL):
+            if line_start and token.type == tokenize.NAME and token.string in ("else", "finally"):
+                starts[token.start[0]] += 1
+            line_start = False
+    return starts
 
 
 def comment_count(code: str) -> int:
@@ -70,9 +110,13 @@ def check_constraints(tree: ast.Module, code: str, constraints) -> list[str]:
     if constraints.max_lines is not None:
         used = code_lines(code)
         if used > constraints.max_lines:
+            why = (
+                "Two statements on one line count as two."
+                if shares_lines(code)
+                else "(Blank lines and comments don't count.)"
+            )
             problems.append(
-                f"This level allows at most {count(constraints.max_lines, 'line')} of code, and yours has {used}. "
-                "(Blank lines and comments don't count.)"
+                f"This level allows at most {count(constraints.max_lines, 'line')} of code, and yours has {used}. {why}"
             )
     if constraints.min_comments and comment_count(code) < constraints.min_comments:
         wanted = "a comment" if constraints.min_comments == 1 else f"{constraints.min_comments} comments"
@@ -139,7 +183,10 @@ def describe_rules(constraints) -> list[str]:
     """The level's rules as the Challenge panel lists them, one sentence each."""
     rules = []
     if constraints.max_lines is not None:
-        rules.append(f"At most {count(constraints.max_lines, "line")} of code. Blank lines and comments don't count.")
+        rules.append(
+            f"At most {count(constraints.max_lines, "line")} of code. Blank lines and comments don't count; "
+            "two statements on one line count as two."
+        )
     if constraints.min_comments:
         rules.append(f"At least {count(constraints.min_comments, 'comment')} (a note starting with #).")
     rules += [f"Must use {describe_node(name)}." for name in constraints.require_nodes]

@@ -295,7 +295,11 @@ Enemies *(M3.1)* move one square per tick of their clock:
 Unknown keys, symbols,
 abilities or `ast` node names are errors, so typos fail in the level checker.
 `max_lines` counts lines containing code (blank and comment-only lines don't
-count); `require_nodes`/`ban_nodes` name `ast` node classes.
+count), as if every statement had its own line *(M3.3)*: a second statement
+after `;`, a loop's body on the loop's own line, or `else:` with its body
+beside it counts as another line, so squeezing code together can't dodge a
+limit. The par star counts the same way. `require_nodes`/`ban_nodes` name
+`ast` node classes.
 
 Alongside each level:
 

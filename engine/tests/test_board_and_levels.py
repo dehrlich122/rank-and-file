@@ -97,7 +97,7 @@ def test_describe_puts_goals_and_rules_into_words():
     described = level.describe()
     assert described["goals"] == ["Reach the goal on a2.", "Get past the locked gate on b2. A guard keeps it shut."]
     assert described["rules"] == [
-        "At most 2 lines of code. Blank lines and comments don't count.",
+        "At most 2 lines of code. Blank lines and comments don't count; two statements on one line count as two.",
         "At least 1 comment (a note starting with #).",
         "Must use a for loop.",
         "Not allowed: a while loop.",
