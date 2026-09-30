@@ -1,0 +1,7 @@
+hall = pawn.squares_ahead()
+pawn.move(hall)
+pawn.turn_right()
+gallery = pawn.squares_ahead()
+pawn.move(gallery)
+print(f"I walked {hall + gallery} squares.")
+pawn.move(pawn.squares_ahead())

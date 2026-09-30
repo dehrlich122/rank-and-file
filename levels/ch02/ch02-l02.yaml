@@ -1,0 +1,46 @@
+id: ch02-l02
+chapter: 2
+title: "Doing the Sums"
+trains: "A function that gives back a value, and arithmetic on it: +, - and *"
+brief: "Walk up the hall and turn right at the door, one square before its end. The goal is twice as far along the gallery as you walked up the hall, and the halls are different on every board."
+piece: pawn
+map: |
+  # # # # # # #
+  . # # # # # #
+  . . . . G . .
+  . # # # # # #
+  P # # # # # #
+start: {"facing": "north"}
+api:
+- move
+- turn_left
+- turn_right
+- squares_ahead
+par:
+  lines: 4
+hints:
+- "The halls are different on every board, so your code has to find out how far to go. Count first."
+- "pawn.squares_ahead() gives back a number, and Python can do sums with it: - takes away and * multiplies. Keep a number you'll need again in a name."
+- "One way to write the line that matters most: `pawn.move(walked * 2)`"
+lesson: ch02/ch02-l02.md
+lesson_board:
+  map: |
+    # # # # #
+    . . . . .
+    . . . . .
+    . . . . .
+    . . . . .
+    . . P . .
+variants:
+- map: |
+    # # # # # # # #
+    . # # # # # # #
+    . . . . . . G .
+    . # # # # # # #
+    . # # # # # # #
+    P # # # # # # #
+- map: |
+    # # # # # #
+    . # # # # #
+    . . G . . .
+    P # # # # #

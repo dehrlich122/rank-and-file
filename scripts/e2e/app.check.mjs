@@ -336,6 +336,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
   // -- M3.1: the obstacle toolkit (the Testing ground's practice-02 to practice-09) ------------
   // Counts, labels and outcomes only: never code, never the console (it can hold an answer).
   const PRACTICE = ["practice-02", "practice-03", "practice-04", "practice-05", "practice-06", "practice-07", "practice-08", "practice-09", "practice-10"];
+  const CH02 = ["ch02-l01", "ch02-l02", "ch02-l03", "ch02-l04", "ch02-l05", "ch02-l06"]; // Chapter 2 (M3.2)
   const drawn = () =>
     b.evaluate(`(() => {
       const board = document.querySelector('.board-host .board');
@@ -364,7 +365,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(d["practice-04"].enemies === 1 && d["practice-04"].routes === 1 && d["practice-04"].obstacles === 2, `patrol: ${JSON.stringify(d["practice-04"])}`);
     expect(d["practice-05"].badges.includes("chases") && d["practice-05"].routes === 0, `chaser: ${JSON.stringify(d["practice-05"])}`);
     expect(d["practice-06"].badges.some((text) => text.startsWith("⚙")), `clockwork: ${JSON.stringify(d["practice-06"])}`);
-    expect(d["practice-07"].timed === 2 && d["practice-07"].badges.join() === "2 of 3,2 of 4", `timed gates: ${JSON.stringify(d["practice-07"])}`);
+    expect(d["practice-07"].timed === 2 && d["practice-07"].badges.join() === "2 of 3 · tick 0,2 of 4 · tick 0", `timed gates: ${JSON.stringify(d["practice-07"])}`);
     expect(d["practice-08"].gems === 3 && d["practice-08"].badges.includes("?"), `gems and the guard: ${JSON.stringify(d["practice-08"])}`);
     expect(d["practice-09"].enemies === 2 && d["practice-09"].armoured === 1, `capture: ${JSON.stringify(d["practice-09"])}`);
     return Object.entries(d).map(([id, x]) => `${id}: ${x.obstacles} rules`).join(", ");
@@ -407,7 +408,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     "practice-02": (board) => expect(board.bridged === 1 && board.planksTaken === 1, `pits bridged: ${board.bridged}, planks taken: ${board.planksTaken}`),
     "practice-10": (board) => expect(board.gone === 1, `chasers gone: ${board.gone}`),
   };
-  for (const id of PRACTICE) {
+  for (const id of [...PRACTICE, ...CH02]) {
     await check(`${id}: reference solution solves it`, async () => {
       await openLevel(id, { fresh: true });
       await setCode(solution(id));
@@ -893,6 +894,94 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await run();
     const vars = await b.evaluate(`[...document.querySelectorAll('.inspector tr')].map((r) => r.innerText.split(/\\s/)[0])`);
     expect(vars.includes("steps") && !vars.includes("help"), JSON.stringify(vars));
+  });
+
+  // -- M3.2: Chapter 2 (QA-029 to QA-032) -------------------------------------------------------
+  // Labels, counts, yes or no. The code typed is test code, or a reference compared in Node.
+  const boardsView = () =>
+    b.evaluate(`({
+      caption: document.querySelector('.boards-caption')?.textContent ?? null,
+      thumbs: [...document.querySelectorAll('.board-thumb-label')].map((e) => e.textContent),
+    })`);
+
+  await check("QA-029: 2.1 has no signpost, and its one rule turns away a second number", async () => {
+    await openLevel("ch02-l01", { fresh: true });
+    await challengeTab();
+    const panel = await b.evaluate(`({
+      signs: document.querySelectorAll('.board-host .signpost, .sign-text').length,
+      rules: [...document.querySelectorAll('ul.rules li')].map((e) => e.textContent),
+    })`);
+    await setCode("pawn.move(2)\npawn.move(3)\n");
+    const r = await run();
+    expect(panel.signs === 0 && panel.rules.includes("Your code may contain only one number, written once."), JSON.stringify(panel));
+    expect(r.head === "Check the rules" && r.text.includes("It may contain only one number, written once"), brief(r));
+    return panel.rules.join(" / ");
+  });
+
+  await check("QA-029: 2.2 brings in squares_ahead, New in its Codex, on three boards", async () => {
+    await openLevel("ch02-l02", { fresh: true });
+    const view = await boardsView();
+    const entry = (await codexEntries()).find((e) => e.name === "pawn.squares_ahead");
+    expect(view.thumbs.length === 2 && entry?.isNew === true, JSON.stringify({ view, entry }));
+  });
+
+  await check("QA-030: 2.4 starts with the guard's sentence as a comment, and its lesson's guard calls out a miscount", async () => {
+    await openLevel("ch02-l04", { fresh: true });
+    const starter = (await editorText()).includes('# Tell the guard "I walked X squares."');
+    const lesson = await runSnippet(1, { settle: true }); // a wrong sum, then the right one
+    const miscount = lesson.said.some((text) => text.startsWith('"Do you not know how to count!?" says the guard.'));
+    expect(starter && miscount, JSON.stringify({ starter, miscount }));
+  });
+
+  await check("QA-031: the third hints of 2.5 and 2.6 take the remainder once", async () => {
+    const facts = {};
+    for (const id of ["ch02-l05", "ch02-l06"]) facts[id] = await aboutHints(id, { onePercent: "(hints[2].match(/%/g) ?? []).length === 1" });
+    expect(Object.values(facts).every(allTrue), JSON.stringify(facts));
+  });
+
+  await check("QA-032: the other boards sit small beside the one on show, marked ✓ or ✗ after a run", async () => {
+    await openLevel("ch02-l02", { fresh: true });
+    const before = await boardsView();
+    await b.evaluate(`document.querySelectorAll('.board-thumb')[0].click()`);
+    const picked = await boardsView();
+    expect(before.caption === "Board 1 of 3. Your code has to work on every board." && before.thumbs.join() === "Board 2,Board 3", JSON.stringify(before));
+    expect(picked.caption.startsWith("Board 2 of 3") && picked.thumbs.join() === "Board 1,Board 3", JSON.stringify(picked));
+
+    await setCode("pawn.move(1)\n"); // test code: it can't do the whole job anywhere
+    const failed = await run();
+    const after = await boardsView();
+    expect(failed.head !== "Solved!" && /^Board [1-3] ✗$/.test(after.caption), `${brief(failed)} | ${JSON.stringify(after)}`);
+    expect(after.thumbs.length === 2 && after.thumbs.every((text) => /^Board [1-3] [✓✗]$/.test(text)), JSON.stringify(after));
+    const other = after.thumbs[0].split(" ")[1];
+    await b.evaluate(`document.querySelectorAll('.board-thumb')[0].click()`);
+    await sleep(300);
+    const replayed = await boardsView();
+    expect(replayed.caption.startsWith(`Board ${other} `), JSON.stringify(replayed));
+
+    await setCode(solution("ch02-l02"));
+    const solved = await run();
+    const done = await boardsView();
+    expect(solved.head === "Solved!" && done.caption === "Board 1 ✓" && done.thumbs.join() === "Board 2 ✓,Board 3 ✓", `${solved.head} | ${JSON.stringify(done)}`);
+    return `${before.caption} → ${after.caption} → ${done.caption}`;
+  });
+
+  await check("M3.2: a timed gate's badge counts the ticks", async () => {
+    await openLevel("ch02-l05", { fresh: true });
+    const badge = () => b.evaluate(`document.querySelector('.boards-main .badge-text').textContent`);
+    const before = /^(.+) · tick 0$/.exec(await badge());
+    await setCode(solution("ch02-l05"));
+    await run();
+    const after = await badge();
+    expect(before !== null && after.startsWith(`${before[1]} · tick `) && !after.endsWith(" · tick 0"), JSON.stringify({ before: before?.[0], after }));
+  });
+
+  await check("M3.2: The Gauntlet is tagged as the chapter's optional mastery challenge", async () => {
+    await levelCards();
+    const card = await b.evaluate(`document.querySelector('a[href="#/level/ch02-l06"] .mastery-tag')?.textContent ?? null`);
+    await openLevel("ch02-l06", { fresh: true });
+    await challengeTab();
+    const panel = await b.evaluate(`document.querySelector('.mastery-note .mastery-tag')?.textContent ?? null`);
+    expect(card === "Mastery · optional" && panel === card, JSON.stringify({ card, panel }));
   });
 
   await check("no console errors during the app checks", async () => {

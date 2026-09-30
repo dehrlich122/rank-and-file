@@ -57,11 +57,17 @@ export interface LevelInfo {
   enemies: Enemy[]; // patrols and chasers; where they are is in each WorldState
   goal: Pos | null;
   goal_spots: Pos[]; // a hidden goal: the squares it might be on (drawn as ?)
-  case_title: string; // the title of the row of cases above the board; "" for a single case
+  case_title: string; // a hidden goal's row of cases above the board: its title; "" otherwise
   start: WorldState;
   objectives: { reach_goal: boolean; say: string[]; waypoints: boolean; collect: number | "all" | null; capture: number | "all" | null };
   api: string[];
-  constraints: { max_lines: number | null; min_comments: number; require_nodes: string[]; ban_nodes: string[] };
+  constraints: {
+    max_lines: number | null;
+    min_comments: number;
+    require_nodes: string[];
+    ban_nodes: string[];
+    max_numbers: number | null; // numbers the code may write (M3.2, QA-029); 1 means one number, written once
+  };
   par: { lines: number | null };
   starter: string;
   goals: string[]; // what to do, in words (never a passphrase)
@@ -69,6 +75,8 @@ export interface LevelInfo {
   obstacles: string[]; // each obstacle's rule, in words (M3.1)
   stars: string[]; // what each of the three stars asks for, in words
   hints: string[]; // tiered: nudge, concept reminder, partial example
+  mastery: boolean; // a chapter's optional mastery challenge (M3.2)
+  boards: LevelInfo[]; // a level with other maps (M3.2): every board, first to last, the others shown small beside it (QA-032); otherwise empty
 }
 
 /** A patrol or a chaser (levels.Enemy), as the board draws it. */

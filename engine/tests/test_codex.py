@@ -121,7 +121,7 @@ def test_help_is_a_builtin_not_one_of_the_players_variables():
 def test_help_on_the_piece_lists_what_it_knows_here():
     output = run_sandbox("help(pawn)", ["move", "wait", "turn_left"]).output
     listed = [line.strip() for line in output.splitlines() if line.startswith("    pawn.")]
-    assert listed == ["pawn.move(squares=1)", "pawn.turn_left()", "pawn.wait()"]  # the pawn's own order
+    assert listed == ["pawn.move(squares=1)", "pawn.turn_left()", "pawn.wait(ticks=1)"]  # the pawn's own order
 
 
 def test_help_on_a_locked_ability_says_it_isnt_learned_yet():

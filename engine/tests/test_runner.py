@@ -284,7 +284,7 @@ def test_code_that_never_runs_is_reported_once():
 def test_other_maps_are_boards():
     level = make_level("# G #\n# . #\n# P #\n", variants=[{"map": "# . #\n# G #\n# P #\n"}])
     result = run_level(level, "pawn.move(2)\n")
-    assert [case["label"] for case in result.cases] == ["your board", "board 2"]
+    assert [case["label"] for case in result.cases] == ["board 1", "board 2"]
     assert result.case == 1
     assert result.case_note == "It worked for 1 of the 2 boards."
     assert result.cases[1]["case_note"] == "This run is the one on board 2."

@@ -1,7 +1,11 @@
 import ast
 
+import pytest
+
 from conftest import make_level
+from rankfile import constraints
 from rankfile.constraints import code_lines, comment_count
+from rankfile.levels import LevelError
 from rankfile.runner import run_level
 
 
@@ -73,3 +77,37 @@ def test_no_warnings_for_normal_code(corridor):
 def test_ast_module_is_what_we_think():
     # A reminder of what the constraint names refer to.
     assert type(ast.parse("for x in y: pass").body[0]).__name__ == "For"
+
+
+# -- max_numbers (M3.2, QA-029) --------------------------------------------------------
+
+
+def test_only_one_number_written_once():
+    level = make_level("G\n.\n.\n.\n.\nP\n", constraints={"max_numbers": 1})
+    result = run_level(level, "pawn.move(2)\npawn.move(3)")
+    assert result.status == "constraint"
+    assert result.summary == (
+        "Your code writes 2 numbers: 2 and 3. It may contain only one number, written once: give it a name, and use the name."
+    )
+    assert run_level(level, "steps = 2\npawn.move(steps)\npawn.move(steps)\npawn.move()").status == "solved"
+    assert run_level(level, "steps = 2\npawn.move(steps + steps)\npawn.move()").status == "solved"  # sums on the name are fine
+
+
+def test_a_higher_limit_counts_every_number_written():
+    level = make_level("G\n.\n.\n.\nP\n", constraints={"max_numbers": 2})
+    assert run_level(level, "pawn.move(1)\npawn.move(1)\npawn.move(2)").summary.endswith("This level allows at most 2.")
+
+
+def test_numbers_inside_text_dont_count_and_a_minus_sign_doesnt_hide_one():
+    numbers = constraints.numbers_written(ast.parse("print('5 squares')\nx = -3\ny = 2.5\nz = True"))
+    assert sorted(numbers) == [2.5, 3]
+
+
+def test_max_numbers_is_described():
+    assert make_level("G\nP\n", constraints={"max_numbers": 1}).describe()["rules"] == ["Your code may contain only one number, written once."]
+    assert make_level("G\nP\n", constraints={"max_numbers": 3}).describe()["rules"] == ["Your code may contain at most 3 numbers."]
+
+
+def test_max_numbers_must_be_a_whole_number():
+    with pytest.raises(LevelError, match="max_numbers must be a whole number"):
+        make_level("G\nP\n", constraints={"max_numbers": 0})

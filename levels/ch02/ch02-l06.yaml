@@ -1,0 +1,54 @@
+id: ch02-l06
+chapter: 2
+title: "The Gauntlet"
+trains: "Chapter 2 mastery: counting, sums, f-strings and timing, together"
+brief: "Everything at once, on three boards: a hall, a guard who wants to know how far you've come, and a portcullis that has kept time since your very first move."
+piece: pawn
+map: |
+  # # # # # # # # #
+  . . . . X . . T G
+  . # # # # # # # #
+  P # # # # # # # #
+legend:
+  "X": {"tile": "gate", "question": "Halt! How far have you come? Answer like this: I walked 10 squares.", "passphrase": "I walked 5 squares."}
+  "T": {"tile": "timed_gate", "every": 4, "open": 2}
+start: {"facing": "north"}
+api:
+- move
+- turn_left
+- turn_right
+- squares_ahead
+- wait
+constraints: {"require_nodes": ["FormattedValue"]}
+par:
+  lines: 11
+hints:
+- "The portcullis has been counting since your very first action, and a turn is an action too."
+- "Add up every tick before you reach the gate: every square walked and every turn. Then the remainder works just as it did in Keeping Time."
+- "One way to write the line that matters most: `pawn.wait(4 - ticks % 4)`"
+lesson: ch02/ch02-l06.md
+starter: "# Tell the guard \"I walked X squares.\"\n"
+mastery: true
+lesson_board:
+  map: |
+    . . . . .
+    . . . . T
+    . . . . .
+    . . P . .
+  legend: {"T": {"tile": "timed_gate", "every": 4, "open": 2}}
+variants:
+- map: |
+    # # # # # # # # #
+    . . . . . X . T G
+    . # # # # # # # #
+    . # # # # # # # #
+    P # # # # # # # #
+  legend: {"X": {"tile": "gate", "question": "Halt! How far have you come? Answer like this: I walked 10 squares.", "passphrase": "I walked 7 squares."}}
+- map: |
+    # # # # # # # # #
+    . . . X . . . T G
+    . # # # # # # # #
+    . # # # # # # # #
+    . # # # # # # # #
+    P # # # # # # # #
+  legend: {"X": {"tile": "gate", "question": "Halt! How far have you come? Answer like this: I walked 10 squares.", "passphrase": "I walked 6 squares."}}

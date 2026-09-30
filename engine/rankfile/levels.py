@@ -58,7 +58,7 @@ CLOCK_TICKS = {
 ALLOWED_KEYS = {
     "id", "chapter", "title", "trains", "brief", "piece", "map", "legend", "start",
     "objectives", "api", "constraints", "par", "hints", "lesson", "starter", "variants",
-    "enemies", "lesson_board",
+    "enemies", "lesson_board", "mastery",
 }  # fmt: skip
 REQUIRED_KEYS = {"id", "chapter", "title", "trains", "map", "api", "lesson"}
 
@@ -69,6 +69,7 @@ class Constraints:
     min_comments: int = 0
     require_nodes: list[str] = field(default_factory=list)  # ast node names, e.g. "For"
     ban_nodes: list[str] = field(default_factory=list)
+    max_numbers: int | None = None  # numbers written in the code, at most (M3.2, QA-029); 1 means one number, written once
 
 
 @dataclass
@@ -155,6 +156,7 @@ class Level:
     enemies: list[Enemy] = field(default_factory=list)  # patrols and chasers (M3.1)
     planks: int = 0  # planks the piece starts with (QA-017)
     lesson_board: dict | None = None  # the board the lesson's snippets run on, as the level file gives it (QA-019)
+    mastery: bool = False  # a chapter's optional mastery challenge (M3.2)
 
     def cases(self) -> list[Case]:
         """Every situation a solution must handle: one per square a hidden goal
@@ -163,7 +165,7 @@ class Level:
         if self.goal_spots:
             return [Case(square_name(spot), f"with the goal on {square_name(spot)}", replace(self, goal=spot)) for spot in self.goal_spots]
         boards = [Case(f"board {number}", f"on board {number}", variant) for number, variant in enumerate(self.variants, start=2)]
-        return [Case("your board", "on your board", replace(self, variants=[])), *boards]
+        return [Case("board 1", "on board 1", replace(self, variants=[])), *boards]
 
     @property
     def case_words(self) -> tuple[str, str]:
@@ -207,7 +209,7 @@ class Level:
             else:
                 goals.append(f"Get past the locked gate on {square_name(gate)}. A guard keeps it shut.")
         if self.variants:
-            goals.append(f"Your code is also checked on {count(len(self.variants), 'other board')}.")
+            goals.append(f"Your code has to work on all {len(self.variants) + 1} boards.")
         return goals
 
     @property
@@ -281,7 +283,7 @@ class Level:
             ],  # where each one is comes with the world's state
             "goal": list(self.goal) if self.goal else None,
             "goal_spots": [list(spot) for spot in self.goal_spots],
-            "case_title": self.case_words[0] if self.goal_spots or self.variants else "",
+            "case_title": self.case_words[0] if self.goal_spots else "",  # other maps show their boards instead
             # Gates appear in `tiles`; their passphrases are deliberately left out.
             "start": World(self).state(),
             "objectives": asdict(self.objectives),
@@ -298,6 +300,9 @@ class Level:
             # Tiered hints (nudge, concept reminder, partial example); the UI
             # reveals them one at a time, and only when asked.
             "hints": self.hints,
+            "mastery": self.mastery,
+            # With other maps (M3.2): every board, first to last, shown beside the one on show (QA-032).
+            "boards": [case.level.describe() for case in self.cases()] if self.variants else [],
         }
 
 
@@ -340,7 +345,10 @@ def parse_level(data: dict) -> Level:
         lesson=_text(data, "lesson"),
         brief=str(data.get("brief", "")),
         starter=str(data.get("starter", "")),
+        mastery=data.get("mastery", False),
     )
+    if not isinstance(level.mastery, bool):
+        raise LevelError("mastery is true or false")
     if "lesson_board" in data:
         try:
             sandbox_level(level.api, piece, data["lesson_board"])
@@ -446,7 +454,7 @@ def _parse_details(symbol: str, tile: Tile, meaning: dict) -> dict:
 class Case:
     """One situation a solution must handle (see Level.cases)."""
 
-    label: str  # "b3" (where a hidden goal is), "your board" or "board 2"
+    label: str  # "b3" (where a hidden goal is), or "board 1", "board 2", ...
     where: str  # for sentences: "with the goal on b3", "on board 2"
     level: Level  # the level as it is in this case
 
@@ -588,15 +596,19 @@ def _parse_board(text: str, legend: dict, objectives: Objectives) -> tuple[Board
 
 
 def _parse_variants(items, legend: dict, level: Level) -> list[Level]:
-    """Each other map is the level on another board: same legend, objectives and abilities."""
+    """Each other map is the level on another board: same objectives and abilities,
+    and the same legend, though a board can give a symbol its own entry (M3.2),
+    e.g. a guard with a different answer."""
     if not isinstance(items, list):
         raise LevelError("variants must be a list of {map: ...} entries")
     variants = []
     for number, item in enumerate(items, start=1):
-        if not isinstance(item, dict) or set(item) != {"map"}:
-            raise LevelError(f"variant {number} must have a map, and nothing else")
+        if not isinstance(item, dict) or "map" not in item or set(item) - {"map", "legend"}:
+            raise LevelError(f"variant {number} must have a map, and optionally a legend, and nothing else")
+        if not isinstance(item.get("legend", {}), dict):
+            raise LevelError(f"variant {number}: legend must be a mapping of symbols to tiles")
         try:
-            board, start, goal, spots = _parse_board(item["map"], legend, level.objectives)
+            board, start, goal, spots = _parse_board(item["map"], {**legend, **item.get("legend", {})}, level.objectives)
         except LevelError as exc:
             raise LevelError(f"variant {number}: {exc}") from None
         if spots:
@@ -704,11 +716,13 @@ def _parse_par(data: dict) -> Par:
 
 
 def _parse_constraints(data: dict) -> Constraints:
-    allowed = {"max_lines", "min_comments", "require_nodes", "ban_nodes"}
+    allowed = {"max_lines", "min_comments", "require_nodes", "ban_nodes", "max_numbers"}
     unknown = set(data) - allowed
     if unknown:
         raise LevelError(f"unknown constraint(s): {', '.join(sorted(unknown))}")
     constraints = Constraints(**data)
+    if constraints.max_numbers is not None and not _positive(constraints.max_numbers):
+        raise LevelError("constraint max_numbers must be a whole number of at least 1")
     for name in constraints.require_nodes + constraints.ban_nodes:
         node_type = getattr(ast, name, None)
         if not (isinstance(node_type, type) and issubclass(node_type, ast.AST)):

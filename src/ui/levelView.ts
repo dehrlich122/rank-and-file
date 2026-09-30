@@ -9,6 +9,7 @@ import { ChipTooltip, codexHover, renderCodex, type CodexLookup, type CodexView 
 import { h } from "./dom";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
+import { masteryTag } from "./levelSelect";
 import { Console, Inspector, noticeCard, outcomeCard } from "./panels";
 import { callCompletion, KnownCalls } from "./completion";
 import { HelpPanel } from "./help";
@@ -28,11 +29,15 @@ export interface LevelContext {
 
 const AUTOPLAY_LIMIT = 150; // longer runs open at the end instead of playing
 
+/** ✓ or ✗: how one case of a run ended. */
+const verdict = (c: LevelResult) => (c.status === "solved" ? "✓" : "✗");
+
 export function mountLevel(root: HTMLElement, context: LevelContext, source: LevelSource): () => void {
   const { client } = context;
   let level: LevelInfo | null = null;
   let board: BoardView | null = null;
   let caseBoard: BoardView | null = null; // the board of the case being replayed (M2), shown instead
+  let thumbs: BoardView[] = []; // a level's other boards, small, beside the one on show (QA-032)
   const shownBoard = () => caseBoard ?? board;
   let runResult: LevelResult | null = null; // the last run as a whole: its verdict, stars and cases
   let player: Player | null = null;
@@ -257,7 +262,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       }
       level = loaded.level;
       board = new BoardView(level);
-      boardHost.replaceChildren(board.element);
+      if (level.boards.length) showBoards(0, null); // with its other boards beside it (QA-032)
+      else boardHost.replaceChildren(board.element);
       help = new HelpPanel(source.id, level.hints, () => getCode(editor));
       challengePanel.replaceChildren(...describeChallenge(level, openCodexEntry, chipTooltip, () => codex), help.element);
       updateControls();
@@ -386,31 +392,67 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     outcomeHost.replaceChildren(outcomeCard(run, result, actions));
   }
 
-  // -- several cases (M2): a hidden goal's ? squares, other maps ------------------------
+  // -- several cases (M2): a hidden goal's ? squares ----------------------------------------
   // A run comes back with every case's result. The board shows the case being
   // replayed (its goal, and ✓ or ✗ on each ? square), and a row of buttons
   // above it replays any other case.
   function showCaseBoard(run: LevelResult, index: number): void {
+    if (level?.boards.length) return showBoards(index, run);
     caseBoard?.dispose();
     // ✓ or ✗ on each ? square: whether the code reached a goal hidden there.
     const spots = new Map(run.cases.flatMap((c) => (c.level.goal ? [[squareName(c.level.goal), c.status === "solved"] as const] : [])));
     caseBoard = new BoardView(run.cases[index]!.level, { spots });
+    const title = level?.case_title ?? "";
     const buttons = run.cases.map((c, i) =>
+      h("button", { class: "btn btn-small btn-toggle", "aria-pressed": String(i === index), onClick: () => showCase(i, "play") }, `${c.label} ${verdict(c)}`),
+    );
+    boardHost.replaceChildren(h("div", { class: "case-row", role: "group", "aria-label": title }, h("span", { class: "muted small" }, `${title}:`), ...buttons), caseBoard.element);
+  }
+
+  // -- other maps (M3.2, QA-032) ---------------------------------------------------------
+  // The board on show is large, and the level's other boards sit small beside
+  // it: before a run as they start, after one as they ended, with ✓ or ✗.
+  // Clicking a small board puts it on show, and replays it after a run.
+  function showBoards(shown: number, run: LevelResult | null): void {
+    if (!level || !board) return;
+    caseBoard?.dispose();
+    for (const thumb of thumbs) thumb.dispose();
+    const boards = level.boards; // the same boards a run's cases come back with
+    caseBoard = shown > 0 ? new BoardView(boards[shown]!) : null; // board 1 is the level's own
+    const mark = (i: number) => (run ? ` ${verdict(run.cases[i]!)}` : "");
+    thumbs = [];
+    const others = boards.flatMap((info, i) => {
+      if (i === shown) return [];
+      const thumb = new BoardView(info, { mini: true });
+      if (run) thumb.show(run.cases[i]!.final);
+      thumbs.push(thumb);
+      const title = run ? `Replay board ${i + 1}` : `Look at board ${i + 1}`;
+      return [
+        h(
+          "button",
+          { class: "btn board-thumb", title, "aria-label": title, onClick: () => (run ? showCase(i, "play") : showBoards(i, null)) },
+          h("span", { class: "board-thumb-label" }, `Board ${i + 1}${mark(i)}`),
+          thumb.element,
+        ),
+      ];
+    });
+    const caption = run ? `Board ${shown + 1}${mark(shown)}` : `Board ${shown + 1} of ${boards.length}. Your code has to work on every board.`;
+    boardHost.replaceChildren(
       h(
-        "button",
-        { class: "btn btn-small btn-toggle", "aria-pressed": String(i === index), onClick: () => showCase(i, "play") },
-        `${c.label} ${c.status === "solved" ? "✓" : "✗"}`,
+        "div",
+        { class: "boards" },
+        h("div", { class: "boards-main" }, h("p", { class: "boards-caption" }, caption), (caseBoard ?? board).element),
+        h("div", { class: "boards-side", role: "group", "aria-label": "The other boards" }, ...others),
       ),
     );
-    const title = level?.case_title ?? "";
-    boardHost.replaceChildren(h("div", { class: "case-row", role: "group", "aria-label": title }, h("span", { class: "muted small" }, `${title}:`), ...buttons), caseBoard.element);
   }
 
   /** No recording, and the level's own board at the start: before every run. */
   function resetStage(): void {
     player?.dispose();
     player = null;
-    if (caseBoard && board) {
+    if (level?.boards.length) showBoards(0, null);
+    else if (caseBoard && board) {
       caseBoard.dispose();
       caseBoard = null;
       boardHost.replaceChildren(board.element);
@@ -473,6 +515,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     player?.dispose();
     board?.dispose();
     caseBoard?.dispose();
+    for (const thumb of thumbs) thumb.dispose();
     lesson?.dispose();
     editor.destroy();
     context.repl.setLevel(null); // so Scratch Python doesn't keep this screen alive
@@ -484,6 +527,11 @@ function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, 
     h("h2", { class: "challenge-title" }, level.title),
     h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), level.trains),
   ];
+  if (level.mastery) {
+    parts.push(
+      h("p", { class: "mastery-note" }, masteryTag(), " A harder challenge for the whole chapter, played for par."),
+    );
+  }
   if (level.brief) parts.push(h("p", {}, level.brief));
 
   // The goals and rules come worded from the engine (Level.describe), which owns

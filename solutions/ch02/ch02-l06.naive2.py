@@ -1,0 +1,12 @@
+# expect: lost
+hall = pawn.squares_ahead()
+pawn.move(hall)
+pawn.turn_right()
+gallery = pawn.squares_ahead()
+pawn.move(gallery)
+print(f"I walked {hall + gallery} squares.")
+ahead = pawn.squares_ahead()
+pawn.move(ahead)
+ticks = hall + (gallery + (ahead + 1))
+pawn.wait(3)
+pawn.move(2)

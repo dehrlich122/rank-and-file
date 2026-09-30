@@ -1342,6 +1342,165 @@ enough, or should they be rewritten?
 - **Cause** *(Claude)*: the same as QA-026. The reference passed time with
   turns, so its opening lines turned the pawn toward the edge of the board.
 
+## Session 7 — 2026-09-30 · M3.2 play-test (`m3-2-chapter-2`, PR #12)
+
+### QA-029 · Signposts on 2.1 and 2.2 teach nothing · Verified
+
+(The designer filed this as QA-025, which was taken, so it's QA-029.)
+
+- **Verified** *(Designer, 2026-09-30)*: all of that looks good.
+- **Fixed** in `2d7ceec` (2026-09-30); awaiting the designer's retest.
+  - **2.1:**
+    - The signpost is gone.
+    - The one rule is "Your code may contain only one number, written
+      once" (`max_numbers: 1`), plus the 10-line limit.
+    - Par 8, as before.
+  - **2.2** brings in `squares_ahead()` and does `+`, `-` and `*` on what the
+    pawn counts, on three boards:
+    - Walk up the hall to the door, one square before its end, then twice
+      as far along the gallery.
+    - The halls differ, so the numbers can't be known ahead of time. Par 4.
+    - Its lesson brings in counting together with the sums.
+  - **2.3** is only about `//` now. Its lesson and second hint changed.
+  - `max_numbers` replaces the two signpost rules, which are removed from
+    the engine. Signposts as tiles are unchanged.
+  - References, wrong attempts and third hints were regenerated blind.
+- **Decided** *(Designer, 2026-09-30)*:
+  - 2.1's rule: only one number, written once. That's the designer's "write
+    the number once", with the loophole closed: each stretch could otherwise
+    be a different sum.
+  - 2.2: count, then do the sums.
+  - Not chosen: 2.1 with "each number only once"; 2.2 built on one number
+    with a rule.
+- **Retest:**
+  - **2.1:** no signpost, and the Challenge panel lists the one-number rule.
+    Writing the number twice, or two different numbers, gets a message
+    that says why.
+  - **2.2:**
+    - Three board tabs, and the Codex marks `squares_ahead` as New.
+    - The lesson counts, then does sums.
+    - Numbers typed for board 1 fail on another board.
+  - **2.3:** the lesson is about `/` and `//`, and `squares_ahead` isn't New
+    any more.
+
+- **Area:** 2.1 The Surveyor's Road and 2.2 Doing the Sums: their signposts
+  and the "numbers must come from the signposts" rule
+- **Observed** *(Designer, 2026-09-30)*:
+  - **2.1:** why is there a signpost? There's no information to be gleaned
+    from it. It feels like a red herring, and makes the challenge less
+    clear. The rule to write the number only once is enough to teach how
+    to assign a variable.
+  - **2.2:** there are no numbers on the signpost, and no obvious function
+    to read it. Signs are fine, but this isn't teaching the skill it claims
+    to.
+- **Why** *(Claude)*:
+  - The numbers were there, but only in the Challenge panel's signpost
+    quotes and in a hover tooltip on the sign. Nothing on the board shows
+    them.
+  - Even when found, they tell you nothing the board doesn't already show:
+    you can count the squares. So "numbers must come from the signposts" is
+    an arbitrary rule, not a reason to do the sums in code. It's the same
+    gap as QA-023: code only needs to work something out when the answer
+    can't be known ahead of time.
+
+
+### QA-030 · 2.4: a typo in the guard's answer, and the guard only says "Wrong!" · Verified
+
+- **Verified** *(Designer, 2026-09-30)*: all of that looks good.
+- **Fixed** in `3afd893` (2026-09-30); awaiting the designer's retest.
+  - 2.4 and 2.6 start with the comment `# Tell the guard "I walked X
+    squares."`, to copy from instead of retyping.
+  - A guard who asks a question now answers a wrong line one of two ways:
+    - the answer's words with a different number: "Do you not know how to
+      count!?"
+    - anything else, such as a typo: "I can't understand you!", with a
+      pointer to say it exactly the way the question shows
+  - It used to say "Wrong!" every time. The Testing ground's The Toll gets
+    the same replies.
+  - 2.4's lesson now shows the miscount reply before the right answer.
+- **Retest:**
+  - 2.4: the editor starts with the comment.
+  - Print the sentence with a wrong number, then with a typo, next to the
+    gate. Each gets its own reply in the console.
+  - The Learn tab's guard snippet shows "Do you not know how to count!?".
+
+- **Area:** 2.4 Halt! (and 2.6, which has the same guard), and guard replies
+- **Observed** *(Designer, 2026-09-30)*: the f-string seemed to print
+  correctly and the count was right, but the guard refused. The cause was a
+  typo in the sentence. The guard's only reply was "Wrong!".
+- **Wanted** *(Designer, 2026-09-30)*:
+  - Put the guard's sentence in the code as a comment, e.g. Tell the guard
+    "I walked X steps.", so it can be copied without typos.
+  - Better guard feedback in the console: "Do you not know how to count!?"
+    for a calculation error, and "I can't understand you!" for a typo.
+
+
+
+### QA-031 · The wait's second remainder is unnecessary · Verified
+
+- **Verified** *(Designer, 2026-09-30)*: all of that looks good.
+- **Fixed** in `7bc114e` (2026-09-30); awaiting the designer's retest.
+  - 2.5's and 2.6's reference solutions take the remainder once. Their
+    third hints quote the new line.
+  - 2.5's solution note says why a whole extra cycle is fine.
+  - The generator now accepts any wait that gets through on each board,
+    not just the shortest.
+- **Retest:** 2.5 and 2.6: hint 3 and the solution after solving have one
+  `%` in the wait. Both still solve every board.
+
+- **Area:** 2.5 Keeping Time and 2.6 The Gauntlet: the reference solution
+  and hint 3
+- **Observed** *(Designer, 2026-09-30)*: the second remainder operator seems
+  unnecessary; taking the remainder again gives the same result. It's an
+  extra bit of code that muddles both the hint and the idiomatic solution.
+- **Why** *(Claude)*:
+  - Without it, a pawn that would arrive exactly as the gate opens waits
+    a whole cycle instead of none. That's harmless, since the gate opens
+    again, so the simpler expression works on every board.
+  - The generator only kept the outer remainder because it looked for the
+    shortest wait on each board.
+
+
+### QA-032 · Several boards are hard to follow · Verified
+
+- **Verified** *(Designer, 2026-09-30)*: all of that looks good.
+- **Fixed** in `22ff6bf` (2026-09-30); awaiting the designer's retest.
+  - The board on show is large, and the level's other boards sit small
+    beside it, in the space narrow boards leave (below it on narrow
+    windows).
+  - **Before a run:** "Board 1 of 3. Your code has to work on every board.",
+    with every other board visible as it starts.
+  - **After a run:** the first board that failed is on show and replays.
+    Each small board shows how it ended, with ✓ or ✗ (a crushed or caught
+    pawn shows as lost).
+  - Clicking a small board puts it on show, and replays it after a run.
+  - The hidden-goal levels (the ? squares) keep their row of buttons.
+  - The board area no longer shrinks under the controls and outcome, so a
+    tall board can't overlap the playback bar.
+- **Decided** *(Designer, 2026-09-30)*: a main board plus small boards
+  beside it. The small ones show how each board ended; they don't play
+  along.
+  - Not chosen: small boards that play along, playing each board in turn,
+    or all boards side by side.
+- **Retest:**
+  - 2.3 (or any multi-board level): before running, the caption and the
+    small boards. Click one to put it on show.
+  - Run code that works on some boards but not others: the failing board
+    is on show, and the small boards show ✓ and ✗.
+  - Click a ✓ board to replay it.
+  - 2.5: the tall corridor fits above the playback controls.
+
+- **Area:** the board tabs on levels with other boards (2.2 to 2.6)
+- **Observed** *(Designer, 2026-09-30)*: the idea of multiple boards is
+  great, but the display makes it hard to understand for someone who
+  didn't work on the project.
+- **Ideas** *(Designer, 2026-09-30)*:
+  - Run all the boards in succession automatically, to show why the code
+    failed on some but worked on others.
+  - All boards visible at once, though that takes a lot of screen space.
+  - Or use the negative space: a main board front and centre, and the
+    other boards smaller off to the side, where they can be selected.
+
 ---
 
 ## Queued work

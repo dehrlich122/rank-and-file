@@ -206,13 +206,16 @@ objectives:                  # default [reach_goal]
   - waypoints                # cross every waypoint (added whenever the map has any)
   - collect: all             # or a number: gems to walk over
   - capture: all             # or a number: enemies to capture (armoured ones can't be)
-api: [move, turn_left, turn_right]      # abilities the piece has in this level (also at_goal, wait, capture_left, capture_right, bridge)
+api: [move, turn_left, turn_right]      # abilities the piece has in this level (also squares_ahead, at_goal, wait, capture_left, capture_right, bridge)
 constraints: {max_lines: 4, min_comments: 1, require_nodes: [For], ban_nodes: []}
+                             # also max_numbers: 1 (M3.2, QA-029): only one number, written once
 par: {lines: 3}              # the par star: this many lines of code or fewer
 hints: ["nudge", "concept reminder", "partial example"]   # opened one at a time, on request
 variants:                    # optional: the same level on other maps, which it must also solve
-  - map: |
+  - map: |                   # shown small beside the level's board, before and after a run (M3.2, QA-032)
       ...
+    legend: {X: {...}}       # optional (M3.2): this board's own entry for a symbol, e.g. a guard's answer
+mastery: true                # optional (M3.2): the chapter's optional mastery challenge
 lesson: ch01/ch01-l03.md
 starter: ""                  # optional initial editor contents
 lesson_board:                # optional (QA-019): the board the lesson's snippets run on
@@ -237,13 +240,16 @@ must reach the goal whichever `?` it's on). Legend tiles:
     move, as it would be in Python.
   - With a `question` *(M3.1)*, the guard asks it: the question is shown in
     the goals and on the gate, and the passphrase is its answer. A wrong
-    answer gets its own reply.
+    answer gets one of two replies *(QA-030)*. The answer's words with
+    another number get "Do you not know how to count!?". Anything else,
+    such as a typo, gets "I can't understand you!".
   - The guard lines live in `world.py`.
   - `describe()` never includes the passphrase.
 - `timed_gate` *(M3.1)*: open for the first `open` ticks (default 2) of every
   `every` ticks of its clock, starting open; `every` must be more than
   `open`. Shut, it blocks like a wall. Anything under it when it shuts is
-  crushed *(QA-024)*: the piece loses the run, and a chaser is gone.
+  crushed *(QA-024)*: the piece loses the run, and a chaser is gone. Its
+  badge counts its clock's ticks during playback ("2 of 4 · tick 5", M3.2).
 - `pit` *(M3.1)*: stepping in loses the run. `pawn.bridge()` lays a plank
   over the pit ahead *(QA-017)*, which makes it floor for everyone. A chaser
   whose step lands on an open pit falls in and is gone.
@@ -252,6 +258,18 @@ must reach the goal whichever `?` it's on). Legend tiles:
 - `waypoint` *(M3.1)*: must be crossed (passed over, not stopped on) before
   the program ends.
 - `gem` *(M3.1)*: collected by walking over it.
+
+The piece's counting and waiting *(M3.2)*:
+- `squares_ahead()` gives back how many squares the piece could walk straight
+  ahead. It stops before a wall, the board's edge, a signpost, any timed gate
+  (even an open one), and a guard's gate that isn't open yet. Pits and
+  enemies don't stop it. It costs no tick.
+- `wait(ticks=1)` waits a whole number of ticks, from 0 to 100. The ceiling
+  keeps one line from recording a flood of ticks.
+
+`max_numbers` *(M3.2, QA-029)*: how many numbers the code may write, counted
+with `ast`. With 1, "Your code may contain only one number, written once".
+Numbers inside text don't count, and `-3` counts as 3.
 
 Enemies *(M3.1)* move one square per tick of their clock:
 - A **patrol** walks its `route`, straight lines between the corners listed,

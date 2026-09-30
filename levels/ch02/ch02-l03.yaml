@@ -1,0 +1,40 @@
+id: ch02-l03
+chapter: 2
+title: "Halfway There"
+trains: "Whole-number division (//): halving what you count"
+brief: "Three boards, three different halls. Ride to the end of the hall, turn right, and stop halfway along the gallery, rounding down on an odd one."
+piece: pawn
+map: |
+  # # # # # # #
+  . . . G . . .
+  . # # # # # #
+  . # # # # # #
+  . # # # # # #
+  P # # # # # #
+start: {"facing": "north"}
+api:
+- move
+- turn_left
+- turn_right
+- squares_ahead
+par:
+  lines: 3
+hints:
+- "The halls and galleries are different on every board, so no number you type fits them all. Let your pawn do the counting."
+- "// divides and drops what's left over: 7 // 2 is 3, and 6 // 2 is 3 as well. That's how halfway lands on a square."
+- "One way to write the line that matters most: `pawn.move(pawn.squares_ahead() // 2)`"
+lesson: ch02/ch02-l03.md
+variants:
+- map: |
+    # # # # # #
+    . . G . . .
+    . # # # # #
+    P # # # # #
+- map: |
+    # # # # # # # #
+    . . . G . . . .
+    . # # # # # # #
+    . # # # # # # #
+    . # # # # # # #
+    . # # # # # # #
+    P # # # # # # #

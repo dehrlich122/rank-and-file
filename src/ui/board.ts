@@ -28,7 +28,7 @@ export class BoardView {
   private readonly flash: SVGRectElement;
   private readonly lostMark: SVGGElement; // where the run was lost (M3.1)
   private readonly enemies: SVGGElement[]; // one per level.enemies, moved like the piece
-  private readonly counters: SVGGElement[]; // clockwork badges that count their clock's ticks (QA-021)
+  private readonly counters: SVGGElement[]; // badges that count a clock's ticks: clockwork's (QA-021), timed gates' (M3.2)
   private readonly art = new Map<TileKind, Map<string, SVGGElement>>(); // tile kind -> "x,y" -> its art
   private angle = 0; // cumulative, so turns always take the short way round
   private timers: number[] = [];
@@ -157,7 +157,8 @@ export class BoardView {
       if (pos) enemy.style.transform = centre(pos, this.level.height);
     });
     for (const counter of this.counters) {
-      const ticks = state.clock_ticks?.[counter.dataset.clock as Clock] ?? 0;
+      const clock = counter.dataset.clock as Clock;
+      const ticks = clock === "action" ? state.tick : (state.clock_ticks?.[clock] ?? 0);
       setBadgeText(counter, counter.dataset.template!.replace("{n}", String(ticks)));
     }
     this.element.classList.toggle("lost", Boolean(state.lost));
@@ -237,9 +238,11 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
   },
   timed_gate: (left, top, level, pos) => {
     const timer = find(level.timed_gates, pos);
-    const counted = counts(level, timer?.clock);
-    const label = `${counted ? `${GEAR} {n} · ` : ""}${timer?.open ?? 0} of ${timer?.every ?? 0}`;
-    return gate(left, top, timer?.text ?? "A timed gate.", label, true, counted ? timer?.clock : undefined);
+    const timing = `${timer?.open ?? 0} of ${timer?.every ?? 0}`;
+    // Its clock's count, live during playback: clockwork's gear (QA-021), or the pawn's ticks (M3.2).
+    const clock = timer?.clock ?? "action";
+    const label = counts(level, clock) ? `${GEAR} {n} · ${timing}` : `${timing} · tick {n}`;
+    return gate(left, top, timer?.text ?? "A timed gate.", label, true, clock);
   },
   pit: (left, top) => pit(left, top),
   plank: (left, top) => plank(left, top, "plank", "A plank. Walk over it to pick it up; bridge() lays it over a pit."),

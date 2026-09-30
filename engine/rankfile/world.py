@@ -25,6 +25,7 @@ so the run stays lost even if the player's code catches the exception.
 
 import copy
 import functools
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -41,8 +42,10 @@ Event = dict
 # What the guard at a locked gate says. Every level with a gate shares these.
 GUARD_WRONG_PHRASE = "The guard called your mother a hamster! The gate remains locked."
 GUARD_GATE_LOCKED = "Does your father really smell of elderberries? Maybe try the passphrase first."
-# ...and at a gate whose guard asks a question (M3.1).
-GUARD_WRONG_ANSWER = '"Wrong!" says the guard. The gate remains locked.'
+# ...and at a gate whose guard asks a question (M3.1). The guard tells a wrong
+# number said the right way from words it can't follow (QA-030).
+GUARD_MISCOUNTED = '"Do you not know how to count!?" says the guard. The gate remains locked.'
+GUARD_NOT_UNDERSTOOD = '"I can\'t understand you!" says the guard. Say it exactly the way the question shows. The gate remains locked.'
 
 CLOCKS = ("action", "line", "new_line")
 CODE_CLOCKS = {"line", "new_line"}  # the clocks that keep time with the code, not the piece
@@ -59,6 +62,11 @@ class Foe:
     captured: bool = False
     gone: bool = False  # off the board: captured, or fallen into a pit (QA-017)
 
+
+
+def _without_numbers(text: str) -> str:
+    """The text with every number in it replaced by #: "I walked 7 squares." -> "I walked # squares." """
+    return re.sub(r"\d+", "#", text)
 
 
 def _acts(method: Callable) -> Callable:
@@ -136,6 +144,19 @@ class World:
 
     def at_goal(self) -> bool:
         return self.level.goal is not None and self.pos == self.level.goal
+
+    def squares_ahead(self) -> int:
+        """How many squares the piece can walk straight ahead before something
+        could stop it (M3.2): a wall, the board's edge, a signpost, or a gate
+        that isn't open for good. That's every timed gate, even while it's
+        open, so the count doesn't depend on when you ask, and a guard's gate
+        until it's opened. Pits and enemies don't stop the count."""
+        ahead, pos = 0, self.pos
+        while True:
+            target = step(pos, self.facing)
+            if self.board.blocked(target) or target in self.board.timers or self._locked_gate(target):
+                return ahead
+            ahead, pos = ahead + 1, target
 
     @_acts
     def turn_left(self) -> None:
@@ -218,8 +239,18 @@ class World:
                 self._emit("gate_open", at=list(gate))
             else:
                 self.refused[gate] = printed_on
-                reply = GUARD_WRONG_ANSWER if gate in self.board.questions else GUARD_WRONG_PHRASE
-                self._emit("guard", at=list(gate), message=reply)
+                self._emit("guard", at=list(gate), message=self._guard_reply(gate, line))
+
+    def _guard_reply(self, gate: Pos, line: str) -> str:
+        """What the guard says to a line that isn't the passphrase. A guard who asks a
+        question (QA-030) tells a miscount (the answer's words with another number)
+        from anything it can't follow, such as a typo."""
+        if gate not in self.board.questions:
+            return GUARD_WRONG_PHRASE
+        answer = self.board.gates[gate]
+        if re.search(r"\d", answer) and _without_numbers(line) == _without_numbers(answer):
+            return GUARD_MISCOUNTED
+        return GUARD_NOT_UNDERSTOOD
 
     @property
     def gems_collected(self) -> int:

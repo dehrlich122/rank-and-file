@@ -54,7 +54,10 @@ class Piece:
 
 class Pawn(Piece):
     NAME = "pawn"
-    ABILITIES = ("move", "turn_left", "turn_right", "at_goal", "position", "facing", "wait", "capture_left", "capture_right", "bridge")
+    ABILITIES = (
+        "move", "turn_left", "turn_right", "squares_ahead", "at_goal", "position", "facing", "wait",
+        "capture_left", "capture_right", "bridge",
+    )  # fmt: skip
 
     # These docstrings are the Codex's entries for the pawn (codex.py): the
     # Codex tab, the editor's hover tooltips and help() all show them.
@@ -100,18 +103,40 @@ class Pawn(Piece):
         """
         self._world.turn_right()
 
-    def wait(self):
-        """Stand still for one tick, while everything else on the board takes its turn.
+    def squares_ahead(self) -> int:
+        """Count the squares your pawn could walk straight ahead.
 
-        It takes no number: to wait longer, call it again.
+        It counts until something could stop you: a wall, the edge of the
+        board, a signpost, or a gate, unless it's a guard's gate you've already
+        opened. Counting is free: it doesn't take a tick.
+
+        Returns:
+            How many squares, a whole number (int). 0 if something is right in
+            front of you.
+
+        Example:
+            print(pawn.squares_ahead())
+        """
+        return self._world.squares_ahead()
+
+    def wait(self, ticks=1):
+        """Stand still while everything else on the board takes its turn.
+
+        `pawn.wait()` waits one tick, and `pawn.wait(3)` waits three.
+        `pawn.wait(0)` doesn't wait at all.
+
+        Args:
+            ticks: how many ticks to wait, a whole number (int) from 0 to
+                100. Leave it out to wait 1.
 
         Returns:
             Nothing.
 
         Example:
-            pawn.wait()
+            pawn.wait(2)
         """
-        self._world.wait()
+        for _ in range(_check_ticks(ticks)):
+            self._world.wait()
 
     def capture_left(self):
         """Take the enemy one square diagonally forward and to the left, and move onto its square.
@@ -200,15 +225,32 @@ PIECES: dict[str, type[Piece]] = {"pawn": Pawn}
 
 
 def _check_squares(squares) -> int:
-    if isinstance(squares, str):
-        raise GameArgumentError(
-            f"move() needs a number of squares, like pawn.move(3). You gave it the text {squares!r}. "
-            "Numbers don't have quote marks around them."
-        )
-    if isinstance(squares, bool) or not isinstance(squares, (int, float)):
-        raise GameArgumentError(f"move() needs a number of squares, like pawn.move(3), not {squares!r}.")
-    if isinstance(squares, float):
-        raise GameArgumentError(f"move() needs a whole number of squares, like pawn.move(3), not {squares!r}.")
-    if squares < 1:
+    if _whole_number(squares, "move", "squares") < 1:
         raise GameArgumentError(f"move() needs at least 1 square, not {squares}. Pawns never step backwards!")
     return squares
+
+
+MOST_TICKS = 100  # one wait's ceiling: each tick is recorded, so wait(10**6) would swamp the run
+
+
+def _check_ticks(ticks) -> int:
+    """wait()'s number: 0 is fine, since a computed wait can come out as 0 (M3.2)."""
+    if _whole_number(ticks, "wait", "ticks") < 0:
+        raise GameArgumentError(f"wait() can't wait {ticks} ticks. The fewest is 0, which doesn't wait at all.")
+    if ticks > MOST_TICKS:
+        raise GameArgumentError(f"wait() can't wait {ticks} ticks. The most is {MOST_TICKS}: nothing on a board takes that long to come round.")
+    return ticks
+
+
+def _whole_number(value, ability: str, noun: str) -> int:
+    """An ability's number, checked: a whole number (not text, a float or True)."""
+    if isinstance(value, str):
+        raise GameArgumentError(
+            f"{ability}() needs a number of {noun}, like pawn.{ability}(3). You gave it the text {value!r}. "
+            "Numbers don't have quote marks around them."
+        )
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise GameArgumentError(f"{ability}() needs a number of {noun}, like pawn.{ability}(3), not {value!r}.")
+    if isinstance(value, float):
+        raise GameArgumentError(f"{ability}() needs a whole number of {noun}, like pawn.{ability}(3), not {value!r}.")
+    return value
