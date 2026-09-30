@@ -1,0 +1,30 @@
+id: ch03-l01
+chapter: 3
+title: "The Grand Staircase"
+trains: "for loops and range(): repeating a block of lines"
+brief: "A grand staircase climbs to the goal, six steps all the same. There's only room for 7 lines of code."
+piece: pawn
+map: |
+  # # # # # . G
+  # # # # . . #
+  # # # . . # #
+  # # . . # # #
+  # . . # # # #
+  . . # # # # #
+  P # # # # # #
+  
+start: {"facing": "east"}
+api: ["move", "turn_left", "turn_right", "squares_ahead", "wait"]
+constraints: {"max_lines": 7}
+par: {"lines": 5}
+hints:
+- "Every step of the staircase is the same. Find the moves for one step."
+- "Put the moves for one step under a for loop, indented, and let range() repeat them once for every step."
+- "One way to start:\nfor _ in range(6):\n    pawn.turn_left()"
+lesson: ch03/ch03-l01.md
+lesson_board:
+  map: |
+    . . .
+    . # .
+    P . .
+  start: {"facing": "north"}

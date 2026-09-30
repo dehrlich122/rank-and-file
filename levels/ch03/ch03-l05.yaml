@@ -1,0 +1,32 @@
+id: ch03-l05
+chapter: 3
+title: "Three Flights"
+trains: "Loops inside loops"
+brief: "Three flights of stairs, each turned a quarter from the last, with a landing after each. There's only room for 10 lines of code."
+piece: pawn
+map: |
+  # # # . . . # # #
+  # # . . # . . # #
+  # . . # # # . . #
+  . . # # # # # . .
+  . # # # # # # # .
+  G # # # # # # . .
+  # # # # # # . . #
+  # # # # # . . # #
+  # # # # # P # # #
+  
+start: {"facing": "east"}
+api: ["move", "turn_left", "turn_right", "squares_ahead", "wait"]
+constraints: {"max_lines": 10}
+par: {"lines": 8}
+hints:
+- "Each flight is the same staircase, turned a quarter. Each landing is the same too."
+- "One loop can climb a flight. Put that loop, and the landing after it, inside another loop that runs once for every flight."
+- "One way to start:\nfor _ in range(3):\n    for _ in range(3):"
+lesson: ch03/ch03-l05.md
+lesson_board:
+  map: |
+    . . .
+    . # .
+    P . .
+  start: {"facing": "north"}

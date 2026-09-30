@@ -1,0 +1,32 @@
+id: ch03-l04
+chapter: 3
+title: "The Clockwork Sentry"
+trains: "Outpacing clockwork: a loop runs fewer new lines than the same moves copied out"
+brief: "A clockwork sentry waits on the gallery above the stairs. Every new line of code you write winds it one step closer."
+piece: pawn
+map: |
+  # # . . . . . . .
+  # # # # # # # # .
+  # # # # # # . . G
+  # # # # . . . # #
+  # # . . . # # # #
+  . . . # # # # # #
+  P # # # # # # # #
+  
+enemies:
+- {"kind": "patrol", "route": ["c7", "i7", "i5", "g5", "g4", "e4", "e3", "c3", "c2", "a2", "a1"], "clock": "new_line"}
+start: {"facing": "east"}
+api: ["move", "turn_left", "turn_right", "squares_ahead", "wait"]
+par: {"lines": 5}
+hints:
+- "The sentry only moves when a line of your code runs for the first time. Watch its gear count."
+- "A loop's lines are new only in its first round. After that the sentry stands still while the loop repeats, however far the pawn climbs."
+- "One way to start:\nfor _ in range(4):\n    pawn.turn_left()"
+lesson: ch03/ch03-l04.md
+lesson_board:
+  map: |
+    # # # # # # #
+    P . . . . . .
+    # # # # # # #
+  enemies: [{"kind": "patrol", "start": "g2", "route": ["g2", "a2"], "clock": "new_line"}]
+  start: {"facing": "east"}
