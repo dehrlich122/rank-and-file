@@ -208,7 +208,7 @@ objectives:                  # default [reach_goal]
   - capture: all             # or a number: enemies to capture (armoured ones can't be)
 api: [move, turn_left, turn_right]      # abilities the piece has in this level (also squares_ahead, at_goal, wait, capture_left, capture_right, bridge)
 constraints: {max_lines: 4, min_comments: 1, require_nodes: [For], ban_nodes: []}
-                             # also numbers_from_signs / numbers_once: true (M3.2), the signpost rules
+                             # also max_numbers: 1 (M3.2, QA-029): only one number, written once
 par: {lines: 3}              # the par star: this many lines of code or fewer
 hints: ["nudge", "concept reminder", "partial example"]   # opened one at a time, on request
 variants:                    # optional: the same level on other maps, which it must also solve
@@ -248,19 +248,6 @@ must reach the goal whichever `?` it's on). Legend tiles:
   `open`. Shut, it blocks like a wall. Anything under it when it shuts is
   crushed *(QA-024)*: the piece loses the run, and a chaser is gone. Its
   badge counts its clock's ticks during playback ("2 of 4 · tick 5", M3.2).
-
-The piece's counting and waiting *(M3.2)*:
-- `squares_ahead()` gives back how many squares the piece could walk straight
-  ahead. It stops before a wall, the board's edge, a signpost, any timed gate
-  (even an open one), and a guard's gate that isn't open yet. Pits and
-  enemies don't stop it. It costs no tick.
-- `wait(ticks=1)` waits a whole number of ticks, 0 or more.
-
-The signpost rules *(M3.2)*, checked with `ast`:
-- `numbers_from_signs`: the only numbers allowed in the code are those
-  written on the level's signposts, read from the map.
-- `numbers_once`: each number may be written only once.
-- Numbers inside text don't count, and `-3` counts as 3.
 - `pit` *(M3.1)*: stepping in loses the run. `pawn.bridge()` lays a plank
   over the pit ahead *(QA-017)*, which makes it floor for everyone. A chaser
   whose step lands on an open pit falls in and is gone.
@@ -269,6 +256,17 @@ The signpost rules *(M3.2)*, checked with `ast`:
 - `waypoint` *(M3.1)*: must be crossed (passed over, not stopped on) before
   the program ends.
 - `gem` *(M3.1)*: collected by walking over it.
+
+The piece's counting and waiting *(M3.2)*:
+- `squares_ahead()` gives back how many squares the piece could walk straight
+  ahead. It stops before a wall, the board's edge, a signpost, any timed gate
+  (even an open one), and a guard's gate that isn't open yet. Pits and
+  enemies don't stop it. It costs no tick.
+- `wait(ticks=1)` waits a whole number of ticks, 0 or more.
+
+`max_numbers` *(M3.2, QA-029)*: how many numbers the code may write, counted
+with `ast`. With 1, "Your code may contain only one number, written once".
+Numbers inside text don't count, and `-3` counts as 3.
 
 Enemies *(M3.1)* move one square per tick of their clock:
 - A **patrol** walks its `route`, straight lines between the corners listed,

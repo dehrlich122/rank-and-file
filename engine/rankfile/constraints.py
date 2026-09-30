@@ -95,28 +95,14 @@ def numbers_written(tree: ast.Module) -> list[int | float]:
 
 
 def _number_problems(numbers: list[int | float], constraints) -> list[str]:
-    """The signpost rules (M3.2): numbers only from the signposts, and each written once."""
-    problems = []
-    if constraints.numbers_from_signs:
-        stray = sorted({number for number in numbers if number not in constraints.sign_numbers})
-        if stray:
-            which = "isn't on a signpost" if len(stray) == 1 else "aren't on a signpost"
-            problems.append(
-                f"Your code uses {_numbers_list(stray)}, which {which}. The only numbers allowed are the "
-                f"signposts': {_numbers_list(constraints.sign_numbers)}."
-            )
-    if constraints.numbers_once:
-        repeated = sorted({number for number in numbers if numbers.count(number) > 1})
-        if repeated:
-            problems.append(
-                f"Your code writes {_numbers_list(repeated)} more than once. Each number may appear only once: "
-                "give it a name, and use the name."
-            )
-    return problems
-
-
-def _numbers_list(numbers: list[int | float]) -> str:
-    return and_list([str(number) for number in numbers])
+    """max_numbers (M3.2, QA-029): how many numbers the code may write."""
+    limit = constraints.max_numbers
+    if limit is None or len(numbers) <= limit:
+        return []
+    written = f"Your code writes {count(len(numbers), 'number')}: {and_list([str(number) for number in sorted(numbers)])}."
+    if limit == 1:
+        return [f"{written} It may contain only one number, written once: give it a name, and use the name."]
+    return [f"{written} This level allows at most {limit}."]
 
 
 def lint(tree: ast.Module, namespace: dict) -> list[LintWarning]:
@@ -151,10 +137,10 @@ def describe_rules(constraints) -> list[str]:
         rules.append(f"At least {count(constraints.min_comments, 'comment')} (a note starting with #).")
     rules += [f"Must use {describe_node(name)}." for name in constraints.require_nodes]
     rules += [f"Not allowed: {describe_node(name)}." for name in constraints.ban_nodes]
-    if constraints.numbers_from_signs:
-        rules.append(f"Numbers must come from the signposts: only {_numbers_list(constraints.sign_numbers)} may appear in your code.")
-    if constraints.numbers_once:
-        rules.append("Each number may appear only once in your code.")
+    if constraints.max_numbers == 1:
+        rules.append("Your code may contain only one number, written once.")
+    elif constraints.max_numbers:
+        rules.append(f"Your code may contain at most {count(constraints.max_numbers, 'number')}.")
     return rules
 
 

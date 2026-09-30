@@ -1,6 +1,4 @@
-width = 3
-pawn.move(5 - 1)
+walked = pawn.squares_ahead() - 1
+pawn.move(walked)
 pawn.turn_right()
-pawn.move(2 * width)
-pawn.turn_left()
-pawn.move(width)
+pawn.move(walked * 2)

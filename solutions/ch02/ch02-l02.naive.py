@@ -1,6 +1,4 @@
-# expect: constraint
-pawn.move(4)
+# expect: error BlockedError
+pawn.move(2)
 pawn.turn_right()
-pawn.move(6)
-pawn.turn_left()
-pawn.move(3)
+pawn.move(4)

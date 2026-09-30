@@ -2,7 +2,7 @@ id: ch02-l01
 chapter: 2
 title: "The Surveyor's Road"
 trains: "Variables: give a number a name, then use the name"
-brief: "The road zigzags up the hill in equal stretches, and the signpost says how long each one is. You may write its number only once."
+brief: "The road zigzags up the hill in stretches that are all the same length. Your code may contain only one number, written once."
 piece: pawn
 map: |
   # # # . . . G
@@ -11,19 +11,17 @@ map: |
   . . . . # # #
   . # # # # # #
   . # # # # # #
-  P S # # # # #
-legend:
-  "S": {"tile": "sign", "text": "Every stretch of this road is 3 squares long. The surveyor was most particular about that."}
+  P # # # # # #
 start: {"facing": "north"}
 api:
 - move
 - turn_left
 - turn_right
-constraints: {"numbers_from_signs": true, "numbers_once": true, "max_lines": 10}
+constraints: {"max_numbers": 1, "max_lines": 10}
 par:
   lines: 8
 hints:
-- "Every stretch is the same length, and the signpost says what it is. How could you write that number only once?"
+- "Every stretch is the same length. How could you write that number only once?"
 - "A variable is a name for a value: write the number once, store it under a name, and use the name wherever the number would go."
 - "One way to write the line that matters most: `stretch = 3`"
 lesson: ch02/ch02-l01.md

@@ -8,7 +8,6 @@ checker instead of confusing a player.
 """
 
 import ast
-import re
 from dataclasses import asdict, dataclass, field, replace
 
 from .board import Board, Direction, Pos, Tile, Timer, sign, square_name
@@ -70,9 +69,7 @@ class Constraints:
     min_comments: int = 0
     require_nodes: list[str] = field(default_factory=list)  # ast node names, e.g. "For"
     ban_nodes: list[str] = field(default_factory=list)
-    numbers_from_signs: bool = False  # only numbers written on the level's signposts (M3.2)
-    numbers_once: bool = False  # each number written at most once (M3.2)
-    sign_numbers: list[int] = field(default_factory=list)  # the signposts' numbers, read from the map, not the level file
+    max_numbers: int | None = None  # numbers written in the code, at most (M3.2, QA-029); 1 means one number, written once
 
 
 @dataclass
@@ -342,7 +339,7 @@ def parse_level(data: dict) -> Level:
         goal_spots=spots,
         objectives=objectives,
         api=_parse_api(data["api"], piece),
-        constraints=_parse_constraints(data.get("constraints") or {}, board),
+        constraints=_parse_constraints(data.get("constraints") or {}),
         par=_parse_par(data.get("par") or {}),
         hints=[str(hint) for hint in data.get("hints") or []],
         lesson=_text(data, "lesson"),
@@ -718,18 +715,14 @@ def _parse_par(data: dict) -> Par:
     return Par(lines=lines)
 
 
-def _parse_constraints(data: dict, board: Board) -> Constraints:
-    allowed = {"max_lines", "min_comments", "require_nodes", "ban_nodes", "numbers_from_signs", "numbers_once"}
+def _parse_constraints(data: dict) -> Constraints:
+    allowed = {"max_lines", "min_comments", "require_nodes", "ban_nodes", "max_numbers"}
     unknown = set(data) - allowed
     if unknown:
         raise LevelError(f"unknown constraint(s): {', '.join(sorted(unknown))}")
     constraints = Constraints(**data)
-    if not isinstance(constraints.numbers_from_signs, bool) or not isinstance(constraints.numbers_once, bool):
-        raise LevelError("constraints numbers_from_signs and numbers_once are true or false")
-    if constraints.numbers_from_signs:
-        constraints.sign_numbers = sorted({int(digits) for text in board.signs.values() for digits in re.findall(r"\d+", text)})
-        if not constraints.sign_numbers:
-            raise LevelError("constraint numbers_from_signs needs a signpost with a number written on it")
+    if constraints.max_numbers is not None and not _positive(constraints.max_numbers):
+        raise LevelError("constraint max_numbers must be a whole number of at least 1")
     for name in constraints.require_nodes + constraints.ban_nodes:
         node_type = getattr(ast, name, None)
         if not (isinstance(node_type, type) and issubclass(node_type, ast.AST)):

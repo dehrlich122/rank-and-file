@@ -1,31 +1,46 @@
 id: ch02-l02
 chapter: 2
 title: "Doing the Sums"
-trains: "Arithmetic with whole numbers (ints): +, - and *"
-brief: "Two signposts give the distances in pieces. Numbers may only come from the signposts, once each, so the sums happen in your code."
+trains: "A function that gives back a value, and arithmetic on it: +, - and *"
+brief: "Walk up the hall and turn right at the door, one square before its end. The goal is twice as far along the gallery as you walked up the hall, and the halls are different on every board."
 piece: pawn
 map: |
-  # # # # # # G
-  # # # # # # .
-  . T # # # # .
-  . . . . . . .
+  # # # # # # #
   . # # # # # #
+  . . . . G . .
   . # # # # # #
-  . # # # # # #
-  P S # # # # #
-legend:
-  "S": {"tile": "sign", "text": "This hall is 5 squares long. The door out is 1 square before its end."}
-  "T": {"tile": "sign", "text": "Beyond the door: 2 rooms to the east, each 3 squares wide. The goal is one room north of the last."}
+  P # # # # # #
 start: {"facing": "north"}
 api:
 - move
 - turn_left
 - turn_right
-constraints: {"numbers_from_signs": true, "numbers_once": true, "max_lines": 7}
+- squares_ahead
 par:
-  lines: 6
+  lines: 4
 hints:
-- "You can't write the distances you need, only the signposts' numbers. So work each distance out from them."
-- "Python does sums right inside a call's brackets, with +, - and *. A number you need in more than one place can live in a variable."
-- "One way to write the line that matters most: `pawn.move(5 - 1)`"
+- "The halls are different on every board, so your code has to find out how far to go. Count first."
+- "pawn.squares_ahead() gives back a number, and Python can do sums with it: - takes away and * multiplies. Keep a number you'll need again in a name."
+- "One way to write the line that matters most: `pawn.move(walked * 2)`"
 lesson: ch02/ch02-l02.md
+lesson_board:
+  map: |
+    # # # # #
+    . . . . .
+    . . . . .
+    . . . . .
+    . . . . .
+    . . P . .
+variants:
+- map: |
+    # # # # # # # #
+    . # # # # # # #
+    . . . . . . G .
+    . # # # # # # #
+    . # # # # # # #
+    P # # # # # # #
+- map: |
+    # # # # # #
+    . # # # # #
+    . . G . . .
+    P # # # # #

@@ -66,9 +66,7 @@ export interface LevelInfo {
     min_comments: number;
     require_nodes: string[];
     ban_nodes: string[];
-    numbers_from_signs: boolean; // the signpost rules (M3.2)
-    numbers_once: boolean;
-    sign_numbers: number[];
+    max_numbers: number | null; // numbers the code may write (M3.2, QA-029); 1 means one number, written once
   };
   par: { lines: number | null };
   starter: string;

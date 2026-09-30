@@ -79,29 +79,23 @@ def test_ast_module_is_what_we_think():
     assert type(ast.parse("for x in y: pass").body[0]).__name__ == "For"
 
 
-# -- the signpost rules (M3.2) ---------------------------------------------------------
-
-SIGNS = {"S": {"tile": "sign", "text": "Walk 3, then 2 more."}}
+# -- max_numbers (M3.2, QA-029) --------------------------------------------------------
 
 
-def signpost_level(**rules):
-    return make_level("G .\n. .\n. .\n. .\n. .\nP S\n", legend=SIGNS, constraints=rules)
-
-
-def test_only_signpost_numbers_may_appear():
-    level = signpost_level(numbers_from_signs=True)
-    assert level.constraints.sign_numbers == [2, 3]
-    result = run_level(level, "pawn.move(5)")
+def test_only_one_number_written_once():
+    level = make_level("G\n.\n.\n.\n.\nP\n", constraints={"max_numbers": 1})
+    result = run_level(level, "pawn.move(2)\npawn.move(3)")
     assert result.status == "constraint"
-    assert result.summary == "Your code uses 5, which isn't on a signpost. The only numbers allowed are the signposts': 2 and 3."
-    assert run_level(level, "pawn.move(3 + 2)").status == "solved"
-
-
-def test_each_number_may_appear_only_once():
-    level = signpost_level(numbers_once=True)
-    result = run_level(level, "pawn.move(2)\npawn.move(2)\npawn.move()")
-    assert result.status == "constraint" and result.summary.startswith("Your code writes 2 more than once.")
+    assert result.summary == (
+        "Your code writes 2 numbers: 2 and 3. It may contain only one number, written once: give it a name, and use the name."
+    )
     assert run_level(level, "steps = 2\npawn.move(steps)\npawn.move(steps)\npawn.move()").status == "solved"
+    assert run_level(level, "steps = 2\npawn.move(steps + steps)\npawn.move()").status == "solved"  # sums on the name are fine
+
+
+def test_a_higher_limit_counts_every_number_written():
+    level = make_level("G\n.\n.\n.\nP\n", constraints={"max_numbers": 2})
+    assert run_level(level, "pawn.move(1)\npawn.move(1)\npawn.move(2)").summary.endswith("This level allows at most 2.")
 
 
 def test_numbers_inside_text_dont_count_and_a_minus_sign_doesnt_hide_one():
@@ -109,14 +103,11 @@ def test_numbers_inside_text_dont_count_and_a_minus_sign_doesnt_hide_one():
     assert sorted(numbers) == [2.5, 3]
 
 
-def test_the_signpost_rules_are_described():
-    rules = signpost_level(numbers_from_signs=True, numbers_once=True).describe()["rules"]
-    assert rules == [
-        "Numbers must come from the signposts: only 2 and 3 may appear in your code.",
-        "Each number may appear only once in your code.",
-    ]
+def test_max_numbers_is_described():
+    assert make_level("G\nP\n", constraints={"max_numbers": 1}).describe()["rules"] == ["Your code may contain only one number, written once."]
+    assert make_level("G\nP\n", constraints={"max_numbers": 3}).describe()["rules"] == ["Your code may contain at most 3 numbers."]
 
 
-def test_numbers_from_signs_needs_a_signpost_with_a_number():
-    with pytest.raises(LevelError, match="needs a signpost with a number"):
-        make_level("G\n.\nP\n", constraints={"numbers_from_signs": True})
+def test_max_numbers_must_be_a_whole_number():
+    with pytest.raises(LevelError, match="max_numbers must be a whole number"):
+        make_level("G\nP\n", constraints={"max_numbers": 0})
