@@ -5,7 +5,7 @@ import pytest
 from conftest import events, make_level
 from rankfile.levels import LevelError
 from rankfile.runner import run_level
-from rankfile.world import GUARD_MISCOUNTED, GUARD_NOT_UNDERSTOOD
+from rankfile.world import GUARD_MISCOUNTED, GUARD_NOT_UNDERSTOOD, GUARD_WRONG_YES_NO
 
 API = ["move", "turn_left", "turn_right", "at_goal", "wait"]
 
@@ -296,6 +296,15 @@ def test_the_guard_tells_a_miscount_from_words_it_cant_follow():
     code = "pawn.move()\nprint('I walked 3 squares.')\nprint('I walked 2 steps.')\nprint('I walked 2 squares.')\npawn.move(2)"
     result = run_level(level, code)
     assert [event["message"] for event in events(result, "guard")] == [GUARD_MISCOUNTED, GUARD_NOT_UNDERSTOOD]
+    assert result.status == "solved"
+
+
+def test_a_yes_no_guard_says_wrong_to_the_other_answer():
+    # M3.4: printing a comparison prints True or False; the wrong one is "Wrong!", a typo isn't understood.
+    legend = {"X": {"tile": "gate", "question": "Is it far? Answer True or False.", "passphrase": "True"}}
+    level = make_level("G\nX\n.\nP\n", legend=legend, api=API)
+    result = run_level(level, "pawn.move()\nprint(2 > 3)\nprint('true')\nprint(3 > 2)\npawn.move(2)")
+    assert [event["message"] for event in events(result, "guard")] == [GUARD_WRONG_YES_NO, GUARD_NOT_UNDERSTOOD]
     assert result.status == "solved"
 
 

@@ -216,6 +216,7 @@ variants:                    # optional: the same level on other maps, which it 
   - map: |                   # shown small beside the level's board, before and after a run (M3.2, QA-032)
       ...
     legend: {X: {...}}       # optional (M3.2): this board's own entry for a symbol, e.g. a guard's answer
+    enemies: [...]           # optional (M3.4): this board's own enemies, instead of the level's
 mastery: true                # optional (M3.2): the chapter's optional mastery challenge
 lesson: ch01/ch01-l03.md
 starter: ""                  # optional initial editor contents
@@ -243,7 +244,8 @@ must reach the goal whichever `?` it's on). Legend tiles:
     the goals and on the gate, and the passphrase is its answer. A wrong
     answer gets one of two replies *(QA-030)*. The answer's words with
     another number get "Do you not know how to count!?". Anything else,
-    such as a typo, gets "I can't understand you!".
+    such as a typo, gets "I can't understand you!". A yes/no question's
+    other answer (True for False, or False for True) gets "Wrong!" *(M3.4)*.
   - The guard lines live in `world.py`.
   - `describe()` never includes the passphrase.
 - `timed_gate` *(M3.1)*: open for the first `open` ticks (default 2) of every

@@ -158,6 +158,19 @@ def test_look_names_a_chess_piece():
     assert said(rook_level(), 'pawn.move()\nprint(pawn.look("right"))') == ["rook"]
 
 
+def test_each_board_can_have_its_own_enemies():
+    level = make_level(
+        FIELD,
+        api=API,
+        enemies=[{"kind": "rook", "start": "c3"}],
+        variants=[{"map": FIELD, "enemies": [{"kind": "bishop", "start": "d4"}]}, {"map": FIELD}],
+    )
+    kinds = [[enemy.kind for enemy in case.level.enemies] for case in level.cases()]
+    assert kinds == [["rook"], ["bishop"], ["rook"]]  # a board without its own keeps the level's
+    with pytest.raises(LevelError, match="variant 1: the pawn starts on b1, which the rook on b4 attacks"):
+        make_level(FIELD, api=API, variants=[{"map": FIELD, "enemies": [{"kind": "rook", "start": "b4"}]}])
+
+
 def test_chess_pieces_take_only_their_own_keys():
     with pytest.raises(LevelError, match="a rook doesn't take route"):
         make_level(FIELD, api=API, enemies=[{"kind": "rook", "start": "c3", "route": ["c3", "c4"]}])

@@ -45,6 +45,7 @@ GUARD_GATE_LOCKED = "Does your father really smell of elderberries? Maybe try th
 # ...and at a gate whose guard asks a question (M3.1). The guard tells a wrong
 # number said the right way from words it can't follow (QA-030).
 GUARD_MISCOUNTED = '"Do you not know how to count!?" says the guard. The gate remains locked.'
+GUARD_WRONG_YES_NO = '"Wrong!" says the guard. "Off you go and think again." The gate remains locked.'
 GUARD_NOT_UNDERSTOOD = '"I can\'t understand you!" says the guard. Say it exactly the way the question shows. The gate remains locked.'
 
 CLOCKS = ("action", "line", "new_line")
@@ -285,12 +286,15 @@ class World:
     def _guard_reply(self, gate: Pos, line: str) -> str:
         """What the guard says to a line that isn't the passphrase. A guard who asks a
         question (QA-030) tells a miscount (the answer's words with another number)
-        from anything it can't follow, such as a typo."""
+        from anything it can't follow, such as a typo. A guard who asks a yes/no
+        question tells the wrong one of True and False apart (M3.4)."""
         if gate not in self.board.questions:
             return GUARD_WRONG_PHRASE
         answer = self.board.gates[gate]
         if re.search(r"\d", answer) and _without_numbers(line) == _without_numbers(answer):
             return GUARD_MISCOUNTED
+        if {line, answer} == {"True", "False"}:
+            return GUARD_WRONG_YES_NO
         return GUARD_NOT_UNDERSTOOD
 
     @property

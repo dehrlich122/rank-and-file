@@ -608,13 +608,13 @@ def _parse_board(text: str, legend: dict, objectives: Objectives) -> tuple[Board
 def _parse_variants(items, legend: dict, level: Level) -> list[Level]:
     """Each other map is the level on another board: same objectives and abilities,
     and the same legend, though a board can give a symbol its own entry (M3.2),
-    e.g. a guard with a different answer."""
+    e.g. a guard with a different answer, and its own enemies (M3.4)."""
     if not isinstance(items, list):
         raise LevelError("variants must be a list of {map: ...} entries")
     variants = []
     for number, item in enumerate(items, start=1):
-        if not isinstance(item, dict) or "map" not in item or set(item) - {"map", "legend"}:
-            raise LevelError(f"variant {number} must have a map, and optionally a legend, and nothing else")
+        if not isinstance(item, dict) or "map" not in item or set(item) - {"map", "legend", "enemies"}:
+            raise LevelError(f"variant {number} must have a map, and optionally a legend and enemies, and nothing else")
         if not isinstance(item.get("legend", {}), dict):
             raise LevelError(f"variant {number}: legend must be a mapping of symbols to tiles")
         try:
@@ -623,8 +623,9 @@ def _parse_variants(items, legend: dict, level: Level) -> list[Level]:
             raise LevelError(f"variant {number}: {exc}") from None
         if spots:
             raise LevelError(f"variant {number}: ? squares are only for the level's own map")
-        variant = replace(level, board=board, start=start, goal=goal, variants=[])
         try:
+            enemies = _parse_enemies(item["enemies"]) if "enemies" in item else level.enemies
+            variant = replace(level, board=board, start=start, goal=goal, variants=[], enemies=enemies)
             _check_enemies(variant)
         except LevelError as exc:
             raise LevelError(f"variant {number}: {exc}") from None
