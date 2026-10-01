@@ -1,0 +1,42 @@
+id: ch04-l04
+chapter: 4
+title: "What Lies Ahead"
+trains: "elif: a chain of conditions, where the first that's True wins"
+brief: "Something different lies across the road on every board: a pit, a wall, or nothing at all. You're carrying one plank."
+piece: pawn
+map: |
+  . . . G #
+  . # # . #
+  # # # O #
+  . . . . #
+  # # # P #
+  
+legend: {"O": "pit"}
+start: {"facing": "north", "planks": 1}
+api: ["move", "turn_left", "turn_right", "squares_ahead", "wait", "at_goal", "look", "bridge"]
+par: {"lines": 10}
+hints:
+- "Three boards, three different things across the road, and each needs its own answer."
+- "Check for one thing with if, the next with elif, and leave else for when it's neither. Once a pit is bridged, it's the open road again."
+- "One way to start:\nif pawn.look() == \"pit\":"
+lesson: ch04/ch04-l04.md
+lesson_board:
+  map: |
+    . O .
+    . P #
+    . . .
+  legend: {"O": "pit"}
+  start: {"facing": "north"}
+variants:
+- map: |
+    . . . G #
+    . # # . #
+    . # # # #
+    . . . . #
+    # # # P #
+- map: |
+    . . . G #
+    . # # . #
+    # # # . #
+    . . . . #
+    # # # P #

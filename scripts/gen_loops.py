@@ -24,26 +24,17 @@ line counts and outcomes, never code: the designer is also the game's learner
 (see CLAUDE.md: no spoilers).
 """
 
-import json
 import sys
 from dataclasses import dataclass, replace
 from functools import cache
 from itertools import groupby, product
-from pathlib import Path
 
-import yaml
+from levelgen import build, run_all  # first: it puts the engine on the import path
+from solve import fewest_lines, move_call, write_code
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "engine"))
-sys.path.insert(0, str(ROOT / "scripts"))
-
-from solve import fewest_lines, move_call, write_code  # noqa: E402
-
-from rankfile.constraints import code_lines  # noqa: E402
-from rankfile.levels import Level, parse_level  # noqa: E402
-from rankfile.pieces import PIECES  # noqa: E402
-from rankfile.runner import run_level  # noqa: E402
-from rankfile.world import World  # noqa: E402
+from rankfile.levels import Level
+from rankfile.pieces import PIECES
+from rankfile.world import World
 
 API = ["move", "turn_left", "turn_right", "squares_ahead", "wait"]
 
@@ -551,132 +542,26 @@ LEVELS = [
 ]
 
 
-def board_text(text: str) -> str:
-    return "\n".join(line.strip() for line in text.strip("\n").splitlines()) + "\n"
+def writer(spec: dict):
+    """How `levelgen.build` gets this level's reference and wrong attempts."""
 
+    def write(draft: Level):
+        tokens = merged_tokens(draft)
+        program = shortest(tokens) if tokens else None
+        if program is None:
+            return None
 
-def yaml_text(spec: dict, par: int, hints: list[str]) -> str:
-    q = json.dumps
-    lines = [
-        f"id: {spec['id']}",
-        "chapter: 3",
-        f"title: {q(spec['title'])}",
-        f"trains: {q(spec['trains'])}",
-        f"brief: {q(spec['brief'])}",
-        "piece: pawn",
-        "map: |",
-        *[f"  {row}" for row in board_text(spec["map"]).splitlines()],
-    ]
-    if spec.get("legend"):
-        lines.append(f"legend: {q(spec['legend'])}")
-    if spec.get("enemies"):
-        lines.append("enemies:")
-        lines += [f"- {q(enemy)}" for enemy in spec["enemies"]]
-    lines.append(f"start: {q({'facing': spec['facing']})}")
-    lines.append(f"api: {q(API)}")
-    if spec["limit"]:
-        lines.append(f"constraints: {q({'max_lines': par + 2})}")
-    lines.append(f"par: {q({'lines': par})}")
-    lines.append("hints:")
-    lines += [f"- {q(hint)}" for hint in hints]
-    lines.append(f"lesson: ch03/{spec['id']}.md")
-    if spec.get("mastery"):
-        lines.append("mastery: true")
-    if "lesson_board" in spec:
-        board = spec["lesson_board"]
-        lines += ["lesson_board:", "  map: |", *[f"    {row}" for row in board["map"].splitlines()]]
-        lines += [f"  {key}: {q(board[key])}" for key in ("legend", "enemies", "start") if key in board]
-    if spec.get("variants"):
-        lines.append("variants:")
-        for variant in spec["variants"]:
-            lines += ["- map: |", *[f"    {row}" for row in board_text(variant).splitlines()]]
-    return "\n".join(lines) + "\n"
+        def wrong_code(kind: str, level: Level) -> str:
+            if kind == "copied":
+                return "\n".join(write_code(level, fewest_lines(without_clockwork(level.cases()[0].level)))) + "\n"
+            if kind == "typed":
+                return render(program, "pawn", spec["names"], typed=True)
+            return render(shortest(tokens, nesting=False), "pawn", spec["names"])  # flat
 
+        return render(program, "pawn", spec["names"]), f"loops {depth(program)} deep", wrong_code
 
-def third_hint(spec: dict, reference: str) -> str:
-    kind, *how = spec["hint3"]
-    code = reference.splitlines()
-    if kind == "start":
-        return "One way to start:\n" + "\n".join(code[: how[0]])
-    if kind == "loops":  # everything up to and including the nth loop's first line
-        headers = [i for i, line in enumerate(code) if line.lstrip().startswith("for ")]
-        return "One way to start:\n" + "\n".join(code[: headers[how[0] - 1] + 1])
-    key, intro = how
-    return f"{intro}\n" + next(line.strip() for line in code if key in line)
-
-
-def expect_line(level: Level, code: str) -> str | None:
-    result = run_level(level, code)
-    if result.status == "solved":
-        return None
-    error = f" {result.error.type}" if result.status == "error" and result.error else ""
-    return f"# expect: {result.status}{error}"
-
-
-def save(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8", newline="\n")
-    print(f"  {path.relative_to(ROOT).as_posix()}")
-
-
-def generate(spec: dict) -> list[str]:
-    """Write one level's files; return any problems (in words, never code)."""
-    problems = []
-    draft = parse_level(yaml.safe_load(yaml_text(spec, 99, ["", "", ""])))
-    tokens = merged_tokens(draft)
-    program = shortest(tokens) if tokens else None
-    if program is None:
-        return [f"{spec['id']}: no loop program replays the route"]
-    reference = render(program, "pawn", spec["names"])
-    par = code_lines(reference)
-    if par != spec["par"]:
-        problems.append(f"{spec['id']}: the reference has {par} lines, the spec's par is {spec['par']}")
-    hints = [*spec["hints"], third_hint(spec, reference)]
-    text = yaml_text(spec, par, hints)
-    level = parse_level(yaml.safe_load(text))
-    result = run_level(level, reference)
-    stars = sum(star.earned for star in result.stars) if result.stars else 0
-    print(f"{spec['id']} ({spec['title']}): par {par}, loops {depth(program)} deep, reference {result.status}, {stars} stars")
-    if result.status != "solved" or stars != 3:
-        return [*problems, f"{spec['id']}: the reference isn't a three-star solve ({result.status})"]
-
-    counts = {"lines": par}
-    wrong = []
-    for kind in spec["wrong"]:
-        if kind == "copied":
-            code = "\n".join(write_code(level, fewest_lines(without_clockwork(level.cases()[0].level)))) + "\n"
-        elif kind == "typed":
-            code = render(program, "pawn", spec["names"], typed=True)
-        else:  # flat
-            code = render(shortest(tokens, nesting=False), "pawn", spec["names"])
-        counts[kind] = code_lines(code)
-        expect = expect_line(level, code)
-        print(f"  wrong attempt '{kind}': {counts[kind]} lines, {expect or 'SOLVED (a problem)'}")
-        if expect is None:
-            problems.append(f"{spec['id']}: the '{kind}' attempt solves the level")
-            continue
-        wrong.append(f"{expect}\n{code}")
-
-    folder = ROOT / "solutions" / "ch03"
-    save(ROOT / "levels" / "ch03" / f"{spec['id']}.yaml", text)
-    save(folder / f"{spec['id']}.py", reference)
-    for old in folder.glob(f"{spec['id']}.naive*.py"):
-        old.unlink()
-    for number, code in enumerate(wrong, start=1):
-        save(folder / f"{spec['id']}.naive{'' if number == 1 else number}.py", code)
-    save(folder / f"{spec['id']}.md", spec["note"].format(**counts) + "\n")
-    return problems
-
-
-def main(ids: list[str]) -> None:
-    problems = []
-    for spec in LEVELS:
-        if not ids or spec["id"] in ids:
-            problems += generate(spec)
-    for problem in problems:
-        print(f"PROBLEM: {problem}")
-    sys.exit(1 if problems else 0)
+    return write
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    run_all(LEVELS, lambda spec: build(spec, 3, API, writer(spec)), sys.argv[1:])

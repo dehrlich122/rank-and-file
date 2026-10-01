@@ -1,0 +1,46 @@
+id: ch04-l05
+chapter: 4
+title: "Under Attack"
+trains: "Enemy chess pieces: rooks, which can be taken, and bishops, which can't. And look(\"left\") and look(\"right\")"
+brief: "An enemy rook has taken the goal square. On each board it stands somewhere else, and on one it has gone. Take it back."
+piece: pawn
+map: |
+  # G . . #
+  # . . . #
+  # # . # #
+  # # . # #
+  # # P # #
+  
+enemies:
+- {"kind": "rook", "start": "b5"}
+start: {"facing": "north"}
+api: ["move", "turn_left", "turn_right", "squares_ahead", "wait", "at_goal", "look", "bridge", "capture_left", "capture_right"]
+par: {"lines": 7}
+hints:
+- "The rook stands on one of the two squares a pawn captures on. Look at both before you move."
+- "look(\"left\") and look(\"right\") name what's diagonally ahead. Take the rook on whichever side it stands; when neither side has one, the goal is straight ahead."
+- "One way to start:\nif pawn.look(\"left\") == \"rook\":"
+lesson: ch04/ch04-l05.md
+lesson_board:
+  map: |
+    . . . .
+    . . . .
+    . . . .
+    . . P .
+  enemies: [{"kind": "bishop", "start": "a4"}, {"kind": "rook", "start": "d2"}]
+  start: {"facing": "north"}
+variants:
+- map: |
+    # . . G #
+    # . . . #
+    # # . # #
+    # # . # #
+    # # P # #
+  enemies: [{"kind": "rook", "start": "d5"}]
+- map: |
+    # . G . #
+    # . . . #
+    # # . # #
+    # # . # #
+    # # P # #
+  enemies: []

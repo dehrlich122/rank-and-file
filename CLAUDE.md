@@ -26,7 +26,11 @@ The designer is also the target learner.
   so references pass time with `wait()`, not by spinning (QA-026). A level
   test enforces this wherever `wait()` is unlocked. Chapter 3's levels and
   solutions come from `scripts/gen_loops.py`, which replays solve.py's route
-  with the fewest lines of `for` loops (M3.3).
+  with the fewest lines of `for` loops (M3.3). Chapter 4's come from
+  `scripts/gen_conditions.py`, which lines up each board's route and
+  branches on `look()` where they part (M3.4). Both share
+  `scripts/levelgen.py`. Rerun a generator after changing one of its
+  levels.
 - After each milestone, stop, list what the designer should test manually, and
   wait for feedback (`DESIGN.md` §7).
 

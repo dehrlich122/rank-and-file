@@ -370,7 +370,7 @@ src/py/            worker, client and protocol
 src/ui/            board, editor, playback, panels, lesson, repl, levelView, levelSelect, codex,
                    help (hints, giving up, the comparison), compare, dialog, settingsDialog
 scripts/           copy-pyodide.mjs (runs after npm install), venv.mjs, check-bundle.mjs, e2e/,
-                   solve.py gen_solutions.py gen_loops.py (search levels and write solutions blind)
+                   solve.py gen_solutions.py gen_loops.py gen_conditions.py levelgen.py (search levels, write solutions blind)
 public/pyodide/    Pyodide runtime, copied from node_modules (not committed)
 ```
 

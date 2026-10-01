@@ -1,0 +1,43 @@
+id: ch04-l03
+chapter: 4
+title: "Road Closed"
+trains: "if and else: one thing or the other. None counts as False, and not"
+brief: "The road north is closed on some boards, by a wall or a signpost. Where it's closed, go the long way round. Where it's open, the long way is shut."
+piece: pawn
+map: |
+  # . # # #
+  . G . . #
+  # . # . #
+  # . # # #
+  # . . . #
+  # P # # #
+  
+legend: {"S": {"tile": "sign", "text": "No entry. By order of the management."}}
+start: {"facing": "north"}
+api: ["move", "turn_left", "turn_right", "squares_ahead", "wait", "at_goal", "look", "bridge"]
+par: {"lines": 10}
+hints:
+- "From the junction, look north. What you see decides which way to go."
+- "look() gives back None for an empty square, and None counts as False in an if, while any word counts as True. So one condition can ask whether anything is there at all, and else covers the rest."
+- "One way to decide:\nif pawn.look():"
+lesson: ch04/ch04-l03.md
+lesson_board:
+  map: |
+    . # .
+    . P .
+  start: {"facing": "north"}
+variants:
+- map: |
+    # . # # #
+    . G . . #
+    # . # . #
+    # # # . #
+    # . . . #
+    # P # # #
+- map: |
+    # . # # #
+    . G . . #
+    # . # . #
+    # S # . #
+    # . . . #
+    # P # # #

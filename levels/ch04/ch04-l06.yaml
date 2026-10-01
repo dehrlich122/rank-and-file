@@ -1,0 +1,51 @@
+id: ch04-l06
+chapter: 4
+title: "Pawn Storm"
+trains: "Chapter 4 mastery: conditions inside a for loop, on boards that each place their rooks differently"
+brief: "A corridor full of rooks, a different storm on every board. Every time one stands diagonally ahead, take it before it takes you."
+piece: pawn
+map: |
+  # . . G #
+  # . . . #
+  # . . # #
+  # . . . #
+  # . # . #
+  # . . . #
+  # # . . #
+  # . P . #
+  
+enemies:
+- {"kind": "rook", "start": "b3"}
+- {"kind": "rook", "start": "c5"}
+- {"kind": "rook", "start": "d7"}
+start: {"facing": "north"}
+api: ["move", "turn_left", "turn_right", "squares_ahead", "wait", "at_goal", "look", "bridge", "capture_left", "capture_right"]
+constraints: {"max_lines": 9}
+par: {"lines": 7}
+hints:
+- "Every board is different, but every round asks the same question: is there a rook to take?"
+- "Put 4.5's choice inside a loop. Each round the pawn looks again, so the same lines take a rook on the left, a rook on the right, or step forward."
+- "One way to start:\nfor _ in range(7):\n    if pawn.look(\"left\") == \"rook\":"
+lesson: ch04/ch04-l06.md
+mastery: true
+variants:
+- map: |
+    # G . . #
+    # . . . #
+    # # . . #
+    # . . . #
+    # . # . #
+    # . . . #
+    # . . # #
+    # . P . #
+  enemies: [{"kind": "rook", "start": "d3"}, {"kind": "rook", "start": "c5"}, {"kind": "rook", "start": "b7"}]
+- map: |
+    # G . . #
+    # # . . #
+    # . . . #
+    # . # . #
+    # . . . #
+    # # . . #
+    # . . . #
+    # . P . #
+  enemies: [{"kind": "rook", "start": "b4"}, {"kind": "rook", "start": "c6"}, {"kind": "rook", "start": "b8"}]
