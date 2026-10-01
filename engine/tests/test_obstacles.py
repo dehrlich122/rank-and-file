@@ -455,7 +455,7 @@ def test_the_ui_gets_each_enemys_route_and_marks(prey):
 @pytest.mark.parametrize(
     ("enemy", "message"),
     [
-        ({"kind": "knight", "start": "a2"}, "kind must be patrol or chaser"),
+        ({"kind": "knight", "start": "a2"}, "kind must be patrol, chaser, rook or bishop"),
         ({"kind": "patrol", "route": ["a2", "c3"]}, "isn't a straight line"),
         ({"kind": "patrol", "route": ["b2", "d2"]}, "d2 isn't on the board"),
         ({"kind": "patrol", "route": ["a3", "c3"]}, "is a wall"),

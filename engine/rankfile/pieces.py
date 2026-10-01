@@ -56,7 +56,7 @@ class Pawn(Piece):
     NAME = "pawn"
     ABILITIES = (
         "move", "turn_left", "turn_right", "squares_ahead", "at_goal", "position", "facing", "wait",
-        "capture_left", "capture_right", "bridge",
+        "capture_left", "capture_right", "bridge", "look",
     )  # fmt: skip
 
     # These docstrings are the Codex's entries for the pawn (codex.py): the
@@ -118,6 +118,30 @@ class Pawn(Piece):
             print(pawn.squares_ahead())
         """
         return self._world.squares_ahead()
+
+    def look(self, side=None) -> str | None:
+        """Look at the square in front of your pawn, or diagonally in front.
+
+        `pawn.look()` looks straight ahead. `pawn.look("left")` and
+        `pawn.look("right")` look at the two squares diagonally ahead, the ones
+        a pawn captures on. Looking is free: it doesn't take a tick.
+
+        Args:
+            side: "left" or "right" to look diagonally ahead. Leave it out to
+                look straight ahead.
+
+        Returns:
+            What's there, as a word (a str): "wall", "edge", "pit", "gate",
+            "portcullis", "signpost", "gem", "plank", or an enemy such as
+            "rook". None if the square is empty.
+
+        Example:
+            if pawn.look() == "pit":
+                pawn.bridge()
+        """
+        if side not in (None, "left", "right"):
+            raise GameArgumentError(f'look() takes "left" or "right", or nothing to look straight ahead, not {side!r}.')
+        return self._world.look(side)
 
     def wait(self, ticks=1):
         """Stand still while everything else on the board takes its turn.

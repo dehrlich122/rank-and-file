@@ -199,6 +199,7 @@ enemies:                     # optional (M3.1); squares are chess names
   - {kind: patrol, start: c2, route: [c2, f2, f5, c5], loop: true, clock: new_line}
   - {kind: patrol, start: d4, armoured: true}         # no route: it stands guard
   - {kind: chaser, start: g6, strategy: simple}
+  - {kind: rook, start: e5}                           # M3.4: stands still; also bishop
 start: {facing: north}       # also `planks: 1`: planks the piece starts with (QA-017)
 objectives:                  # default [reach_goal]
   - reach_goal               # end the program on the goal square
@@ -266,6 +267,15 @@ The piece's counting and waiting *(M3.2)*:
   enemies don't stop it. It costs no tick.
 - `wait(ticks=1)` waits a whole number of ticks, from 0 to 100. The ceiling
   keeps one line from recording a flood of ticks.
+- `look(side=None)` *(M3.4)* names what's on the square straight ahead, or
+  diagonally ahead with `"left"` or `"right"` (the squares a pawn captures
+  on). It gives back a word, or None if the square is empty:
+  - the board: "wall", "edge", "signpost", "pit", "gate", "portcullis"
+  - things to pick up: "gem", "plank"
+  - an enemy's kind, such as "rook"
+  - A bridged pit, an opened gate and a picked-up gem look empty. Squares
+    you only pass over (the goal, a waypoint) look empty too, so a hidden
+    goal stays hidden. It costs no tick.
 
 `max_numbers` *(M3.2, QA-029)*: how many numbers the code may write, counted
 with `ast`. With 1, "Your code may contain only one number, written once".
@@ -281,6 +291,16 @@ Enemies *(M3.1)* move one square per tick of their clock:
   it tries the other. If both are blocked, it waits. Pits don't block it: it
   falls in *(QA-017)*.
 - An enemy on the piece's square catches it, and the run is `lost`.
+- A **rook** or **bishop** *(M3.4)* stands still and attacks along real chess
+  lines: a rook its rank and file, a bishop its diagonals. A line runs to
+  the board's edge or the first wall, closed gate or shut timed gate. A
+  square holding another enemy is attacked too, and ends the line.
+  - Standing on an attacked square loses the run: "The rook on c3 took your
+    pawn on b3."
+  - Taking the piece (capturing diagonally) ends its attacks.
+  - The checker refuses a level whose start square is attacked.
+  - States carry `attacked`, the attacked squares, on levels with chess
+    pieces.
 - `armoured: true` means it can't be captured. `pawn.capture_left()` and
   `capture_right()` take an enemy one square diagonally forward and move onto
   its square. That costs a tick. An empty square or an armoured enemy is a

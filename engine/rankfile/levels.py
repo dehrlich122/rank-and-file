@@ -14,7 +14,7 @@ from .board import Board, Direction, Pos, Tile, Timer, sign, square_name
 from .constraints import describe_rules
 from .pieces import PIECES
 from .words import and_list, count
-from .world import CHASERS, CLOCKS, World
+from .world import CHASERS, CHESS_LINES, CLOCKS, World
 
 
 class LevelError(ValueError):
@@ -37,6 +37,8 @@ TILE_DETAILS: dict[Tile, tuple[set[str], set[str]]] = {
 ENEMY_KEYS = {
     "patrol": {"kind", "start", "route", "loop", "clock", "armoured"},
     "chaser": {"kind", "start", "clock", "strategy", "armoured"},
+    "rook": {"kind", "start", "armoured"},  # chess pieces stand still (M3.4)
+    "bishop": {"kind", "start", "armoured"},
 }
 OPEN_GROUND = (Tile.FLOOR, Tile.WAYPOINT, Tile.GEM, Tile.PLANK)
 
@@ -110,7 +112,13 @@ class Enemy:
         """Its rule, in words, for the Challenge panel."""
         start = square_name(self.start)
         ticks = CLOCK_TICKS[self.clock]
-        if self.kind == "chaser":
+        if self.kind in CHESS_LINES:
+            lines = "rank and file (straight across, and up and down)" if self.kind == "rook" else "diagonals"
+            text = (
+                f"A {self.kind} stands on {start}. It attacks every square along its {lines}, up to the first wall, "
+                "closed gate or piece. Step onto one of those squares and it takes you: the run is lost."
+            )
+        elif self.kind == "chaser":
             text = (
                 f"A chaser starts on {start}. It steps one square toward you for {ticks}: along the rank or "
                 "the file, whichever gap is bigger (east or west when they're equal). If that way is blocked "
@@ -248,8 +256,10 @@ class Level:
                 obstacles.append("A chaser doesn't see pits: if its step lands on one, it falls in and is gone.")
         obstacles.extend(gate_rule(pos, timer) for pos, timer in sorted(self.board.timers.items()))
         obstacles.extend(enemy.describe() for enemy in self.enemies)
-        if self.enemies:
+        if any(enemy.kind not in CHESS_LINES for enemy in self.enemies):
             obstacles.append("If an enemy lands on your square, or you walk into one, you're caught and the run is lost.")
+        elif self.enemies:
+            obstacles.append("If you walk into an enemy, you're caught and the run is lost.")
         return obstacles
 
     def star_goals(self) -> list[str]:
@@ -629,7 +639,7 @@ def _parse_enemies(items) -> list[Enemy]:
     for number, item in enumerate(items, start=1):
         where = f"enemy {number}"
         if not isinstance(item, dict) or item.get("kind") not in ENEMY_KEYS:
-            raise LevelError(f"{where}: kind must be patrol or chaser")
+            raise LevelError(f"{where}: kind must be patrol, chaser, rook or bishop")
         kind = item["kind"]
         unknown = set(item) - ENEMY_KEYS[kind]
         if unknown:
@@ -701,6 +711,8 @@ def _check_enemies(level: Level) -> None:
         if enemy.start in starts:
             raise LevelError(f"enemy {number}: starts on the same square as another enemy")
         starts.add(enemy.start)
+    if foe := World(level).attacker(level.start):
+        raise LevelError(f"the {level.piece} starts on {square_name(level.start)}, which the {foe.enemy.kind} on {square_name(foe.pos)} attacks")
 
 
 def _parse_par(data: dict) -> Par:
