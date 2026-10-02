@@ -5,7 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Rank & File is a browser puzzle game that teaches Python: the player writes real
 Python to move a chess piece. `DESIGN.md` is the design brief (pedagogy rules,
 curriculum, milestones). `docs/ARCHITECTURE.md` records the decisions and the
-level file format.
+level file format. Each milestone's plan, specs and build notes go in its own
+folder, `docs/M<n>/` (e.g. `docs/M3/` holds `M3.md`, `M3.1.md`…); `docs/QA.md`
+is the play-test log for all of them.
 
 ## Non-negotiable: no spoilers
 

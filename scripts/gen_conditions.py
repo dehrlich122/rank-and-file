@@ -466,8 +466,8 @@ def depth_of(program: tuple) -> int:
 # first comparison for both guards), "first"/"last" (every if-chain replaced by
 # its first or last branch), "unrolled" (the loop's body written out).
 
-GUARD_1 = "Halt! Is the hall you came up longer than 4 squares? Answer True or False."
-GUARD_2 = "And was it shorter than 3 squares, or longer than 6? Answer True or False."
+GUARD_1 = "Gate 1. Halt! Is the hall you walked up before your turn longer than 4 squares? Answer True or False."
+GUARD_2 = "Gate 2. And was that same hall shorter than 3 squares, or longer than 6? Answer True or False."
 
 
 def guards(first: str, second: str) -> dict:
@@ -494,7 +494,7 @@ LEVELS = [
         "id": "ch04-l01",
         "title": "True or False",
         "trains": "True and False, comparisons, and combining them with and, or and not",
-        "brief": "Two guards stand between you and the goal. Each asks a question about the hall you came up, and wants a plain True or False.",
+        "brief": "Two guards stand between you and the goal. Each asks about the hall: the stretch you walked before your turn. Count it before you leave it, then answer True or False.",
         "map": hall_board(2),
         "legend": guards("False", "True"),
         "variants": [

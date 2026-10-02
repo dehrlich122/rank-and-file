@@ -395,7 +395,7 @@ public/pyodide/    Pyodide runtime, copied from node_modules (not committed)
 - `match` isn't placed yet. It's a natural fit for tile types, in Chapter 9
   or 11 (the brief's Chapters 8 and 10, which move up by one after the split
   below).
-- Settled for M3 in `docs/M3.md`:
+- Settled for M3 in `docs/M3/M3.md`:
   - Chapter 4 is split in two (conditions, then `while`), so every later
     chapter moves up by one.
   - Where `break`/`continue`, `in`, truthiness and `None` and nested loops

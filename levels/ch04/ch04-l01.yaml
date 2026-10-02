@@ -2,14 +2,14 @@ id: ch04-l01
 chapter: 4
 title: "True or False"
 trains: "True and False, comparisons, and combining them with and, or and not"
-brief: "Two guards stand between you and the goal. Each asks a question about the hall you came up, and wants a plain True or False."
+brief: "Two guards stand between you and the goal. Each asks about the hall: the stretch you walked before your turn. Count it before you leave it, then answer True or False."
 piece: pawn
 map: |
   # # # # # # #
   . . X . Y G #
   . # # # # # #
   P # # # # # #
-legend: {"X": {"tile": "gate", "question": "Halt! Is the hall you came up longer than 4 squares? Answer True or False.", "passphrase": "False"}, "Y": {"tile": "gate", "question": "And was it shorter than 3 squares, or longer than 6? Answer True or False.", "passphrase": "True"}}
+legend: {"X": {"tile": "gate", "question": "Gate 1. Halt! Is the hall you walked up before your turn longer than 4 squares? Answer True or False.", "passphrase": "False"}, "Y": {"tile": "gate", "question": "Gate 2. And was that same hall shorter than 3 squares, or longer than 6? Answer True or False.", "passphrase": "True"}}
 start: {"facing": "north"}
 api: ["move", "turn_left", "turn_right", "squares_ahead", "wait", "at_goal"]
 par: {"lines": 8}
@@ -34,7 +34,7 @@ variants:
     . # # # # # #
     . # # # # # #
     P # # # # # #
-  legend: {"X": {"tile": "gate", "question": "Halt! Is the hall you came up longer than 4 squares? Answer True or False.", "passphrase": "False"}, "Y": {"tile": "gate", "question": "And was it shorter than 3 squares, or longer than 6? Answer True or False.", "passphrase": "False"}}
+  legend: {"X": {"tile": "gate", "question": "Gate 1. Halt! Is the hall you walked up before your turn longer than 4 squares? Answer True or False.", "passphrase": "False"}, "Y": {"tile": "gate", "question": "Gate 2. And was that same hall shorter than 3 squares, or longer than 6? Answer True or False.", "passphrase": "False"}}
 - map: |
     # # # # # # #
     . . X . Y G #
@@ -43,7 +43,7 @@ variants:
     . # # # # # #
     . # # # # # #
     P # # # # # #
-  legend: {"X": {"tile": "gate", "question": "Halt! Is the hall you came up longer than 4 squares? Answer True or False.", "passphrase": "True"}, "Y": {"tile": "gate", "question": "And was it shorter than 3 squares, or longer than 6? Answer True or False.", "passphrase": "False"}}
+  legend: {"X": {"tile": "gate", "question": "Gate 1. Halt! Is the hall you walked up before your turn longer than 4 squares? Answer True or False.", "passphrase": "True"}, "Y": {"tile": "gate", "question": "Gate 2. And was that same hall shorter than 3 squares, or longer than 6? Answer True or False.", "passphrase": "False"}}
 - map: |
     # # # # # # #
     . . X . Y G #
@@ -54,4 +54,4 @@ variants:
     . # # # # # #
     . # # # # # #
     P # # # # # #
-  legend: {"X": {"tile": "gate", "question": "Halt! Is the hall you came up longer than 4 squares? Answer True or False.", "passphrase": "True"}, "Y": {"tile": "gate", "question": "And was it shorter than 3 squares, or longer than 6? Answer True or False.", "passphrase": "True"}}
+  legend: {"X": {"tile": "gate", "question": "Gate 1. Halt! Is the hall you walked up before your turn longer than 4 squares? Answer True or False.", "passphrase": "True"}, "Y": {"tile": "gate", "question": "Gate 2. And was that same hall shorter than 3 squares, or longer than 6? Answer True or False.", "passphrase": "True"}}
