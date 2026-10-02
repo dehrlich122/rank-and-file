@@ -19,7 +19,7 @@ date)* marks a decision.
 
 Playable now: Chapters 1 to 5 (the first five of the Pawn tier's six), each with
 five levels and one optional mastery challenge, plus a Testing ground of
-practice levels. Chapter 6, Runes, is being built (M3.6).
+practice levels. Chapter 6, Runes, completes the Pawn tier's six chapters.
 
 Built beyond the first brief:
 - **Feedback:** tiered hints, stars for par, a reveal of the idiomatic solution,
@@ -37,8 +37,10 @@ Built beyond the first brief:
   its naive attempts fail; blind level generators that write solutions without
   anyone reading them; an end-to-end suite that drives the real app.
 
-Next: finish Chapter 6. Then a first design pass (§9), which also builds the
-promotion ceremony and the knight skin (§8), then the level editor and free play (§7).
+Next: the first design pass (§9), which also builds the promotion ceremony and
+the knight skin (§8). Its step 0, the direction, is under way: the brief is
+recorded in §9 and the style tiles are being built. Then the level editor and
+free play (§7).
 
 ---
 
@@ -168,7 +170,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 | M2 Feedback depth | tiered hints, AST constraints, several boards, par and stars, idiomatic-solution reveal, progress saving | Done |
 | M3.0–M3.5 | the obstacle toolkit, the Codex, Chapters 2–5 | Done |
 | M3.6 Chapter 6 | Runes | In play-test: engine, levels and lessons built |
-| **M3.7 Look & Feel** | the first major design pass (§9), with the **promotion ceremony** and the knight skin (§8) | Planned, before M4 |
+| **M3.7 Look & Feel** | the first major design pass (§9), with the **promotion ceremony** and the knight skin (§8) | Step 0 (direction) in progress; before M4 |
 | M4 Level editor | author levels without hand-writing YAML; the Pawn tier's set of mastery challenges | Planned |
 | **M4.x Free play** | an open board to experiment on, with a skins gallery | Planned, after M4 |
 | M5+ | the remaining chapters, one tier at a time, each ending in a promotion | Planned |
@@ -205,12 +207,62 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 - **Dark-first, light kept.** Glow is designed for dark. The light theme keeps the same shapes and palette family as a "daylight terminal", with softer accents.
 - **A system, not a reskin.** Later tiers add tiles and pieces, so the pass delivers a style that new things slot into.
 
+### Decided for the pass *(Designer, 2026-10-02)*
+
+**Priority order.** When two of these conflict, the higher one wins.
+1. **Readability is the product.** The game teaches Python by showing what code does on the board. If the board or the code panel gets harder to parse, the design has failed, however good it looks. The rules are testable:
+   - Every tile, piece and enemy is told apart by its silhouette alone, in greyscale, at the smallest main-board size we ship (a 12×12 board at its minimum height, about 20px a square). The small side and lesson boards get a simpler sprite tier and only have to keep tiles distinguishable.
+   - Squares stay quiet: art lives on squares, and the squares don't get busy. Quiet isn't invisible. Light and dark squares keep a visible step (about 1.4:1 against each other) while sprites stay well above that against both. The grid reads in greyscale, so squares can be counted at a glance. The threatened-square hatch reads on both square colours. File letters and rank numbers meet normal text contrast. All of these go in the automated contrast check.
+   - Glow, glitch and texture go on edges, sprites and lines, never on code, lesson text, labels or badges.
+   - At most one thing on the board moves "ambiently" in a given square. Everything else is still unless the event log says something happened.
+   - With Animations set to reduced, every meaning still reads with zero motion.
+2. **It's a coding game as much as a chess game.** Draw the world as a running program: terminal greens and phosphor amber, cursor blinks, scanning reads, circuit-trace walls, `>_` on runes, line numbers and coordinates treated as part of the HUD. The player's piece is the program: clean, lit, stable.
+3. **Enemies and threats are corrupted code.** Data gone wrong, in magenta and red on a dark body: cracks, dead pixels and intermittent glitch bursts (RGB split, a horizontal slice offset, a frame of noise) every few seconds, not constant. Squares an enemy threatens get the same language: a diagonal hatch (it works without colour) plus a slow scanline or flicker. **Stable = yours or safe; unstable = hostile.** The player should feel the difference before reading any tooltip. In reduced motion the corruption stays as a static colour fringe plus the hatch.
+4. **80s retro-futurism, cyberpunk.** A near-black blue/violet base with cyan, amber and green used sparingly; magenta stays reserved for hostile things (the one chrome exception is the start-menu logo's pixel shadow, *to confirm*). Synthwave and vector-arcade energy belongs in the chrome (titles, the promotion ceremony, level-complete), not the play area. CRT scanlines are optional and off by default. The light theme is a "daylight terminal": the same shapes and semantic colours, softer, with no glow.
+
+**Colour roles** (every later decision hangs on these):
+- cyan / white: the player and their code (piece, pointer, trail, step line)
+- magenta / red: **hostile only** (enemies, threatened squares, enemy routes, lost runs). Magenta is taken out of every non-hostile accent.
+- amber: goals, gates, things to act on
+- phosphor green: text the world holds (runes, signs), and success
+- violet / near-black: structure (walls, pits, the board itself)
+
+**Heroes** are small armoured figures whose silhouette still reads as their chess piece, so each piece's chess identity lives in its outline. The pawn is a round-helmed knight-errant with a lit visor; the knight skin is a horse-head helm. The style draws on SNES Zelda and the modern pixel games in that lineage (Shovel Knight, Hyper Light Drifter, Dead Cells, Loop Hero): chunky readable shapes, a 1px dark outline, 3–4 tone shading, and personality in a 2-frame idle. It is crisp, high-contrast, deliberately limited modern pixel art, not a blurry retro filter, and it carries over to the environment tiles.
+
+**Glitch lives in two places only:** on the board (enemies and threatened squares) and on the error card. When player code throws, the card's frame gets one brief corruption flicker, never its text, so bugs and enemies read as the same kind of thing. Every other panel, the lessons and the level list stay calm.
+
+**The board is the "lit grid"** and every style tile uses it, so the tiles differ in sprites and chrome, not in the board:
+- a clear checker: dark squares near-black navy, light squares a visibly lighter indigo (about 1.4:1 between them)
+- thin cyan grid lines at low strength between every square, with a faint glow on the outer edge only
+- a small cyan tick where grid lines cross, so squares can be counted like on a targeting grid
+- file letters (a–h) along the bottom and rank numbers (1–8) up the left, always both, restyled from today's `labels()`; they're text, so no glow
+
+**The start menu** is a styled title screen with some animation, honouring reduced motion. Its four entries are Lessons, Free Play, Level Editor and Settings. Free Play (M4.x) and Level Editor (M4) show now as "coming soon" and switch on when those milestones land.
+- Direction: the arcade title. A big pixel-font "RANK & FILE" logo in cyan with a hard magenta pixel-offset shadow (an offset, not a blur, so it isn't glow on text), over a slowly scrolling synthwave perspective grid and a striped sun. Menu items are in the pixel face, with a blinking ▶ on the selected one. With reduced motion the grid and the blink stop.
+- The name stays Rank & File. The code form `rank_and_file()` is a secondary mark (for example the subtitle under the logo), never the logo.
+- Keyboard first: the arrow keys move the selection and Enter opens it.
+
+**Lessons is a directory, not a long page.** `src/ui/levelSelect.ts` today shows every chapter open on one page. It becomes a folder cascade: Lessons / Chapter 1 / its levels, with a breadcrumb showing the path.
+- Direction: the "neon explorer". Collapsible chapter folders grouped under tier headings in the pixel display face, inside a thin cyan HUD frame with corner brackets, with indent guides under an open folder. Each chapter has a segmented progress bar (one block per level) and the victory symbol; each level row has its number or ✓ and its stars, and keeps "Solution seen" and the mastery tag. Folders slide open. One hybrid is mocked up as an alternative: the explorer on the left, and a detail pane for the selected level on the right (what it trains, a mini board, best stars, Run / Replay).
+- **Nothing is locked.** Every chapter and level stays open, as today.
+- **Only what you need is open.** On load, the folder holding the next unsolved level is the only one open, and that level is selected and scrolled into view. Folders the player opens by hand are remembered per browser, like settings. The Testing ground is its own folder.
+- **Clearing a chapter earns a victory symbol** (a pixel crown in the samples). When all five core levels are solved the chapter's folder gets it, with a short flourish the first time and still afterwards. The mastery challenge upgrades it (a second state of the same symbol). It reads by shape and label, not only by colour.
+
+**Words and themes follow the art direction.** Flavour lives in the chrome: titles, chapter and tier headings, the intro, the start menu, folder names, the level-complete and promotion moments, and the theme names in Settings (for example a dark "Night shift" and a light "Daylight terminal"). The voice is terse, 80s-terminal and cyberpunk, with the player as the one writing the program and enemies as corrupted code. **Teaching text stays plain**: lessons, hints, error translations, the Codex and tooltips keep today's clear wording (§2), because a clever line that slows down understanding is a bug. Any label someone clicks still says plainly what it does. The voice guide, with before/after examples, is in `docs/M3/M3.7.md`.
+
+**Sprite system.**
+- A 16×16 pixel grid per sprite, drawn at 4 units per pixel so it fills a 64-unit square, with `shape-rendering: crispEdges`.
+- Sprites are data (grids or rects generated from a small palette map), so one is easy to read and diff and the level editor's palette can reuse it.
+- A sprite and skin registry sits beside `TILE_ART`. Pawn and knight are skins (§8). An enemy kind maps to a sprite plus a "corruption" effect layer.
+- Every sprite takes its colours from CSS tokens (no hard-coded hex in TS), so the light theme and the contrast checks still work.
+- Every existing state class (open, crossed, collected, bridged, gone, lost, celebrate, bumping, reading, refusing), the badges and the tooltips stay, restyled, not replaced.
+
 ### The look *(directions to explore, not decisions)*
-- **Colour:** a deep near-black, with cyan, magenta and amber used sparingly, in the spirit of synthwave and 80s arcade vector graphics.
+- **Colour:** a near-black blue/violet base, with cyan, amber and phosphor green as role colours used sparingly (see the roles above), in the spirit of synthwave and 80s arcade vector graphics. Magenta is reserved for hostile things and is never a general accent.
 - **Board:** thin lit lines that glow slightly; squares that stay quiet so tiles and pieces read first.
 - **Sprites:** wireframe or pixel-grid pieces, tiles and enemies, with each tile's meaning clear at a glance.
 - **Type:** a clean monospace for code. A pixel-adjacent or geometric display face only for titles and badges.
-- **Texture:** a restrained scanline or grain, off by default.
+- **Texture:** CRT scanlines, optional and off by default, never over code or text.
 
 ### Motion kit
 A trail behind a move, turns, a bump, a capture (the rook takes the pawn, from QA Session 9), a rune read as a scan, a gate unlocking, a level-complete flourish, the promotion ceremony, and screen transitions.
@@ -237,4 +289,4 @@ Colours are CSS custom properties written as `light-dark()`, there is a tile-to-
 - Before/after screenshots through the end-to-end suite.
 
 ### Open for the pass
-Sound (tiny optional chiptune effects, off by default); how much CRT texture; whether the light theme keeps any glow.
+Sound (tiny optional chiptune effects, off by default). Settled by the brief above: CRT scanlines are optional and off by default, and the light theme has no glow.
