@@ -125,22 +125,13 @@ def _explain_syntax(exc: SyntaxError) -> str:
 
 
 def _endless_while_hint() -> str:
-    """A hint for a program that ran out of lines, when the player's `while` explains it. The
-    source comes from linecache (see `runner.remember_source`); checked with `ast`."""
+    """A hint for a program that ran out of lines, when the player has a `while`. The source
+    comes from linecache (see `runner.remember_source`); checked with `ast`."""
     try:
         tree = ast.parse("".join(linecache.getlines(PLAYER_FILENAME)))
     except SyntaxError:
         return ""
-    whiles = [node for node in ast.walk(tree) if isinstance(node, ast.While)]
-    for loop in whiles:
-        called = {id(node.func) for node in ast.walk(loop.test) if isinstance(node, ast.Call)}
-        for node in ast.walk(loop.test):
-            if isinstance(node, ast.Attribute) and id(node) not in called:
-                return (
-                    f" A `while` repeats as long as its condition is True, and `{ast.unparse(node)}` "
-                    f"without parentheses is never False. Did you mean `{ast.unparse(node)}()`?"
-                )
-    if whiles:
+    if any(isinstance(node, ast.While) for node in ast.walk(tree)):
         return (
             " A `while` repeats as long as its condition is True: check that something inside "
             "the loop can make it False, or leave it with `break`."

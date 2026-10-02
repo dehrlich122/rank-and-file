@@ -144,6 +144,8 @@ def lint(tree: ast.Module, namespace: dict) -> list[LintWarning]:
     pieces = {name: type(value) for name, value in namespace.items() if isinstance(value, Piece)}
     warnings = []
     for node in ast.walk(tree):
+        if isinstance(node, (ast.While, ast.If)):
+            warnings += _condition_warnings(node, pieces)
         if not isinstance(node, ast.Expr):
             continue
         value = node.value
@@ -160,6 +162,28 @@ def lint(tree: ast.Module, namespace: dict) -> list[LintWarning]:
                 LintWarning(node.lineno, "This line compares with == but doesn't use the answer. To store a value, use a single =.")
             )
     return sorted(warnings, key=lambda warning: warning.line)
+
+
+def _condition_warnings(node: ast.While | ast.If, pieces: dict) -> list[LintWarning]:
+    """An ability named in a `while` or `if` condition without its parentheses (M3.5). The
+    ability itself is always truthy, so `while not pawn.at_goal:` never runs and
+    `while pawn.at_goal:` never ends."""
+    called = {id(call.func) for call in ast.walk(node.test) if isinstance(call, ast.Call)}
+    found = []
+    for attr in ast.walk(node.test):
+        if not (isinstance(attr, ast.Attribute) and isinstance(attr.value, ast.Name) and attr.value.id in pieces):
+            continue
+        if id(attr) in called or isinstance(inspect.getattr_static(pieces[attr.value.id], attr.attr, None), property):
+            continue
+        name = f"{attr.value.id}.{attr.attr}"
+        found.append(
+            LintWarning(
+                node.lineno,
+                f"`{name}` in this condition has no parentheses, so it's the ability itself, not its answer, "
+                f"and that is always True. To ask it, call it: {name}()",
+            )
+        )
+    return found
 
 
 def describe_rules(constraints) -> list[str]:

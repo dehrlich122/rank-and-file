@@ -75,18 +75,11 @@ def _waiting_corridor():
     return make_level("# G #\n# . #\n# P #\n", api=["move", "wait", "at_goal"])
 
 
-@pytest.mark.parametrize(
-    ("code", "hint"),
-    [
-        ("while pawn.at_goal:\n    pawn.wait()", "`pawn.at_goal` without parentheses is never False. Did you mean `pawn.at_goal()`?"),
-        ("steps = 0\nwhile steps < 3:\n    pawn.wait()", "check that something inside the loop can make it False, or leave it with `break`"),
-    ],
-)
-def test_an_endless_while_gets_a_hint(code, hint):
-    result = run_level(_waiting_corridor(), code, line_budget=500)
+def test_an_endless_while_gets_a_hint():
+    result = run_level(_waiting_corridor(), "steps = 0\nwhile steps < 3:\n    pawn.wait()", line_budget=500)
     assert result.status == "timeout"
     assert "never finished" in result.error.friendly
-    assert hint in result.error.friendly
+    assert "check that something inside the loop can make it False, or leave it with `break`" in result.error.friendly
 
 
 def test_an_endless_for_loop_gets_no_while_hint():
