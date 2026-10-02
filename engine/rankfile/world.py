@@ -57,7 +57,7 @@ CHESS_LINES: dict[str, tuple[Pos, ...]] = {
 }
 
 # What look() calls each tile that's always there; the others depend on the run (M3.4).
-LOOK_WORDS = {Tile.WALL: "wall", Tile.SIGN: "signpost", Tile.TIMED_GATE: "portcullis"}
+LOOK_WORDS = {Tile.WALL: "wall", Tile.SIGN: "signpost", Tile.TIMED_GATE: "portcullis", Tile.RUNE: "rune"}
 CODE_CLOCKS = {"line", "new_line"}  # the clocks that keep time with the code, not the piece
 
 
@@ -178,6 +178,14 @@ class World:
         if tile in (Tile.GEM, Tile.PLANK):
             return None if target in self.collected else tile.value
         return LOOK_WORDS.get(tile)
+
+    def read(self) -> str | None:
+        """The text on the rune the piece stands on, or None when it isn't on
+        one (M3.6). Reading costs no tick."""
+        text = self.board.runes.get(self.pos)
+        if text is not None:
+            self._emit("read", at=list(self.pos))
+        return text
 
     def attacked(self) -> set[Pos]:
         """Every square an enemy chess piece attacks (M3.4)."""

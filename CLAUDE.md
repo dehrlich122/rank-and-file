@@ -234,7 +234,8 @@ names.
   - It appears as a third tab, as hover tooltips in every editor, and on the
     Challenge panel's chips. Player code's `help()` shows the same entries.
   - Entries are Google-style docstrings: abilities in `pieces.py`, built-ins
-    in `codex.BUILTINS`. A new ability or taught built-in needs one.
+    in `codex.BUILTINS`, or `codex.METHODS` for a method of text. A new ability,
+    taught built-in or taught text method needs one.
   - The engine decides what's "taught so far" (`codex.history`). The UI
     sends every chapter's levels and lessons (`content.codexChapters`).
   - The level checker fails if a lesson calls an undocumented built-in, or a

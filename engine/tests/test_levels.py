@@ -177,8 +177,9 @@ def chapters_in_play_order() -> list[dict]:
 def test_lesson_builtins_have_codex_entries(level_file):
     """Every built-in a lesson calls is documented, so the Codex can list it."""
     lesson = (ROOT / "lessons" / load(level_file).lesson).read_text(encoding="utf-8")
-    missing = set().union(*map(codex.builtins_called, codex.lesson_snippets(lesson))) - set(codex.BUILTINS)
-    assert not missing, f"{load(level_file).lesson} calls {sorted(missing)}: document them in codex.BUILTINS"
+    called = set().union(*map(codex.python_called, codex.lesson_snippets(lesson)))
+    missing = called - set(codex.PYTHON)
+    assert not missing, f"{load(level_file).lesson} calls {sorted(missing)}: document them in codex.BUILTINS or codex.METHODS"
 
 
 def test_reference_solution_only_calls_builtins_taught_by_then(level_file):
@@ -186,5 +187,5 @@ def test_reference_solution_only_calls_builtins_taught_by_then(level_file):
     built-ins that a lesson up to it teaches (docs/Codex.md)."""
     taught = set().union(*(codex.taught(item["lesson"]) for item in codex.history(level_file.stem, chapters_in_play_order())))
     reference = (solutions_dir(level_file) / f"{level_file.stem}.py").read_text(encoding="utf-8")
-    missing = codex.builtins_called(reference) - taught
+    missing = codex.python_called(reference) - taught
     assert not missing, f"{level_file.stem}: its reference calls {sorted(missing)}, which no lesson up to it teaches"

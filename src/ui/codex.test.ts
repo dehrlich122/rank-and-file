@@ -18,9 +18,16 @@ describe("codexNameAt: what a hover over code looks up", () => {
     expect(at("print")).toBe("print");
   });
 
-  it("ignores methods of anything but the piece, and comments", () => {
-    expect(at("move()")).toBeNull();
+  it("looks up another object's methods as methods of text, and ignores comments", () => {
+    expect(at("move()")).toBe("str.move"); // the Codex only has an entry if a lesson taught it
     expect(at("wait")).toBeNull();
+  });
+
+  it("finds a text method on any value", () => {
+    const text = 'pawn.read().upper()\nname.strip()';
+    const names = EditorState.create({ doc: text, extensions: [python()] });
+    expect(codexNameAt(names, text.indexOf("upper") + 1, 1, "pawn")?.name).toBe("str.upper");
+    expect(codexNameAt(names, text.indexOf("strip") + 1, 1, "pawn")?.name).toBe("str.strip");
   });
 });
 

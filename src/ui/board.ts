@@ -142,6 +142,10 @@ export class BoardView {
       const gate = this.art.get("gate")?.get(`${event.at[0]},${event.at[1]}`);
       if (gate) restartAnimation(gate, "refusing");
     }
+    if (event.kind === "read" && event.at) {
+      const rune = this.art.get("rune")?.get(`${event.at[0]},${event.at[1]}`);
+      if (rune) restartAnimation(rune, "reading");
+    }
   }
 
   private place(state: WorldState): void {
@@ -262,6 +266,7 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
   plank: (left, top) => plank(left, top, "plank", "A plank. Walk over it to pick it up; bridge() lays it over a pit."),
   waypoint: (left, top) => waypoint(left, top),
   gem: (left, top) => gem(left, top),
+  rune: (left, top, level, pos) => rune(left, top, find(level.runes, pos)?.text ?? ""),
 };
 
 function wall(left: number, top: number): SVGGElement {
@@ -281,6 +286,19 @@ function signpost(left: number, top: number, text: string): SVGGElement {
     svg("rect", { x: left + S / 2 - 3, y: top + S * 0.35, width: 6, height: S * 0.55, class: "sign-post" }),
     svg("rect", { x: left + 8, y: top + 10, width: S - 16, height: S * 0.34, rx: 3, class: "sign-board" }),
     svg("path", { d: `M ${left + 14} ${top + 18} h ${S - 28} M ${left + 14} ${top + 25} h ${S - 36}`, class: "sign-lines" }),
+  );
+  return group;
+}
+
+/** A rune (M3.6): a stone slab with text on it, which the pawn reads by standing on it. Hover shows the text. */
+function rune(left: number, top: number, text: string): SVGGElement {
+  const group = svg("g", { class: "rune" });
+  const glyph = svg("text", { x: left + S / 2, y: top + S / 2 + 8, "text-anchor": "middle", class: "rune-glyph" });
+  glyph.textContent = "ᚱ";
+  group.append(
+    tooltip(`A rune. Stand on it and use read() to get its text: "${text}"`),
+    svg("rect", { x: left + 9, y: top + 9, width: S - 18, height: S - 18, rx: 5, class: "rune-stone" }),
+    glyph,
   );
   return group;
 }

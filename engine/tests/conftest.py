@@ -35,6 +35,16 @@ def corridor():
 
 
 @pytest.fixture
+def rune_corridor():
+    """Pawn on b1 facing north, a rune on b2 (text "north-3"), goal on b3, with read() unlocked (M3.6)."""
+    return make_level(
+        "# G #\n# R #\n# P #\n",
+        api=["move", "read", "look", "squares_ahead"],
+        legend={"R": {"tile": "rune", "text": "north-3"}},
+    )
+
+
+@pytest.fixture
 def waiting_corridor():
     """Pawn on b1 facing north, goal on b3, with wait() and at_goal() unlocked."""
     return make_level("# G #\n# . #\n# P #\n", api=["move", "wait", "at_goal"])

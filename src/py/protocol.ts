@@ -22,7 +22,7 @@ export interface SnippetResult {
 
 export type Facing = "north" | "east" | "south" | "west";
 export type Pos = [number, number];
-export type TileKind = "floor" | "wall" | "sign" | "gate" | "pit" | "waypoint" | "gem" | "timed_gate" | "plank";
+export type TileKind = "floor" | "wall" | "sign" | "gate" | "pit" | "waypoint" | "gem" | "timed_gate" | "plank" | "rune";
 export type Clock = "action" | "line" | "new_line";
 
 /** The world at one moment: where the piece is, which gates are open, and the obstacles (M3.1). */
@@ -53,6 +53,7 @@ export interface LevelInfo {
   height: number;
   tiles: TileKind[][]; // tiles[y][x]; y = 0 is the bottom rank
   signs: Array<{ pos: Pos; text: string }>;
+  runes: Array<{ pos: Pos; text: string }>; // the text on each rune tile, which `pawn.read()` gives back (M3.6)
   questions: Array<{ pos: Pos; text: string }>; // what the guard asks, at gates that ask (never the answer)
   timed_gates: Array<{ pos: Pos; every: number; open: number; clock: Clock; text: string }>; // open for the first `open` ticks of every `every` (QA-024); text: its rule in words
   enemies: Enemy[]; // patrols and chasers; where they are is in each WorldState
@@ -92,9 +93,9 @@ export interface Enemy {
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };
 
 export interface GameEvent {
-  kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "capture" | "tick" | "lost" | "pick_up" | "bridge" | "fall" | "crush";
+  kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "capture" | "tick" | "lost" | "pick_up" | "bridge" | "fall" | "crush" | "read";
   state: WorldState; // the whole world's state after the event
-  at?: Pos; // bump: the square bumped into; gate_open/guard: the gate; capture, fall: the enemy's square; bridge: the pit; pick_up, lost: where
+  at?: Pos; // bump: the square bumped into; gate_open/guard: the gate; capture, fall: the enemy's square; bridge: the pit; pick_up, lost: where; read: the rune
   message?: string; // guard: what the guard said; pick_up, fall, crush, lost: what happened
 }
 
@@ -167,7 +168,7 @@ interface ReplResult {
 /** One entry of the Codex, the dictionary of functions the player knows (codex.Entry; docs/Codex.md). */
 export interface CodexEntry {
   name: string; // as code writes it: "pawn.move", "print"
-  kind: "ability" | "property" | "builtin"; // a property is used without parentheses (pawn.position)
+  kind: "ability" | "property" | "builtin" | "method"; // a property is used without parentheses (pawn.position); a method is called on text (str.upper, M3.6)
   calls: string[]; // how to use it: ["pawn.move(squares=1)"]; some built-ins have more than one form
   paragraphs: string[]; // what it does; `code` is in backticks
   args: Array<{ name: string; about: string }>;

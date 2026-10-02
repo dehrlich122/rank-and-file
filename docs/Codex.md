@@ -62,9 +62,14 @@ Example:
 - **Python's built-ins** (`print`, `range`, and more as chapters teach them)
   are documented in `engine/rankfile/codex.py`, in the same style. Python's
   own help text for them is written for experienced programmers.
-- The level checker fails if an unlocked ability or a built-in called in a
-  lesson has no entry. It also fails if a reference solution calls a
-  built-in that hasn't been taught by its level.
+- **Methods of text** *(M3.6)* (`.upper()`, `.replace()`, `.find()` and the
+  rest) are documented in `codex.METHODS`, named as `str.upper`, with the
+  call shown as `text.upper()`. The Codex tab lists them under "Text", and
+  hovering `.upper` in code on any value shows the entry once it's taught.
+  Indexing and slicing are syntax, so they have no entry.
+- The level checker fails if an unlocked ability, a built-in or a text method
+  called in a lesson has no entry. It also fails if a reference solution
+  calls a built-in or method that hasn't been taught by its level.
 
 ## "Taught so far"
 
@@ -79,13 +84,14 @@ disagree.
   - the levels of its own chapter, up to and including it
   - So a Testing-ground level counts Chapter 1 and the Testing-ground levels
     before it.
-- The engine finds the built-ins each lesson snippet calls with `ast`, never
-  by matching strings. A snippet that is meant to be a syntax error is
+- The engine finds the built-ins and text methods each lesson snippet calls
+  with `ast`, never by matching strings. A snippet that is meant to be a syntax error is
   skipped.
 - The pawn's entries are exactly this level's abilities, since a locked
   ability can't be used.
-- The built-ins' entries are every documented built-in taught so far, in the
-  order `codex.BUILTINS` lists them, since Python's built-ins always work.
+- The built-ins' and methods' entries are every documented one taught so
+  far, in the order `codex.PYTHON` lists them (`BUILTINS`, then `METHODS`),
+  since Python's own tools always work.
 - Each entry names the id of the level that brought it in. The UI turns that
   into "1.4 The Password" or "Testing ground: Clockwork".
 

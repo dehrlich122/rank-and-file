@@ -39,8 +39,9 @@ export function renderCodex(entries: CodexEntry[], piece: string): CodexView {
       "div",
       { class: "codex" },
       h("p", { class: "muted small" }, "Everything you've learned so far. Hover a function in your code to see its entry, or ask Python with help()."),
-      ...group(`Your ${piece}`, (entry) => entry.kind !== "builtin"),
+      ...group(`Your ${piece}`, (entry) => entry.kind === "ability" || entry.kind === "property"),
       ...group("Python", (entry) => entry.kind === "builtin"),
+      ...group("Text", (entry) => entry.kind === "method"),
     ),
     show(name) {
       const item = items.get(name);
@@ -104,12 +105,17 @@ function details(entry: CodexEntry): HTMLElement[] {
 
 const label = (text: string) => h("span", { class: "codex-label" }, text);
 
-/** The Codex name at `pos`: "pawn.move" on the `move` of pawn.move(), "print" on print. */
+/**
+ * The Codex name at `pos`: "pawn.move" on the `move` of pawn.move(), "print" on
+ * print, and "str.upper" on the `upper` of any other `x.upper()` (a method of
+ * text, M3.6: the Codex only has an entry for it once a lesson has taught it).
+ */
 export function codexNameAt(state: EditorState, pos: number, side: -1 | 1, piece: string): { name: string; from: number; to: number } | null {
   const node = syntaxTree(state).resolveInner(pos, side);
   if (node.name === "PropertyName" && node.parent) {
     const name = memberName(state, node.parent);
-    return name?.startsWith(`${piece}.`) ? { name, from: node.from, to: node.to } : null;
+    const found = name?.startsWith(`${piece}.`) ? name : `str.${state.sliceDoc(node.from, node.to)}`;
+    return { name: found, from: node.from, to: node.to };
   }
   return node.name === "VariableName" ? { name: state.sliceDoc(node.from, node.to), from: node.from, to: node.to } : null;
 }

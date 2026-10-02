@@ -49,7 +49,7 @@ SNIPPET = re.compile(r"^```python run(?: (error|lost|timeout))?\n(.*?)^```", re.
 @dataclass
 class Entry:
     name: str  # as code writes it: "pawn.move", "print"
-    kind: str  # "ability", "property" (used without parentheses) or "builtin"
+    kind: str  # "ability", "property" (used without parentheses), "builtin" or "method" (of text, M3.6)
     calls: list[str]  # how to use it: ["pawn.move(squares=1)"]; some built-ins have more than one form
     paragraphs: list[str]  # what it does
     args: list[dict] = field(default_factory=list)  # {"name", "about"} for each argument
@@ -112,7 +112,185 @@ BUILTINS: dict[str, tuple[list[str], str]] = {
                 print(number)
         """,
     ),
+    "len": (
+        ["len(text)"],
+        """Count the characters in a piece of text.
+
+        Letters, digits, spaces and punctuation each count as one.
+
+        Args:
+            text: the text to measure, a str.
+
+        Returns:
+            How many characters, a whole number (int).
+
+        Example:
+            print(len("knight"))
+        """,
+    ),
+    "int": (
+        ["int(text)"],
+        """Turn text made of digits into a whole number.
+
+        `int("42")` is the number 42, which you can add and compare. Text that
+        isn't a whole number, like `"4 2"` or `"ten"`, is an error.
+
+        Args:
+            text: the digits to read, a str such as "42". A leading minus
+                sign is fine.
+
+        Returns:
+            The number, a whole number (int).
+
+        Example:
+            print(int("7") + 1)
+        """,
+    ),
 }
+
+# Methods of text (M3.6): called on a piece of text, `text.upper()`. Named
+# "str.upper" in the Codex, since a str is Python's name for text. The order is
+# the order the lessons teach them.
+METHODS: dict[str, tuple[list[str], str]] = {
+    "str.upper": (
+        ["text.upper()"],
+        """Make a copy of the text in capital letters.
+
+        The original text doesn't change: text can never be changed, only
+        copied. Keep the copy in a variable, or use it straight away.
+
+        Returns:
+            The new text (a str).
+
+        Example:
+            print("rook".upper())
+        """,
+    ),
+    "str.lower": (
+        ["text.lower()"],
+        """Make a copy of the text in small letters.
+
+        Handy for comparing text without caring about capitals.
+
+        Returns:
+            The new text (a str).
+
+        Example:
+            print("ROOK".lower())
+        """,
+    ),
+    "str.replace": (
+        ["text.replace(old, new)"],
+        """Make a copy of the text with every `old` swapped for `new`.
+
+        Args:
+            old: the piece of text to find, a str.
+            new: what to put there instead, a str. An empty "" takes it out.
+
+        Returns:
+            The new text (a str).
+
+        Example:
+            print("a-b-c".replace("-", " "))
+        """,
+    ),
+    "str.strip": (
+        ["text.strip()"],
+        """Make a copy of the text without the spaces at its start and end.
+
+        Spaces in the middle stay.
+
+        Returns:
+            The new text (a str).
+
+        Example:
+            print("  hello  ".strip())
+        """,
+    ),
+    "str.startswith": (
+        ["text.startswith(start)"],
+        """Check whether the text begins with some other text.
+
+        Args:
+            start: the beginning to look for, a str.
+
+        Returns:
+            True if it does, False if it doesn't (a bool).
+
+        Example:
+            print("knight".startswith("kn"))
+        """,
+    ),
+    "str.endswith": (
+        ["text.endswith(end)"],
+        """Check whether the text finishes with some other text.
+
+        Args:
+            end: the ending to look for, a str.
+
+        Returns:
+            True if it does, False if it doesn't (a bool).
+
+        Example:
+            print("knight".endswith("ght"))
+        """,
+    ),
+    "str.find": (
+        ["text.find(part)"],
+        """Find where a piece of text first appears inside the text.
+
+        Positions count from 0, like the characters of text do.
+
+        Args:
+            part: the text to look for, a str.
+
+        Returns:
+            The position where it starts (an int), or -1 if it isn't there.
+
+        Example:
+            print("bishop".find("sh"))
+        """,
+    ),
+    "str.count": (
+        ["text.count(part)"],
+        """Count how many times a piece of text appears inside the text.
+
+        Copies that would overlap aren't counted twice.
+
+        Args:
+            part: the text to look for, a str.
+
+        Returns:
+            How many times, a whole number (int). 0 if it isn't there.
+
+        Example:
+            print("banana".count("a"))
+        """,
+    ),
+    "str.split": (
+        ["text.split(separator)"],
+        """Cut the text into pieces wherever the separator appears.
+
+        The separator itself is left out. Take one piece by its position,
+        counting from 0: `pieces[0]` is the first.
+
+        Args:
+            separator: the text to cut at, a str. Leave it out to cut at
+                every run of spaces.
+
+        Returns:
+            The pieces, in order, in square brackets (a list), like
+            ["a", "b"].
+
+        Example:
+            pieces = "north,3".split(",")
+            print(pieces[0])
+        """,
+    ),
+}
+
+# Everything the lessons can teach about Python itself, built-ins first.
+PYTHON = {**BUILTINS, **METHODS}
 
 
 def parse_docstring(doc: str) -> dict:
@@ -159,9 +337,10 @@ def ability_entry(piece: type[Piece], name: str) -> Entry:
     return Entry(f"{piece.NAME}.{name}", kind, [call], **parse_docstring(doc or ""))
 
 
-def builtin_entry(name: str) -> Entry:
-    calls, doc = BUILTINS[name]
-    return Entry(name, "builtin", calls, **parse_docstring(doc))
+def python_entry(name: str) -> Entry:
+    """The entry for one of Python's own tools: a built-in (`print`) or a method of text (`str.upper`)."""
+    calls, doc = PYTHON[name]
+    return Entry(name, "builtin" if name in BUILTINS else "method", calls, **parse_docstring(doc))
 
 
 # -- which entries a level lists: "taught so far" ---------------------------------
@@ -180,14 +359,32 @@ def builtins_called(code: str) -> set[str]:
     }
 
 
+def methods_called(code: str) -> set[str]:
+    """The methods of text `code` calls, named as the Codex does ("str.upper")."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return set()
+    return {
+        f"str.{node.func.attr}"
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and f"str.{node.func.attr}" in METHODS
+    }
+
+
+def python_called(code: str) -> set[str]:
+    """The built-ins and methods of text `code` calls (the level checker uses it too)."""
+    return builtins_called(code) | methods_called(code)
+
+
 def lesson_snippets(markdown: str) -> list[str]:
     """The code of a lesson's runnable snippets, in order."""
     return [code for _, code in SNIPPET.findall(markdown)]
 
 
 def taught(markdown: str) -> set[str]:
-    """The documented built-ins a lesson's snippets call."""
-    return {name for code in lesson_snippets(markdown) for name in builtins_called(code) if name in BUILTINS}
+    """The documented built-ins and text methods a lesson's snippets call."""
+    return {name for code in lesson_snippets(markdown) for name in python_called(code) if name in PYTHON}
 
 
 def history(level_id: str, chapters: list[dict]) -> list[dict]:
@@ -211,11 +408,11 @@ def history(level_id: str, chapters: list[dict]) -> list[dict]:
 
 
 def entries(level_id: str, chapters: list[dict]) -> list[Entry]:
-    """A level's Codex: its piece's abilities, then every built-in taught so far.
+    """A level's Codex: its piece's abilities, then every built-in and text method taught so far.
 
     The piece's entries are exactly this level's abilities, since a locked one
-    can't be used. Python's built-ins always work, so every one taught so far
-    is listed, in BUILTINS' order. Each says which level brought it in.
+    can't be used. Python's own tools always work, so every one taught so far
+    is listed, in PYTHON's order. Each says which level brought it in.
     """
     counted = history(level_id, chapters)
     if not counted:
@@ -228,7 +425,7 @@ def entries(level_id: str, chapters: list[dict]) -> list[Entry]:
     here = parse_level(counted[-1]["data"])
     piece = PIECES[here.piece]
     found = [ability_entry(piece, name) for name in piece.ABILITIES if name in here.api]
-    found += [builtin_entry(name) for name in BUILTINS if name in introduced]
+    found += [python_entry(name) for name in PYTHON if name in introduced]
     for entry in found:
         entry.introduced = introduced[entry.name]
         entry.new = entry.introduced == level_id
@@ -292,17 +489,22 @@ def describe(thing) -> str:
 
 
 def _entry_for(thing) -> Entry | None:
-    """The Codex entry for an ability (`pawn.move`), a built-in (`print`), or either's name as text."""
+    """The Codex entry for an ability (`pawn.move`), a built-in (`print`), a method of text (`"x".upper`), or any of their names as text."""
     if isinstance(thing, str):
-        if thing in BUILTINS:
-            return builtin_entry(thing)
+        if thing in PYTHON:
+            return python_entry(thing)
         piece_name, _, ability = thing.partition(".")
         piece = PIECES.get(piece_name)
         return ability_entry(piece, ability) if piece and ability in piece.ABILITIES else None
     owner = getattr(thing, "__self__", None)
     if isinstance(owner, Piece) and getattr(thing, "__name__", "") in type(owner).ABILITIES:
         return ability_entry(type(owner), thing.__name__)
-    return next((builtin_entry(name) for name in BUILTINS if thing is getattr(builtins, name)), None)
+    if isinstance(owner, str) and f"str.{thing.__name__}" in METHODS:  # "x".upper
+        return python_entry(f"str.{thing.__name__}")
+    method = next((name for name in METHODS if thing is getattr(str, name.removeprefix("str."))), None)  # str.upper
+    if method:
+        return python_entry(method)
+    return next((python_entry(name) for name in BUILTINS if thing is getattr(builtins, name)), None)
 
 
 def format_entry(entry: Entry) -> str:

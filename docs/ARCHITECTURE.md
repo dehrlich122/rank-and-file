@@ -187,6 +187,7 @@ map: |                       # top row is the highest rank; symbols separated by
   P . # #
 legend:                      # optional: extra symbols beyond the built-ins
   S: {tile: sign, text: "Words written on the signpost"}
+  R: {tile: rune, text: "north-3"}                   # M3.6: floor with text, read with pawn.read()
   X: {tile: gate, passphrase: Open sesame}
   Q: {tile: gate, question: "How many gems did you collect?", passphrase: "4"}
   T: {tile: timed_gate, every: 3, open: 2}           # open and clock (action) are optional
@@ -207,7 +208,7 @@ objectives:                  # default [reach_goal]
   - waypoints                # cross every waypoint (added whenever the map has any)
   - collect: all             # or a number: gems to walk over
   - capture: all             # or a number: enemies to capture (armoured ones can't be)
-api: [move, turn_left, turn_right]      # abilities the piece has in this level (also squares_ahead, at_goal, wait, capture_left, capture_right, bridge)
+api: [move, turn_left, turn_right]      # abilities the piece has in this level (also squares_ahead, at_goal, wait, capture_left, capture_right, bridge, look, read)
 constraints: {max_lines: 4, min_comments: 1, require_nodes: [For], ban_nodes: []}
                              # also max_numbers: 1 (M3.2, QA-029): only one number, written once
 par: {lines: 3}              # the par star: this many lines of code or fewer
@@ -253,6 +254,15 @@ must reach the goal whichever `?` it's on). Legend tiles:
   `open`. Shut, it blocks like a wall. Anything under it when it shuts is
   crushed *(QA-024)*: the piece loses the run, and a chaser is gone. Its
   badge counts its clock's ticks during playback ("2 of 4 · tick 5", M3.2).
+- `rune` *(M3.6)*: floor the piece walks over, with text on it; needs `text`.
+  - `pawn.read()` gives back the text of the rune the piece stands on, or
+    None off a rune. It costs no tick, and announces a `read` event so
+    playback can light the rune.
+  - A rune's text is shown before the run: on the tile's tooltip and in the
+    Challenge panel, like a signpost's. Each board of a level can give the
+    same symbol its own text through a variant's `legend`, so one program has
+    to decode every board.
+  - Enemies can stand on one.
 - `pit` *(M3.1)*: stepping in loses the run. `pawn.bridge()` lays a plank
   over the pit ahead *(QA-017)*, which makes it floor for everyone. A chaser
   whose step lands on an open pit falls in and is gone.
@@ -272,7 +282,7 @@ The piece's counting and waiting *(M3.2)*:
 - `look(side=None)` *(M3.4)* names what's on the square straight ahead, or
   diagonally ahead with `"left"` or `"right"` (the squares a pawn captures
   on). It gives back a word, or None if the square is empty:
-  - the board: "wall", "edge", "signpost", "pit", "gate", "portcullis"
+  - the board: "wall", "edge", "signpost", "rune", "pit", "gate", "portcullis"
   - things to pick up: "gem", "plank"
   - an enemy's kind, such as "rook"
   - A bridged pit, an opened gate and a picked-up gem look empty. Squares

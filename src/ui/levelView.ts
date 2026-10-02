@@ -541,6 +541,9 @@ function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, 
   for (const sign of level.signs) {
     parts.push(h("blockquote", { class: "sign-text" }, h("span", { class: "muted small" }, `Signpost on ${squareName(sign.pos)}`), sign.text));
   }
+  for (const rune of level.runes) {
+    parts.push(h("blockquote", { class: "sign-text" }, h("span", { class: "muted small" }, `Rune on ${squareName(rune.pos)}`), rune.text));
+  }
   if (level.obstacles.length) parts.push(h("h3", {}, "Obstacles"), list("obstacles", level.obstacles));
   if (level.rules.length) parts.push(h("h3", {}, "Rules"), list("rules", level.rules));
   parts.push(h("h3", {}, "Stars"), list("star-goals", level.stars));

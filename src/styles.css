@@ -43,6 +43,8 @@
   --sq-dark: light-dark(#b5c99a, #7f9868);
   --wall: light-dark(#6b625a, #3d3833);
   --wall-inner: light-dark(#7d746b, #4a443e);
+  --rune-stone: light-dark(#a9b4c2, #56606d);
+  --rune-glyph: light-dark(#3b4a5c, #d6dde6);
   --goal: #d4a017;
   --pawn: #fdfbf6;
   --pawn-stroke: #2a2622;
@@ -1339,6 +1341,25 @@ pre {
   stroke: #f3e2c7;
   stroke-width: 2.5;
   stroke-linecap: round;
+}
+
+.rune-stone {
+  fill: var(--rune-stone);
+}
+
+.rune-glyph {
+  fill: var(--rune-glyph);
+  font: 700 22px var(--font-ui);
+}
+
+.rune.reading .rune-stone {
+  animation: read-rune 650ms ease-out;
+}
+
+@keyframes read-rune {
+  25% {
+    fill: var(--goal);
+  }
 }
 
 .goal-ring,
