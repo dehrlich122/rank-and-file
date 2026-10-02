@@ -108,7 +108,9 @@ const label = (text: string) => h("span", { class: "codex-label" }, text);
 /**
  * The Codex name at `pos`: "pawn.move" on the `move` of pawn.move(), "print" on
  * print, and "str.upper" on the `upper` of any other `x.upper()` (a method of
- * text, M3.6: the Codex only has an entry for it once a lesson has taught it).
+ * text, M3.6). That's a candidate: the Codex only has an entry for it once a lesson
+ * has taught it, and the editor can't tell a text from any other value, so the lookup
+ * simply finds nothing for a name that isn't in the level's Codex.
  */
 export function codexNameAt(state: EditorState, pos: number, side: -1 | 1, piece: string): { name: string; from: number; to: number } | null {
   const node = syntaxTree(state).resolveInner(pos, side);

@@ -18,7 +18,7 @@ How a reference is written, with no one reading it:
   that works, and every expression is checked on boards that aren't in the level.
 - The walk between the stops comes from the board's own geometry.
 The few fixed lines of code (the loop, the reading) are stored in ROT13, as the hints
-and notes are, so that nothing here shows a solution: `code()` decodes them. The
+and notes are, so that nothing here shows a solution: `said()` decodes them. The
 generator prints counts and outcomes only; the designer is also the game's learner
 (see CLAUDE.md: no spoilers).
 
@@ -27,27 +27,19 @@ operations in the smallest expression that gives every board's answer, and how f
 board's own typed attempt gets.
 """
 
-import codecs
 import json
 import re
-from itertools import product
+from itertools import pairwise, product
 
 import yaml
-from levelgen import build, main, yaml_text
+from levelgen import BUDGET, build, main, said, yaml_text
 
 from rankfile.levels import Level, parse_level
 from rankfile.runner import run_level
 
 CHAPTER = 6
 MAX_SIZE = 6  # operations in a searched expression
-BUDGET = 400  # lines of player code a candidate may run before it counts as endless
 
-
-def said(text: str) -> str:
-    return codecs.decode(text, "rot13")
-
-
-code = said  # the fixed lines of code below are stored the same way
 
 # -- drafting boards -------------------------------------------------------------------
 
@@ -131,7 +123,7 @@ def typed_code(spec: dict, board: dict) -> str:
         turn = {"left": "pawn.turn_left()\n", "right": "pawn.turn_right()\n", "ahead": ""}[board["good"]]
         return f"pawn.move(4)\n{turn}pawn.move(4)\n"
     lines = []
-    for (here, _), (there, gate) in zip(stops(spec), stops(spec)[1:], strict=False):
+    for (here, _), (there, gate) in pairwise(stops(spec)):
         lines.append(move(there - here))
         if gate:
             lines.append(f"print({board[gate]!r})")
@@ -433,14 +425,14 @@ def draft(spec: dict) -> Level:
 # -- the programs ----------------------------------------------------------------------------------
 
 # Fixed lines, in ROT13. Once decoded, {sep} is the separator, {i} an index, {nam} how a leg's number reads.
-READ = code("grkg = cnja.ernq()")
-SPLIT_BIND = code("cnegf = cnja.ernq().fcyvg({frc})")
-PIECE_STEP = code("cnja.zbir(vag(cnegf[{v}]))")
-PIECE_TEXT = code("cnja.zbir(cnegf[{v}])")
-DIGIT_STEP = code("cnja.zbir(vag(grkg[{v}]))")
-LOOP = code("sbe yrt va cnja.ernq().fcyvg({frc}):")
-LEG_STEP = code("cnja.zbir(vag({anz}))")
-UNROLLED = [code("sbe ahzore va enatr({a}):"), code("yrt = cnegf[ahzore]")]
+READ = said("grkg = cnja.ernq()")
+SPLIT_BIND = said("cnegf = cnja.ernq().fcyvg({frc})")
+PIECE_STEP = said("cnja.zbir(vag(cnegf[{v}]))")
+PIECE_TEXT = said("cnja.zbir(cnegf[{v}])")
+DIGIT_STEP = said("cnja.zbir(vag(grkg[{v}]))")
+LOOP = said("sbe yrt va cnja.ernq().fcyvg({frc}):")
+LEG_STEP = said("cnja.zbir(vag({anz}))")
+UNROLLED = [said("sbe ahzore va enatr({a}):"), said("yrt = cnegf[ahzore]")]
 
 Made = tuple[list[str], str, dict[str, list[str]]]  # the reference, a few words on its shape, each wrong attempt
 
@@ -488,7 +480,7 @@ def make_guards(spec: dict) -> Made | None:
     reading = READ + suffix
     again = f"pawn.read(){suffix}"
     attempts = {
-        "typed": as_code(typed_code(spec, spec["boards"][0]).splitlines()).splitlines(),
+        "typed": typed_code(spec, spec["boards"][0]).splitlines(),
         "plain": program(reading, dict.fromkeys(gates, "text")),
         "reread": program(None, {gate: reads.replace("text", again) for gate, reads in says.items()}),
     }

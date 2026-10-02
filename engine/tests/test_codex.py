@@ -103,16 +103,15 @@ def test_only_this_levels_abilities_are_listed():
 
 
 def test_a_lessons_built_ins_are_found_with_ast():
-    assert codex.builtins_called("for i in range(2):\n    print(abs(i))\nx = print") == {"range", "print", "abs"}
-    assert codex.builtins_called("this is not Python") == set()
+    assert codex.python_called("for i in range(2):\n    print(abs(i))\nx = print") == {"range", "print", "abs"}
+    assert codex.python_called("this is not Python") == set()
     lesson = f"{FENCE}python run\nprint(abs(-2))\n{FENCE}\n\n{FENCE}python\nrange(3)\n{FENCE}\n"
     assert codex.taught(lesson) == {"print"}  # only documented built-ins, and only in runnable snippets
 
 
 def test_a_lessons_text_methods_are_found_with_ast():
     code = "text = pawn.read()\nprint(text.upper().replace('a', 'b'), pawn.move(), text.nonsense())"
-    assert codex.methods_called(code) == {"str.upper", "str.replace"}  # not the pawn's, and not made-up ones
-    assert codex.methods_called("this is not Python") == set()
+    assert codex.python_called(code) == {"print", "str.upper", "str.replace"}  # not the pawn's, and not made-up ones
     lesson = f"{FENCE}python run\nprint('x'.strip(), len('x'))\n{FENCE}\n"
     assert codex.taught(lesson) == {"print", "len", "str.strip"}
 

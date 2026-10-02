@@ -26,18 +26,15 @@ the shortest ones that avoid `while`, avoid `for`, or avoid `break`, so a spec c
 say what makes each concept necessary.
 """
 
-import codecs
 from itertools import product
 
 import yaml
-from levelgen import build, main, yaml_text  # first: it puts the engine on the import path
+from levelgen import BUDGET, build, main, said, yaml_text  # first: it puts the engine on the import path
 from solve import fewest_lines, write_code
 
 from rankfile.constraints import code_lines
 from rankfile.levels import Level, parse_level
 from rankfile.runner import run_level
-
-BUDGET = 400  # lines of player code a candidate may run before it counts as endless
 
 # A program is a tuple of items; an item is a line (a string) or a block
 # (header, body, else_body | None). Rendering is the only place text is made.
@@ -460,10 +457,6 @@ def pick(codes: list[str]) -> str:
 
 
 # -- writing a level -----------------------------------------------------------------------------
-
-
-def said(text: str) -> str:
-    return codecs.decode(text, "rot13")
 
 
 def writer(spec: dict):

@@ -346,35 +346,28 @@ def python_entry(name: str) -> Entry:
 # -- which entries a level lists: "taught so far" ---------------------------------
 
 
-def builtins_called(code: str) -> set[str]:
-    """The Python built-ins `code` calls by name (print, range, ...). The level checker uses it too."""
+def _callees(code: str) -> list[ast.expr]:
+    """What each call in `code` calls: a name (`print`) or an attribute (`text.upper`)."""
     try:
         tree = ast.parse(code)
     except SyntaxError:
-        return set()  # a lesson snippet that's meant to be a syntax error
-    return {
-        node.func.id
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and hasattr(builtins, node.func.id)
-    }
+        return []  # a lesson snippet that's meant to be a syntax error
+    return [node.func for node in ast.walk(tree) if isinstance(node, ast.Call)]
 
 
-def methods_called(code: str) -> set[str]:
-    """The methods of text `code` calls, named as the Codex does ("str.upper")."""
-    try:
-        tree = ast.parse(code)
-    except SyntaxError:
-        return set()
-    return {
-        f"str.{node.func.attr}"
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and f"str.{node.func.attr}" in METHODS
-    }
+def _builtins_in(callees: list[ast.expr]) -> set[str]:
+    return {callee.id for callee in callees if isinstance(callee, ast.Name) and hasattr(builtins, callee.id)}
+
+
+def _methods_in(callees: list[ast.expr]) -> set[str]:
+    """The methods of text among them, named as the Codex does ("str.upper")."""
+    return {f"str.{callee.attr}" for callee in callees if isinstance(callee, ast.Attribute) and f"str.{callee.attr}" in METHODS}
 
 
 def python_called(code: str) -> set[str]:
-    """The built-ins and methods of text `code` calls (the level checker uses it too)."""
-    return builtins_called(code) | methods_called(code)
+    """The built-ins (print, range, ...) and methods of text ("str.upper") `code` calls by name. The level checker uses it too."""
+    callees = _callees(code)
+    return _builtins_in(callees) | _methods_in(callees)
 
 
 def lesson_snippets(markdown: str) -> list[str]:
@@ -499,10 +492,8 @@ def _entry_for(thing) -> Entry | None:
     owner = getattr(thing, "__self__", None)
     if isinstance(owner, Piece) and getattr(thing, "__name__", "") in type(owner).ABILITIES:
         return ability_entry(type(owner), thing.__name__)
-    if isinstance(owner, str) and f"str.{thing.__name__}" in METHODS:  # "x".upper
-        return python_entry(f"str.{thing.__name__}")
-    method = next((name for name in METHODS if thing is getattr(str, name.removeprefix("str."))), None)  # str.upper
-    if method:
+    method = f"str.{getattr(thing, '__name__', '')}"
+    if method in METHODS and (isinstance(owner, str) or thing is getattr(str, thing.__name__)):  # "x".upper, or str.upper
         return python_entry(method)
     return next((python_entry(name) for name in BUILTINS if thing is getattr(builtins, name)), None)
 
