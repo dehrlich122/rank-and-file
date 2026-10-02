@@ -37,8 +37,8 @@ Built beyond the first brief:
   its naive attempts fail; blind level generators that write solutions without
   anyone reading them; an end-to-end suite that drives the real app.
 
-Next: finish Chapter 6, with a promotion ceremony (§8). Then a first design pass
-(§9), then the level editor and free play (§7).
+Next: finish Chapter 6. Then a first design pass (§9), which also builds the
+promotion ceremony and the knight skin (§8), then the level editor and free play (§7).
 
 ---
 
@@ -167,8 +167,8 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 | M1 Vertical slice | board, editor, Run, animated event log, line highlighting, variables, error translation, Learn phase, Chapter 1 | Done |
 | M2 Feedback depth | tiered hints, AST constraints, several boards, par and stars, idiomatic-solution reveal, progress saving | Done |
 | M3.0–M3.5 | the obstacle toolkit, the Codex, Chapters 2–5 | Done |
-| M3.6 Chapter 6 | Runes, ending with the **promotion ceremony** and the knight skin (§8) | In progress: engine built, level specs approved |
-| **M3.7 Look & Feel** | the first major design pass (§9) | Planned, before M4 |
+| M3.6 Chapter 6 | Runes | In play-test: engine, levels and lessons built |
+| **M3.7 Look & Feel** | the first major design pass (§9), with the **promotion ceremony** and the knight skin (§8) | Planned, before M4 |
 | M4 Level editor | author levels without hand-writing YAML; the Pawn tier's set of mastery challenges | Planned |
 | **M4.x Free play** | an open board to experiment on, with a skins gallery | Planned, after M4 |
 | M5+ | the remaining chapters, one tier at a time, each ending in a promotion | Planned |
@@ -181,7 +181,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 
 ## 8. Promotion, pieces and skins *(Updated 2026-10-02)*
 
-*(Designer, 2026-10-02)* The end of Chapter 6 celebrates the promotion from pawn to knight, and the knight becomes an unlockable skin.
+*(Designer, 2026-10-02)* The end of Chapter 6 celebrates the promotion from pawn to knight, and the knight becomes an unlockable skin. Both are built in the design pass (M3.7), in the new look, not in M3.6.
 
 - **A piece is its rules; a skin is its look.** The pawn walks forward and captures diagonally. From Chapter 7 the player's piece is a knight with L-moves. A knight skin on a Pawn-tier level still moves like a pawn.
 - **The promotion ceremony** closes each tier. The first is at the end of Chapter 6:
@@ -189,7 +189,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
   - It is a full-screen moment, not a pop-up. It celebrates, sums up what the player learned (the Codex), shows the new piece, and teases the next tier.
 - **Unlocking:** a skin unlocks when its promotion is earned. The rule is worked out from the saved progress, so Reset progress locks it again. The bishop, rook and queen would unlock the same way *(proposed; confirm when those tiers are built)*.
 - **Using a skin:**
-  - From M3.6, Settings has a **Piece** choice (pawn or knight) that works on every level, in a simple style that the design pass replaces.
+  - From M3.7, once a skin is unlocked it is **selectable in the menu**: Settings has a **Piece** choice (pawn or knight) that works on every level.
   - After M4, free play gets a gallery of unlocked skins.
 
 ---
