@@ -28,6 +28,8 @@ _IGNORED_TOKENS = {
 NODE_NAMES = {
     "For": "a for loop",
     "While": "a while loop",
+    "Break": "a break statement",
+    "Continue": "a continue statement",
     "If": "an if statement",
     "FunctionDef": "a function definition (def)",
     "Return": "a return statement",

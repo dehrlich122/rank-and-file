@@ -1,0 +1,65 @@
+id: ch05-l05
+chapter: 5
+title: "The Staircase"
+trains: "while on look(): a loop that runs as many times as the board says, even none"
+brief: "A line of rooks climbs the board, one step up and one step across. Take them all. The goal is straight above the last one."
+piece: pawn
+map: |
+  . . . . . . .
+  . . . . . . .
+  . . . . . . .
+  . . . . . . .
+  . . G . . . .
+  . . . . . . .
+  . . . . . . .
+  P . . . . . .
+enemies:
+- {"kind": "rook", "start": "b2"}
+- {"kind": "rook", "start": "c3"}
+start: {"facing": "north"}
+api: ["move", "turn_left", "turn_right", "wait", "at_goal", "look", "capture_left", "capture_right"]
+par: {"lines": 3}
+hints:
+- "Every board has a different number of rooks, even none. Look before you take."
+- "Keep taking rooks for as long as one stands diagonally ahead on the right. When none is left the loop ends, even if there was none to begin with."
+- "Start the loop like this:\nwhile pawn.look(\"right\") == \"rook\":"
+lesson: ch05/ch05-l05.md
+lesson_board:
+  map: |
+    . . . .
+    . . . .
+    . . . .
+    P . . .
+  enemies: [{"kind": "rook", "start": "b2"}, {"kind": "rook", "start": "c3"}]
+  start: {"facing": "north"}
+variants:
+- map: |
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    G . . . . . .
+    P . . . . . .
+  enemies: []
+- map: |
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    . . . G . . .
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    P . . . . . .
+  enemies: [{"kind": "rook", "start": "b2"}, {"kind": "rook", "start": "c3"}, {"kind": "rook", "start": "d4"}]
+- map: |
+    . . . . . . .
+    . . . . . G .
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    P . . . . . .
+  enemies: [{"kind": "rook", "start": "b2"}, {"kind": "rook", "start": "c3"}, {"kind": "rook", "start": "d4"}, {"kind": "rook", "start": "e5"}, {"kind": "rook", "start": "f6"}]

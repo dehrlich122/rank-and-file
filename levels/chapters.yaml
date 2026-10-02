@@ -16,6 +16,10 @@
   title: Eyes Open
   tier: pawn
   summary: True and False, comparisons, if, elif and else, and a pawn that looks before it steps.
+- chapter: 5
+  title: Keep Going
+  tier: pawn
+  summary: while loops, a counter kept inside one, break and continue, and a pawn that goes on until it's done.
 - chapter: 0
   title: Testing ground
   tier: practice

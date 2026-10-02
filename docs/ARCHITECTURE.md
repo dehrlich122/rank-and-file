@@ -330,7 +330,8 @@ Alongside each level:
   small open board with the level's abilities, or on its `lesson_board` *(QA-019)*,
   so a snippet can show an obstacle at work. Mark a snippet that is *meant*
   to fail (to show an error) with ```` ```python run error ````, and one meant
-  to lose (to show a pit or an enemy at work) with ```` ```python run lost ````. The Learn
+  to lose (to show a pit or an enemy at work) with ```` ```python run lost ````, and one
+  meant to run out of lines (an endless loop) with ```` ```python run timeout ```` *(M3.5)*. The Learn
   panel shows the lesson in steps, one per runnable snippet. Each step is
   the text leading up to a snippet plus the snippet; text after the last
   snippet joins the last step. So where the snippets go decides where the

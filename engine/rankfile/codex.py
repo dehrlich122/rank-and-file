@@ -43,7 +43,7 @@ from .pieces import PIECES, Piece
 SECTIONS = ("Args", "Returns", "Example")
 
 # A lesson's runnable snippets: ```python run``` blocks, optionally `run error` or `run lost`.
-SNIPPET = re.compile(r"^```python run(?: (error|lost))?\n(.*?)^```", re.MULTILINE | re.DOTALL)
+SNIPPET = re.compile(r"^```python run(?: (error|lost|timeout))?\n(.*?)^```", re.MULTILINE | re.DOTALL)
 
 
 @dataclass

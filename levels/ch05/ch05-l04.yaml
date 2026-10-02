@@ -1,0 +1,38 @@
+id: ch05-l04
+chapter: 5
+title: "Which Rook?"
+trains: "break: leaving a loop early (continue skips the rest of one pass)"
+brief: "A staircase of rooks, and the goal is hidden under one of them. Take rooks until you find it."
+piece: pawn
+map: |
+  . . . . . . .
+  . . . . . . .
+  . . . . . . .
+  . . . . ? . .
+  . . . ? . . .
+  . . ? . . . .
+  . ? . . . . .
+  P . . . . . .
+enemies:
+- {"kind": "rook", "start": "b2"}
+- {"kind": "rook", "start": "c3"}
+- {"kind": "rook", "start": "d4"}
+- {"kind": "rook", "start": "e5"}
+- {"kind": "rook", "start": "f6"}
+start: {"facing": "north"}
+api: ["move", "turn_left", "turn_right", "wait", "at_goal", "look", "capture_left", "capture_right"]
+constraints: {"require_nodes": ["Break"]}
+par: {"lines": 4}
+hints:
+- "You can't tell which rook hides the goal, so take them one at a time and check after each capture."
+- "Use a loop that never ends by itself, check for the goal inside it after each capture, and leave the loop with break."
+- "Leave the loop with:\nbreak"
+lesson: ch05/ch05-l04.md
+lesson_board:
+  map: |
+    # # #
+    # . #
+    # . #
+    # . #
+    # P #
+  start: {"facing": "north"}
