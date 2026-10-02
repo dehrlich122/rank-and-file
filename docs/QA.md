@@ -1574,6 +1574,19 @@ The designer played Chapter 6: "mostly excellent", with one note.
     the rest. 6.5's lesson also says the pieces come back as a list, so the idea
     starts a level earlier. Only the lessons changed: the levels, references and
     pars are the same.
+- **Pre-merge pass** *(2026-10-02, after the designer called M3.6 feature-complete)*:
+  - `/simplify` cleaned up the Codex's call finder (one parse per snippet, one
+    branch for text methods in `help()`), the generators' shared pieces (`said`
+    and the line budget now live in `levelgen.py`), and merged the signpost and
+    rune blocks in the Challenge panel. Chapter 5 and 6's levels, solutions and
+    lessons are byte for byte the same (sha256).
+  - Eight e2e checks were added (all 194 pass): the six reference solves, the
+    chapter list and mastery tag, the rune on the board (tooltip, Challenge panel,
+    lighting up as it is read), the "not standing on a rune" message, the Codex's
+    Text group and method hover, the pit snippet in 6.4, and QA-035's three panels.
+  - One thing a player can notice: `help(len)` now shows the game's own entry,
+    since `len` is in the Codex, instead of Python's. The e2e check for Python's
+    own help now uses `abs`.
 
 ---
 
