@@ -286,6 +286,8 @@ After round 2 *(Designer, 2026-10-02)*: neither style yet, and the noir tile is 
 - **HUD brackets frame the hero's square**, for the hero only. They show its facing: the side it faces is brighter and carries a small notch. No floating glyph.
 - **No light pool.** The floor shadow stays.
 
+**Approved after round 5** *(Designer, 2026-10-02)*: round 5 is the style, ready to apply to the full set. One note: **the halftone dots scale with the board**, so a threatened square stays clear on the smaller boards too.
+
 ### The look *(directions to explore, not decisions)*
 - **Colour:** a near-black blue/violet base, with cyan, amber and phosphor green as role colours used sparingly (see the roles above), in the spirit of synthwave, 80s computer graphics and cyberpunk film. Magenta is reserved for hostile things and is never a general accent, except in the sunset of the big chrome moments.
 - **Board:** thin lit lines that glow slightly; squares that stay quiet so tiles and pieces read first.
