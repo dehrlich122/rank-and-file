@@ -1543,6 +1543,10 @@ The designer played all six Chapter 4 levels.
     challenge. 4.6 was one program that worked on every board.
 - **Idea, for the visual design pass** *(Designer, 2026-10-02)*: a red
   hatched line on the board along the squares an enemy piece threatens.
+- **Idea, for the visual design pass** *(Designer, 2026-10-02)*: animate the
+  rook moving to capture the pawn when it takes it.
+- **Retest** *(Designer, 2026-10-02)*: skipped; the designer asked to merge
+  after the pre-merge pass.
 
 ---
 
