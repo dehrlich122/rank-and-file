@@ -218,16 +218,16 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
    - With Animations set to reduced, every meaning still reads with zero motion.
 2. **It's a coding game as much as a chess game.** Draw the world as a running program: terminal greens and phosphor amber, cursor blinks, scanning reads, circuit-trace walls, `>_` on runes, line numbers and coordinates treated as part of the HUD. The player's piece is the program: clean, lit, stable.
 3. **Enemies and threats are corrupted code.** Data gone wrong, in magenta and red on a dark body: cracks, dead pixels and intermittent glitch bursts (RGB split, a horizontal slice offset, a frame of noise) every few seconds, not constant. Squares an enemy threatens get the same language: a diagonal hatch (it works without colour) plus a slow scanline or flicker. **Stable = yours or safe; unstable = hostile.** The player should feel the difference before reading any tooltip. In reduced motion the corruption stays as a static colour fringe plus the hatch.
-4. **80s retro-futurism, cyberpunk.** A near-black blue/violet base with cyan, amber and green used sparingly; magenta stays reserved for hostile things (the one chrome exception is the start-menu logo's pixel shadow, *to confirm*). Synthwave and vector-arcade energy belongs in the chrome (titles, the promotion ceremony, level-complete), not the play area. CRT scanlines are optional and off by default. The light theme is a "daylight terminal": the same shapes and semantic colours, softer, with no glow.
+4. **80s retro-futurism, cyberpunk.** A near-black blue/violet base with cyan, amber and green used sparingly. Magenta is hostile wherever the board can be seen; the big chrome moments may use the full sunset (see "Step 0 feedback" below). Synthwave and vector-arcade energy belongs in the chrome (titles, the promotion ceremony, level-complete), not the play area. CRT scanlines are optional and off by default. The light theme is a "daylight terminal": the same shapes and semantic colours, softer, with no glow.
 
 **Colour roles** (every later decision hangs on these):
 - cyan / white: the player and their code (piece, pointer, trail, step line)
-- magenta / red: **hostile only** (enemies, threatened squares, enemy routes, lost runs). Magenta is taken out of every non-hostile accent.
+- magenta / red: **hostile only** (enemies, threatened squares, enemy routes, lost runs). Magenta is taken out of every non-hostile accent. The one exception is the sunset in the big chrome moments, away from the board (see "Step 0 feedback").
 - amber: goals, gates, things to act on
 - phosphor green: text the world holds (runes, signs), and success
 - violet / near-black: structure (walls, pits, the board itself)
 
-**Heroes** are small armoured figures whose silhouette still reads as their chess piece, so each piece's chess identity lives in its outline. The pawn is a round-helmed knight-errant with a lit visor; the knight skin is a horse-head helm. The style draws on SNES Zelda and the modern pixel games in that lineage (Shovel Knight, Hyper Light Drifter, Dead Cells, Loop Hero): chunky readable shapes, a 1px dark outline, 3–4 tone shading, and personality in a 2-frame idle. It is crisp, high-contrast, deliberately limited modern pixel art, not a blurry retro filter, and it carries over to the environment tiles.
+**Heroes** are small armoured figures whose silhouette still reads as their chess piece, so each piece's chess identity lives in its outline. The pawn is a round-helmed knight-errant with a lit visor; the knight skin is a horse-head helm. ~~The style draws on SNES Zelda and the modern pixel games in that lineage (Shovel Knight, Hyper Light Drifter, Dead Cells, Loop Hero): chunky readable shapes, a 1px dark outline, 3–4 tone shading, and personality in a 2-frame idle.~~ *Revisited after step 0 (see below): the old-game lineage is dialled down, and the drawing style (neon pixel or vector) is being compared.* Whichever wins stays crisp, high-contrast and deliberately limited, keeps a 2-frame idle, and carries over to the environment tiles.
 
 **Glitch lives in two places only:** on the board (enemies and threatened squares) and on the error card. When player code throws, the card's frame gets one brief corruption flicker, never its text, so bugs and enemies read as the same kind of thing. Every other panel, the lessons and the level list stay calm.
 
@@ -238,12 +238,12 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 - file letters (a–h) along the bottom and rank numbers (1–8) up the left, always both, restyled from today's `labels()`; they're text, so no glow
 
 **The start menu** is a styled title screen with some animation, honouring reduced motion. Its four entries are Lessons, Free Play, Level Editor and Settings. Free Play (M4.x) and Level Editor (M4) show now as "coming soon" and switch on when those milestones land.
-- Direction: the arcade title. A big pixel-font "RANK & FILE" logo in cyan with a hard magenta pixel-offset shadow (an offset, not a blur, so it isn't glow on text), over a slowly scrolling synthwave perspective grid and a striped sun. Menu items are in the pixel face, with a blinking ▶ on the selected one. With reduced motion the grid and the blink stop.
+- Direction: ~~the arcade title, with a pixel-font logo~~ *the neon title (revised after step 0, below)*. A big "RANK & FILE" logo with a hard offset shadow (an offset, not a blur, so it isn't glow on text), over a slowly scrolling synthwave perspective grid and a striped sun. **A rank of enemy chess pieces stands in front of the sun, and the player's hero (the pawn, or whatever rank the player has reached) stands under the menu.** A blinking ▶ marks the selected entry. With reduced motion the grid, the blink and the glitches stop.
 - The name stays Rank & File. The code form `rank_and_file()` is a secondary mark (for example the subtitle under the logo), never the logo.
 - Keyboard first: the arrow keys move the selection and Enter opens it.
 
 **Lessons is a directory, not a long page.** `src/ui/levelSelect.ts` today shows every chapter open on one page. It becomes a folder cascade: Lessons / Chapter 1 / its levels, with a breadcrumb showing the path.
-- Direction: the "neon explorer". Collapsible chapter folders grouped under tier headings in the pixel display face, inside a thin cyan HUD frame with corner brackets, with indent guides under an open folder. Each chapter has a segmented progress bar (one block per level) and the victory symbol; each level row has its number or ✓ and its stars, and keeps "Solution seen" and the mastery tag. Folders slide open. One hybrid is mocked up as an alternative: the explorer on the left, and a detail pane for the selected level on the right (what it trains, a mini board, best stars, Run / Replay).
+- Direction: the "neon explorer". Collapsible chapter folders grouped under tier headings in the display face, inside a thin cyan HUD frame with corner brackets, with indent guides under an open folder. Each chapter has a segmented progress bar (one block per level) and the victory symbol; each level row has its number or ✓ and its stars, and keeps "Solution seen" and the mastery tag. Folders slide open. One hybrid is mocked up as an alternative: the explorer on the left, and a detail pane for the selected level on the right (what it trains, a mini board, best stars, Run / Replay).
 - **Nothing is locked.** Every chapter and level stays open, as today.
 - **Only what you need is open.** On load, the folder holding the next unsolved level is the only one open, and that level is selected and scrolled into view. Folders the player opens by hand are remembered per browser, like settings. The Testing ground is its own folder.
 - **Clearing a chapter earns a victory symbol** (a pixel crown in the samples). When all five core levels are solved the chapter's folder gets it, with a short flourish the first time and still afterwards. The mastery challenge upgrades it (a second state of the same symbol). It reads by shape and label, not only by colour.
@@ -256,12 +256,21 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 - A sprite and skin registry sits beside `TILE_ART`. Pawn and knight are skins (§8). An enemy kind maps to a sprite plus a "corruption" effect layer.
 - Every sprite takes its colours from CSS tokens (no hard-coded hex in TS), so the light theme and the contrast checks still work.
 - Every existing state class (open, crossed, collected, bridged, gone, lost, celebrate, bumping, reading, refusing), the badges and the tooltips stay, restyled, not replaced.
+- If the vector style wins (below), the same holds with polygons in place of pixel grids: each sprite is a list of faces in the 64-unit square, each face a tone.
+
+### Step 0 feedback *(Designer, 2026-10-02)*
+
+After the first three style tiles (`docs/M3/M3.7.md`):
+- **Neon is the base**, pushed further toward 80s cyberpunk and retro-futurism. The new inspiration is Hotline Miami (its neon, its type and its title screens, without the violence), *Hackers*, *The Lawnmower Man* and their kin. The old video-game references (SNES Zelda and the pixel games in its lineage) are dialled down.
+- **Pink in the big chrome moments.** The title screen, the promotion ceremony and the level-complete flourish may use the full sunset (pink, orange and violet) in the sky, the sun and the logo. Wherever the board can be seen (the level screen, the lessons, the level list), magenta still means hostile, so the rule players learn on the board stays true.
+- **The title screen** gets a rank of enemy chess pieces lined up in front of the sun, and the player's hero, at the rank they've reached, under the menu.
+- **Drawing style: to be compared.** The fourth tile switches between neon pixel sprites and vector "VR" figures (flat-shaded polygons with a lit edge), on the same board, before one is chosen.
 
 ### The look *(directions to explore, not decisions)*
-- **Colour:** a near-black blue/violet base, with cyan, amber and phosphor green as role colours used sparingly (see the roles above), in the spirit of synthwave and 80s arcade vector graphics. Magenta is reserved for hostile things and is never a general accent.
+- **Colour:** a near-black blue/violet base, with cyan, amber and phosphor green as role colours used sparingly (see the roles above), in the spirit of synthwave, 80s computer graphics and cyberpunk film. Magenta is reserved for hostile things and is never a general accent, except in the sunset of the big chrome moments.
 - **Board:** thin lit lines that glow slightly; squares that stay quiet so tiles and pieces read first.
 - **Sprites:** wireframe or pixel-grid pieces, tiles and enemies, with each tile's meaning clear at a glance.
-- **Type:** a clean monospace for code. A pixel-adjacent or geometric display face only for titles and badges.
+- **Type:** a clean monospace for code. A geometric display face (80s computer lettering) only for titles and headings.
 - **Texture:** CRT scanlines, optional and off by default, never over code or text.
 
 ### Motion kit
