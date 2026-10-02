@@ -10,8 +10,10 @@ Friendly messages never mention line numbers; the UI shows the line next to
 them and highlights it in the editor.
 """
 
+import ast
 import builtins
 import difflib
+import linecache
 import re
 import traceback
 from dataclasses import dataclass
@@ -50,7 +52,7 @@ def friendly_message(exc: BaseException, namespace: dict) -> str:
     if isinstance(exc, StepBudgetExceeded):
         return (
             f"Your program never finished. It ran more than {exc.budget:,} lines, "
-            "which almost always means a loop that never ends."
+            f"which almost always means a loop that never ends.{_endless_while_hint()}"
         )
     if isinstance(exc, SyntaxError):
         return _explain_syntax(exc)
@@ -89,6 +91,11 @@ def _explain_syntax(exc: SyntaxError) -> str:
             )
         if "unindent does not match" in msg:
             return "This line's indentation doesn't line up with any line above it."
+    if match := re.fullmatch(r"'(break|continue)' (?:outside loop|not properly in loop)", msg):
+        return (
+            f"`{match.group(1)}` only works inside a loop (a `for` or a `while`). "
+            "Indent it so it sits under the loop it belongs to."
+        )
     if match := re.search(r"'(.)' was never closed", msg):
         opening = match.group(1)
         return f"The bracket {opening} opened on this line is never closed. Add the matching {_BRACKET_PAIRS.get(opening, '')}."
@@ -112,6 +119,33 @@ def _explain_syntax(exc: SyntaxError) -> str:
     if msg == "invalid syntax":
         return "Python couldn't understand this line. Look for a missing bracket, quote mark or colon, or a misspelled word."
     return f"Python couldn't understand this line: {msg}."
+
+
+# -- loops that never end (M3.5) -------------------------------------------------
+
+
+def _endless_while_hint() -> str:
+    """A hint for a program that ran out of lines, when the player's `while` explains it. The
+    source comes from linecache (see `runner.remember_source`); checked with `ast`."""
+    try:
+        tree = ast.parse("".join(linecache.getlines(PLAYER_FILENAME)))
+    except SyntaxError:
+        return ""
+    whiles = [node for node in ast.walk(tree) if isinstance(node, ast.While)]
+    for loop in whiles:
+        called = {id(node.func) for node in ast.walk(loop.test) if isinstance(node, ast.Call)}
+        for node in ast.walk(loop.test):
+            if isinstance(node, ast.Attribute) and id(node) not in called:
+                return (
+                    f" A `while` repeats as long as its condition is True, and `{ast.unparse(node)}` "
+                    f"without parentheses is never False. Did you mean `{ast.unparse(node)}()`?"
+                )
+    if whiles:
+        return (
+            " A `while` repeats as long as its condition is True: check that something inside "
+            "the loop can make it False, or leave it with `break`."
+        )
+    return ""
 
 
 # -- names and attributes: usually typos ---------------------------------------
