@@ -7,25 +7,32 @@
     <style>
       /* M3.7 step 0 (design prototype, dev-only): the way in to the mood board and the style tiles. */
       :root { color-scheme: dark; }
-      body { margin: 0; background: #07081a; color: #e6e9ff; font: 16px/1.55 system-ui, "Segoe UI", sans-serif; }
+      body { margin: 0; background: #090416; color: #ecebff; font: 16px/1.55 system-ui, "Segoe UI", sans-serif; }
       main { max-width: 860px; margin: 0 auto; padding: 36px 20px 60px; }
       h1 { margin: 0 0 6px; color: #3be0ff; font-size: 26px; }
-      p { color: #98a0d4; margin: 0 0 18px; }
+      h2 { margin: 26px 0 8px; font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; color: #a69ed6; }
+      p { color: #a69ed6; margin: 0 0 18px; }
       ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-      a.card { display: block; border: 1px solid #2a2f66; background: #0d0f2a; padding: 14px 18px; color: inherit; text-decoration: none; }
+      a.card { display: block; border: 1px solid #33255e; background: #110a24; padding: 14px 18px; color: inherit; text-decoration: none; }
       a.card:hover, a.card:focus-visible { border-color: #3be0ff; }
       a.card strong { display: block; color: #3be0ff; }
-      a.card span { color: #98a0d4; font-size: 14px; }
+      a.card span { color: #a69ed6; font-size: 14px; }
     </style>
   </head>
   <body>
     <main>
       <h1>Look &amp; Feel · step 0: direction</h1>
       <p>Dev-only pages for choosing a direction. Nothing here is in the game or in the production build.</p>
+      <h2>Round 2</h2>
       <ul>
-        <li><a class="card" href="./moodboard.html"><strong>Mood board</strong><span>Twelve references, each with what we take and what we leave.</span></a></li>
+        <li><a class="card" href="./tiles.html?tile=noir&amp;sprites=vector"><strong>Tile 4 · Neon noir, vector sprites</strong><span>Flat-shaded polygons with a lit edge, after The Lawnmower Man. The sunset title screen with the enemy rank before the sun.</span></a></li>
+        <li><a class="card" href="./tiles.html?tile=noir&amp;sprites=pixel"><strong>Tile 4 · Neon noir, pixel sprites</strong><span>The same tile with tile 2's neon pixel sprites, for comparison.</span></a></li>
+        <li><a class="card" href="./moodboard.html"><strong>Mood board</strong><span>Round 2: Hotline Miami, Hackers, The Lawnmower Man and their kin, each with what we take and what we leave.</span></a></li>
+      </ul>
+      <h2>Round 1</h2>
+      <ul>
         <li><a class="card" href="./tiles.html?tile=snes"><strong>Tile 1 · SNES-crisp</strong><span>Pixel-forward, 4-tone sprites, almost no glow. Silkscreen.</span></a></li>
-        <li><a class="card" href="./tiles.html?tile=neon"><strong>Tile 2 · Neon vector</strong><span>Lit outlines and more line glow; also shows the explorer-and-detail Lessons hybrid. Press Start 2P.</span></a></li>
+        <li><a class="card" href="./tiles.html?tile=neon"><strong>Tile 2 · Neon vector</strong><span>Lit outlines and more line glow; the explorer-and-detail Lessons hybrid. Press Start 2P.</span></a></li>
         <li><a class="card" href="./tiles.html?tile=terminal"><strong>Tile 3 · Terminal</strong><span>Phosphor-forward and code-flavoured: scanlined sprites, circuit-trace walls, <code>&gt;_</code> on runes. VT323.</span></a></li>
       </ul>
     </main>

@@ -5,10 +5,8 @@ import { createEditor, setActiveLine, setErrorLine } from "../src/ui/editor";
 import { icon } from "../src/ui/icons";
 import { BoardView } from "../src/ui/board";
 import { LEVEL } from "./sample";
-import { KITS, reskin, type TileName } from "./reskin";
-import {
-  BISHOP, BLOB, CROWN, CROWN_MASTER, FLAG, GATE, GATE_OPEN, GATE_TIMED, GEM, KNIGHT, PAWN, PIT, PLANK, ROOK, SIGN, WAYPOINT, WAYPOINT_DONE, corruption, draw, type Sprite,
-} from "./sprites";
+import { corrupted, reskin, type Skin, type TileName } from "./reskin";
+import { hero, type Painter, type SpriteName } from "./paint";
 
 const SVG = "http://www.w3.org/2000/svg";
 const svg = (tag: string, attrs: Record<string, string | number> = {}, ...children: Element[]): SVGElement => {
@@ -22,10 +20,10 @@ const svg = (tag: string, attrs: Record<string, string | number> = {}, ...childr
 
 /** Each tile's chrome in its own voice. Teaching text (lessons, hints, errors) is never touched. */
 export interface Voice {
-  font: string;
   lessons: string;
   tier: string;
   chapter: (n: number, title: string) => string;
+  outside: string;
   intro: string;
   complete: string;
   lost: string;
@@ -37,12 +35,14 @@ export interface Voice {
   detail: string;
 }
 
+const plainChapter = (n: number, title: string) => (n ? `Chapter ${n} · ${title}` : title);
+
 export const VOICES: Record<TileName, Voice> = {
   snes: {
-    font: "Silkscreen",
     lessons: "Lessons",
     tier: "Pawn tier",
-    chapter: (n, title) => `Chapter ${n} · ${title}`,
+    chapter: plainChapter,
+    outside: "Outside the curriculum",
     intro: "You write the program. The pawn runs it.",
     complete: "Level cleared!",
     lost: "Run lost",
@@ -54,10 +54,10 @@ export const VOICES: Record<TileName, Voice> = {
     detail: "Level",
   },
   neon: {
-    font: "Press Start 2P",
     lessons: "// LESSONS",
     tier: "TIER 01 — PAWN",
-    chapter: (n, title) => `CH.0${n} :: ${title.toUpperCase()}`,
+    chapter: (n, title) => (n ? `CH.0${n} :: ${title.toUpperCase()}` : title.toUpperCase()),
+    outside: "Outside the curriculum",
     intro: "You are the program. Make the pawn move.",
     complete: "RUN COMPLETE",
     lost: "RUN CORRUPTED",
@@ -69,10 +69,10 @@ export const VOICES: Record<TileName, Voice> = {
     detail: "LEVEL",
   },
   terminal: {
-    font: "VT323",
     lessons: "$ ls lessons/",
     tier: "pawn/  (6 chapters)",
-    chapter: (n, title) => `ch0${n}_${title.toLowerCase().replaceAll(" ", "_")}/`,
+    chapter: (n, title) => `${n ? `ch0${n}_` : ""}${title.toLowerCase().replaceAll(" ", "_")}/`,
+    outside: "Outside the curriculum",
     intro: "$ python pawn.py   # you write pawn.py",
     complete: "exit 0 · all checks passed",
     lost: "exit 1 · run failed",
@@ -83,69 +83,81 @@ export const VOICES: Record<TileName, Voice> = {
     comingSoon: "not yet built",
     detail: "level",
   },
+  noir: {
+    lessons: "Lessons",
+    tier: "Tier 1 · Pawn",
+    chapter: (n, title) => (n ? `0${n} · ${title}` : title),
+    outside: "Off the grid",
+    intro: "You write the program. The pawn runs it.",
+    complete: "Run complete",
+    lost: "Run lost",
+    crumbRoot: "Lessons",
+    themes: ["Night shift", "Daylight terminal"],
+    menu: ["Lessons", "Free Play", "Level Editor", "Settings"],
+    subtitle: "rank_and_file()",
+    comingSoon: "coming soon",
+    detail: "Level 2.4",
+  },
 };
 
 // -- the sprite sheet ------------------------------------------------------------------
 
 interface SheetItem {
-  name: string;
-  sprite: Sprite;
+  label: string;
+  name: SpriteName;
   enemy?: boolean;
   burst?: boolean; // show the glitch's burst frame, held still
 }
 
-const sheetItems = (style: TileName): SheetItem[] => {
-  const kit = KITS[style];
-  return [
-    { name: "pawn", sprite: PAWN },
-    { name: "knight skin", sprite: KNIGHT },
-    { name: "rook", sprite: ROOK, enemy: true },
-    { name: "bishop", sprite: BISHOP, enemy: true },
-    { name: "chaser", sprite: BLOB, enemy: true },
-    { name: "chaser, glitch", sprite: BLOB, enemy: true, burst: true },
-    { name: "wall", sprite: kit.wall },
-    { name: "sign", sprite: SIGN },
-    { name: "gate", sprite: GATE },
-    { name: "gate, open", sprite: GATE_OPEN },
-    { name: "timed gate", sprite: GATE_TIMED },
-    { name: "pit", sprite: PIT },
-    { name: "plank", sprite: PLANK },
-    { name: "waypoint", sprite: WAYPOINT },
-    { name: "waypoint, crossed", sprite: WAYPOINT_DONE },
-    { name: "gem", sprite: GEM },
-    { name: "rune", sprite: kit.rune },
-    { name: "goal", sprite: FLAG },
-    { name: "chapter cleared", sprite: CROWN },
-    { name: "mastery too", sprite: CROWN_MASTER },
-  ];
-};
+const SHEET: SheetItem[] = [
+  { label: "pawn", name: "pawn" },
+  { label: "knight skin", name: "knight" },
+  { label: "rook", name: "rook", enemy: true },
+  { label: "bishop", name: "bishop", enemy: true },
+  { label: "chaser", name: "blob", enemy: true },
+  { label: "chaser, glitch", name: "blob", enemy: true, burst: true },
+  { label: "wall", name: "wall" },
+  { label: "sign", name: "sign" },
+  { label: "gate", name: "gate" },
+  { label: "gate, open", name: "gateOpen" },
+  { label: "timed gate", name: "gateTimed" },
+  { label: "pit", name: "pit" },
+  { label: "plank", name: "plank" },
+  { label: "waypoint", name: "waypoint" },
+  { label: "waypoint, crossed", name: "waypointDone" },
+  { label: "gem", name: "gem" },
+  { label: "rune", name: "rune" },
+  { label: "goal", name: "flag" },
+  { label: "chapter cleared", name: "crown" },
+  { label: "mastery too", name: "crownMaster" },
+];
 
 /** One sprite on a dark and a light square, side by side, at `px` pixels a square. */
-function sheetCell(item: SheetItem, style: TileName, px: number): SVGElement {
-  const mode = KITS[style].mode;
-  const root = svg("svg", { viewBox: "0 0 128 64", width: px * 2, height: px, class: `sheet-svg${item.burst ? " freeze" : ""}`, role: "img", "aria-label": item.name });
+function sheetCell(item: SheetItem, painter: Painter, px: number): SVGElement {
+  const root = svg("svg", { viewBox: "0 0 128 64", width: px * 2, height: px, class: `sheet-svg sprites-${painter.kind}${item.burst ? " freeze" : ""}`, role: "img", "aria-label": item.label });
   [["sq-dark", 0], ["sq-light", 64]].forEach(([cls, x]) => {
     root.append(svg("rect", { x: x as number, y: 0, width: 64, height: 64, class: cls as string }));
-    const group = svg("g", { transform: `translate(${x} 0)`, class: item.enemy ? "enemy" : "" });
     if (item.enemy) {
-      const layers = corruption(item.sprite, 5);
-      const body = svg("g", { class: "spr" });
-      body.append(draw(item.sprite, mode));
-      group.append(layers.fringe, layers.under, body, layers.over);
+      root.append(corrupted(painter, item.name, 5, svg("g", { transform: `translate(${(x as number) + 32} 32)`, class: "enemy" }) as SVGGElement));
     } else {
-      group.append(draw(item.sprite, mode));
+      root.append(svg("g", { transform: `translate(${x} 0)` }, painter.draw(item.name)));
     }
-    root.append(group);
   });
   return root;
 }
 
-export function spriteSheet(style: TileName): HTMLElement {
+export function spriteSheet(painter: Painter): HTMLElement {
   return h(
     "div",
     { class: "sheet" },
-    ...sheetItems(style).map((item) =>
-      h("figure", { class: "sheet-item" }, h("div", { class: "sheet-big" }, sheetCell(item, style, 64) as unknown as Node), h("div", { class: "sheet-small" }, sheetCell(item, style, 20) as unknown as Node), h("figcaption", {}, item.name)),
+    ...SHEET.map((item) =>
+      h(
+        "figure",
+        { class: "sheet-item" },
+        h("div", { class: "sheet-big" }, sheetCell(item, painter, 64) as unknown as Node),
+        h("div", { class: "sheet-small" }, sheetCell(item, painter, 20) as unknown as Node),
+        h("figcaption", {}, item.label),
+      ),
     ),
   );
 }
@@ -182,7 +194,37 @@ export function codeSlice(voice: Voice): { element: HTMLElement; replay: () => v
 
 // -- the start menu ------------------------------------------------------------------------
 
-export function startMenu(voice: Voice): HTMLElement {
+// The enemy rank before the sun (round 2): a chess back rank of rooks and bishops.
+const RANK: SpriteName[] = ["rook", "bishop", "rook", "bishop", "bishop", "rook", "bishop", "rook"];
+
+/** The enemy rank, silhouetted against the sun with a lit rim, glitching now and then. */
+function enemyRank(painter: Painter): SVGElement {
+  const root = svg("svg", { viewBox: `0 0 ${RANK.length * 64} 66`, class: `menu-rank sprites-${painter.kind}`, "aria-hidden": "true" });
+  RANK.forEach((name, i) => {
+    const piece = corrupted(painter, name, 3 + i * 5, svg("g", { class: "enemy rank-piece", transform: `translate(${i * 64 + 32} 33)` }) as SVGGElement);
+    // the sprite becomes a silhouette: a rim of light from the sun, then the dark shape over it
+    const body = piece.querySelector(".spr")!;
+    body.replaceChildren(
+      svg("g", { transform: "translate(-32 -32)" }, painter.draw(name, { flat: "var(--title-rim)", dy: -3 })),
+      svg("g", { transform: "translate(-32 -32)" }, painter.draw(name, { flat: "var(--title-silhouette)" })),
+    );
+    (piece as SVGGElement).style.setProperty("--glitch-delay", `${(i * 1.3) % 5}s`);
+    root.append(piece);
+  });
+  return root;
+}
+
+/** The player's hero at the rank they've reached, standing on the grid under the menu. */
+export function menuHero(painter: Painter, skin: Skin): SVGElement {
+  return svg(
+    "svg",
+    { viewBox: "-40 -40 80 80", class: `menu-hero sprites-${painter.kind}`, role: "img", "aria-label": `Your piece: the ${skin}` },
+    svg("ellipse", { cx: 0, cy: 29, rx: 24, ry: 5, class: "menu-hero-shadow" }),
+    hero(painter, skin),
+  );
+}
+
+export function startMenu(voice: Voice, scene?: { painter: Painter; skin: Skin }): HTMLElement {
   const items = voice.menu.map((label, i) => ({ label, soon: i === 1 || i === 2 }));
   let selected = 0;
   const note = h("p", { class: "menu-note", "aria-live": "polite" }, "↑ ↓ to choose, Enter to open");
@@ -194,7 +236,6 @@ export function startMenu(voice: Voice): HTMLElement {
       h("span", { class: "menu-cursor", "aria-hidden": "true" }, "▶"),
       h("span", { class: "menu-label" }, item.label),
       item.soon ? h("span", { class: "menu-tag" }, voice.comingSoon) : null,
-      // a click selects and opens, like Enter
     ),
   );
   list.append(...rows);
@@ -204,11 +245,27 @@ export function startMenu(voice: Voice): HTMLElement {
     const item = items[selected]!;
     note.textContent = item.soon ? `${item.label}: ${voice.comingSoon}` : `→ ${item.label}`;
   };
+  const sky = h(
+    "div",
+    { class: "menu-sky", "aria-hidden": "true" },
+    h("div", { class: "menu-sun" }),
+    scene ? (enemyRank(scene.painter) as unknown as Node) : null,
+    h("div", { class: "menu-floor" }),
+    scene ? h("div", { class: "menu-vhs" }) : null,
+  );
   const root = h(
     "section",
-    { class: "menu-mock", tabindex: "0", "aria-label": "Start menu (use the arrow keys)" },
-    h("div", { class: "menu-sky", "aria-hidden": "true" }, h("div", { class: "menu-sun" }), h("div", { class: "menu-floor" })),
-    h("div", { class: "menu-body" }, h("h2", { class: "logo", "aria-label": "Rank and File" }, h("span", { class: "logo-text", "data-text": "RANK & FILE" }, "RANK & FILE")), h("p", { class: "logo-sub" }, voice.subtitle), list, note),
+    { class: `menu-mock${scene ? " scene" : ""}`, tabindex: "0", "aria-label": "Start menu (use the arrow keys)" },
+    sky,
+    h(
+      "div",
+      { class: "menu-body" },
+      h("h2", { class: "logo", "aria-label": "Rank and File" }, h("span", { class: "logo-text", "data-text": "RANK & FILE" }, "RANK & FILE")),
+      h("p", { class: "logo-sub" }, voice.subtitle),
+      list,
+      note,
+      scene ? h("div", { class: "menu-hero-slot" }, menuHero(scene.painter, scene.skin) as unknown as Node) : null,
+    ),
   );
   rows.forEach((row, i) =>
     row.addEventListener("click", () => {
@@ -226,6 +283,30 @@ export function startMenu(voice: Voice): HTMLElement {
     paint();
   });
   return root;
+}
+
+// -- the level-complete flourish (round 2) ---------------------------------------------------
+
+/**
+ * The flourish plays once, in the sunset (a big chrome moment), then settles into
+ * the plain green card the game already shows. The card itself never turns pink:
+ * the board is beside it.
+ */
+export function levelComplete(voice: Voice): { element: HTMLElement; replay: () => void } {
+  const banner = h("div", { class: "complete-banner play" }, h("span", { class: "complete-text", "data-text": voice.complete }, voice.complete));
+  const starRow = (label: string) => h("li", { class: "earned" }, icon("star"), label);
+  const card = h(
+    "div",
+    { class: "outcome outcome-good" },
+    h("div", { class: "outcome-head" }, h("strong", {}, "Solved!"), h("a", { class: "btn btn-primary btn-small", href: "#" }, "Next level →")),
+    h("ul", { class: "stars" }, starRow("Solved"), starRow("Within par: 4 lines"), starRow("No hints")),
+  );
+  const replay = () => {
+    banner.classList.remove("play");
+    banner.getBoundingClientRect();
+    banner.classList.add("play");
+  };
+  return { element: h("div", { class: "complete-mock" }, banner, card), replay };
 }
 
 // -- the Lessons directory ----------------------------------------------------------------------
@@ -258,10 +339,8 @@ const CHAPTER_2: Row[] = [
 
 const starIcons = (n: number) => [0, 1, 2].map((i) => icon(i < n ? "star" : "starOutline"));
 
-function pixelIcon(sprite: Sprite, style: TileName, px = 24): SVGElement {
-  const root = svg("svg", { viewBox: "0 0 64 64", width: px, height: px, class: "crown-icon", "aria-hidden": "true" });
-  root.append(draw(sprite, KITS[style].mode));
-  return root;
+function crownIcon(painter: Painter, mastered: boolean, px = 24): SVGElement {
+  return svg("svg", { viewBox: "0 0 64 64", width: px, height: px, class: `crown-icon sprites-${painter.kind}`, "aria-hidden": "true" }, painter.draw(mastered ? "crownMaster" : "crown"));
 }
 
 function row(row: Row, index: number, selectable: (r: HTMLElement) => void): HTMLElement {
@@ -278,8 +357,8 @@ function row(row: Row, index: number, selectable: (r: HTMLElement) => void): HTM
   return element;
 }
 
-function folder(options: { n: number; title: string; rows: Row[]; open: boolean; cleared?: boolean; mastered?: boolean; style: TileName; voice: Voice; select: (r: HTMLElement) => void }): HTMLElement {
-  const { n, title, rows, style, voice } = options;
+function folder(options: { n: number; title: string; rows: Row[]; open: boolean; cleared?: boolean; mastered?: boolean; painter: Painter; voice: Voice; select: (r: HTMLElement) => void }): HTMLElement {
+  const { n, title, rows, painter, voice } = options;
   const core = rows.filter((r) => !r.mastery);
   const done = core.filter((r) => (r.stars ?? 0) > 0).length;
   const segments = rows.map((r) => h("span", { class: `seg${(r.stars ?? 0) > 0 ? " on" : ""}${r.mastery ? " mastery" : ""}` }));
@@ -289,7 +368,7 @@ function folder(options: { n: number; title: string; rows: Row[]; open: boolean;
     h("span", { class: "folder-caret", "aria-hidden": "true" }, "▸"),
     h("span", { class: "folder-title" }, voice.chapter(n, title)),
     options.cleared
-      ? h("span", { class: "victory", title: options.mastered ? "Chapter cleared, mastery done" : "Chapter cleared" }, pixelIcon(options.mastered ? CROWN_MASTER : CROWN, style), h("span", { class: "victory-label" }, options.mastered ? "mastered" : "cleared"))
+      ? h("span", { class: "victory", title: options.mastered ? "Chapter cleared, mastery done" : "Chapter cleared" }, crownIcon(painter, Boolean(options.mastered)), h("span", { class: "victory-label" }, options.mastered ? "mastered" : "cleared"))
       : null,
     h("span", { class: "segments", role: "img", "aria-label": `${done} of ${core.length} levels solved` }, ...segments),
   );
@@ -302,15 +381,18 @@ function folder(options: { n: number; title: string; rows: Row[]; open: boolean;
   return element;
 }
 
-export function lessonsSlice(style: TileName, voice: Voice, hybrid = false): HTMLElement {
+export function lessonsSlice(painter: Painter, voice: Voice, hybrid = false): HTMLElement {
   const detail = h("aside", { class: "detail" });
   const showDetail = (rowElement?: HTMLElement) => {
-    document.querySelectorAll(".lrow.selected").forEach((r) => r.classList.remove("selected"));
-    rowElement?.classList.add("selected");
+    if (rowElement) {
+      rowElement.closest(".lessons-mock")?.querySelectorAll(".lrow.selected").forEach((r) => r.classList.remove("selected"));
+      rowElement.classList.add("selected");
+    }
+    if (!hybrid) return;
     const board = new BoardView(LEVEL, { mini: true });
-    reskin(board.element, LEVEL, style);
+    reskin(board.element, LEVEL, painter);
     detail.replaceChildren(
-      h("p", { class: "detail-kicker" }, `${voice.detail} 2.4`),
+      h("p", { class: "detail-kicker" }, voice.detail),
       h("h4", {}, "Halt!"),
       h("p", { class: "muted" }, "f-strings: putting values into text"),
       h("div", { class: "detail-board" }, board.element as unknown as Node),
@@ -318,18 +400,19 @@ export function lessonsSlice(style: TileName, voice: Voice, hybrid = false): HTM
       h("div", { class: "detail-actions" }, h("button", { class: "btn btn-primary" }, icon("play"), "Run this level"), h("button", { class: "btn", disabled: true }, "Replay")),
     );
   };
+  const blank = (rows: Row[]) => rows.map((r) => ({ title: r.title, trains: r.trains }));
   const explorer = h(
     "div",
     { class: "hud-frame" },
     h("p", { class: "tier-head" }, voice.tier),
-    folder({ n: 1, title: "First Moves", rows: CHAPTER_1, open: false, cleared: true, style, voice, select: showDetail }),
-    folder({ n: 2, title: "Counting Steps", rows: CHAPTER_2, open: true, style, voice, select: showDetail }),
-    folder({ n: 3, title: "Marching Orders", rows: CHAPTER_1.map((r) => ({ title: r.title, trains: r.trains })), open: false, style, voice, select: showDetail }),
-    h("p", { class: "tier-head" }, "Outside the curriculum"),
-    folder({ n: 0, title: "Testing ground", rows: CHAPTER_1.slice(0, 2).map((r) => ({ title: r.title, trains: r.trains })), open: false, style, voice, select: showDetail }),
+    folder({ n: 1, title: "First Moves", rows: CHAPTER_1, open: false, cleared: true, painter, voice, select: showDetail }),
+    folder({ n: 2, title: "Counting Steps", rows: CHAPTER_2, open: true, painter, voice, select: showDetail }),
+    folder({ n: 3, title: "Marching Orders", rows: blank(CHAPTER_1), open: false, painter, voice, select: showDetail }),
+    h("p", { class: "tier-head" }, voice.outside),
+    folder({ n: 0, title: "Testing ground", rows: blank(CHAPTER_1.slice(0, 2)), open: false, painter, voice, select: showDetail }),
   );
   const crumbs = h("nav", { class: "lcrumbs", "aria-label": "Where you are" }, h("a", { href: "#" }, voice.crumbRoot), h("span", {}, "/"), h("span", {}, voice.chapter(2, "Counting Steps")));
-  if (hybrid) showDetail();
+  showDetail();
   return h(
     "section",
     { class: `lessons-mock${hybrid ? " hybrid" : ""}` },

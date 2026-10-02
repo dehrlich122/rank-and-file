@@ -13,7 +13,7 @@
 //   mono  two tones plus accents, with every other pixel row dimmed (phosphor)
 const SVG = "http://www.w3.org/2000/svg";
 const PX = 4;
-export const SIZE = 16;
+const SIZE = 16;
 
 export type Mode = "full" | "neon" | "mono";
 
@@ -434,6 +434,55 @@ export const WAYPOINT_DONE = make(
   "--grn-3",
 );
 
+/** A waypoint as a diamond (round 2), so it can't be mistaken for the goal's ring or a hidden-goal spot. */
+export const WAYPOINT_DIAMOND = make(
+  [
+    "",
+    ".......44",
+    "......4334",
+    ".....43..34",
+    "....43....34",
+    "...43......34",
+    "..43........34",
+    ".43..........34",
+    ".23..........32",
+    "..23........32",
+    "...23......32",
+    "....23....32",
+    ".....23..32",
+    "......2332",
+    ".......22",
+  ],
+  AMB,
+  "--amb-3",
+  undefined,
+  true,
+);
+
+export const WAYPOINT_DIAMOND_DONE = make(
+  [
+    "",
+    ".......44",
+    "......4334",
+    ".....433334",
+    "....43333334",
+    "...4333333o34",
+    "..433333oo3334",
+    ".43o333oo333334",
+    ".23oo3oo333332",
+    "..23ooo333332",
+    "...23o333332",
+    "....233333 32",
+    ".....233332",
+    "......2332",
+    ".......22",
+  ].map((r) => r.replaceAll(" ", "")),
+  GRN,
+  "--grn-3",
+  undefined,
+  true,
+);
+
 export const GEM = make(
   [
     "",
@@ -575,51 +624,4 @@ export function centred(group: SVGGElement): SVGGElement {
   wrap.setAttribute("transform", `translate(${-(SIZE * PX) / 2} ${-(SIZE * PX) / 2})`);
   wrap.append(group);
   return wrap;
-}
-
-/** A tiny deterministic generator, so the glitch's noise frame is the same every time. */
-function seeded(seed: number): () => number {
-  let s = seed;
-  return () => {
-    s = (s * 1664525 + 1013904223) % 4294967296;
-    return s / 4294967296;
-  };
-}
-
-/**
- * An enemy's corruption layers, for the sprite (centred on (0, 0)) to sit between:
- *  - `fringe`: a static RGB-split fringe behind the sprite, shown only when motion is reduced
- *  - `under`: the glitch burst's colour-split copies, also behind it, so only their offset edges show
- *  - `over`: the burst's slice shifted sideways and a frame of noise, over it
- * The piece itself is never covered: it has to stay readable in the middle of a glitch.
- */
-export function corruption(sprite: Sprite, seed: number): { fringe: SVGGElement; under: SVGGElement; over: SVGGElement } {
-  const layer = (className: string) => {
-    const g = document.createElementNS(SVG, "g");
-    g.setAttribute("class", className);
-    return g;
-  };
-  const fringe = layer("fringe");
-  fringe.append(
-    centred(draw(sprite, "full", { flat: "var(--glitch-a)", dx: -1 })),
-    centred(draw(sprite, "full", { flat: "var(--glitch-b)", dx: 1 })),
-  );
-  const under = layer("burst burst-split");
-  under.append(centred(draw(sprite, "full", { flat: "var(--glitch-a)", dx: -2 })), centred(draw(sprite, "full", { flat: "var(--glitch-b)", dx: 2 })));
-  const over = layer("burst");
-  const slice = layer("burst-slice");
-  slice.append(centred(draw(sprite, "full", { rows: [5, 8], dx: 3 })));
-  const noise = layer("burst-noise");
-  const random = seeded(seed);
-  for (let i = 0; i < 9; i++) {
-    const rect = document.createElementNS(SVG, "rect");
-    rect.setAttribute("x", String(Math.floor(random() * 14 + 1) * PX - 32));
-    rect.setAttribute("y", String(Math.floor(random() * 14 + 1) * PX - 32));
-    rect.setAttribute("width", String(PX * (1 + Math.floor(random() * 3))));
-    rect.setAttribute("height", String(PX));
-    rect.setAttribute("fill", i % 2 ? "var(--glitch-a)" : "var(--glitch-b)");
-    noise.append(rect);
-  }
-  over.append(slice, noise);
-  return { fringe, under, over };
 }

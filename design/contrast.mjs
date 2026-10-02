@@ -8,7 +8,7 @@
 // The step-1 version reads src/styles.css instead and joins `npm run check`.
 import { readFileSync } from "node:fs";
 
-const css = readFileSync(new URL("./tile.css", import.meta.url), "utf8");
+const css = ["./tile.css", "./noir.css"].map((file) => readFileSync(new URL(file, import.meta.url), "utf8")).join("\n");
 
 /** The declarations in the first block whose selector is exactly `selector`. */
 function tokens(selector) {
@@ -20,7 +20,8 @@ function tokens(selector) {
 }
 
 const base = tokens(".pane");
-const overrides = { snes: tokens('[data-tile="snes"] .pane'), neon: tokens('[data-tile="neon"] .pane'), terminal: tokens('[data-tile="terminal"] .pane') };
+const TILES = ["snes", "neon", "terminal", "noir"];
+const overrides = Object.fromEntries(TILES.map((tile) => [tile, tokens(`[data-tile="${tile}"] .pane`)]));
 
 /** Split "a, b" at the top-level comma (rgb() has no commas here, but keep it honest). */
 function splitTop(text) {
@@ -73,7 +74,7 @@ const ratio = (a, b) => {
 const rows = [];
 let failed = 0;
 
-for (const tile of ["snes", "neon", "terminal"]) {
+for (const tile of TILES) {
   for (const theme of ["dark", "light"]) {
     const colour = (name) => parse(resolve(name, theme, tile));
     const bg = colour("bg");
@@ -121,6 +122,16 @@ for (const tile of ["snes", "neon", "terminal"]) {
 
     // 6. the UI frame (not text) meets the 3:1 for components
     atLeast("HUD frame on its panel", ratio(colour("frame"), colour("panel")), 3);
+
+    // 7. the title screen's menu (noir): its plate is see-through, so test it over the brightest sky and the floor
+    if (tile === "noir") {
+      for (const [where, under] of [["sky", colour("sky-4")], ["floor", colour("floor-bg")]]) {
+        const plate = over(colour("plate-bg"), under);
+        atLeast(`title menu text on its plate (over the ${where})`, ratio(colour("plate-text"), plate), 4.5);
+        atLeast(`title menu, coming-soon text (over the ${where})`, ratio(colour("plate-muted"), plate), 4.5);
+        atLeast(`title menu frame (over the ${where})`, ratio(colour("plate-accent"), plate), 3);
+      }
+    }
   }
 }
 

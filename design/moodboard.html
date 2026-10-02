@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mood board · Rank &amp; File</title>
     <style>
-      /* M3.7 step 0 (design prototype, dev-only): the mood board. Plain HTML, no images:
+      /* M3.7 step 0 (design prototype, dev-only): the mood board, round 2. Plain HTML, no images:
          the references are described and linked, not copied. */
       :root {
         color-scheme: dark;
-        --bg: #07081a;
-        --panel: #0d0f2a;
-        --line: #2a2f66;
-        --text: #e6e9ff;
-        --muted: #98a0d4;
+        --bg: #090416;
+        --panel: #110a24;
+        --line: #33255e;
+        --text: #ecebff;
+        --muted: #a69ed6;
         --cyan: #3be0ff;
         --amber: #ffb02e;
         --green: #4cf27a;
@@ -22,15 +22,16 @@
       body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, "Segoe UI", sans-serif; }
       main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 60px; }
       h1 { margin: 0 0 6px; font-size: 26px; color: var(--cyan); }
-      .lede { color: var(--muted); max-width: 72ch; margin: 0 0 6px; }
+      h2.section { margin: 34px 0 4px; font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+      .lede { color: var(--muted); max-width: 74ch; margin: 0 0 6px; }
       nav a { color: var(--cyan); }
       .rules { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 8px; padding: 0; list-style: none; }
       .rules li { border: 1px solid var(--line); padding: 3px 10px; font-size: 13px; color: var(--muted); }
       .rules b { color: var(--text); }
-      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-top: 22px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-top: 14px; }
       article { border: 1px solid var(--line); background: var(--panel); padding: 16px 18px 14px; display: grid; gap: 8px; align-content: start; }
-      article h2 { margin: 0; font-size: 18px; }
-      article h2 small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0.04em; }
+      article h3 { margin: 0; font-size: 18px; }
+      article h3 small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0.04em; }
       article p { margin: 0; }
       .tag { justify-self: start; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; border: 1px solid var(--cyan); color: var(--cyan); padding: 0 7px; }
       .take, .skip { padding: 6px 10px; border-left: 3px solid; font-size: 14px; }
@@ -39,17 +40,18 @@
       .take b { color: var(--green); }
       .skip b { color: var(--red); }
       a { color: var(--cyan); }
+      .dropped { color: var(--muted); max-width: 74ch; }
       footer { margin-top: 26px; color: var(--muted); font-size: 14px; }
     </style>
   </head>
   <body>
     <main>
       <nav><a href="./index.html">← Style tiles</a></nav>
-      <h1>Mood board</h1>
+      <h1>Mood board · round 2</h1>
       <p class="lede">
-        Fourteen references in twelve entries, each with what Rank &amp; File takes from it and, as importantly, what it leaves behind. They are
-        listed in the brief's priority order: readability first, then the coding-game feel, then enemies as corrupted code, then the 80s
-        retro-futurism. Where a reference pulls against a higher priority, the entry says so.
+        After the first tiles, the direction moved from old video games to 80s cyberpunk and retro-futurism: Hotline Miami, <i>Hackers</i>,
+        <i>The Lawnmower Man</i> and their kin. Each entry says what Rank &amp; File takes from it and, as importantly, what it leaves behind.
+        The brief's priorities still decide: where a reference pulls against readability, readability wins.
       </p>
       <ul class="rules">
         <li><b>1</b> readability is the product</li>
@@ -58,115 +60,142 @@
         <li><b>4</b> 80s retro-futurism, in the chrome</li>
       </ul>
 
+      <h2 class="section">The direction</h2>
       <section class="grid">
         <article>
-          <span class="tag">priority 1 · 2</span>
-          <h2>The Legend of Zelda: A Link to the Past <small>SNES, 1991</small></h2>
-          <p>Chunky, readable sprites with a dark outline and a few tones of shading, drawn small enough to read at a glance, and a character that has personality in a two-frame idle.</p>
-          <p class="take"><b>Take:</b> the 1px outline, 3–4 tone shading, and a two-frame idle for the hero. Every object has its own silhouette.</p>
-          <p class="skip"><b>Leave:</b> its busy, textured tiles. Our squares stay quiet; the art lives on them, not in them.</p>
-          <a href="https://en.wikipedia.org/wiki/The_Legend_of_Zelda:_A_Link_to_the_Past">Wikipedia</a>
+          <span class="tag">chrome · title screen</span>
+          <h3>Hotline Miami <small>Dennaton Games, 2012</small></h3>
+          <p>A neon-soaked Miami night: a sunset palette, heavy type with hard stacked shadows, a title screen that sways, and a VHS haze over everything.</p>
+          <p class="take"><b>Take:</b> the sunset on the title screen and in the level-complete flourish, chrome lettering with a two-step offset shadow, a gently swaying logo, a VHS tracking band.</p>
+          <p class="skip"><b>Leave:</b> the violence, entirely. Also the screen that wobbles and colour-cycles during play: on our board nothing moves unless the code made it move, and pink stays hostile there.</p>
+          <a href="https://en.wikipedia.org/wiki/Hotline_Miami">Wikipedia</a>
         </article>
 
         <article>
-          <span class="tag">priority 1 · 2</span>
-          <h2>Shovel Knight <small>Yacht Club Games, 2014</small></h2>
-          <p>A modern game that looks like an 8-bit one: a limited palette, high contrast, and an armoured hero whose helmet alone tells you who it is.</p>
-          <p class="take"><b>Take:</b> the armoured hero whose silhouette is the character. This is the model for a pawn and a knight that read as chess pieces.</p>
-          <p class="skip"><b>Leave:</b> the strict console-palette rules, and the side-scrolling layouts. We need modern, crisp pixel art, not a retro filter.</p>
-          <a href="https://en.wikipedia.org/wiki/Shovel_Knight">Wikipedia</a>
+          <span class="tag">world · voice</span>
+          <h3>Hackers <small>film, 1995</small></h3>
+          <p>Cyberspace as a glowing city of data, fluorescent type on black, and hackers who treat a computer as a playground.</p>
+          <p class="take"><b>Take:</b> the board as a running system lit from inside; cyan, green and amber neon on near-black; the player as the one writing the program, in a playful chrome voice.</p>
+          <p class="skip"><b>Leave:</b> the rapid cuts and the text flying through space. Code and lessons sit still and stay plain.</p>
+          <a href="https://en.wikipedia.org/wiki/Hackers_(film)">Wikipedia</a>
         </article>
 
         <article>
-          <span class="tag">priority 3 · 4</span>
-          <h2>Hyper Light Drifter <small>Heart Machine, 2016</small></h2>
-          <p>Bright magenta, cyan and amber accents against a dark world, with a glitching, corrupted-data motif around its enemies and ruins.</p>
-          <p class="take"><b>Take:</b> bright accents on near-black, and the idea that a corrupted thing flickers while a safe thing sits still.</p>
-          <p class="skip"><b>Leave:</b> the constant ambient particles and fog, which break our one-ambient-motion-per-square rule, and magenta as the world's main colour. Ours is for enemies only.</p>
-          <a href="https://en.wikipedia.org/wiki/Hyper_Light_Drifter">Wikipedia</a>
+          <span class="tag">sprites</span>
+          <h3>The Lawnmower Man <small>film, 1992</small></h3>
+          <p>Early computer graphics: virtual reality built from flat-shaded polygons, chrome and wireframe.</p>
+          <p class="take"><b>Take:</b> the vector sprites: flat faces lit from one side with a thin lit edge; the pit as a wireframe funnel falling away.</p>
+          <p class="skip"><b>Leave:</b> the morphing bodies and the horror. Our figures are stable; only enemies glitch.</p>
+          <a href="https://en.wikipedia.org/wiki/The_Lawnmower_Man_(film)">Wikipedia</a>
         </article>
 
         <article>
-          <span class="tag">priority 1</span>
-          <h2>Dead Cells <small>Motion Twin, 2018</small></h2>
-          <p>Pixel art that stays readable at speed: strong silhouettes, clear colour families for friends and foes, and a brief flash when something is hit.</p>
-          <p class="take"><b>Take:</b> a crisp silhouette that survives at a small size, and short, sharp state flashes rather than long effects.</p>
-          <p class="skip"><b>Leave:</b> the screen shake, particles and the pre-rendered 3D look. Playback has to stay calm so the code can be followed.</p>
-          <a href="https://en.wikipedia.org/wiki/Dead_Cells">Wikipedia</a>
+          <span class="tag">corruption</span>
+          <h3>Max Headroom <small>television, 1985</small></h3>
+          <p>A computer-generated TV host who stutters, skips and breaks up: a broken signal with a face.</p>
+          <p class="take"><b>Take:</b> the language of corruption for enemies: a stuttered frame, an RGB split, a slice that slips sideways, in bursts.</p>
+          <p class="skip"><b>Leave:</b> the constant stutter. Bursts come every few seconds, and never touch code, text or the player's piece.</p>
+          <a href="https://en.wikipedia.org/wiki/Max_Headroom">Wikipedia</a>
         </article>
 
         <article>
-          <span class="tag">priority 1</span>
-          <h2>Loop Hero <small>Four Quarters, 2021</small></h2>
-          <p>A game played on tiles, with a restrained palette and icon-driven state. The board is always the main thing you look at.</p>
-          <p class="take"><b>Take:</b> tile-first restraint: the tile says what it is, and nothing else competes with it.</p>
-          <p class="skip"><b>Leave:</b> the muted, desaturated palette and the small dense text. Ours is lit, and the text has to be easy.</p>
-          <a href="https://en.wikipedia.org/wiki/Loop_Hero">Wikipedia</a>
-        </article>
-
-        <article>
-          <span class="tag">priority 1 · 3</span>
-          <h2>Into the Breach <small>Subset Games, 2018</small></h2>
-          <p>Every threat is shown on the board before it happens, on the exact squares it will hit, and the whole game is built so you can read the state without effort.</p>
-          <p class="take"><b>Take:</b> telegraphing an attack on the squares themselves. This is our hatch for the squares a rook or bishop threatens.</p>
-          <p class="skip"><b>Leave:</b> the isometric mechs and the pale blue interface.</p>
-          <a href="https://en.wikipedia.org/wiki/Into_the_Breach">Wikipedia</a>
-        </article>
-
-        <article>
-          <span class="tag">priority 2</span>
-          <h2>TIS-100 and EXAPUNKS <small>Zachtronics, 2015 and 2018</small></h2>
-          <p>Games where the code is the interface: monospaced text, line numbers, terse manual-style wording and a screen that looks like a machine you are programming.</p>
-          <p class="take"><b>Take:</b> treating line numbers, the step line and coordinates as part of the HUD, and the terse tone.</p>
-          <p class="skip"><b>Leave:</b> the dense multi-panel screens and the walls of manual text. Our teaching text stays short and plain.</p>
-          <a href="https://en.wikipedia.org/wiki/TIS-100">TIS-100</a> · <a href="https://en.wikipedia.org/wiki/Exapunks">EXAPUNKS</a>
-        </article>
-
-        <article>
-          <span class="tag">priority 4</span>
-          <h2>Tempest and Battlezone <small>Atari, 1981 and 1980</small></h2>
-          <p>Vector arcade games: thin, bright lines on black, where the line itself is the picture.</p>
-          <p class="take"><b>Take:</b> thin lit lines with a faint glow, for the board grid and its edge.</p>
-          <p class="skip"><b>Leave:</b> wireframe-only characters (they lose their body at small sizes) and the flicker as visual noise.</p>
-          <a href="https://en.wikipedia.org/wiki/Tempest_(video_game)">Tempest</a> · <a href="https://en.wikipedia.org/wiki/Battlezone_(1980_video_game)">Battlezone</a>
-        </article>
-
-        <article>
-          <span class="tag">priority 4 · 2</span>
-          <h2>Tron <small>film, 1982</small></h2>
+          <span class="tag">board · player</span>
+          <h3>Tron <small>film, 1982</small></h3>
           <p>People and machines as glowing outlines on a dark grid. The world is a computer, and the player is a program inside it.</p>
-          <p class="take"><b>Take:</b> the lit outline (the "neon vector" tile) and the idea of the player as the program, clean and lit.</p>
-          <p class="skip"><b>Leave:</b> the heavy bloom and circuit patterns everywhere. Glow stays on edges, sprites and lines, never on text.</p>
+          <p class="take"><b>Take:</b> the lit grid, the lit edge on every sprite, and the player as the program: clean, cyan, stable.</p>
+          <p class="skip"><b>Leave:</b> heavy bloom everywhere. Glow stays on edges, sprites and lines, in the dark theme only.</p>
           <a href="https://en.wikipedia.org/wiki/Tron">Wikipedia</a>
         </article>
 
         <article>
-          <span class="tag">priority 4</span>
-          <h2>Out Run and the synthwave title <small>Sega, 1986, and after</small></h2>
-          <p>A striped sun on the horizon and a perspective grid running to it: the picture most people mean by "80s".</p>
-          <p class="take"><b>Take:</b> the title screen composition only: logo, sun, scrolling grid, a blinking cursor on the menu.</p>
-          <p class="skip"><b>Leave:</b> palm trees, pink-to-orange everywhere, and any of it inside the play area. This belongs to the chrome.</p>
+          <span class="tag">HUD</span>
+          <h3>Johnny Mnemonic <small>film, 1995</small></h3>
+          <p>Cyberspace interfaces: wireframe frames, brackets and floating panels around data.</p>
+          <p class="take"><b>Take:</b> the HUD frame with corner brackets around the Lessons directory and the level's panels.</p>
+          <p class="skip"><b>Leave:</b> the gloom and the clutter of floating windows.</p>
+          <a href="https://en.wikipedia.org/wiki/Johnny_Mnemonic_(film)">Wikipedia</a>
+        </article>
+
+        <article>
+          <span class="tag">world text</span>
+          <h3>Blade Runner <small>film, 1982</small></h3>
+          <p>Neon signs as the only light in a dark city: the world speaks in lit lettering.</p>
+          <p class="take"><b>Take:</b> runes and signs as the world's lit text, in phosphor green, the one place on the board where the world "talks".</p>
+          <p class="skip"><b>Leave:</b> the rain, the smog and the brown murk. Our squares stay clean.</p>
+          <a href="https://en.wikipedia.org/wiki/Blade_Runner">Wikipedia</a>
+        </article>
+
+        <article>
+          <span class="tag">motion · ceremony</span>
+          <h3>Akira <small>film, 1988</small></h3>
+          <p>Light trails that hang in the air behind a moving bike, and poster-bold type.</p>
+          <p class="take"><b>Take:</b> a short light trail behind the moving piece (the motion kit, step 2) and bold type energy for the promotion ceremony.</p>
+          <p class="skip"><b>Leave:</b> red for anything but hostile, and all of the violence.</p>
+          <a href="https://en.wikipedia.org/wiki/Akira_(1988_film)">Wikipedia</a>
+        </article>
+
+        <article>
+          <span class="tag">title screen</span>
+          <h3>Out Run and the synthwave sunset <small>Sega, 1986, and after</small></h3>
+          <p>A striped sun on the horizon and a perspective grid running to it.</p>
+          <p class="take"><b>Take:</b> the title composition: logo, striped sun, scrolling grid, and now the enemy rank on the horizon with the hero below.</p>
+          <p class="skip"><b>Leave:</b> palm trees, and any of it inside the play area.</p>
           <a href="https://en.wikipedia.org/wiki/Out_Run">Wikipedia</a>
         </article>
 
         <article>
-          <span class="tag">priority 2</span>
-          <h2>Hacknet <small>Team Fractal Alligator, 2015</small></h2>
-          <p>A game played in a terminal, in the terse voice of a command line.</p>
-          <p class="take"><b>Take:</b> the voice for headings and folders: <code>$ ls lessons/</code>, short and flat.</p>
-          <p class="skip"><b>Leave:</b> the hacker jargon. A clever line that slows down understanding is a bug, so lessons, hints and errors stay plain.</p>
-          <a href="https://en.wikipedia.org/wiki/Hacknet">Wikipedia</a>
+          <span class="tag">logo</span>
+          <h3>Kung Fury and Blood Dragon <small>2015 and 2013</small></h3>
+          <p>Modern love letters to the 80s: chrome logos split by a horizon line, laser grids, VHS.</p>
+          <p class="take"><b>Take:</b> the chrome logo: sky above the horizon line, sunset below it, a hard shadow under it.</p>
+          <p class="skip"><b>Leave:</b> the parody and the excess. The game's own text is never a joke at the learner's expense.</p>
+          <a href="https://en.wikipedia.org/wiki/Kung_Fury">Kung Fury</a> · <a href="https://en.wikipedia.org/wiki/Far_Cry_3:_Blood_Dragon">Blood Dragon</a>
         </article>
 
         <article>
-          <span class="tag">priority 1</span>
-          <h2>PICO-8 <small>Lexaloffle, 2015</small></h2>
-          <p>A fantasy console with one small, fixed palette. Everything made for it looks like it belongs together.</p>
-          <p class="take"><b>Take:</b> palette discipline: every sprite is drawn from a handful of named tones, so a new tier's art slots in.</p>
-          <p class="skip"><b>Leave:</b> the fixed 16 colours. Ours are tokens, so the light theme and the contrast check keep working.</p>
-          <a href="https://en.wikipedia.org/wiki/PICO-8">Wikipedia</a>
+          <span class="tag">restraint</span>
+          <h3>Drive <small>film, 2011</small></h3>
+          <p>Neon-pink titles over a night city, used sparingly, so each one lands.</p>
+          <p class="take"><b>Take:</b> restraint. One big chrome moment at a time, over darkness, and quiet everywhere else.</p>
+          <p class="skip"><b>Leave:</b> the script lettering for anything someone has to read quickly.</p>
+          <a href="https://en.wikipedia.org/wiki/Drive_(2011_film)">Wikipedia</a>
+        </article>
+
+        <article>
+          <span class="tag">lines</span>
+          <h3>Tempest and Battlezone <small>Atari, 1981 and 1980</small></h3>
+          <p>Vector arcade games: thin, bright lines on black, where the line itself is the picture.</p>
+          <p class="take"><b>Take:</b> thin lit lines with a faint glow, for the board grid and its edge.</p>
+          <p class="skip"><b>Leave:</b> wireframe-only figures, which lose their body at small sizes; our vector sprites keep filled faces.</p>
+          <a href="https://en.wikipedia.org/wiki/Tempest_(video_game)">Tempest</a> · <a href="https://en.wikipedia.org/wiki/Battlezone_(1980_video_game)">Battlezone</a>
         </article>
       </section>
+
+      <h2 class="section">Kept for readability</h2>
+      <section class="grid">
+        <article>
+          <span class="tag">priority 1</span>
+          <h3>Into the Breach <small>Subset Games, 2018</small></h3>
+          <p>Every threat is shown on the board before it happens, on the exact squares it will hit.</p>
+          <p class="take"><b>Take:</b> telegraphing an attack on the squares themselves: our hatch for the squares a rook or bishop threatens.</p>
+          <p class="skip"><b>Leave:</b> the isometric view and the pale interface.</p>
+          <a href="https://en.wikipedia.org/wiki/Into_the_Breach">Wikipedia</a>
+        </article>
+        <article>
+          <span class="tag">priority 2</span>
+          <h3>TIS-100 and EXAPUNKS <small>Zachtronics, 2015 and 2018</small></h3>
+          <p>Games where the code is the interface: line numbers, a step line and a machine you program.</p>
+          <p class="take"><b>Take:</b> line numbers, the step line and coordinates treated as part of the HUD.</p>
+          <p class="skip"><b>Leave:</b> the dense panels and walls of manual text.</p>
+          <a href="https://en.wikipedia.org/wiki/TIS-100">TIS-100</a> · <a href="https://en.wikipedia.org/wiki/Exapunks">EXAPUNKS</a>
+        </article>
+      </section>
+
+      <h2 class="section">Dialled down after round 1</h2>
+      <p class="dropped">
+        A Link to the Past, Shovel Knight, Hyper Light Drifter, Dead Cells, Loop Hero, PICO-8 and Hacknet shaped the first tiles' pixel sprites and
+        terminal voice. Their lessons about clear silhouettes and limited palettes still hold, but they no longer set the look.
+      </p>
 
       <footer>Links go to each reference's Wikipedia page. No images are copied; the tiles show our own art.</footer>
     </main>

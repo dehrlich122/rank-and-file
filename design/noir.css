@@ -1,0 +1,463 @@
+/* M3.7 step 0, round 2 (design prototype): tile 4, "neon noir".
+   From neon, pushed toward 80s cyberpunk: Hotline Miami's sunset and type, Hackers'
+   neon, The Lawnmower Man's polygons. Pink lives only in the big chrome moments (the
+   title screen and the level-complete flourish), never where it could be read as hostile
+   on the board (DESIGN.md §9, "Step 0 feedback"). Loaded after tile.css. */
+
+[data-tile="noir"] {
+  --font-pixel: "Orbitron", system-ui, sans-serif;
+  --pixel-size: 12px;
+  --pixel-title: 66px;
+}
+
+[data-tile="noir"] .pane {
+  --radius: 2px;
+  --bg: light-dark(#ecebf8, #090416);
+  --panel: light-dark(#f8f7fd, #110a24);
+  --border: light-dark(#b9b2e0, #33255e);
+  --code-bg: light-dark(#f0eefb, #0c061d);
+  --muted: light-dark(#51497f, #a69ed6);
+  --frame: light-dark(#0a6f8a, #2fb6d4);
+  --sq-dark: light-dark(#bdb8ea, #110a2a);
+  --sq-light: light-dark(#e2dff6, #2e2466);
+  --coords: light-dark(#2f2a78, #a9b4ff);
+
+  /* the title screen: the sunset is the one place pink is allowed */
+  --sky-0: light-dark(#cfe6ff, #05021a);
+  --sky-1: light-dark(#e2dbff, #1c0742);
+  --sky-2: light-dark(#ffd3ea, #561366);
+  --sky-3: light-dark(#ffadcb, #c1267b);
+  --sky-4: light-dark(#ffc496, #ff7843);
+  --floor-bg: light-dark(#e9e3ff, #0a0420);
+  --floor-line: light-dark(rgb(30 80 150 / 0.55), rgb(110 232 255 / 0.7));
+  --sun-a: light-dark(#fff2ad, #fff27a);
+  --sun-b: light-dark(#ffc278, #ffb347);
+  --sun-c: light-dark(#ff8fb6, #ff4f8b);
+  --title-silhouette: light-dark(#2a1240, #120320);
+  --title-rim: light-dark(#e0207f, #ff3d9a);
+  --plate-bg: light-dark(rgb(250 248 255 / 0.93), rgb(8 3 24 / 0.9));
+  --plate-text: light-dark(#1a1240, #ecebff);
+  --plate-muted: light-dark(#51497f, #a69ed6);
+  --plate-accent: light-dark(#07708b, #3be0ff);
+  --logo-shadow-1: light-dark(#e0207f, #ff2a8a);
+  --logo-shadow-2: light-dark(#4b2390, #3b0f7a);
+  --scanline: light-dark(rgb(40 20 90 / 0.05), rgb(0 0 0 / 0.16));
+}
+
+[data-tile="noir"] .tile-sub {
+  font-size: 14px;
+  color: #a69ed6;
+  letter-spacing: 0.04em;
+}
+
+[data-tile="noir"] .controls-gap {
+  width: 16px;
+}
+
+[data-tile="noir"] .controls a.btn[aria-pressed="true"] {
+  border-color: #3be0ff;
+  color: #3be0ff;
+}
+
+/* headings in the display face: never lesson text, code or labels on the board */
+[data-tile="noir"] :is(.pane-name, .lessons-title, .tier-head, .folder-title, .detail h4, .detail-kicker, .voice-line) {
+  font-family: var(--font-pixel);
+}
+
+[data-tile="noir"] .pane-name {
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+[data-tile="noir"] .lessons-title {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+[data-tile="noir"] .tier-head {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+[data-tile="noir"] .folder-title {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
+[data-tile="noir"] .voice-line {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+[data-tile="noir"] .detail h4 {
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+}
+
+[data-tile="noir"] :is(.btn, .outcome, .lrow-num, .seg) {
+  border-radius: 2px;
+}
+
+/* glow on edges, sprites and lines, in the dark theme only (the daylight terminal has none) */
+[data-tile="noir"] .pane[data-scheme="dark"] .grid-edge {
+  filter: drop-shadow(0 0 5px rgb(80 220 255 / 0.85));
+}
+
+[data-tile="noir"] .pane[data-scheme="dark"] .grid-lines {
+  filter: drop-shadow(0 0 2px rgb(80 220 255 / 0.45));
+}
+
+[data-tile="noir"] .pane[data-scheme="dark"] .hero {
+  filter: drop-shadow(0 0 3px var(--hero-3));
+}
+
+[data-tile="noir"] .pane[data-scheme="dark"] .enemy:not(.rank-piece) .spr {
+  filter: drop-shadow(0 0 3px var(--foe-4));
+}
+
+[data-tile="noir"] .pane[data-scheme="dark"] :is(.gate, .waypoint, .gem, .goal, .plank) .spr {
+  filter: drop-shadow(0 0 2.5px var(--amb-3));
+}
+
+[data-tile="noir"] .pane[data-scheme="dark"] :is(.rune, .signpost) .spr {
+  filter: drop-shadow(0 0 2.5px var(--grn-3));
+}
+
+[data-tile="noir"] .pane[data-scheme="dark"] .hud-frame {
+  box-shadow: 0 0 16px rgb(80 220 255 / 0.18), inset 0 0 16px rgb(80 220 255 / 0.06);
+}
+
+/* -- the title screen ------------------------------------------------------------------ */
+
+.menu-mock.scene {
+  --horizon: 396px;
+  min-height: 780px;
+  background: var(--floor-bg);
+  color: var(--plate-text);
+  isolation: isolate;
+}
+
+.scene .menu-sky {
+  overflow: hidden;
+}
+
+/* the sky alone colour-cycles, so the enemies and the sun keep their colours */
+.scene .menu-sky::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--horizon);
+  background: linear-gradient(to bottom, var(--sky-0), var(--sky-1) 34%, var(--sky-2) 64%, var(--sky-3) 86%, var(--sky-4));
+}
+
+/* faint scanlines, on the sky only: never over the logo's letters or the menu */
+.scene .menu-sky::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--horizon);
+  background: repeating-linear-gradient(to bottom, var(--scanline) 0 1px, transparent 1px 3px);
+  pointer-events: none;
+}
+
+:root[data-motion="full"] .scene .menu-sky::before {
+  animation: sky-cycle 22s ease-in-out infinite alternate;
+}
+
+@keyframes sky-cycle {
+  to {
+    filter: hue-rotate(-28deg) saturate(1.15);
+  }
+}
+
+.scene .menu-sun {
+  bottom: auto;
+  top: calc(var(--horizon) - 236px);
+  width: 300px;
+  height: 300px;
+  margin-left: -150px;
+  background: linear-gradient(to bottom, var(--sun-a), var(--sun-b) 48%, var(--sun-c) 78%);
+  -webkit-mask-image: linear-gradient(#000 0 52%, transparent 52% 55%, #000 55% 63%, transparent 63% 67%, #000 67% 73%, transparent 73% 78%, #000 78%);
+  mask-image: linear-gradient(#000 0 52%, transparent 52% 55%, #000 55% 63%, transparent 63% 67%, #000 67% 73%, transparent 73% 78%, #000 78%);
+}
+
+/* the enemy rank stands on the horizon, in front of the sun (viewBox 512 by 66) */
+.menu-rank {
+  --rank-width: min(600px, 86%);
+  position: absolute;
+  left: 50%;
+  width: var(--rank-width);
+  top: calc(var(--horizon) - var(--rank-width) * 66 / 512);
+  transform: translateX(-50%);
+  overflow: visible;
+}
+
+.menu-rank .rank-piece {
+  transition: none;
+}
+
+.scene .menu-floor {
+  top: var(--horizon);
+  bottom: auto;
+  height: calc(100% - var(--horizon));
+  left: -60%;
+  right: -60%;
+  transform: perspective(240px) rotateX(62deg);
+  background:
+    repeating-linear-gradient(90deg, var(--floor-line) 0 2px, transparent 2px 60px),
+    repeating-linear-gradient(0deg, var(--floor-line) 0 2px, transparent 2px 42px),
+    var(--floor-bg);
+  border-top: 2px solid var(--floor-line);
+}
+
+:root[data-motion="full"] .scene .menu-floor {
+  animation: floor-scroll-scene 1.4s linear infinite;
+}
+
+@keyframes floor-scroll-scene {
+  to {
+    background-position: 0 0, 0 42px, 0 0;
+  }
+}
+
+/* a VHS tracking band rolls down the sky now and then */
+.menu-vhs {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 22px;
+  top: -30px;
+  background: linear-gradient(to bottom, transparent, rgb(255 255 255 / 0.14) 40%, rgb(255 255 255 / 0.05) 60%, transparent);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+:root[data-motion="full"] .menu-vhs {
+  animation: vhs 9s linear infinite;
+}
+
+@keyframes vhs {
+  0% {
+    top: -30px;
+  }
+  30% {
+    top: var(--horizon);
+  }
+  100% {
+    top: var(--horizon);
+    opacity: 0;
+  }
+}
+
+.scene .menu-body {
+  padding-top: 34px;
+  gap: 4px;
+}
+
+/* the logo: chrome lettering with a hard two-step shadow (offsets, not blur, so not glow) */
+.scene .logo {
+  position: relative;
+  transform: skewX(-9deg);
+}
+
+:root[data-motion="full"] .scene .logo {
+  animation: logo-sway 5.5s ease-in-out infinite alternate;
+}
+
+@keyframes logo-sway {
+  from {
+    transform: skewX(-9deg) rotate(-1.4deg);
+  }
+  to {
+    transform: skewX(-9deg) rotate(1.4deg);
+  }
+}
+
+.scene .logo-text {
+  position: relative;
+  display: inline-block;
+  font-family: var(--font-pixel);
+  font-weight: 900;
+  font-size: var(--pixel-title);
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+  color: transparent;
+  text-shadow: none;
+  background: linear-gradient(to bottom, #f4feff 0%, #a8eeff 38%, #2a5bd0 49%, #1b1350 51%, #b83cff 64%, #ff7ad0 86%, #fff1fa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.scene .logo-text::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  color: var(--logo-shadow-1);
+  transform: translate(5px, 5px);
+  text-shadow: 5px 5px 0 var(--logo-shadow-2);
+}
+
+.scene .logo-sub {
+  margin: 4px 0 0;
+  padding: 1px 10px;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  color: var(--plate-text);
+  background: var(--plate-bg);
+  border: 1px solid var(--plate-accent);
+}
+
+.scene .menu-items {
+  margin-top: 268px;
+  min-width: 380px;
+  padding: 14px 16px;
+  gap: 8px;
+  background: var(--plate-bg);
+  border: 1px solid var(--plate-accent);
+}
+
+.scene .menu-item {
+  font-family: var(--font-pixel);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--plate-text);
+  padding: 5px 10px;
+}
+
+.scene .menu-item.soon {
+  color: var(--plate-muted);
+}
+
+.scene .menu-item.selected {
+  color: var(--plate-text);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--plate-accent) 28%, transparent), transparent 85%);
+  box-shadow: inset 3px 0 0 var(--plate-accent);
+}
+
+.scene .menu-cursor {
+  color: var(--plate-accent);
+}
+
+.scene .menu-tag {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--plate-muted);
+  border-color: var(--plate-muted);
+}
+
+.scene .menu-note {
+  color: var(--plate-text);
+  background: var(--plate-bg);
+}
+
+.menu-hero-slot {
+  margin-top: 4px;
+}
+
+.menu-hero {
+  display: block;
+  width: 120px;
+  height: 120px;
+  overflow: visible;
+}
+
+.menu-hero-shadow {
+  fill: rgb(0 0 0 / 0.45);
+}
+
+.pane[data-scheme="dark"] .menu-hero .hero {
+  filter: drop-shadow(0 0 5px var(--hero-3));
+}
+
+/* -- the level-complete flourish ------------------------------------------------------------ */
+
+.complete-mock {
+  display: grid;
+  max-width: 560px;
+}
+
+.complete-banner {
+  position: relative;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    linear-gradient(to bottom, transparent 0 82%, var(--floor-bg) 82% 85%, transparent 85% 91%, var(--floor-bg) 91% 93%, transparent 93%),
+    linear-gradient(90deg, var(--sky-1), var(--sky-3) 35%, var(--sky-4) 60%, var(--sky-2));
+  border: 1px solid var(--border);
+  border-bottom: none;
+}
+
+.complete-text {
+  position: relative;
+  font-family: var(--font-pixel);
+  font-weight: 900;
+  font-size: 30px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: skewX(-9deg);
+  color: transparent;
+  background: linear-gradient(to bottom, #f4feff 0%, #a8eeff 40%, #2a5bd0 50%, #1b1350 52%, #b83cff 66%, #fff1fa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-stroke: 1px var(--px-line);
+}
+
+.complete-text::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  color: var(--logo-shadow-2);
+  transform: translate(3px, 3px);
+}
+
+:root[data-motion="full"] .complete-banner.play {
+  animation: banner-in 2.4s ease-out 1;
+}
+
+:root[data-motion="full"] .complete-banner.play .complete-text {
+  animation: banner-text 2.4s ease-out 1;
+}
+
+@keyframes banner-in {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  14%,
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes banner-text {
+  0% {
+    transform: skewX(-9deg) translateX(-60px);
+    opacity: 0;
+  }
+  18% {
+    transform: skewX(-9deg) translateX(0);
+    opacity: 1;
+  }
+}
+
+.complete-mock .outcome {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
