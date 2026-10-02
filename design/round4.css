@@ -1,0 +1,301 @@
+/* M3.7 step 0, round 4 (design prototype): a wireframe world, a solid hero.
+   Loaded after directions.css, which holds the board, A's wire wall and C's halftone. */
+
+:root {
+  --hero-hi: #8ff4ff;
+  --hero-lo: #03263e;
+  --hero-edge: rgb(205 252 255 / 0.8);
+  --hero-glow: #3be0ff;
+  --foe-wire: #e0479a;
+}
+
+#round4 {
+  max-width: 1840px;
+  margin: 0 auto;
+  padding: 18px 20px 28px;
+}
+
+.r4-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.r4-blurb {
+  min-height: 4.6em;
+}
+
+.r4-col .dir-board {
+  width: 100%;
+  max-width: 470px;
+  justify-self: center;
+}
+
+.r4-large {
+  width: min(100%, 270px);
+  overflow: visible;
+}
+
+.r4-facings {
+  display: grid;
+  grid-template-columns: repeat(4, 84px);
+  justify-content: center;
+  gap: 10px;
+}
+
+.r4-facings figure {
+  margin: 0;
+  text-align: center;
+}
+
+.r4-facings figcaption {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.r4-mini {
+  width: 84px;
+  height: 84px;
+  display: block;
+}
+
+.r4-rook-row {
+  margin-top: 16px;
+}
+
+.r4-frames {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.r4-frames figure {
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.r4-frames figcaption {
+  max-width: 34ch;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.r4-frame {
+  width: min(100%, 230px);
+  overflow: visible;
+}
+
+/* ---- the solid hero ------------------------------------------------------------------- */
+
+.h4-outline polygon {
+  fill: #04020d;
+  stroke: #04020d;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.h4-body {
+  filter: drop-shadow(0 0 3px rgb(59 224 255 / 0.45));
+}
+
+.h4-wire polygon {
+  fill: none;
+  stroke: var(--hero-edge);
+  stroke-width: 0.5;
+  stroke-linejoin: round;
+}
+
+.h4-wire {
+  filter: drop-shadow(0 0 1.2px var(--hero-glow));
+}
+
+.h4-visor {
+  fill: #ffffff;
+}
+
+.h4-shadow {
+  fill: rgb(0 0 0 / 0.62);
+}
+
+.h4-pool-in {
+  stop-color: var(--hero-glow);
+  stop-opacity: 0.8;
+}
+
+.h4-pool-mid {
+  stop-color: var(--hero-glow);
+  stop-opacity: 0.3;
+}
+
+.h4-pool-out {
+  stop-color: var(--hero-glow);
+  stop-opacity: 0;
+}
+
+.h4-rim {
+  fill: none;
+  stroke: #eafeff;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 1.5px var(--hero-glow));
+}
+
+.h4-reticle {
+  fill: none;
+  stroke: var(--hero-hi);
+  stroke-width: 1.9;
+  stroke-linecap: square;
+  filter: drop-shadow(0 0 2px var(--hero-glow));
+}
+
+.h4-chevron {
+  fill: none;
+  stroke: #eafeff;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.h4-underscore {
+  fill: #eafeff;
+}
+
+.h4-cursor {
+  filter: drop-shadow(0 0 1.5px var(--hero-glow));
+}
+
+:root:not([data-still]) .h4-underscore {
+  animation: r4-blink 1.1s steps(1) infinite;
+}
+
+@keyframes r4-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ---- the broken rook ------------------------------------------------------------------- */
+
+.r4-rook {
+  filter: drop-shadow(0 0 1.4px #ff3d9a);
+}
+
+.r4-rook path {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.rk-front {
+  stroke: var(--foe-wire);
+  stroke-width: 0.8;
+}
+
+.rk-back {
+  stroke: rgb(224 71 154 / 0.2);
+  stroke-width: 0.45;
+}
+
+.rk-ghost-a {
+  stroke: var(--glitch-a);
+  stroke-width: 0.6;
+  opacity: 0.35;
+}
+
+.rk-ghost-b {
+  stroke: var(--glitch-b);
+  stroke-width: 0.6;
+  opacity: 0.5;
+}
+
+.rk-after {
+  stroke: var(--foe-wire);
+  stroke-width: 0.6;
+  opacity: 0.22;
+}
+
+.rk-slit {
+  fill: var(--hot);
+}
+
+.rk-noise-a {
+  fill: var(--glitch-a);
+}
+
+.rk-noise-b {
+  fill: var(--glitch-b);
+}
+
+/* On the board: at rest, then now and then a break and a snap back. */
+.r4-live .rf-break,
+.r4-live .rf-snap {
+  opacity: 0;
+}
+
+:root:not([data-still]) .r4-live .rf-rest {
+  animation: rf-rest 5.6s steps(1) infinite;
+}
+
+:root:not([data-still]) .r4-live .rf-break {
+  animation: rf-break 5.6s steps(1) infinite;
+}
+
+:root:not([data-still]) .r4-live .rf-snap {
+  animation: rf-snap 5.6s steps(1) infinite;
+}
+
+@keyframes rf-rest {
+  0%,
+  88% {
+    opacity: 1;
+  }
+  89%,
+  95% {
+    opacity: 0;
+  }
+  96% {
+    opacity: 1;
+  }
+}
+
+@keyframes rf-break {
+  0%,
+  88% {
+    opacity: 0;
+  }
+  89%,
+  92% {
+    opacity: 1;
+  }
+  93% {
+    opacity: 0;
+  }
+}
+
+@keyframes rf-snap {
+  0%,
+  92% {
+    opacity: 0;
+  }
+  93%,
+  95% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0;
+  }
+}
+
+/* Reduced motion: the rook stays at rest (still broken) and the cursor stops blinking. */
+@media (prefers-reduced-motion: reduce) {
+  .r4-live .rf,
+  .h4-underscore {
+    animation: none !important;
+  }
+
+  .r4-live .rf-rest {
+    opacity: 1;
+  }
+}

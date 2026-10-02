@@ -119,7 +119,7 @@ function sector(a: [number, number], r: [number, number], h: [number, number], p
 const merge = (...models: Model[]): Model => ({ faces: models.flatMap((m) => m.faces), contour: models.flatMap((m) => m.contour) });
 
 /** Turn a model about its upright axis (so a piece can face a little to one side). */
-function yaw(model: Model, angle: number): Model {
+export function yaw(model: Model, angle: number): Model {
   const [c, s] = [Math.cos(angle), Math.sin(angle)];
   const turn = ([x, y, z]: V3): V3 => [x * c - z * s, y, x * s + z * c];
   // a turned body looks the same from every side, so its outline doesn't turn

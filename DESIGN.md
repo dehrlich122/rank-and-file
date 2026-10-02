@@ -273,6 +273,14 @@ After round 2 *(Designer, 2026-10-02)*: neither style yet, and the noir tile is 
 - **Amber worked** when it stayed on objects that aren't a threat. **The goal needs to be more distinctive and eye-catching.**
 - The colours generally look good.
 
+**Direction decided after round 3** *(Designer, 2026-10-02)*:
+- **The world is wireframe** (direction A): glowing line art, no fills.
+- **The hero is the only solid thing in it**, and the only thing with a floor shadow.
+- **Enemies are broken wireframe**: magenta mesh that looks damaged even at rest (missing segments, lines out of register), with an occasional "glitch and break" animation. With reduced motion the resting frame alone still looks broken.
+- **Threatened squares use the poster direction's halftone dots** (C), kept quiet.
+- **Walls are A's wireframe wall:** clean, violet and still.
+- Round 4 compares three ways of making the solid hero distinctive.
+
 ### The look *(directions to explore, not decisions)*
 - **Colour:** a near-black blue/violet base, with cyan, amber and phosphor green as role colours used sparingly (see the roles above), in the spirit of synthwave, 80s computer graphics and cyberpunk film. Magenta is reserved for hostile things and is never a general accent, except in the sunset of the big chrome moments.
 - **Board:** thin lit lines that glow slightly; squares that stay quiet so tiles and pieces read first.
