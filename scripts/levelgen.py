@@ -117,7 +117,11 @@ def yaml_text(spec: dict, *, chapter: int, api: list[str], par: int, hints: list
     start = {"facing": spec["facing"], **({"planks": spec["planks"]} if spec.get("planks") else {})}
     lines.append(f"start: {q(start)}")
     lines.append(f"api: {q(api)}")
-    rules = {**({"max_lines": par + 2} if spec.get("limit") else {}), **({"require_nodes": spec["require"]} if spec.get("require") else {})}
+    rules = {}
+    if spec.get("limit"):
+        rules["max_lines"] = par + 2
+    if spec.get("require"):
+        rules["require_nodes"] = spec["require"]
     if rules:
         lines.append(f"constraints: {q(rules)}")
     lines.append(f"par: {q({'lines': par})}")

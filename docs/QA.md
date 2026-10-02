@@ -1548,6 +1548,16 @@ The designer played all six Chapter 4 levels.
 - **Retest** *(Designer, 2026-10-02)*: skipped; the designer asked to merge
   after the pre-merge pass.
 
+## Session 10 — 2026-10-02 · M3.5 play-test (`m3-5-chapter-5`, PR #15)
+
+No findings. *(Designer, 2026-10-02)*: "chapter 5 is awesome." The designer
+called Chapter 5 feature-complete, which started the pre-merge pass.
+
+The pass changed nothing a player can see: the `/simplify` cleanups were in the
+level generator, the lint's property check and the tests, and Chapter 5's
+levels, solutions and lessons are byte for byte the same (sha256). The
+designer asked to merge after the retest list.
+
 ---
 
 ## Queued work

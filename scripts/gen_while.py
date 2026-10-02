@@ -81,6 +81,10 @@ class Grammar:
         self.statements = list(statements)  # lines that aren't calls on the piece, e.g. "steps += 1"
         self.cache: dict[tuple, list[tuple]] = {}
 
+    @classmethod
+    def from_spec(cls, spec: dict) -> Grammar:
+        return cls(spec["calls"], spec["conds"], spec.get("ranges", []), statements=spec.get("statements", ()))
+
     def headers(self) -> list[str]:
         found = []
         if "while" in self.loops:
@@ -116,8 +120,8 @@ class Grammar:
         for cond in self.conds:
             found += [(f"if {cond}", body, None) for body in self.sequences(n - 1, in_loop, depth - 1)]
         for cond in self.conds:
-            for then in range(1, n - 2 + 1):
-                for yes, no in product(self.sequences(then, in_loop, depth - 1), self.sequences(n - 1 - then - 1, in_loop, depth - 1)):
+            for then in range(1, n - 1):
+                for yes, no in product(self.sequences(then, in_loop, depth - 1), self.sequences(n - 2 - then, in_loop, depth - 1)):
                     found.append((f"if {cond}", yes, no))
         if "while" in self.loops:
             found += [("while True", body, None) for body in self.sequences(n - 1, True, depth - 1) if uses(body, "break")]
@@ -183,18 +187,24 @@ def road(*legs: int, turn: str = "left", guard: bool = False) -> str:
     return "\n".join(rows)
 
 
-def staircase(rooks_: int) -> str:
-    """A board 7 wide and 8 tall: the pawn starts bottom left, and the goal is one square
-    above the last rook of a diagonal line of `rooks_` rooks (or straight above the pawn if none)."""
+def stairs(marks: dict[int, tuple[int, str]]) -> str:
+    """An open board 7 wide and 8 tall with the pawn bottom left. `marks` puts a character on
+    a row (counted from the bottom, from 1): {row: (column, character)}."""
     rows = []
     for row in range(8, 0, -1):
         cells = ["."] * 7
         if row == 1:
             cells[0] = "P"
-        if row == rooks_ + 2:
-            cells[rooks_] = "G"
+        if row in marks:
+            column, char = marks[row]
+            cells[column] = char
         rows.append(" ".join(cells))
     return "\n".join(rows)
+
+
+def staircase(rooks_: int) -> str:
+    """The goal one square above the last rook of a diagonal line of `rooks_` rooks (or straight above the pawn if none)."""
+    return stairs({rooks_ + 2: (rooks_, "G")})
 
 
 def rooks(count: int) -> list[dict]:
@@ -204,31 +214,17 @@ def rooks(count: int) -> list[dict]:
 def tally(rooks_: int) -> dict:
     """The staircase with a guard straight above its last rook, and the goal above the guard.
     The guard asks how many rooks you took."""
-    rows = []
-    for row in range(8, 0, -1):
-        cells = ["."] * 7
-        if row == 1:
-            cells[0] = "P"
-        if row == rooks_ + 2:
-            cells[rooks_] = "X"
-        if row == rooks_ + 3:
-            cells[rooks_] = "G"
-        rows.append(" ".join(cells))
     question = "Halt! How many rooks did you take? Answer with the number."
-    return {"map": "\n".join(rows), "enemies": rooks(rooks_), "legend": {"X": {"tile": "gate", "question": question, "passphrase": str(rooks_)}}}
+    return {
+        "map": stairs({rooks_ + 2: (rooks_, "X"), rooks_ + 3: (rooks_, "G")}),
+        "enemies": rooks(rooks_),
+        "legend": {"X": {"tile": "gate", "question": question, "passphrase": str(rooks_)}},
+    }
 
 
 def under_a_rook(spots: int) -> str:
     """The staircase with a goal hidden under one of its first `spots` rooks (? marks each)."""
-    rows = []
-    for row in range(8, 0, -1):
-        cells = ["."] * 7
-        if row == 1:
-            cells[0] = "P"
-        if 2 <= row <= spots + 1:
-            cells[row - 1] = "?"
-        rows.append(" ".join(cells))
-    return "\n".join(rows)
+    return stairs({row: (row - 1, "?") for row in range(2, spots + 2)})
 
 
 def keeper(*legs: int) -> dict:
@@ -238,8 +234,6 @@ def keeper(*legs: int) -> dict:
 
 
 AT_GOAL = ["not pawn.at_goal()"]
-
-HALL = "# # # # #\n# . G . #\n# . . . #\n# . . . #\n# . . . #\n# . P . #"  # three wide, five long
 
 # Each level: its boards and rules, what the search may use (`calls`, `conds`, `ranges`),
 # and its words. Hints 1 and 2 and the note are ROT13 (see the docstring); `{lines}` in a
@@ -430,10 +424,9 @@ def ladder_codes(spec: dict):
                     yield spec.get("before", "") + "\n".join(lines) + "\n" + spec.get("after", "")
 
 
-def grammar_codes(spec: dict, lines: int, ban: tuple, need: tuple):
+def grammar_codes(grammar: Grammar, spec: dict, lines: int, ban: tuple, need: tuple):
     """Every program of `lines` lines (plus the level's fixed first and last lines) that avoids
     the words in `ban` and uses those in `need`."""
-    grammar = Grammar(spec["calls"], spec["conds"], spec.get("ranges", []), statements=spec.get("statements", ()))
     for program in grammar.sequences(lines, False, 2):
         if any(uses(program, word) for word in ban) or not all(uses(program, word) for word in need):
             continue
@@ -454,8 +447,9 @@ def shortest_programs(level: Level, spec: dict, *, ban: tuple = (), need: tuple 
             if solves(code):
                 found.setdefault(code_lines(code), []).append(code)
         return (min(found), found[min(found)]) if found else None
+    grammar = Grammar.from_spec(spec)
     for lines in range(1, spec.get("search", 4) + 1):
-        codes = [code for code in grammar_codes(spec, lines, ban, need) if solves(code)]
+        codes = [code for code in grammar_codes(grammar, spec, lines, ban, need) if solves(code)]
         if codes:
             return code_lines(codes[0]), codes
     return None
@@ -485,8 +479,7 @@ def writer(spec: dict):
 
         def wrong_code(kind: str, level: Level) -> str:
             if kind == "typed":
-                board = level.cases()[0].level
-                return "\n".join(write_code(board, fewest_lines(board))) + "\n"
+                return route_code(level.cases()[0].level)
             if kind == "once":
                 return reference.replace("while ", "if ", 1)
             return pick(shortest_programs(level, spec, ban=tuple(spec["need"]))[1])  # "norule"
@@ -494,6 +487,11 @@ def writer(spec: dict):
         return reference, f"{lines} lines searched, {len(codes)} like it", wrong_code
 
     return write
+
+
+def route_code(board: Level) -> str:
+    """The board's own fewest-line route of plain calls, typed out as code."""
+    return "\n".join(write_code(board, fewest_lines(board))) + "\n"
 
 
 def build_one(spec: dict) -> list[str]:
@@ -526,7 +524,7 @@ def probe(spec: dict) -> None:
         best = shortest_programs(level, spec)
         print("  a loop over a chain of branches: " + (f"{best[0]} lines ({len(best[1])} programs)" if best else "none"))
         return
-    grammar = Grammar(spec["calls"], spec["conds"], spec.get("ranges", [2, 3, 4, 5, 6, 7]), statements=spec.get("statements", ()))
+    grammar = Grammar.from_spec(spec)
     top = spec.get("search", 4)
     found = survey(level, grammar, top, before=spec.get("before", ""), after=spec.get("after", ""))
     for kind in KINDS:

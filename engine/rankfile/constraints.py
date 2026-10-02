@@ -175,7 +175,7 @@ def _condition_warnings(node: ast.While | ast.If, pieces: dict) -> list[LintWarn
     for attr in ast.walk(node.test):
         if not (isinstance(attr, ast.Attribute) and isinstance(attr.value, ast.Name) and attr.value.id in pieces):
             continue
-        if id(attr) in called or isinstance(inspect.getattr_static(pieces[attr.value.id], attr.attr, None), property):
+        if id(attr) in called or _is_property(pieces[attr.value.id], attr.attr):
             continue
         name = f"{attr.value.id}.{attr.attr}"
         found.append(
@@ -211,8 +211,12 @@ def describe_node(name: str) -> str:
     return NODE_NAMES.get(name, f"`{name}`")
 
 
+def _is_property(piece_type: type, attr: str) -> bool:
+    return isinstance(inspect.getattr_static(piece_type, attr, None), property)
+
+
 def _piece_attribute_warning(piece: str, attr: str, piece_type: type) -> str:
-    if isinstance(inspect.getattr_static(piece_type, attr, None), property):
+    if _is_property(piece_type, attr):
         return f"This line looks up `{piece}.{attr}` but doesn't use it. To see it, print it: print({piece}.{attr})"
     return (
         f"This line mentions `{piece}.{attr}` but doesn't call it, so nothing happens. "

@@ -2,7 +2,6 @@
 
 import pytest
 
-from conftest import make_level
 from rankfile.runner import run_level
 
 
@@ -71,18 +70,14 @@ def test_game_errors_read_like_builtin_errors_in_tracebacks(corridor):
     assert result.error.traceback.rstrip().splitlines()[-1] == "BlockedError: Your pawn bumped into a wall on c1."
 
 
-def _waiting_corridor():
-    return make_level("# G #\n# . #\n# P #\n", api=["move", "wait", "at_goal"])
-
-
-def test_an_endless_while_gets_a_hint():
-    result = run_level(_waiting_corridor(), "steps = 0\nwhile steps < 3:\n    pawn.wait()", line_budget=500)
+def test_an_endless_while_gets_a_hint(waiting_corridor):
+    result = run_level(waiting_corridor, "steps = 0\nwhile steps < 3:\n    pawn.wait()", line_budget=500)
     assert result.status == "timeout"
     assert "never finished" in result.error.friendly
     assert "check that something inside the loop can make it False, or leave it with `break`" in result.error.friendly
 
 
-def test_an_endless_for_loop_gets_no_while_hint():
-    result = run_level(_waiting_corridor(), "for i in range(10**9):\n    pawn.wait()", line_budget=500)
+def test_an_endless_for_loop_gets_no_while_hint(waiting_corridor):
+    result = run_level(waiting_corridor, "for i in range(10**9):\n    pawn.wait()", line_budget=500)
     assert result.status == "timeout"
     assert "`while`" not in result.error.friendly
