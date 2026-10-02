@@ -1,0 +1,57 @@
+id: ch05-l02
+chapter: 5
+title: "The Winding Road"
+trains: "while, when the number of rounds isn't known ahead"
+brief: "The road bends left, and on every board it bends a different number of times. The goal is at the end. The pawn starts facing east."
+piece: pawn
+map: |
+  # # # # # #
+  # G . . . #
+  # # # # . #
+  # # # # . #
+  # # # # . #
+  # # # # . #
+  # # # # . #
+  # # # # P #
+  # # # # # #
+start: {"facing": "east"}
+api: ["move", "turn_left", "turn_right", "squares_ahead", "wait", "at_goal", "look"]
+par: {"lines": 3}
+hints:
+- "Every road bends a different number of times, so no fixed number of rounds works. Repeat until you arrive."
+- "One round is a stretch of road and a turn. The pawn can ask how far the next wall is. Repeat rounds for as long as the pawn is not at the goal."
+- "Start the loop like this:\nwhile not pawn.at_goal():"
+lesson: ch05/ch05-l02.md
+lesson_board:
+  map: |
+    # . #
+    # . #
+    # . #
+    # P #
+  start: {"facing": "north"}
+variants:
+- map: |
+    # # # # # # #
+    # . . . . . #
+    # . # # # . #
+    # G # # # . #
+    # # # # # P #
+    # # # # # # #
+- map: |
+    # # # # # # #
+    # . . . . . #
+    # . # # # . #
+    # . # # # . #
+    # . . G # . #
+    # # # # # . #
+    # # # # # P #
+    # # # # # # #
+- map: |
+    # # # # #
+    # . . . #
+    # . # . #
+    # . # . #
+    # . # . #
+    # . # P #
+    # G # # #
+    # # # # #

@@ -1,0 +1,54 @@
+id: ch05-l03
+chapter: 5
+title: "Counting Steps, Again"
+trains: "a counter: a variable changed on every pass of a while loop"
+brief: "A guard stands on the road. He wants to know how far you walked to get here, and the road is different on every board."
+piece: pawn
+map: |
+  # # # # # #
+  # G X . . #
+  # # # # . #
+  # # # # . #
+  # # # # . #
+  # # # # . #
+  # # # # . #
+  # # # # P #
+  # # # # # #
+legend: {"X": {"tile": "gate", "question": "Halt! How many squares did you walk to get here? Answer with the number.", "passphrase": "7"}}
+start: {"facing": "north"}
+api: ["move", "turn_left", "turn_right", "squares_ahead", "wait", "at_goal", "look"]
+par: {"lines": 9}
+hints:
+- "The guard asks about your whole walk, and every road is different. Count as you go."
+- "Make a variable that starts at 0 before the loop and grows by 1 for every step. Print it when the guard is ahead, then walk on."
+- "Count inside the loop, with a line like:\nsteps += 1"
+lesson: ch05/ch05-l03.md
+variants:
+- map: |
+    # # # # # # #
+    # . . . . . #
+    # X # # # . #
+    # G # # # . #
+    # # # # # P #
+    # # # # # # #
+  legend: {"X": {"tile": "gate", "question": "Halt! How many squares did you walk to get here? Answer with the number.", "passphrase": "7"}}
+- map: |
+    # # # # # # #
+    # . . . . . #
+    # . # # # . #
+    # . # # # . #
+    # . X G # . #
+    # # # # # . #
+    # # # # # P #
+    # # # # # # #
+  legend: {"X": {"tile": "gate", "question": "Halt! How many squares did you walk to get here? Answer with the number.", "passphrase": "12"}}
+- map: |
+    # # # # #
+    # . . . #
+    # . # . #
+    # . # . #
+    # . # . #
+    # X # P #
+    # G # # #
+    # # # # #
+  legend: {"X": {"tile": "gate", "question": "Halt! How many squares did you walk to get here? Answer with the number.", "passphrase": "9"}}

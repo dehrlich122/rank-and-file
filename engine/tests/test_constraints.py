@@ -103,6 +103,17 @@ def test_warns_about_other_do_nothing_lines(corridor):
     assert messages[1].startswith("This line compares with ==")
 
 
+@pytest.mark.parametrize("header", ["while not pawn.at_goal:", "while pawn.at_goal:", "if pawn.at_goal:"])
+def test_warns_about_an_ability_without_parentheses_in_a_condition(header, waiting_corridor):
+    result = run_level(waiting_corridor, f"{header}\n    pawn.wait()\npawn.move(2)", line_budget=500)
+    assert [warning["line"] for warning in result.warnings] == [1]
+    assert "`pawn.at_goal` in this condition has no parentheses" in result.warnings[0]["message"]
+
+
+def test_no_condition_warning_when_the_ability_is_called(waiting_corridor):
+    assert run_level(waiting_corridor, "while not pawn.at_goal():\n    pawn.move()").warnings == []
+
+
 def test_no_warnings_for_normal_code(corridor):
     assert run_level(corridor, "pawn.move(3)\nprint('done')").warnings == []
 

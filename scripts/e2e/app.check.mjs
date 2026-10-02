@@ -339,6 +339,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
   const CH02 = ["ch02-l01", "ch02-l02", "ch02-l03", "ch02-l04", "ch02-l05", "ch02-l06"]; // Chapter 2 (M3.2)
   const CH03 = ["ch03-l01", "ch03-l02", "ch03-l03", "ch03-l04", "ch03-l05", "ch03-l06"]; // Chapter 3 (M3.3)
   const CH04 = ["ch04-l01", "ch04-l02", "ch04-l03", "ch04-l04", "ch04-l05", "ch04-l06"]; // Chapter 4 (M3.4)
+  const CH05 = ["ch05-l01", "ch05-l02", "ch05-l03", "ch05-l04", "ch05-l05", "ch05-l06"]; // Chapter 5 (M3.5)
   const drawn = () =>
     b.evaluate(`(() => {
       const board = document.querySelector('.board-host .board');
@@ -411,7 +412,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     "practice-02": (board) => expect(board.bridged === 1 && board.planksTaken === 1, `pits bridged: ${board.bridged}, planks taken: ${board.planksTaken}`),
     "practice-10": (board) => expect(board.gone === 1, `chasers gone: ${board.gone}`),
   };
-  for (const id of [...PRACTICE, ...CH02, ...CH03, ...CH04]) {
+  for (const id of [...PRACTICE, ...CH02, ...CH03, ...CH04, ...CH05]) {
     await check(`${id}: reference solution solves it`, async () => {
       await openLevel(id, { fresh: true });
       await setCode(solution(id));
@@ -1099,6 +1100,65 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await challengeTab();
     const brief41 = await b.evaluate(`document.body.innerText`);
     expect(/stretch you walked before your turn/.test(brief41), "the Challenge panel is missing the hall's definition");
+  });
+
+  // -- M3.5: Chapter 5 ----------------------------------------------------------------------------
+  // Labels, counts and outcomes only. The code typed is test code, or a wrong attempt read from solutions/.
+
+  await check("M3.5: Chapter 5 is listed after Chapter 4, and The Tally is its optional mastery challenge", async () => {
+    await levelCards();
+    const list = await b.evaluate(`({
+      chapters: [...document.querySelectorAll('.chapter h2')].map((e) => e.textContent),
+      cards: ${JSON.stringify(CH05)}.map((id) => !!document.querySelector('a[href="#/level/' + id + '"]')),
+      mastery: document.querySelector('a[href="#/level/ch05-l06"] .mastery-tag')?.textContent ?? null,
+    })`);
+    const fifth = list.chapters.indexOf("Chapter 5 · Keep Going");
+    expect(fifth > list.chapters.indexOf("Chapter 4 · Eyes Open") && list.cards.every(Boolean), JSON.stringify(list));
+    expect(list.mastery === "Mastery · optional", JSON.stringify(list));
+  });
+
+  await check("M3.5: an endless loop in a lesson snippet is stopped, and the message explains a while loop", async () => {
+    await openLevel("ch05-l01", { fresh: true });
+    const stopped = await runSnippet(1);
+    const message = await b.evaluate(`${snippet(1)}.innerText.replace(/\\s+/g, ' ')`);
+    expect(/stopped/i.test(stopped.status) && message.includes("A `while` repeats as long as its condition is True"), `${stopped.status} | ${message.slice(0, 120)}`);
+  });
+
+  await check("M3.5: an ability without parentheses in a while condition gets a warning on its line", async () => {
+    await openLevel("ch05-l01", { fresh: true });
+    await setCode("while not pawn.at_goal:\n    pawn.move()\n"); // test code: runs zero times
+    const r = await run();
+    expect(r.head === "Not there yet" && r.warnMarks === 1, brief(r));
+  });
+
+  await check("M3.5: 5.4 asks for a break statement, and a program without one is refused", async () => {
+    await openLevel("ch05-l04", { fresh: true });
+    await challengeTab();
+    const rules = await b.evaluate(`[...document.querySelectorAll('ul.rules li')].map((e) => e.textContent)`);
+    await setCode(withoutExpectLine(solution("ch05-l04", ".naive2")));
+    const r = await run();
+    expect(rules.includes("Must use a break statement."), JSON.stringify(rules));
+    expect(r.head === "Check the rules" && r.text.includes("break statement"), brief(r));
+    return brief(r);
+  });
+
+  await check("M3.5: the staircases show their rooks and the squares they attack, and walking on loses", async () => {
+    const boards = {};
+    for (const id of ["ch05-l04", "ch05-l05"]) {
+      await openLevel(id, { fresh: true });
+      boards[id] = await drawn();
+    }
+    await setCode("pawn.move()\n"); // test code: straight into a rook's line
+    const r = await run();
+    expect(boards["ch05-l04"].rooks === 5 && boards["ch05-l05"].rooks > 0 && boards["ch05-l05"].attacked > 0, JSON.stringify(boards));
+    expect(r.head === "Lost", brief(r));
+  });
+
+  await check("M3.5: The Tally's guard asks for a count, and its limit is 8 lines", async () => {
+    await openLevel("ch05-l06", { fresh: true });
+    await challengeTab();
+    const rules = await b.evaluate(`[...document.querySelectorAll('ul.rules li')].map((e) => e.textContent)`);
+    expect(rules.some((rule) => rule.startsWith("At most 8 lines")), JSON.stringify(rules));
   });
 
   await check("no console errors during the app checks", async () => {

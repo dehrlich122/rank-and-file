@@ -1,0 +1,63 @@
+id: ch05-l06
+chapter: 5
+title: "The Tally"
+trains: "a loop that asks the board and keeps a count, together (mastery)"
+brief: "Take every rook on the staircase, then tell the guard how many you took."
+piece: pawn
+map: |
+  . . . . . . .
+  . . . . . . .
+  . . . . . . .
+  . . G . . . .
+  . . X . . . .
+  . . . . . . .
+  . . . . . . .
+  P . . . . . .
+legend: {"X": {"tile": "gate", "question": "Halt! How many rooks did you take? Answer with the number.", "passphrase": "2"}}
+enemies:
+- {"kind": "rook", "start": "b2"}
+- {"kind": "rook", "start": "c3"}
+start: {"facing": "north"}
+api: ["move", "turn_left", "turn_right", "wait", "at_goal", "look", "capture_left", "capture_right"]
+constraints: {"max_lines": 8}
+par: {"lines": 6}
+hints:
+- "Two jobs share one loop: taking the rooks and counting them."
+- "Set a counter to 0 before the loop and add 1 for every rook you take. When the guard is ahead, print it, then walk through the gate."
+- "Count inside the loop, with a line like:\ntaken += 1"
+lesson: ch05/ch05-l06.md
+mastery: true
+variants:
+- map: |
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    . G . . . . .
+    . X . . . . .
+    . . . . . . .
+    P . . . . . .
+  legend: {"X": {"tile": "gate", "question": "Halt! How many rooks did you take? Answer with the number.", "passphrase": "1"}}
+  enemies: [{"kind": "rook", "start": "b2"}]
+- map: |
+    . . . . . . .
+    . . . . . . .
+    . . . G . . .
+    . . . X . . .
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    P . . . . . .
+  legend: {"X": {"tile": "gate", "question": "Halt! How many rooks did you take? Answer with the number.", "passphrase": "3"}}
+  enemies: [{"kind": "rook", "start": "b2"}, {"kind": "rook", "start": "c3"}, {"kind": "rook", "start": "d4"}]
+- map: |
+    . . . . . G .
+    . . . . . X .
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    P . . . . . .
+  legend: {"X": {"tile": "gate", "question": "Halt! How many rooks did you take? Answer with the number.", "passphrase": "5"}}
+  enemies: [{"kind": "rook", "start": "b2"}, {"kind": "rook", "start": "c3"}, {"kind": "rook", "start": "d4"}, {"kind": "rook", "start": "e5"}, {"kind": "rook", "start": "f6"}]

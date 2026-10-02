@@ -31,6 +31,9 @@ from rankfile.runner import run_level
         ("for step in 3:\n    pawn.move()", "give the number to range(): for step in range(5):", 1),
         ("for step in range(7 / 2):\n    pawn.move()", "This needs a whole number (an int), but got a number with a decimal point (a float). If it came from dividing with /, use // instead", 1),
         ('for step in range("3"):\n    pawn.move()', "This needs a whole number (an int), but got text (a str). Numbers in quotes are text.", 1),
+        # while loops (M3.5)
+        ("break", "`break` only works inside a loop", 1),
+        ("pawn.move()\ncontinue", "`continue` only works inside a loop", 2),
         # syntax errors
         ('pawn.move(\nprint("hi")', "The bracket ( opened on this line is never closed. Add the matching ).", 1),
         ('print("hi)', "This text is missing its closing quote mark.", 1),
@@ -65,3 +68,16 @@ def test_game_errors_raised_inside_the_engine_still_point_at_the_players_line(co
 def test_game_errors_read_like_builtin_errors_in_tracebacks(corridor):
     result = run_level(corridor, "pawn.turn_right()\npawn.move()")
     assert result.error.traceback.rstrip().splitlines()[-1] == "BlockedError: Your pawn bumped into a wall on c1."
+
+
+def test_an_endless_while_gets_a_hint(waiting_corridor):
+    result = run_level(waiting_corridor, "steps = 0\nwhile steps < 3:\n    pawn.wait()", line_budget=500)
+    assert result.status == "timeout"
+    assert "never finished" in result.error.friendly
+    assert "check that something inside the loop can make it False, or leave it with `break`" in result.error.friendly
+
+
+def test_an_endless_for_loop_gets_no_while_hint(waiting_corridor):
+    result = run_level(waiting_corridor, "for i in range(10**9):\n    pawn.wait()", line_budget=500)
+    assert result.status == "timeout"
+    assert "`while`" not in result.error.friendly

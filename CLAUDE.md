@@ -32,7 +32,8 @@ The designer is also the target learner.
   `scripts/gen_conditions.py`, which lines up each board's route and
   branches on `look()` where they part (M3.4). Both share
   `scripts/levelgen.py`. Rerun a generator after changing one of its
-  levels.
+  levels. Chapter 5's `scripts/gen_while.py` (M3.5) searches small
+  programs with `while` on the real engine and prints only counts.
 - After each milestone, stop, list what the designer should test manually, and
   wait for feedback (`DESIGN.md` §7).
 

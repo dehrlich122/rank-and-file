@@ -32,3 +32,9 @@ def events(result, kind: str | None = None) -> list[dict]:
 def corridor():
     """Pawn on b1 facing north, goal on b4, walls on both sides."""
     return make_level("# G #\n# . #\n# . #\n# P #\n")
+
+
+@pytest.fixture
+def waiting_corridor():
+    """Pawn on b1 facing north, goal on b3, with wait() and at_goal() unlocked."""
+    return make_level("# G #\n# . #\n# P #\n", api=["move", "wait", "at_goal"])

@@ -1,0 +1,33 @@
+id: ch05-l01
+chapter: 5
+title: "Until You Arrive"
+trains: "while: repeat for as long as a condition is True, here until the pawn arrives"
+brief: "The goal is hidden. It might be on any of the three squares marked ?."
+piece: pawn
+map: |
+  # ? #
+  # . #
+  # . #
+  # ? #
+  # . #
+  # . #
+  # . #
+  # ? #
+  # . #
+  # P #
+start: {"facing": "north"}
+api: ["move", "turn_left", "turn_right", "wait", "at_goal"]
+par: {"lines": 2}
+hints:
+- "You don't know where the goal is, so you can't count the steps. Ask the pawn whether it has arrived."
+- "A while loop repeats its indented lines for as long as its condition is True. Keep stepping for as long as the pawn is not at the goal."
+- "Start the loop like this:\nwhile not pawn.at_goal():"
+lesson: ch05/ch05-l01.md
+lesson_board:
+  map: |
+    # G #
+    # . #
+    # . #
+    # . #
+    # P #
+  start: {"facing": "north"}
