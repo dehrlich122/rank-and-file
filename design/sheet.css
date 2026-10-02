@@ -1,0 +1,1357 @@
+/* M3.7 step 0, round 6 (design prototype): the full style sheet in the approved style.
+   A wire world with one solid thing in it. Every colour is a light-dark() token on .pane,
+   so each pane picks its theme from its color-scheme. Glow is for the dark theme only.
+   Sections: 1 page, 2 tokens, 3 board, 4 wire, 5 solid hero and brackets, 6 broken enemies,
+   7 goal and crown, 8 sprite sheet, 9 cards and code, 10 title, 11 lessons, 12 motion. */
+
+/* ---- 1. page ------------------------------------------------------------------------------ */
+
+body {
+  margin: 0;
+  background: #070414;
+}
+
+#sheet {
+  max-width: 1840px;
+  margin: 0 auto;
+  padding: 16px;
+  color: #ecebff;
+}
+
+.sheet-head h1 {
+  margin: 0;
+  font: 700 20px "Orbitron", var(--font-ui);
+  letter-spacing: 0.06em;
+  color: #3be0ff;
+}
+
+.sheet-head p {
+  margin: 4px 0 0;
+  max-width: 120ch;
+  color: #a69ed6;
+}
+
+.controls {
+  margin: 14px 0;
+  padding: 10px 12px;
+  border: 1px solid #33255e;
+  display: grid;
+  gap: 6px;
+  color-scheme: dark;
+  --border: #33255e;
+  --panel: #110a24;
+  --text: #ecebff;
+  --accent: #3be0ff;
+}
+
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.controls-row > strong {
+  width: 52px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.controls .btn[aria-pressed="true"] {
+  border-color: #3be0ff;
+  color: #3be0ff;
+}
+
+.panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+body.greyscale {
+  filter: grayscale(1);
+}
+
+/* ---- 2. tokens ------------------------------------------------------------------------------ */
+
+.pane {
+  --font-display: "Orbitron", var(--font-ui);
+  --radius: 2px;
+
+  /* structure and text */
+  --bg: light-dark(#ecebf8, #090416);
+  --panel: light-dark(#f8f7fd, #110a24);
+  --border: light-dark(#b9b2e0, #33255e);
+  --text: light-dark(#14163a, #ecebff);
+  --muted: light-dark(#51497f, #a69ed6);
+  --code-bg: light-dark(#f0eefb, #0c061d);
+  --frame: light-dark(#0a6f8a, #2fb6d4);
+
+  /* the player and their code: cyan */
+  --accent: light-dark(#07708b, #3be0ff);
+  --accent-text: light-dark(#ffffff, #02131a);
+  --step-line: light-dark(rgb(10 127 156 / 0.18), rgb(59 224 255 / 0.17));
+  --selection: light-dark(rgb(10 127 156 / 0.25), rgb(59 224 255 / 0.3));
+  --active-line: light-dark(rgb(10 127 156 / 0.05), rgb(255 255 255 / 0.04));
+
+  /* hostile: magenta / red */
+  --bad: light-dark(#c4144f, #ff5c86);
+  --bad-bg: light-dark(#fde6ee, #2a0b1b);
+  --error-line: light-dark(rgb(196 20 79 / 0.14), rgb(255 92 134 / 0.17));
+  --glitch-a: light-dark(#e0207f, #ff2a8a);
+  --glitch-b: light-dark(#5a3cff, #6a5cff);
+  --hot: light-dark(#d40f3c, #ff2a55);
+
+  /* amber: goals, gates, things to act on; green: world text and success */
+  --warn: light-dark(#8a5300, #ffb02e);
+  --warn-bg: light-dark(#fdf0d9, #2e1f06);
+  --good: light-dark(#157a3c, #4cf27a);
+  --good-bg: light-dark(#e1f6e8, #0a2a1a);
+  --star: light-dark(#935500, #ffb02e);
+  --game-message: light-dark(#8a5300, #ffb02e);
+
+  --syn-keyword: light-dark(#7a3fc4, #c39bff);
+  --syn-string: light-dark(#157a3c, #7dfc9c);
+  --syn-number: light-dark(#0a6f8c, #6fe3ff);
+  --syn-comment: light-dark(#5f6699, #8189bd);
+  --syn-function: light-dark(#1f5fb8, #8fb4ff);
+  --syn-definition: light-dark(#157a3c, #7dfc9c);
+  --syn-class: light-dark(#8a5300, #ffb02e);
+
+  /* the board */
+  --sq-dark: light-dark(#bdb8ea, #110a2a);
+  --sq-light: light-dark(#e2dff6, #2e2466);
+  --coords: light-dark(#2f2a78, #a9b4ff);
+  --grid-line: light-dark(rgb(24 88 140 / 0.3), rgb(80 220 255 / 0.22));
+  --grid-tick: light-dark(rgb(20 96 150 / 0.8), rgb(110 232 255 / 0.7));
+  --grid-edge: light-dark(rgb(20 96 150 / 0.65), rgb(80 220 255 / 0.55));
+  --halftone-dot: light-dark(rgb(186 18 92 / 0.3), rgb(255 70 150 / 0.24));
+  --route: light-dark(rgb(196 20 79 / 0.7), rgb(255 92 134 / 0.7));
+  --badge-bg: light-dark(#f8f7fd, #110a24);
+  --badge-border: light-dark(#51497f, #6b73b8);
+  --badge-text: light-dark(#14163a, #ecebff);
+
+  /* the wire world */
+  --wire-wall: light-dark(#4a3fa0, #8172e0);
+  --wire-amber: light-dark(#8a4f00, #ffb02e);
+  --wire-green: light-dark(#0b6b32, #4cf27a);
+  --wire-foe: light-dark(#b8166c, #e0479a);
+  --void: light-dark(#2a2350, #04020d);
+
+  /* the solid hero */
+  --solid-hi: light-dark(#5fd6f0, #9af5ff);
+  --solid-lo: light-dark(#06344c, #032a44);
+  --solid-edge: light-dark(#04506a, #7ff2ff);
+  --solid-hairline: light-dark(#e8f9ff, #031420);
+  --solid-lit: #ffffff;
+  --shadow: light-dark(rgb(30 20 80 / 0.35), rgb(0 0 0 / 0.62));
+  --bracket: light-dark(#0a6f8a, #9af5ff);
+  --bracket-facing: light-dark(#04506a, #eafeff);
+
+  /* the goal's beacon */
+  --beacon: light-dark(#c47a00, #ffb02e);
+
+  /* the title screen: the sunset is the one place pink is allowed */
+  --sky-0: light-dark(#cfe6ff, #05021a);
+  --sky-1: light-dark(#e2dbff, #1c0742);
+  --sky-2: light-dark(#ffd3ea, #561366);
+  --sky-3: light-dark(#ffadcb, #c1267b);
+  --sky-4: light-dark(#ffc496, #ff7843);
+  --floor-bg: light-dark(#e9e3ff, #0a0420);
+  --floor-line: light-dark(rgb(30 80 150 / 0.55), rgb(110 232 255 / 0.7));
+  --sun-a: light-dark(#fff2ad, #fff27a);
+  --sun-b: light-dark(#ffc278, #ffb347);
+  --sun-c: light-dark(#ff8fb6, #ff4f8b);
+  --plate-bg: light-dark(rgb(250 248 255 / 0.93), rgb(8 3 24 / 0.9));
+  --plate-text: light-dark(#1a1240, #ecebff);
+  --plate-muted: light-dark(#51497f, #a69ed6);
+  --plate-accent: light-dark(#07708b, #3be0ff);
+  --logo-shadow-1: light-dark(#e0207f, #ff2a8a);
+  --logo-shadow-2: light-dark(#4b2390, #3b0f7a);
+  --scanline: light-dark(rgb(40 20 90 / 0.05), rgb(0 0 0 / 0.16));
+  --title-silhouette: light-dark(rgb(42 18 64 / 0.85), rgb(18 3 32 / 0.85));
+
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 var(--font-ui);
+  padding: 18px;
+  border: 1px solid var(--border);
+}
+
+.pane[data-scheme="dark"] {
+  color-scheme: dark;
+}
+
+.pane[data-scheme="light"] {
+  color-scheme: light;
+}
+
+.pane-name {
+  margin: 0;
+  font: 700 12px var(--font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.pane-h {
+  margin: 24px 0 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+/* ---- 3. the board ------------------------------------------------------------------------------ */
+
+.board-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 22px;
+}
+
+.board-row > .board-wrap {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 720px;
+}
+
+.board-side {
+  flex: none;
+  width: 207px;
+}
+
+.board-side p {
+  margin: 0 0 6px;
+}
+
+.board-wrap .board {
+  width: 100%;
+  max-height: none;
+}
+
+.board-min {
+  width: 207px; /* 20px squares: the smallest main board we ship */
+}
+
+.coords text {
+  fill: var(--coords);
+  font: 700 14px var(--font-code);
+}
+
+.grid-lines {
+  fill: none;
+  stroke: var(--grid-line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.grid-ticks {
+  fill: none;
+  stroke: var(--grid-tick);
+  stroke-width: 1.1;
+  vector-effect: non-scaling-stroke;
+}
+
+.grid-edge {
+  fill: none;
+  stroke: var(--grid-edge);
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.pane[data-scheme="dark"] .grid-edge {
+  filter: drop-shadow(0 0 4px rgb(80 220 255 / 0.7));
+}
+
+/* threatened squares: halftone dots sized in squares (dress.ts picks fine or coarse) */
+.dressed .attacked {
+  fill: var(--halftone);
+}
+
+.ht-dot {
+  fill: var(--halftone-dot);
+}
+
+/* the facing shows in the hero's brackets, so the old pointer goes */
+.dressed .piece-pointer {
+  display: none;
+}
+
+.dressed .route {
+  stroke: var(--route);
+  stroke-width: 2.5;
+  stroke-dasharray: 2 6;
+}
+
+.spot-ring {
+  fill: none;
+  stroke: var(--beacon);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  opacity: 0.85;
+}
+
+.spot-mark {
+  fill: var(--beacon);
+  font: 700 24px var(--font-code);
+}
+
+.spot-pass .spot-ring,
+.spot-pass .spot-mark {
+  stroke: var(--good);
+  fill: var(--good);
+}
+
+.badge {
+  fill: var(--badge-bg);
+  stroke: var(--badge-border);
+}
+
+.badge-text {
+  fill: var(--badge-text);
+  font-family: var(--font-code);
+}
+
+.lost-ring {
+  stroke: var(--bad);
+}
+
+.lost-cross {
+  fill: var(--bad);
+}
+
+.bump-flash {
+  fill: var(--bad);
+}
+
+/* state classes on the new art: a gate's bars lift, a waypoint turns green */
+.gate .spr-open,
+.waypoint .spr-done {
+  display: none;
+}
+
+.gate.open .spr-open,
+.waypoint.crossed .spr-done {
+  display: inline;
+}
+
+.gate.open .spr-closed,
+.waypoint.crossed .spr-todo {
+  display: none;
+}
+
+.gate-flash,
+.rune-flash {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.gate-flash {
+  fill: var(--bad);
+}
+
+.rune-flash {
+  fill: var(--wire-green);
+}
+
+.gate.refusing .gate-flash,
+.rune.reading .rune-flash {
+  animation: pulse 650ms ease-out;
+}
+
+@keyframes pulse {
+  25% {
+    opacity: 0.5;
+  }
+}
+
+/* ---- 4. the wire world ----------------------------------------------------------------------------- */
+
+.w path,
+.w polygon {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.w-wall {
+  --w: var(--wire-wall);
+}
+
+.w-amber {
+  --w: var(--wire-amber);
+}
+
+.w-green {
+  --w: var(--wire-green);
+}
+
+.wf {
+  stroke: var(--w);
+  stroke-width: 0.85;
+}
+
+.wl {
+  stroke: var(--w);
+  stroke-width: 1.05;
+}
+
+.wb {
+  stroke: var(--w);
+  stroke-width: 0.45;
+  opacity: 0.3;
+}
+
+.w .wv {
+  fill: var(--void);
+  stroke: var(--w);
+  stroke-width: 1.2;
+}
+
+.pane[data-scheme="dark"] .w-wall {
+  filter: drop-shadow(0 0 1.4px #6b5ec4);
+}
+
+.pane[data-scheme="dark"] .w-amber {
+  filter: drop-shadow(0 0 1.8px #ffb02e);
+}
+
+.pane[data-scheme="dark"] .w-green {
+  filter: drop-shadow(0 0 1.8px #4cf27a);
+}
+
+/* ---- 5. the solid hero and its brackets ---------------------------------------------------------------- */
+
+.s-shadow {
+  fill: var(--shadow);
+}
+
+/* the glowing edge: every face stroked wide; the faces then cover all but the outline */
+.s-glow polygon {
+  fill: var(--solid-edge);
+  stroke: var(--solid-edge);
+  stroke-width: 3.6;
+  stroke-linejoin: round;
+}
+
+.pane[data-scheme="dark"] .s-glow {
+  filter: drop-shadow(0 0 2.2px #3be0ff) drop-shadow(0 0 5px rgb(59 224 255 / 0.5));
+}
+
+.s-hairline polygon {
+  fill: var(--solid-hairline);
+  stroke: var(--solid-hairline);
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+
+.s-lit {
+  fill: var(--solid-lit);
+}
+
+.pane[data-scheme="light"] .s-lit {
+  stroke: var(--solid-edge);
+  stroke-width: 0.5;
+}
+
+.br path {
+  fill: none;
+  stroke-linecap: square;
+}
+
+.br-dim {
+  stroke: var(--bracket);
+  stroke-width: 1.8;
+  opacity: 0.45;
+}
+
+.br-facing {
+  stroke: var(--bracket-facing);
+  stroke-width: 2.2;
+}
+
+.br .br-notch {
+  fill: var(--bracket-facing);
+}
+
+.pane[data-scheme="dark"] :is(.br-facing, .br-notch) {
+  filter: drop-shadow(0 0 2px #3be0ff);
+}
+
+/* ---- 6. broken enemies -------------------------------------------------------------------------------- */
+
+.bw path {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.bw-front {
+  stroke: var(--wire-foe);
+  stroke-width: 0.8;
+}
+
+.bw-back {
+  stroke: var(--wire-foe);
+  stroke-width: 0.45;
+  opacity: 0.22;
+}
+
+.bw-ghost-a {
+  stroke: var(--glitch-a);
+  stroke-width: 0.6;
+  opacity: 0.35;
+}
+
+.bw-ghost-b {
+  stroke: var(--glitch-b);
+  stroke-width: 0.6;
+  opacity: 0.5;
+}
+
+.bw-after {
+  stroke: var(--wire-foe);
+  stroke-width: 0.6;
+  opacity: 0.22;
+}
+
+.bw-lit {
+  fill: var(--hot);
+}
+
+.bw-noise-a {
+  fill: var(--glitch-a);
+}
+
+.bw-noise-b {
+  fill: var(--glitch-b);
+}
+
+.pane[data-scheme="dark"] .bw {
+  filter: drop-shadow(0 0 1.4px #ff3d9a);
+}
+
+/* ---- 7. the goal's beacon and the victory crown --------------------------------------------------------- */
+
+/* the goal is the board's one beacon: its wire is heavier and brighter than the rest of the world's */
+.beacon .wf,
+.beacon .wl {
+  stroke-width: 1.4;
+}
+
+.pane[data-scheme="dark"] .beacon .w-amber {
+  filter: drop-shadow(0 0 2.5px #ffb02e) drop-shadow(0 0 6px rgb(255 176 46 / 0.6));
+}
+
+/* on the title, each enemy is backlit by the sun: a dark shape behind its broken wire */
+.bw-backing polygon {
+  fill: var(--title-silhouette);
+  stroke: var(--title-silhouette);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.beacon-column-base {
+  stop-color: var(--beacon);
+  stop-opacity: 0.7;
+}
+
+.beacon-column-top {
+  stop-color: var(--beacon);
+  stop-opacity: 0;
+}
+
+.beacon-pad-in {
+  stop-color: var(--beacon);
+  stop-opacity: 0.8;
+}
+
+.beacon-pad-out {
+  stop-color: var(--beacon);
+  stop-opacity: 0;
+}
+
+.crown .wf {
+  stroke-width: 2.2;
+}
+
+.crown .wl {
+  stroke-width: 1.4;
+}
+
+.crown-jewel {
+  fill: var(--good);
+}
+
+.crown-spark {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* ---- 8. the sprite sheet --------------------------------------------------------------------------------- */
+
+.sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px 10px;
+}
+
+.sheet figure {
+  margin: 0;
+}
+
+.sheet-svg {
+  display: block;
+  overflow: hidden;
+}
+
+.sheet-small {
+  margin-top: 4px;
+}
+
+.sheet figcaption {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* ---- 9. code, cards ----------------------------------------------------------------------------------- */
+
+.pane .btn,
+.pane .outcome {
+  border-radius: var(--radius);
+}
+
+.code-slice {
+  display: grid;
+  gap: 8px;
+  max-width: 600px;
+}
+
+.messages {
+  display: grid;
+  gap: 10px;
+  max-width: 600px;
+}
+
+.messages .traceback {
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* the error card's frame flickers once when code throws: never its text */
+.error-card-demo.glitch-frame {
+  animation: frame-flicker 650ms steps(1) 1;
+}
+
+@keyframes frame-flicker {
+  0% {
+    box-shadow: -4px 0 0 var(--glitch-a), 4px 0 0 var(--glitch-b);
+  }
+  18% {
+    box-shadow: none;
+  }
+  32% {
+    box-shadow: 4px 0 0 var(--glitch-a), -4px 0 0 var(--glitch-b);
+  }
+  48% {
+    box-shadow: none;
+  }
+  64% {
+    box-shadow: -3px 0 0 var(--glitch-a), 3px 0 0 var(--glitch-b);
+  }
+  80%,
+  100% {
+    box-shadow: none;
+  }
+}
+
+/* success: a sunset banner (a big chrome moment), above the plain green card */
+.complete-mock {
+  display: grid;
+  max-width: 600px;
+}
+
+.complete-banner {
+  position: relative;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    linear-gradient(to bottom, transparent 0 82%, var(--floor-bg) 82% 85%, transparent 85% 91%, var(--floor-bg) 91% 93%, transparent 93%),
+    linear-gradient(90deg, var(--sky-1), var(--sky-3) 35%, var(--sky-4) 60%, var(--sky-2));
+  border: 1px solid var(--border);
+  border-bottom: none;
+}
+
+.complete-text {
+  position: relative;
+  font: 900 30px var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: skewX(-9deg);
+  color: transparent;
+  background: linear-gradient(to bottom, #f4feff 0%, #a8eeff 40%, #2a5bd0 50%, #1b1350 52%, #b83cff 66%, #fff1fa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-stroke: 1px #07031a;
+}
+
+.complete-text::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  color: var(--logo-shadow-2);
+  transform: translate(3px, 3px);
+}
+
+.complete-mock .outcome {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.voice {
+  display: grid;
+  gap: 6px;
+}
+
+.voice-line {
+  margin: 0;
+  font: 700 13px var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.voice-line.ok {
+  color: var(--good);
+}
+
+.voice-line.bad {
+  color: var(--bad);
+}
+
+/* ---- 10. the title screen ------------------------------------------------------------------------------- */
+
+.title-scene {
+  --horizon: 396px;
+  position: relative;
+  min-height: 800px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--floor-bg);
+  color: var(--plate-text);
+  isolation: isolate;
+  outline-offset: 3px;
+}
+
+.title-scene:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.ts-sky {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* the sky alone colour-cycles, so the enemies and the sun keep their colours */
+.ts-sky::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--horizon);
+  background: linear-gradient(to bottom, var(--sky-0), var(--sky-1) 34%, var(--sky-2) 64%, var(--sky-3) 86%, var(--sky-4));
+}
+
+/* faint scanlines on the sky only, never over the logo or the menu */
+.ts-sky::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--horizon);
+  background: repeating-linear-gradient(to bottom, var(--scanline) 0 1px, transparent 1px 3px);
+}
+
+.ts-sun {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--horizon) - 236px);
+  width: 300px;
+  height: 300px;
+  margin-left: -150px;
+  border-radius: 50%;
+  background: linear-gradient(to bottom, var(--sun-a), var(--sun-b) 48%, var(--sun-c) 78%);
+  -webkit-mask-image: linear-gradient(#000 0 52%, transparent 52% 55%, #000 55% 63%, transparent 63% 67%, #000 67% 73%, transparent 73% 78%, #000 78%);
+  mask-image: linear-gradient(#000 0 52%, transparent 52% 55%, #000 55% 63%, transparent 63% 67%, #000 67% 73%, transparent 73% 78%, #000 78%);
+}
+
+/* the enemy rank stands on the horizon, in front of the sun (viewBox 512 by 64) */
+.ts-rank {
+  --rank-width: min(620px, 88%);
+  position: absolute;
+  left: 50%;
+  width: var(--rank-width);
+  top: calc(var(--horizon) - var(--rank-width) / 8);
+  transform: translateX(-50%);
+  overflow: visible;
+}
+
+.ts-floor {
+  position: absolute;
+  top: var(--horizon);
+  height: calc(100% - var(--horizon));
+  left: -60%;
+  right: -60%;
+  transform-origin: 50% 0;
+  transform: perspective(240px) rotateX(62deg);
+  background:
+    repeating-linear-gradient(90deg, var(--floor-line) 0 2px, transparent 2px 60px),
+    repeating-linear-gradient(0deg, var(--floor-line) 0 2px, transparent 2px 42px),
+    var(--floor-bg);
+  border-top: 2px solid var(--floor-line);
+}
+
+.ts-vhs {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 22px;
+  top: -30px;
+  background: linear-gradient(to bottom, transparent, rgb(255 255 255 / 0.14) 40%, rgb(255 255 255 / 0.05) 60%, transparent);
+  mix-blend-mode: screen;
+}
+
+.ts-body {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding-top: 34px;
+}
+
+.ts-logo {
+  margin: 0;
+  position: relative;
+  transform: skewX(-9deg);
+}
+
+/* chrome lettering with a hard two-step shadow: offsets, not blur, so not glow on text */
+.ts-logo-text {
+  position: relative;
+  display: inline-block;
+  font: 900 66px/1.05 var(--font-display);
+  letter-spacing: 0.02em;
+  color: transparent;
+  background: linear-gradient(to bottom, #f4feff 0%, #a8eeff 38%, #2a5bd0 49%, #1b1350 51%, #b83cff 64%, #ff7ad0 86%, #fff1fa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.ts-logo-text::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  color: var(--logo-shadow-1);
+  transform: translate(5px, 5px);
+  text-shadow: 5px 5px 0 var(--logo-shadow-2);
+}
+
+.ts-sub {
+  margin: 4px 0 0;
+  padding: 1px 10px;
+  font: 16px var(--font-code);
+  letter-spacing: 0.08em;
+  color: var(--plate-text);
+  background: var(--plate-bg);
+  border: 1px solid var(--plate-accent);
+}
+
+.ts-menu {
+  list-style: none;
+  margin: 268px 0 0;
+  min-width: 380px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 8px;
+  background: var(--plate-bg);
+  border: 1px solid var(--plate-accent);
+}
+
+.ts-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: 700 17px var(--font-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--plate-text);
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.ts-item.soon {
+  color: var(--plate-muted);
+}
+
+.ts-item.selected {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--plate-accent) 28%, transparent), transparent 85%);
+  box-shadow: inset 3px 0 0 var(--plate-accent);
+}
+
+.ts-cursor {
+  width: 1.2em;
+  color: var(--plate-accent);
+  visibility: hidden;
+}
+
+.ts-item.selected .ts-cursor {
+  visibility: visible;
+}
+
+.ts-tag {
+  margin-left: auto;
+  font: 600 11px var(--font-ui);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--plate-muted);
+  border: 1px solid var(--plate-muted);
+  padding: 1px 6px;
+}
+
+.ts-note {
+  margin: 6px 0 0;
+  padding: 2px 8px;
+  font-size: 13px;
+  color: var(--plate-text);
+  background: var(--plate-bg);
+}
+
+.ts-hero-slot {
+  margin-top: 6px;
+}
+
+.ts-hero {
+  display: block;
+  width: 130px;
+  height: 130px;
+  overflow: visible;
+}
+
+/* ---- 11. the Lessons menu --------------------------------------------------------------------------------- */
+
+.lessons-title {
+  margin: 0 0 4px;
+  font: 900 22px var(--font-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.lcrumbs {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.lcrumbs a {
+  color: var(--muted);
+}
+
+.lessons-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(220px, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.hud-frame {
+  position: relative;
+  padding: 16px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(var(--accent), var(--accent)) top left / 16px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) top left / 2px 16px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) top right / 16px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) top right / 2px 16px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) bottom left / 16px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) bottom left / 2px 16px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) bottom right / 16px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) bottom right / 2px 16px no-repeat,
+    var(--panel);
+}
+
+.pane[data-scheme="dark"] .hud-frame {
+  box-shadow: 0 0 16px rgb(80 220 255 / 0.16), inset 0 0 16px rgb(80 220 255 / 0.05);
+}
+
+.tier-head {
+  margin: 14px 0 6px;
+  font: 700 11px var(--font-display);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tier-head:first-child {
+  margin-top: 0;
+}
+
+.folder-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: none;
+  border: 1px solid transparent;
+  padding: 7px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.folder-head:hover,
+.folder-head:focus-visible {
+  border-color: var(--border);
+}
+
+.folder-caret {
+  display: inline-block;
+  width: 1em;
+  color: var(--accent);
+  transition: transform 200ms ease-out;
+}
+
+.folder.open .folder-caret {
+  transform: rotate(90deg);
+}
+
+.folder-title {
+  font: 700 13px var(--font-display);
+  letter-spacing: 0.06em;
+}
+
+.victory {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: 700 10px var(--font-display);
+  letter-spacing: 0.06em;
+  color: var(--star);
+}
+
+.crown-icon {
+  display: block;
+  overflow: visible;
+}
+
+.segments {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.seg {
+  width: 14px;
+  height: 9px;
+  border: 1px solid var(--muted);
+}
+
+.seg.on {
+  background: var(--good);
+  border-color: var(--good);
+}
+
+.seg.mastery {
+  border-style: dashed;
+}
+
+.folder-slide {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 260ms ease-out;
+}
+
+.folder.open .folder-slide {
+  grid-template-rows: 1fr;
+}
+
+.lrows {
+  list-style: none;
+  margin: 0 0 0 16px;
+  padding: 0 0 0 14px;
+  border-left: 1px dashed var(--frame);
+  overflow: hidden;
+  min-height: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.folder:not(.open) .lrows {
+  border-left-color: transparent;
+}
+
+.lrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.lrow:hover {
+  border-color: var(--accent);
+}
+
+.lrow.selected {
+  border-color: var(--accent);
+  background: var(--step-line);
+}
+
+.lrow-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  font-weight: 700;
+}
+
+.lrow.solved .lrow-num {
+  background: var(--good);
+  border-color: var(--good);
+  color: var(--accent-text);
+}
+
+.lrow-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lrow .mastery-tag {
+  margin-left: 8px;
+}
+
+.lrow .card-stars,
+.lrow .card-tag {
+  margin-left: auto;
+  flex: none;
+}
+
+.lrow .card-stars + .card-tag {
+  margin-left: 8px;
+}
+
+.detail {
+  border: 1px solid var(--frame);
+  background: var(--panel);
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.detail h4 {
+  margin: 0;
+  font: 900 18px var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+.detail p {
+  margin: 0;
+}
+
+.detail-kicker {
+  font: 700 11px var(--font-display);
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+.detail-board .board-mini {
+  width: 100%;
+  max-width: 260px;
+}
+
+.detail-stars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--star);
+}
+
+.detail-stars .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---- 12. motion -------------------------------------------------------------------------------------------- */
+
+/* an enemy rests, then now and then breaks and snaps back */
+.bw-live .bf-break,
+.bw-live .bf-snap {
+  opacity: 0;
+}
+
+:root[data-motion="full"]:not([data-still]) .bw-live .bf {
+  animation-duration: 5.6s;
+  animation-timing-function: steps(1);
+  animation-iteration-count: infinite;
+  animation-delay: var(--glitch-delay, 0s);
+}
+
+:root[data-motion="full"]:not([data-still]) .bw-live .bf-rest {
+  animation-name: bf-rest;
+}
+
+:root[data-motion="full"]:not([data-still]) .bw-live .bf-break {
+  animation-name: bf-break;
+}
+
+:root[data-motion="full"]:not([data-still]) .bw-live .bf-snap {
+  animation-name: bf-snap;
+}
+
+@keyframes bf-rest {
+  0%,
+  88% {
+    opacity: 1;
+  }
+  89%,
+  95% {
+    opacity: 0;
+  }
+  96% {
+    opacity: 1;
+  }
+}
+
+@keyframes bf-break {
+  0%,
+  88% {
+    opacity: 0;
+  }
+  89%,
+  92% {
+    opacity: 1;
+  }
+  93% {
+    opacity: 0;
+  }
+}
+
+@keyframes bf-snap {
+  0%,
+  92% {
+    opacity: 0;
+  }
+  93%,
+  95% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0;
+  }
+}
+
+/* the title: the sky shifts hue, the floor scrolls, a VHS band rolls, the logo sways, the cursor blinks */
+:root[data-motion="full"]:not([data-still]) .ts-sky::before {
+  animation: sky-cycle 22s ease-in-out infinite alternate;
+}
+
+@keyframes sky-cycle {
+  to {
+    filter: hue-rotate(-28deg) saturate(1.15);
+  }
+}
+
+:root[data-motion="full"]:not([data-still]) .ts-floor {
+  animation: floor-scroll 1.4s linear infinite;
+}
+
+@keyframes floor-scroll {
+  to {
+    background-position: 0 0, 0 42px, 0 0;
+  }
+}
+
+:root[data-motion="full"]:not([data-still]) .ts-vhs {
+  animation: vhs 9s linear infinite;
+}
+
+@keyframes vhs {
+  0% {
+    top: -30px;
+  }
+  30%,
+  100% {
+    top: var(--horizon);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+:root[data-motion="full"]:not([data-still]) .ts-logo {
+  animation: logo-sway 5.5s ease-in-out infinite alternate;
+}
+
+@keyframes logo-sway {
+  from {
+    transform: skewX(-9deg) rotate(-1.4deg);
+  }
+  to {
+    transform: skewX(-9deg) rotate(1.4deg);
+  }
+}
+
+:root[data-motion="full"]:not([data-still]) .ts-item.selected .ts-cursor {
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    visibility: hidden;
+  }
+}
+
+:root[data-motion="full"] .complete-banner.play {
+  animation: banner-in 2.4s ease-out 1;
+}
+
+@keyframes banner-in {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  14%,
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+:root[data-motion="reduced"] :is(.folder-slide, .folder-caret, .piece, .piece-pointer, .enemy) {
+  transition: none;
+}
+
+:root[data-motion="reduced"] .error-card-demo.glitch-frame {
+  animation: none;
+}

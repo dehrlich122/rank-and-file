@@ -2,6 +2,7 @@
 //   node design/shoot-directions.mjs [out.png]                       round 3 (directions.html)
 //   node design/shoot-directions.mjs [out.png] --page=round4         round 4, animations held still
 //   node design/shoot-directions.mjs [out.png] --page=round5         round 5, animations held still
+//   node design/shoot-directions.mjs [out.png] --page=sheet          round 6, the full style sheet
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { launch, sleep } from "../scripts/e2e/cdp.mjs";
@@ -13,6 +14,7 @@ const PAGES = {
   directions: { file: "round3-directions.png", ready: `document.querySelectorAll('.dir .board').length === 4` },
   round4: { file: "round4-wireframe-world.png", ready: `document.querySelectorAll('.dir .board').length === 3`, still: true },
   round5: { file: "round5-solid-hero.png", ready: `document.documentElement.dataset.ready !== undefined`, still: true },
+  sheet: { file: "round6-style-sheet.png", ready: `document.querySelectorAll('.pane .board').length >= 6 && document.querySelector('.cm-editor')`, still: true },
 };
 const spec = PAGES[page];
 if (!spec) throw new Error(`unknown page: ${page}`);

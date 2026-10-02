@@ -49,7 +49,7 @@ const polar = (r: number, h: number, a: number): V3 => [r * Math.cos(a), h, r * 
  * A body turned from `profile`: [height, radius] from the bottom up, in `segments`
  * facets. `tag(row, angle)` names the part a facet belongs to.
  */
-function lathe(profile: Array<[number, number]>, segments: number, tag: (h0: number, h1: number, mid: number) => string = () => "body"): Model {
+export function lathe(profile: Array<[number, number]>, segments: number, tag: (h0: number, h1: number, mid: number) => string = () => "body"): Model {
   const faces: Face[] = [];
   const step = (2 * Math.PI) / segments;
   for (let i = 0; i + 1 < profile.length; i++) {
@@ -78,7 +78,7 @@ function lathe(profile: Array<[number, number]>, segments: number, tag: (h0: num
 }
 
 /** A box, axis-aligned: [x0, x1], [y0, y1], [z0, z1]. */
-function box(x: [number, number], y: [number, number], z: [number, number], part = "body"): Model {
+export function box(x: [number, number], y: [number, number], z: [number, number], part = "body"): Model {
   const [x0, x1] = x;
   const [y0, y1] = y;
   const [z0, z1] = z;
@@ -116,7 +116,7 @@ function sector(a: [number, number], r: [number, number], h: [number, number], p
   return { faces, contour: [] };
 }
 
-const merge = (...models: Model[]): Model => ({ faces: models.flatMap((m) => m.faces), contour: models.flatMap((m) => m.contour) });
+export const merge = (...models: Model[]): Model => ({ faces: models.flatMap((m) => m.faces), contour: models.flatMap((m) => m.contour) });
 
 /** Turn a model about its upright axis (so a piece can face a little to one side). */
 export function yaw(model: Model, angle: number): Model {
