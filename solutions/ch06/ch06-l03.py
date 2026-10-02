@@ -1,0 +1,6 @@
+pawn.move(2)
+text = pawn.read().strip()
+print(text.upper())
+pawn.move(2)
+print(text.lower().replace("-", " "))
+pawn.move(3)

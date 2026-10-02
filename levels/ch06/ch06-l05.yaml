@@ -1,0 +1,77 @@
+id: ch06-l05
+chapter: 6
+title: "Where the Rune Points"
+trains: "Text into numbers: int(), split() and indexing the pieces"
+brief: "The goal is somewhere out in the open. The rune says how far: first east, then north."
+piece: pawn
+map: |
+  . . . . . . . . . . . .
+  . . . . . . . . . . . .
+  . . . . . . . . . . . .
+  . . . . . . . . . . . .
+  . . . . . . . . . . . .
+  . . . . . . . . . . . .
+  . . . . . . . . . . . .
+  . . . . . . . . . . . .
+  . . . . . . . . . . . G
+  . . . . . . . . . . . .
+  . . . . . . . . . . . .
+  P R . . . . . . . . . .
+legend: {"R": {"tile": "rune", "text": "10,3"}}
+start: {"facing": "east"}
+api: ["move", "turn_left", "read"]
+par: {"lines": 5}
+hints:
+- "The rune holds two numbers, but it's one piece of text. Cut it into its parts first."
+- "A text can be cut into pieces wherever a separator appears, and each piece is picked by its position, counting from 0. A piece is still text, so turn it into a number before walking that far."
+- "Here is the line that reads the rune:\nparts = pawn.read().split(\",\")"
+lesson: ch06/ch06-l05.md
+lesson_board:
+  map: |
+    . . . . .
+    P R . . .
+  legend: {"R": {"tile": "rune", "text": "3,12"}}
+  start: {"facing": "east"}
+variants:
+- map: |
+    . . . . . . . . . . . .
+    . . . . . G . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    P R . . . . . . . . . .
+  legend: {"R": {"tile": "rune", "text": "4,10"}}
+- map: |
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . G . . .
+    . . . . . . . . . . . .
+    P R . . . . . . . . . .
+  legend: {"R": {"tile": "rune", "text": "7,2"}}
+- map: |
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . G .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    . . . . . . . . . . . .
+    P R . . . . . . . . . .
+  legend: {"R": {"tile": "rune", "text": "9,4"}}

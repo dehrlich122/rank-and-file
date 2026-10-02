@@ -1,0 +1,68 @@
+id: ch06-l04
+chapter: 6
+title: "Which Road?"
+trains: "Asking text a question: `in`, startswith() and endswith(), find() and count()"
+brief: "At the crossroads, two roads end in pits. A rune on the way says which road is safe."
+piece: pawn
+map: |
+  # # # # O # # # #
+  # # # # . # # # #
+  # # # # . # # # #
+  # # # # . # # # #
+  G . . . . . . . O
+  # # # # . # # # #
+  # # # # . # # # #
+  # # # # R # # # #
+  # # # # P # # # #
+legend: {"O": "pit", "R": {"tile": "rune", "text": "The old road to the left is the safe one."}}
+start: {"facing": "north"}
+api: ["move", "turn_left", "turn_right", "read"]
+par: {"lines": 8}
+hints:
+- "Only the rune says which road is safe. Read it before the junction, then choose."
+- "To ask whether one piece of text appears inside another, write the small text, then in, then the big text. It's True or False, so an if can use it."
+- "Here is the line that reads the rune:\ntext = pawn.read()"
+lesson: ch06/ch06-l04.md
+lesson_board:
+  map: |
+    . . . . .
+    . . O . .
+    . . . . .
+    . . R . .
+    . . P . .
+  legend: {"R": {"tile": "rune", "text": "A pit lies ahead."}, "O": "pit"}
+  start: {"facing": "north"}
+variants:
+- map: |
+    # # # # O # # # #
+    # # # # . # # # #
+    # # # # . # # # #
+    # # # # . # # # #
+    O . . . . . . . G
+    # # # # . # # # #
+    # # # # . # # # #
+    # # # # R # # # #
+    # # # # P # # # #
+  legend: {"O": "pit", "R": {"tile": "rune", "text": "Keep to the right, traveller. The other roads end in thorns."}}
+- map: |
+    # # # # G # # # #
+    # # # # . # # # #
+    # # # # . # # # #
+    # # # # . # # # #
+    O . . . . . . . O
+    # # # # . # # # #
+    # # # # . # # # #
+    # # # # R # # # #
+    # # # # P # # # #
+  legend: {"O": "pit", "R": {"tile": "rune", "text": "Straight on is the only safe road."}}
+- map: |
+    # # # # O # # # #
+    # # # # . # # # #
+    # # # # . # # # #
+    # # # # . # # # #
+    G . . . . . . . O
+    # # # # . # # # #
+    # # # # . # # # #
+    # # # # R # # # #
+    # # # # P # # # #
+  legend: {"O": "pit", "R": {"tile": "rune", "text": "Take the left road, friend, and fear nothing."}}

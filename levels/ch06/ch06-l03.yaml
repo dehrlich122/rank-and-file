@@ -1,0 +1,62 @@
+id: ch06-l03
+chapter: 6
+title: "Smudged Runes"
+trains: "Methods of text: strip(), upper(), lower() and replace()"
+brief: "The runes are smudged: stray spaces, wrong capitals, dashes for spaces. The guards want them tidy."
+piece: pawn
+map: |
+  # G #
+  # . #
+  # B #
+  # . #
+  # A #
+  # R #
+  # . #
+  # P #
+legend: {"R": {"tile": "rune", "text": "  Silver-Moon  "}, "A": {"tile": "gate", "question": "What does the rune say, in capitals, without the stray spaces?", "passphrase": "SILVER-MOON"}, "B": {"tile": "gate", "question": "Now in small letters, with a space where each dash was?", "passphrase": "silver moon"}}
+start: {"facing": "north"}
+api: ["move", "read"]
+par: {"lines": 6}
+hints:
+- "The runerf are untidy in different ways. A text can be copied and tidied, and the original is never changed."
+- "Methods are called on text with a dot. One removes spaces from both ends, one makes capitals, one makes small letters, and one swaps one piece of text for another. A method returns a new text, so a second method can follow the first."
+- "Here is the line that reads the rune:\ntext = pawn.read().strip()"
+lesson: ch06/ch06-l03.md
+lesson_board:
+  map: |
+    # . #
+    # R #
+    # P #
+  legend: {"R": {"tile": "rune", "text": "  Pale-Fire "}}
+  start: {"facing": "north"}
+variants:
+- map: |
+    # G #
+    # . #
+    # B #
+    # . #
+    # A #
+    # R #
+    # . #
+    # P #
+  legend: {"R": {"tile": "rune", "text": "Ghost-LANTERN "}, "A": {"tile": "gate", "question": "What does the rune say, in capitals, without the stray spaces?", "passphrase": "GHOST-LANTERN"}, "B": {"tile": "gate", "question": "Now in small letters, with a space where each dash was?", "passphrase": "ghost lantern"}}
+- map: |
+    # G #
+    # . #
+    # B #
+    # . #
+    # A #
+    # R #
+    # . #
+    # P #
+  legend: {"R": {"tile": "rune", "text": " iron-gate"}, "A": {"tile": "gate", "question": "What does the rune say, in capitals, without the stray spaces?", "passphrase": "IRON-GATE"}, "B": {"tile": "gate", "question": "Now in small letters, with a space where each dash was?", "passphrase": "iron gate"}}
+- map: |
+    # G #
+    # . #
+    # B #
+    # . #
+    # A #
+    # R #
+    # . #
+    # P #
+  legend: {"R": {"tile": "rune", "text": "OLD-bridge "}, "A": {"tile": "gate", "question": "What does the rune say, in capitals, without the stray spaces?", "passphrase": "OLD-BRIDGE"}, "B": {"tile": "gate", "question": "Now in small letters, with a space where each dash was?", "passphrase": "old bridge"}}

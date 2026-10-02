@@ -27,11 +27,10 @@ say what makes each concept necessary.
 """
 
 import codecs
-import sys
 from itertools import product
 
 import yaml
-from levelgen import build, run_all, yaml_text  # first: it puts the engine on the import path
+from levelgen import build, main, yaml_text  # first: it puts the engine on the import path
 from solve import fewest_lines, write_code
 
 from rankfile.constraints import code_lines
@@ -533,10 +532,4 @@ def probe(spec: dict) -> None:
 
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
-    if args and args[0] == "probe":
-        for level_spec in LEVELS:
-            if len(args) == 1 or level_spec["id"] in args[1:]:
-                probe(level_spec)
-    else:
-        run_all(LEVELS, build_one, args)
+    main(LEVELS, build_one, probe)

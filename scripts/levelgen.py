@@ -66,6 +66,17 @@ def run_all(levels: list[dict], build_one: Callable[[dict], list[str]], ids: lis
     sys.exit(1 if problems else 0)
 
 
+def main(levels: list[dict], build_one: Callable[[dict], list[str]], probe: Callable[[dict], None]) -> None:
+    """A generator's command line: no arguments for every level, level ids for some, or `probe [ids]` to check the boards only."""
+    args = sys.argv[1:]
+    if args and args[0] == "probe":
+        for spec in levels:
+            if len(args) == 1 or spec["id"] in args[1:]:
+                probe(spec)
+    else:
+        run_all(levels, build_one, args)
+
+
 def third_hint(spec: dict, reference: str) -> str:
     """Hint 3, from the reference's own lines (spec["hint3"]): "start" (the first n
     lines), "loops" (up to and including the nth loop's first line), "key" (the first
