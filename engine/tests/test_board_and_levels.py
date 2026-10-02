@@ -134,8 +134,8 @@ def test_another_board_can_give_a_symbol_its_own_legend_entry():
     guard = {"X": {"tile": "gate", "question": "How far?", "passphrase": "2"}}
     level = make_level("P . X G\n", legend=guard, variants=[{"map": "P . . X G\n", "legend": {"X": {**guard["X"], "passphrase": "3"}}}])
     assert [case.level.board.gates for case in level.cases()] == [{(2, 0): "2"}, {(3, 0): "3"}]
-    with pytest.raises(LevelError, match="optionally a legend"):
-        make_level("P G\n", variants=[{"map": "P G\n", "enemies": []}])
+    with pytest.raises(LevelError, match="optionally a legend and enemies"):
+        make_level("P G\n", variants=[{"map": "P G\n", "start": {"facing": "east"}}])
 
 
 def test_every_board_is_described_for_showing_side_by_side():

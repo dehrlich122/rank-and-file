@@ -1,0 +1,57 @@
+id: ch04-l02
+chapter: 4
+title: "Mind the Gap"
+trains: "if: lines that run only when a condition is True, and look()"
+brief: "The hall has two places where the floor may have fallen away. On each board it's different. You're carrying two planks."
+piece: pawn
+map: |
+  # G #
+  # . #
+  # . #
+  # O #
+  # . #
+  # . #
+  # O #
+  # . #
+  # P #
+  
+legend: {"O": "pit"}
+start: {"facing": "north", "planks": 2}
+api: ["move", "turn_left", "turn_right", "squares_ahead", "wait", "at_goal", "look", "bridge"]
+par: {"lines": 7}
+hints:
+- "Stop in front of each place where the floor might be gone, and look before you step."
+- "look() names what's straight ahead. An if runs the lines indented under it only when its condition is True: bridge only when what's ahead is a pit."
+- "One way to check, each time:\nif pawn.look() == \"pit\":\n    pawn.bridge()"
+lesson: ch04/ch04-l02.md
+lesson_board:
+  map: |
+    # G #
+    # . #
+    # O #
+    # . #
+    # L #
+    # P #
+  legend: {"O": "pit", "L": "plank"}
+  start: {"facing": "north"}
+variants:
+- map: |
+    # G #
+    # . #
+    # . #
+    # . #
+    # . #
+    # . #
+    # O #
+    # . #
+    # P #
+- map: |
+    # G #
+    # . #
+    # . #
+    # O #
+    # . #
+    # . #
+    # . #
+    # . #
+    # P #

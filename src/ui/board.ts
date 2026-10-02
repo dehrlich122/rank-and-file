@@ -1,6 +1,6 @@
 // The board, drawn as SVG: squares, tiles (walls, signposts, gates, pits,
 // waypoints, gems, timed gates, planks), the goal, the enemies and their
-// routes (M3.1) and the piece.
+// routes (M3.1), the squares chess pieces attack (M3.4) and the piece.
 //
 // The board never decides anything. It draws the states the engine reported:
 // `show()` jumps straight to a state, `animate()` plays a step's events in order.
@@ -28,6 +28,8 @@ export class BoardView {
   private readonly flash: SVGRectElement;
   private readonly lostMark: SVGGElement; // where the run was lost (M3.1)
   private readonly enemies: SVGGElement[]; // one per level.enemies, moved like the piece
+  private attackedKey: string | undefined;
+  private readonly attacks: SVGGElement; // the squares enemy chess pieces attack, shaded (M3.4)
   private readonly counters: SVGGElement[]; // badges that count a clock's ticks: clockwork's (QA-021), timed gates' (M3.2)
   private readonly art = new Map<TileKind, Map<string, SVGGElement>>(); // tile kind -> "x,y" -> its art
   private angle = 0; // cumulative, so turns always take the short way round
@@ -82,8 +84,9 @@ export class BoardView {
     for (const enemy of level.enemies) if (enemy.route.length > 1) squares.append(route(enemy, height));
     this.enemies = level.enemies.map((enemy) => enemyPiece(enemy, level));
 
+    this.attacks = svg("g", { class: "attacks", "aria-hidden": "true" });
     this.flash = svg("rect", { class: "bump-flash", width: S, height: S, x: 0, y: 0 });
-    this.element.append(this.flash, ...this.enemies);
+    this.element.append(this.attacks, this.flash, ...this.enemies);
 
     this.piece = svg("g", { class: "piece" });
     this.body = svg("g", { class: "piece-body" });
@@ -150,6 +153,17 @@ export class BoardView {
     this.mark("gem", "collected", state.collected);
     this.mark("plank", "collected", state.collected);
     this.mark("pit", "bridged", state.bridged);
+    // The shaded squares only change when a piece is taken, so skip the rebuild otherwise.
+    const attackedKey = state.attacked?.join(";");
+    if (state.attacked && attackedKey !== this.attackedKey) {
+      this.attackedKey = attackedKey;
+      this.attacks.replaceChildren(
+        ...state.attacked.map((pos) => {
+          const [left, top] = corner(pos, this.level.height);
+          return svg("rect", { x: left, y: top, width: S, height: S, class: "attacked" });
+        }),
+      );
+    }
     (state.enemies ?? []).forEach((pos, i) => {
       const enemy = this.enemies[i];
       if (!enemy) return;
@@ -364,25 +378,56 @@ function route(enemy: Enemy, height: number): SVGPathElement {
   return svg("path", { d: `M ${points.join(" L ")}${enemy.loop ? " Z" : ""}`, class: "route" });
 }
 
+// What a chess piece attacks, in words, for its tooltip (M3.4).
+const CHESS_LINES: Partial<Record<Enemy["kind"], string>> = {
+  rook: "It attacks along its rank and file.",
+  bishop: "It attacks along its diagonals.",
+};
+
 /**
  * An enemy (M3.1), centred on (0, 0) and moved by `place()`. Its badges: a
  * chaser's "chases", a gear for clockwork (it keeps time with the code), and
- * "armoured".
+ * "armoured". Rooks and bishops are drawn as chess pieces (M3.4).
  */
 function enemyPiece(enemy: Enemy, level: LevelInfo): SVGGElement {
   const group = svg("g", { class: `enemy enemy-${enemy.kind}${enemy.armoured ? " armoured" : ""}` });
   const counted = counts(level, enemy.clock);
   const clock = counted ? ", keeping time with your code" : "";
-  const title = tooltip(`A ${enemy.kind}${clock}${enemy.armoured ? ". It's armoured" : ""}.`);
-  group.append(
-    title,
-    svg("circle", { cx: 0, cy: 2, r: S * 0.3, class: "enemy-body" }),
-    svg("circle", { cx: -6, cy: -2, r: 3.2, class: "enemy-eye" }),
-    svg("circle", { cx: 6, cy: -2, r: 3.2, class: "enemy-eye" }),
-  );
+  const lines = CHESS_LINES[enemy.kind];
+  const title = tooltip(`A ${enemy.kind}${clock}${enemy.armoured ? ". It's armoured" : ""}.${lines ? ` ${lines}` : ""}`);
+  group.append(title, ...(lines ? chessShape(enemy.kind) : eyedShape()));
   const badges = [enemy.kind === "chaser" ? "chases" : "", counted ? `${GEAR} {n}` : "", enemy.armoured ? "armoured" : ""].filter(Boolean);
   if (badges.length) group.append(badge(0, -S * 0.3 - 12, badges.join(" "), counted ? enemy.clock : undefined));
   return group;
+}
+
+/** A patrol's or chaser's body: a round piece with two eyes. */
+function eyedShape(): SVGElement[] {
+  return [
+    svg("circle", { cx: 0, cy: 2, r: S * 0.3, class: "enemy-body" }),
+    svg("circle", { cx: -6, cy: -2, r: 3.2, class: "enemy-eye" }),
+    svg("circle", { cx: 6, cy: -2, r: 3.2, class: "enemy-eye" }),
+  ];
+}
+
+/** A rook's or bishop's silhouette, centred on (0, 0), in the enemies' colours (M3.4). */
+function chessShape(kind: Enemy["kind"]): SVGElement[] {
+  if (kind === "rook") {
+    return [
+      svg("path", {
+        d: "M -15 21 L 15 21 L 15 15 L 11 12 L 11 -6 L 14 -8 L 14 -19 L 9 -19 L 9 -14 L 4 -14 L 4 -19 L -4 -19 L -4 -14 L -9 -14 L -9 -19 L -14 -19 L -14 -8 L -11 -6 L -11 12 L -15 15 Z",
+        class: "enemy-body",
+      }),
+    ];
+  }
+  return [
+    svg("path", {
+      d: "M -14 21 L 14 21 L 14 16 Q 8 14 7 10 Q 13 2 10 -6 Q 6 -14 0 -18 Q -6 -14 -10 -6 Q -13 2 -7 10 Q -8 14 -14 16 Z",
+      class: "enemy-body",
+    }),
+    svg("circle", { cx: 0, cy: -22, r: 3.5, class: "enemy-body" }),
+    svg("path", { d: "M 3 -11 L -3 -3", class: "chess-mark" }),
+  ];
 }
 
 /** The ring that marks where a run was lost, moved onto that square (M3.1). */

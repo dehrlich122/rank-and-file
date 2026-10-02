@@ -150,7 +150,7 @@ function result(from: number, names: string[], type: string): CompletionResult |
   return { from, filter: false, options: names.sort().map((name) => callOption(name, type)) };
 }
 
-/** Inserts `name()` with the cursor between the parentheses. */
+/** Inserts `name()` with the cursor after the closing parenthesis (QA-033). */
 function callOption(name: string, type: string): Completion {
   return {
     label: `${name}()`,
@@ -160,7 +160,7 @@ function callOption(name: string, type: string): Completion {
       const insert = hasParen ? name : `${name}()`;
       view.dispatch({
         changes: { from, to, insert },
-        selection: { anchor: from + name.length + 1 },
+        selection: { anchor: from + name.length + 2 },
         userEvent: "input.complete",
       });
     },

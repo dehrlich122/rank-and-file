@@ -202,7 +202,7 @@ mechanic, never by solution code.
     (and later, the `def`s in the code).
   - Write it generally (any `<object>.`, not just `pawn`) so it keeps working
     for later pieces and the player's own classes.
-  - Insert `move()` with the cursor between the parentheses.
+  - Insert `move()` with the cursor after the parentheses (between them until QA-033).
   - Tab label: CodeMirror's `addToOptions` renders one extra element per
     option. Show it only on the selected row (`[aria-selected]`), in the muted
     text color.
@@ -220,7 +220,7 @@ mechanic, never by solution code.
   - After one `pawn.move()`, `pawn.` offers `move()`. After adding
     `pawn.turn_left()`, both appear and arrows switch between them.
     `pawn.t` narrows to `turn_left()`.
-  - Tab inserts the suggestion with the cursor inside `()`. Enter makes a new
+  - Tab inserts the suggestion with the cursor after `()` (QA-033). Enter makes a new
     line even with the list open. Tab still indents when the list is closed.
     The faint Tab label shows on the highlighted row only.
   - A misspelled call already in the code (e.g. `pawn.mvoe()`) is never
@@ -1146,7 +1146,7 @@ Item 6 (hidden boards) became QA-016.
 - **Fixed** in `fc26f1a` (2026-09-27); awaiting the designer's retest.
   - The lesson snippet prints the answer directly (`print(2)`), with no
     variable, and the text says where to stand.
-  - Counting gems in a variable is noted in `docs/M3.md` as an idea for
+  - Counting gems in a variable is noted in `docs/M3/M3.md` as an idea for
     Chapter 2's level specs.
 - **Decided** *(Designer, 2026-09-27)*: drop the variable, and keep the level
   about its two mechanics.
@@ -1179,7 +1179,7 @@ Item 6 (hidden boards) became QA-016.
 - **Decided** *(Designer, 2026-09-27)*: keep it as a demo, and say so.
   - Not chosen: an answer that varies between boards (`print(pawn.gems)`),
     or removing the level.
-  - The idea that makes a question guard worth having is in `docs/M3.md`
+  - The idea that makes a question guard worth having is in `docs/M3/M3.md`
     for Chapter 2: an answer that can't be known ahead of time.
 - **Retest:** Testing ground → The Toll. The level list and the Challenge
   panel say it's a demo with nothing new to learn.
@@ -1511,6 +1511,43 @@ pre-merge pass.
 The pass reworded two older error messages to name types the beginner way.
 The designer skipped their retest *(Designer, 2026-09-30)*: unit tests check the exact wording.
 
+## Session 9 — 2026-10-02 · M3.4 play-test (`m3-4-chapter-4`, PR #14)
+
+The designer played all six Chapter 4 levels.
+
+- **QA-033 · Autocomplete leaves the cursor inside the brackets** *(Designer, 2026-10-02)*
+  - They prefer the cursor after the closing bracket, outside the call.
+  - **Fixed:** Tab now puts the cursor after `()`. A call that takes an
+    argument needs one Left arrow to get back inside. The e2e check that
+    asserted the old position now asserts the new one.
+- **QA-034 · 4.1 True or False: "the hall" is ambiguous** *(Designer, 2026-10-02)*
+  - The guards' questions don't say whether the hall's length is counted
+    before or after the turn. It only worked once they realised it meant
+    the stretch before the turn.
+  - They suggested `#Gate 1:` / `#Gate 2:` comments in the code, or showing
+    the question in the console before the answer.
+  - **Fixed (wording):** the brief now says the hall is the stretch walked
+    before the turn and to count it before leaving; the guards open with
+    "Gate 1." / "Gate 2." and say "before your turn" / "that same hall".
+    Level regenerated; the reference is unchanged.
+  - **Not done:** starter-code comments or echoing the question to the
+    console. Say if the wording isn't enough.
+- **4.2:** no notes.
+- **Notes, no action** *(Designer, 2026-10-02)*:
+  - 4.3: solved without `else`, using a `while` loop and a nested `if`.
+    Within par.
+  - 4.4: solved a different way from the intended one, with `while`, still
+    within par. `while` isn't taught yet, but they're fine with it being
+    used.
+  - 4.5 and 4.6: solved with `while` rather than `for`; a good general
+    challenge. 4.6 was one program that worked on every board.
+- **Idea, for the visual design pass** *(Designer, 2026-10-02)*: a red
+  hatched line on the board along the squares an enemy piece threatens.
+- **Idea, for the visual design pass** *(Designer, 2026-10-02)*: animate the
+  rook moving to capture the pawn when it takes it.
+- **Retest** *(Designer, 2026-10-02)*: skipped; the designer asked to merge
+  after the pre-merge pass.
+
 ---
 
 ## Queued work
@@ -1625,6 +1662,6 @@ Deferred on purpose. Not bugs, but don't lose them.
   the goal square). Early levels keep the set target. *(Designer, 2026-09-26)*
   Engine note: events already carry the full world state (the piece, and from
   QA-002 the opened gates), so moving obstacles would add their positions to
-  that state. **Now planned:** M3.1's obstacle toolkit (`docs/M3.md`): patrols,
+  that state. **Now planned:** M3.1's obstacle toolkit (`docs/M3/M3.md`): patrols,
   chasers, a clock set per obstacle (including this first-time-a-line-runs
   trigger), and waypoints you pass over.

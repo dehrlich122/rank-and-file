@@ -5,7 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Rank & File is a browser puzzle game that teaches Python: the player writes real
 Python to move a chess piece. `DESIGN.md` is the design brief (pedagogy rules,
 curriculum, milestones). `docs/ARCHITECTURE.md` records the decisions and the
-level file format.
+level file format. Each milestone's plan, specs and build notes go in its own
+folder, `docs/M<n>/` (e.g. `docs/M3/` holds `M3.md`, `M3.1.md`…); `docs/QA.md`
+is the play-test log for all of them.
 
 ## Non-negotiable: no spoilers
 
@@ -26,7 +28,11 @@ The designer is also the target learner.
   so references pass time with `wait()`, not by spinning (QA-026). A level
   test enforces this wherever `wait()` is unlocked. Chapter 3's levels and
   solutions come from `scripts/gen_loops.py`, which replays solve.py's route
-  with the fewest lines of `for` loops (M3.3).
+  with the fewest lines of `for` loops (M3.3). Chapter 4's come from
+  `scripts/gen_conditions.py`, which lines up each board's route and
+  branches on `look()` where they part (M3.4). Both share
+  `scripts/levelgen.py`. Rerun a generator after changing one of its
+  levels.
 - After each milestone, stop, list what the designer should test manually, and
   wait for feedback (`DESIGN.md` §7).
 

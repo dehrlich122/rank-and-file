@@ -38,6 +38,7 @@ export interface WorldState {
   tick: number; // ticks of the action clock so far (moves, turns and waits)
   lost: Pos | null; // where the run was lost: a pit, or where the piece was caught
   clock_ticks?: Partial<Record<Clock, number>>; // the code clocks' counts, on levels with clockwork (QA-021)
+  attacked?: Pos[]; // the squares enemy chess pieces attack, on levels with any (M3.4)
 }
 
 /** A level as the engine describes it (levels.Level.describe). */
@@ -81,7 +82,7 @@ export interface LevelInfo {
 
 /** A patrol or a chaser (levels.Enemy), as the board draws it. */
 export interface Enemy {
-  kind: "patrol" | "chaser";
+  kind: "patrol" | "chaser" | "rook" | "bishop"; // rooks and bishops stand still (M3.4)
   route: Pos[]; // a patrol's corners (one square if it stands guard)
   loop: boolean; // a patrol: round and round, instead of there and back
   clock: Clock;

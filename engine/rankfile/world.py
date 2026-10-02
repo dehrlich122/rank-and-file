@@ -30,7 +30,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .board import Pos, Tile, sign, square_name, step
+from .board import Direction, Pos, Tile, sign, square_name, step
 from .exceptions import BlockedError, BridgeError, CaptureError, GateLockedError, Lost
 from .words import count
 
@@ -45,9 +45,19 @@ GUARD_GATE_LOCKED = "Does your father really smell of elderberries? Maybe try th
 # ...and at a gate whose guard asks a question (M3.1). The guard tells a wrong
 # number said the right way from words it can't follow (QA-030).
 GUARD_MISCOUNTED = '"Do you not know how to count!?" says the guard. The gate remains locked.'
+GUARD_WRONG_YES_NO = '"Wrong!" says the guard. "Off you go and think again." The gate remains locked.'
 GUARD_NOT_UNDERSTOOD = '"I can\'t understand you!" says the guard. Say it exactly the way the question shows. The gate remains locked.'
 
 CLOCKS = ("action", "line", "new_line")
+
+# The directions each enemy chess piece attacks along (M3.4). They stand still.
+CHESS_LINES: dict[str, tuple[Pos, ...]] = {
+    "rook": ((0, 1), (1, 0), (0, -1), (-1, 0)),
+    "bishop": ((1, 1), (1, -1), (-1, 1), (-1, -1)),
+}
+
+# What look() calls each tile that's always there; the others depend on the run (M3.4).
+LOOK_WORDS = {Tile.WALL: "wall", Tile.SIGN: "signpost", Tile.TIMED_GATE: "portcullis"}
 CODE_CLOCKS = {"line", "new_line"}  # the clocks that keep time with the code, not the piece
 
 
@@ -100,6 +110,7 @@ class World:
         # The clocks something keeps time with: their ticks show up in the recording.
         self.clocked = {timer.clock for timer in self.board.timers.values()} | {enemy.clock for enemy in level.enemies}
         self.code_clocked = sorted(self.clocked & CODE_CLOCKS)  # clocks the code winds, whose counts the board shows (QA-021)
+        self.chess = any(enemy.kind in CHESS_LINES for enemy in level.enemies)  # M3.4
         self.lost: Lost | None = None
         self.listeners: list[Callable[[Event], None]] = []
 
@@ -129,6 +140,8 @@ class World:
         }
         if self.code_clocked:  # only on levels with clockwork, so other levels' recordings stay lean
             state["clock_ticks"] = {clock: self.ticks[clock] for clock in self.code_clocked}
+        if self.chess:  # the squares enemy chess pieces attack, which change as pieces are taken (M3.4)
+            state["attacked"] = [list(pos) for pos in sorted(self.attacked())]
         return state
 
     @_acts
@@ -144,6 +157,35 @@ class World:
 
     def at_goal(self) -> bool:
         return self.level.goal is not None and self.pos == self.level.goal
+
+    def look(self, side: str | None = None) -> str | None:
+        """What's on the square ahead, or diagonally ahead on `side` ("left" or
+        "right") (M3.4): a word for anything there, or None if it's empty.
+        Squares you only pass over (the goal, a waypoint) count as empty, so a
+        hidden goal stays hidden. Looking costs no tick."""
+        target = step(self.pos, self.facing)
+        if side is not None:
+            target = step(target, self._across(side))
+        if not self.board.contains(target):
+            return "edge"
+        if foe := self._foe_at(target):
+            return foe.enemy.kind
+        tile = self.board.tile(target)
+        if tile is Tile.PIT:
+            return None if target in self.bridged else "pit"
+        if tile is Tile.GATE:
+            return None if target in self.opened else "gate"
+        if tile in (Tile.GEM, Tile.PLANK):
+            return None if target in self.collected else tile.value
+        return LOOK_WORDS.get(tile)
+
+    def attacked(self) -> set[Pos]:
+        """Every square an enemy chess piece attacks (M3.4)."""
+        return set().union(*(self._attacks(foe) for foe in self.foes if not foe.gone))
+
+    def attacker(self, pos: Pos) -> Foe | None:
+        """The enemy chess piece that attacks `pos`, if one does."""
+        return next((foe for foe in self.foes if not foe.gone and pos in self._attacks(foe)), None)
 
     def squares_ahead(self) -> int:
         """How many squares the piece can walk straight ahead before something
@@ -176,8 +218,7 @@ class World:
     @_acts
     def capture(self, side: str) -> None:
         """Take the enemy diagonally forward on `side` ("left" or "right"), chess style, and move onto its square."""
-        across = self.facing.turned_left() if side == "left" else self.facing.turned_right()
-        target = step(step(self.pos, self.facing), across)
+        target = step(step(self.pos, self.facing), self._across(side))
         foe = self._foe_at(target)
         if foe is None or foe.enemy.armoured:
             self._emit("bump", at=list(target))
@@ -244,12 +285,15 @@ class World:
     def _guard_reply(self, gate: Pos, line: str) -> str:
         """What the guard says to a line that isn't the passphrase. A guard who asks a
         question (QA-030) tells a miscount (the answer's words with another number)
-        from anything it can't follow, such as a typo."""
+        from anything it can't follow, such as a typo. A guard who asks a yes/no
+        question tells the wrong one of True and False apart (M3.4)."""
         if gate not in self.board.questions:
             return GUARD_WRONG_PHRASE
         answer = self.board.gates[gate]
         if re.search(r"\d", answer) and _without_numbers(line) == _without_numbers(answer):
             return GUARD_MISCOUNTED
+        if {line, answer} == {"True", "False"}:
+            return GUARD_WRONG_YES_NO
         return GUARD_NOT_UNDERSTOOD
 
     @property
@@ -317,19 +361,45 @@ class World:
                     return target
         return pos
 
+    def _attacks(self, foe: Foe) -> set[Pos]:
+        """The squares a chess piece attacks: along each of its lines, up to the
+        board's edge or the first wall or closed gate. A square holding another
+        enemy is attacked too, and ends that line. Other enemies attack nothing."""
+        squares = set()
+        for dx, dy in CHESS_LINES.get(foe.enemy.kind, ()):
+            pos = foe.pos
+            while True:
+                pos = (pos[0] + dx, pos[1] + dy)
+                if self._stops_line(pos):
+                    break
+                squares.add(pos)
+                if self._foe_at(pos):
+                    break
+        return squares
+
     def _enemy_can_enter(self, pos: Pos) -> bool:
         """Walls and shut gates hold an enemy back. Pits don't: it falls in (see tick)."""
-        if self.board.blocked(pos) or self._locked_gate(pos) or self._shut(pos):
-            return False
-        return self._foe_at(pos) is None
+        return not self._stops_line(pos) and self._foe_at(pos) is None
+
+    def _stops_line(self, pos: Pos) -> bool:
+        """A wall, a locked gate or a shut gate: it ends a chess piece's line and holds an enemy back."""
+        return self.board.blocked(pos) or self._locked_gate(pos) or self._shut(pos)
+
+    def _across(self, side: str) -> Direction:
+        """The direction to the piece's `side` ("left" or "right")."""
+        return self.facing.turned_left() if side == "left" else self.facing.turned_right()
 
     def _foe_at(self, pos: Pos) -> Foe | None:
         """The enemy on `pos`, if one is there (captured and fallen ones are gone)."""
         return next((foe for foe in self.foes if not foe.gone and foe.pos == pos), None)
 
     def _check_caught(self) -> None:
+        """Sharing a square with an enemy loses, and so does standing where a chess piece attacks (M3.4)."""
+        piece, here = self.level.piece, square_name(self.pos)
         if foe := self._foe_at(self.pos):
-            self._lose(f"Your {self.level.piece} was caught by the {foe.enemy.kind} on {square_name(self.pos)}.", self.pos)
+            self._lose(f"Your {piece} was caught by the {foe.enemy.kind} on {here}.", self.pos)
+        elif foe := self.attacker(self.pos):
+            self._lose(f"The {foe.enemy.kind} on {square_name(foe.pos)} took your {piece} on {here}.", self.pos)
 
     def _capture_message(self, target: Pos, foe: Foe | None) -> str:
         if not self.board.contains(target):

@@ -199,6 +199,7 @@ enemies:                     # optional (M3.1); squares are chess names
   - {kind: patrol, start: c2, route: [c2, f2, f5, c5], loop: true, clock: new_line}
   - {kind: patrol, start: d4, armoured: true}         # no route: it stands guard
   - {kind: chaser, start: g6, strategy: simple}
+  - {kind: rook, start: e5}                           # M3.4: stands still; also bishop
 start: {facing: north}       # also `planks: 1`: planks the piece starts with (QA-017)
 objectives:                  # default [reach_goal]
   - reach_goal               # end the program on the goal square
@@ -215,6 +216,7 @@ variants:                    # optional: the same level on other maps, which it 
   - map: |                   # shown small beside the level's board, before and after a run (M3.2, QA-032)
       ...
     legend: {X: {...}}       # optional (M3.2): this board's own entry for a symbol, e.g. a guard's answer
+    enemies: [...]           # optional (M3.4): this board's own enemies, instead of the level's
 mastery: true                # optional (M3.2): the chapter's optional mastery challenge
 lesson: ch01/ch01-l03.md
 starter: ""                  # optional initial editor contents
@@ -242,7 +244,8 @@ must reach the goal whichever `?` it's on). Legend tiles:
     the goals and on the gate, and the passphrase is its answer. A wrong
     answer gets one of two replies *(QA-030)*. The answer's words with
     another number get "Do you not know how to count!?". Anything else,
-    such as a typo, gets "I can't understand you!".
+    such as a typo, gets "I can't understand you!". A yes/no question's
+    other answer (True for False, or False for True) gets "Wrong!" *(M3.4)*.
   - The guard lines live in `world.py`.
   - `describe()` never includes the passphrase.
 - `timed_gate` *(M3.1)*: open for the first `open` ticks (default 2) of every
@@ -266,6 +269,15 @@ The piece's counting and waiting *(M3.2)*:
   enemies don't stop it. It costs no tick.
 - `wait(ticks=1)` waits a whole number of ticks, from 0 to 100. The ceiling
   keeps one line from recording a flood of ticks.
+- `look(side=None)` *(M3.4)* names what's on the square straight ahead, or
+  diagonally ahead with `"left"` or `"right"` (the squares a pawn captures
+  on). It gives back a word, or None if the square is empty:
+  - the board: "wall", "edge", "signpost", "pit", "gate", "portcullis"
+  - things to pick up: "gem", "plank"
+  - an enemy's kind, such as "rook"
+  - A bridged pit, an opened gate and a picked-up gem look empty. Squares
+    you only pass over (the goal, a waypoint) look empty too, so a hidden
+    goal stays hidden. It costs no tick.
 
 `max_numbers` *(M3.2, QA-029)*: how many numbers the code may write, counted
 with `ast`. With 1, "Your code may contain only one number, written once".
@@ -281,6 +293,16 @@ Enemies *(M3.1)* move one square per tick of their clock:
   it tries the other. If both are blocked, it waits. Pits don't block it: it
   falls in *(QA-017)*.
 - An enemy on the piece's square catches it, and the run is `lost`.
+- A **rook** or **bishop** *(M3.4)* stands still and attacks along real chess
+  lines: a rook its rank and file, a bishop its diagonals. A line runs to
+  the board's edge or the first wall, closed gate or shut timed gate. A
+  square holding another enemy is attacked too, and ends the line.
+  - Standing on an attacked square loses the run: "The rook on c3 took your
+    pawn on b3."
+  - Taking the piece (capturing diagonally) ends its attacks.
+  - The checker refuses a level whose start square is attacked.
+  - States carry `attacked`, the attacked squares, on levels with chess
+    pieces.
 - `armoured: true` means it can't be captured. `pawn.capture_left()` and
   `capture_right()` take an enemy one square diagonally forward and move onto
   its square. That costs a tick. An empty square or an armoured enemy is a
@@ -348,7 +370,7 @@ src/py/            worker, client and protocol
 src/ui/            board, editor, playback, panels, lesson, repl, levelView, levelSelect, codex,
                    help (hints, giving up, the comparison), compare, dialog, settingsDialog
 scripts/           copy-pyodide.mjs (runs after npm install), venv.mjs, check-bundle.mjs, e2e/,
-                   solve.py gen_solutions.py gen_loops.py (search levels and write solutions blind)
+                   solve.py gen_solutions.py gen_loops.py gen_conditions.py levelgen.py (search levels, write solutions blind)
 public/pyodide/    Pyodide runtime, copied from node_modules (not committed)
 ```
 
@@ -373,7 +395,7 @@ public/pyodide/    Pyodide runtime, copied from node_modules (not committed)
 - `match` isn't placed yet. It's a natural fit for tile types, in Chapter 9
   or 11 (the brief's Chapters 8 and 10, which move up by one after the split
   below).
-- Settled for M3 in `docs/M3.md`:
+- Settled for M3 in `docs/M3/M3.md`:
   - Chapter 4 is split in two (conditions, then `while`), so every later
     chapter moves up by one.
   - Where `break`/`continue`, `in`, truthiness and `None` and nested loops

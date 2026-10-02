@@ -570,12 +570,12 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     return `${JSON.stringify(both)} → ${JSON.stringify(narrowed)}`;
   });
 
-  await check("QA-003: Tab accepts with the cursor inside (); Enter always makes a new line", async () => {
+  await check("QA-003/033: Tab accepts with the cursor after the (); Enter always makes a new line", async () => {
     await openLevel("ch01-l01", { fresh: true });
     await focusMain();
     await type("pawn.move()\npawn.m");
     await b.key("Tab");
-    await type("2"); // lands between the parentheses
+    await type("2"); // lands after the closing parenthesis
     const accepted = await lastLine();
     await b.key("End", { keyCode: 35 });
     await type("\npawn.");
@@ -583,7 +583,7 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     await b.key("Enter");
     await sleep(100);
     const afterEnter = await b.evaluate(`[...document.querySelectorAll('${MAIN} .cm-line')].map((l) => l.textContent).slice(-2)`);
-    expect(accepted === "pawn.move(2)", `after Tab + typing: ${accepted}`);
+    expect(accepted === "pawn.move()2", `after Tab + typing: ${accepted}`);
     // Enter kept "pawn." as typed (nothing accepted) and started a new, blank line
     // (which may carry Python's continuation indent).
     expect(listOpen && afterEnter[0] === "pawn." && afterEnter[1].trim() === "", `list open: ${listOpen}, last lines: ${JSON.stringify(afterEnter)}`);

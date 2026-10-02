@@ -17,6 +17,7 @@ pieces.Pawn.move
 pieces.Pawn.position
 pieces.Pawn.capture_left
 pieces.Pawn.capture_right
+pieces.Pawn.look
 
 # Level fields read by the level checker (engine/tests/test_levels.py), which
 # vulture doesn't scan.
