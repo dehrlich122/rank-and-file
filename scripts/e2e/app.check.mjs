@@ -338,6 +338,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
   const PRACTICE = ["practice-02", "practice-03", "practice-04", "practice-05", "practice-06", "practice-07", "practice-08", "practice-09", "practice-10"];
   const CH02 = ["ch02-l01", "ch02-l02", "ch02-l03", "ch02-l04", "ch02-l05", "ch02-l06"]; // Chapter 2 (M3.2)
   const CH03 = ["ch03-l01", "ch03-l02", "ch03-l03", "ch03-l04", "ch03-l05", "ch03-l06"]; // Chapter 3 (M3.3)
+  const CH04 = ["ch04-l01", "ch04-l02", "ch04-l03", "ch04-l04", "ch04-l05", "ch04-l06"]; // Chapter 4 (M3.4)
   const drawn = () =>
     b.evaluate(`(() => {
       const board = document.querySelector('.board-host .board');
@@ -346,6 +347,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
         pits: count('.pit'), waypoints: count('.waypoint'), gems: count('.gem'), timed: count('.timed-gate'),
         enemies: count('.enemy'), armoured: count('.enemy.armoured'), routes: count('.route'),
         crossed: count('.waypoint.crossed'), collected: count('.gem.collected'), gone: count('.enemy.gone'),
+        rooks: count('.enemy-rook'), bishops: count('.enemy-bishop'), attacked: count('.attacks .attacked'),
         planks: count('.plank'), planksTaken: count('.plank.collected'), bridged: count('.pit.bridged'),
         badges: [...board.querySelectorAll('.badge-text')].map((e) => e.textContent),
         lost: board.classList.contains('lost'),
@@ -409,7 +411,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     "practice-02": (board) => expect(board.bridged === 1 && board.planksTaken === 1, `pits bridged: ${board.bridged}, planks taken: ${board.planksTaken}`),
     "practice-10": (board) => expect(board.gone === 1, `chasers gone: ${board.gone}`),
   };
-  for (const id of [...PRACTICE, ...CH02, ...CH03]) {
+  for (const id of [...PRACTICE, ...CH02, ...CH03, ...CH04]) {
     await check(`${id}: reference solution solves it`, async () => {
       await openLevel(id, { fresh: true });
       await setCode(solution(id));
@@ -1061,6 +1063,42 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(/Lost/i.test(pit.status), `3.3's fixed-length steps: ${pit.status}`);
     expect(/Finished/i.test(looped.status) && gearCount(looped.badges.find((text) => text.startsWith("⚙"))) === "2", JSON.stringify(looped));
     expect(/Lost/i.test(copied.status), `3.4's copied-out moves: ${copied.status}`);
+  });
+
+  // -- M3.4: Chapter 4 ----------------------------------------------------------------------------
+  // Labels, counts and outcomes only: the guards' answers and the code never go into a message.
+
+  await check("M3.4: Chapter 4 is listed after Chapter 3, and Pawn Storm is its optional mastery challenge", async () => {
+    await levelCards();
+    const list = await b.evaluate(`({
+      chapters: [...document.querySelectorAll('.chapter h2')].map((e) => e.textContent),
+      cards: ${JSON.stringify(CH04)}.map((id) => !!document.querySelector('a[href="#/level/' + id + '"]')),
+      mastery: document.querySelector('a[href="#/level/ch04-l06"] .mastery-tag')?.textContent ?? null,
+    })`);
+    const fourth = list.chapters.indexOf("Chapter 4 · Eyes Open");
+    expect(fourth > list.chapters.indexOf("Chapter 3 · Marching Orders") && list.cards.every(Boolean), JSON.stringify(list));
+    expect(list.mastery === "Mastery · optional", JSON.stringify(list));
+  });
+
+  await check("M3.4: Under Attack draws rooks and shades the squares they attack", async () => {
+    await openLevel("ch04-l05", { fresh: true });
+    const board = await drawn();
+    expect(board.rooks > 0 && board.attacked > 0, JSON.stringify(board));
+  });
+
+  await check("M3.4: a rook's attacked squares are shaded in Pawn Storm, and walking into one reads Lost", async () => {
+    await openLevel("ch04-l06", { fresh: true });
+    const board = await drawn();
+    await setCode("while not pawn.at_goal():\n    pawn.move()\n"); // test code: walks straight, ignoring the rooks
+    const r = await run();
+    expect(board.rooks > 0 && board.attacked > 0 && r.head === "Lost", `${board.rooks} rooks, ${board.attacked} shaded | ${brief(r)}`);
+  });
+
+  await check("QA-034: the guards in True or False name their gate and say the hall is the stretch before the turn", async () => {
+    await openLevel("ch04-l01", { fresh: true });
+    await challengeTab();
+    const brief41 = await b.evaluate(`document.body.innerText`);
+    expect(/stretch you walked before your turn/.test(brief41), "the Challenge panel is missing the hall's definition");
   });
 
   await check("no console errors during the app checks", async () => {

@@ -30,7 +30,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .board import Pos, Tile, sign, square_name, step
+from .board import Direction, Pos, Tile, sign, square_name, step
 from .exceptions import BlockedError, BridgeError, CaptureError, GateLockedError, Lost
 from .words import count
 
@@ -165,7 +165,7 @@ class World:
         hidden goal stays hidden. Looking costs no tick."""
         target = step(self.pos, self.facing)
         if side is not None:
-            target = step(target, self.facing.turned_left() if side == "left" else self.facing.turned_right())
+            target = step(target, self._across(side))
         if not self.board.contains(target):
             return "edge"
         if foe := self._foe_at(target):
@@ -218,8 +218,7 @@ class World:
     @_acts
     def capture(self, side: str) -> None:
         """Take the enemy diagonally forward on `side` ("left" or "right"), chess style, and move onto its square."""
-        across = self.facing.turned_left() if side == "left" else self.facing.turned_right()
-        target = step(step(self.pos, self.facing), across)
+        target = step(step(self.pos, self.facing), self._across(side))
         foe = self._foe_at(target)
         if foe is None or foe.enemy.armoured:
             self._emit("bump", at=list(target))
@@ -371,7 +370,7 @@ class World:
             pos = foe.pos
             while True:
                 pos = (pos[0] + dx, pos[1] + dy)
-                if self.board.blocked(pos) or self._locked_gate(pos) or self._shut(pos):
+                if self._stops_line(pos):
                     break
                 squares.add(pos)
                 if self._foe_at(pos):
@@ -380,9 +379,15 @@ class World:
 
     def _enemy_can_enter(self, pos: Pos) -> bool:
         """Walls and shut gates hold an enemy back. Pits don't: it falls in (see tick)."""
-        if self.board.blocked(pos) or self._locked_gate(pos) or self._shut(pos):
-            return False
-        return self._foe_at(pos) is None
+        return not self._stops_line(pos) and self._foe_at(pos) is None
+
+    def _stops_line(self, pos: Pos) -> bool:
+        """A wall, a locked gate or a shut gate: it ends a chess piece's line and holds an enemy back."""
+        return self.board.blocked(pos) or self._locked_gate(pos) or self._shut(pos)
+
+    def _across(self, side: str) -> Direction:
+        """The direction to the piece's `side` ("left" or "right")."""
+        return self.facing.turned_left() if side == "left" else self.facing.turned_right()
 
     def _foe_at(self, pos: Pos) -> Foe | None:
         """The enemy on `pos`, if one is there (captured and fallen ones are gone)."""
@@ -393,7 +398,7 @@ class World:
         piece, here = self.level.piece, square_name(self.pos)
         if foe := self._foe_at(self.pos):
             self._lose(f"Your {piece} was caught by the {foe.enemy.kind} on {here}.", self.pos)
-        if foe := self.attacker(self.pos):
+        elif foe := self.attacker(self.pos):
             self._lose(f"The {foe.enemy.kind} on {square_name(foe.pos)} took your {piece} on {here}.", self.pos)
 
     def _capture_message(self, target: Pos, foe: Foe | None) -> str:

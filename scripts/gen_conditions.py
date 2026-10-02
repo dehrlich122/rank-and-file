@@ -22,6 +22,7 @@ only file names, line counts and outcomes, never code: the designer is also
 the game's learner (see CLAUDE.md: no spoilers).
 """
 
+import operator
 import re
 import sys
 from dataclasses import dataclass
@@ -121,16 +122,12 @@ class Cond:
         return (order, OBSERVATIONS.index(self.side))
 
 
-def seen(world: World, side: str | None):
-    return world.look(side)
-
-
 def separating(inside: list[World], outside: list[World]) -> Cond | None:
     """The simplest condition that's True for every world `inside` and False for every one `outside`."""
     found = []
     for side in OBSERVATIONS:
-        mine = {seen(world, side) for world in inside}
-        theirs = {seen(world, side) for world in outside}
+        mine = {world.look(side) for world in inside}
+        theirs = {world.look(side) for world in outside}
         if mine & theirs:
             continue
         if mine == {None}:
@@ -140,15 +137,6 @@ def separating(inside: list[World], outside: list[World]) -> Cond | None:
                 found.append(Cond(side, "some"))
             found.append(Cond(side, "is", tuple(sorted(mine))))
     return min(found, key=Cond.rank, default=None)
-
-
-def holds(cond: Cond, world: World) -> bool:
-    value = seen(world, cond.side)
-    if cond.test == "none":
-        return value is None
-    if cond.test == "some":
-        return value is not None
-    return value in cond.words
 
 
 # -- programs ------------------------------------------------------------------------
@@ -249,12 +237,12 @@ class Synth:
         """The simplest True/False expression of the start count that gives each board its phrase."""
         if not self.count or any(phrase not in ("True", "False") for _, phrase in cases):
             return None
-        ops = (">", "<", ">=", "<=", "==", "!=")
+        ops = {">": operator.gt, "<": operator.lt, ">=": operator.ge, "<=": operator.le, "==": operator.eq, "!=": operator.ne}
         atoms = [(op, n) for op in ops for n in self.numbers]
 
         def value(atom, count):
             op, n = atom
-            return {">": count > n, "<": count < n, ">=": count >= n, "<=": count <= n, "==": count == n, "!=": count != n}[op]
+            return ops[op](count, n)
 
         want = [phrase == "True" for _, phrase in cases]
         for atom in atoms:
@@ -264,7 +252,7 @@ class Synth:
             for a, b in product(atoms, atoms):
                 if a[1] >= b[1]:
                     continue
-                combine = (lambda x, y: x or y) if joiner == "or" else (lambda x, y: x and y)
+                combine = operator.or_ if joiner == "or" else operator.and_
                 if [combine(value(a, count), value(b, count)) for count, _ in cases] == want:
                     return (joiner, a, b)
         return None

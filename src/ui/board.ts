@@ -28,6 +28,7 @@ export class BoardView {
   private readonly flash: SVGRectElement;
   private readonly lostMark: SVGGElement; // where the run was lost (M3.1)
   private readonly enemies: SVGGElement[]; // one per level.enemies, moved like the piece
+  private attackedKey: string | undefined;
   private readonly attacks: SVGGElement; // the squares enemy chess pieces attack, shaded (M3.4)
   private readonly counters: SVGGElement[]; // badges that count a clock's ticks: clockwork's (QA-021), timed gates' (M3.2)
   private readonly art = new Map<TileKind, Map<string, SVGGElement>>(); // tile kind -> "x,y" -> its art
@@ -152,12 +153,16 @@ export class BoardView {
     this.mark("gem", "collected", state.collected);
     this.mark("plank", "collected", state.collected);
     this.mark("pit", "bridged", state.bridged);
-    if (state.attacked) {
-      const shade = (pos: Pos) => {
-        const [left, top] = corner(pos, this.level.height);
-        return svg("rect", { x: left, y: top, width: S, height: S, class: "attacked" });
-      };
-      this.attacks.replaceChildren(...state.attacked.map(shade));
+    // The shaded squares only change when a piece is taken, so skip the rebuild otherwise.
+    const attackedKey = state.attacked?.join(";");
+    if (state.attacked && attackedKey !== this.attackedKey) {
+      this.attackedKey = attackedKey;
+      this.attacks.replaceChildren(
+        ...state.attacked.map((pos) => {
+          const [left, top] = corner(pos, this.level.height);
+          return svg("rect", { x: left, y: top, width: S, height: S, class: "attacked" });
+        }),
+      );
     }
     (state.enemies ?? []).forEach((pos, i) => {
       const enemy = this.enemies[i];
