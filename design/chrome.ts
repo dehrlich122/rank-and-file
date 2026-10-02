@@ -4,7 +4,7 @@ import { h } from "../src/ui/dom";
 import { createEditor, setActiveLine, setErrorLine } from "../src/ui/editor";
 import { icon } from "../src/ui/icons";
 import { BoardView } from "../src/ui/board";
-import { LEVEL } from "./sample";
+import { LEVEL } from "../src/ui/styleguideSample";
 import { corrupted, reskin, type Skin, type TileName } from "./reskin";
 import { hero, type Painter, type SpriteName } from "./paint";
 

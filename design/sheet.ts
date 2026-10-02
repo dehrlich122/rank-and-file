@@ -14,10 +14,9 @@ import { BoardView } from "../src/ui/board";
 import { h } from "../src/ui/dom";
 import { codeSlice, levelComplete, VOICES } from "./chrome";
 import { el } from "./directions/looks";
-import { EVENTS, LEVEL, STATES, state } from "./sample";
+import { EVENTS, LEVEL, STATES, state } from "../src/ui/styleguideSample";
 import { lessonsMenu, messages, titleScreen } from "./sheet/chrome";
-import { dress, setHero } from "./sheet/dress";
-import { crown, enemy, goal, hero, tile, type Skin } from "./sheet/sprites";
+import { crown, enemy, goal, hero, tile, type Skin } from "../src/ui/sprites";
 
 const params = new URLSearchParams(location.search);
 const root = document.documentElement;
@@ -35,8 +34,8 @@ const replays: Array<() => void> = [];
 const svgNode = (node: SVGElement) => node as unknown as Node;
 
 function board(small = false): HTMLElement {
-  const view = new BoardView(level);
-  dress(view.element, level, { skin, facing: FACING });
+  const view = new BoardView(level, { skin });
+
   boards.push(view);
   return h("div", { class: small ? "board-wrap board-min" : "board-wrap" }, svgNode(view.element));
 }
@@ -131,7 +130,7 @@ function controls(): HTMLElement {
   const skinButton = button(`piece: ${skin}`, () => {
     skin = skin === "pawn" ? "knight" : "pawn";
     skinButton.textContent = `piece: ${skin}`;
-    all((v) => setHero(v.element, skin, FACING));
+    all((v) => v.setSkin(skin));
     document.querySelectorAll(".ts-hero-slot").forEach((slot) => slot.replaceChildren(svgNode(el("svg", { viewBox: "-38 -38 76 76", class: "ts-hero" }, hero(skin, "south")))));
   });
   return h(

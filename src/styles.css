@@ -1,7 +1,7 @@
 /* Colour tokens. Each is light-dark(<light>, <dark>): the browser picks one from
    the element's color-scheme, which follows the system unless the Theme setting
    forces it (data-theme on <html>, set by src/settings.ts). Never hard-code
-   colours elsewhere; the visual design pass will retune these. */
+   colours elsewhere. scripts/check-contrast.mjs tests these in both themes (npm run check). */
 :root {
   color-scheme: light dark;
   --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -9,67 +9,90 @@
   --code-size: 15px; /* the Code text size setting */
   --radius: 8px;
 
-  --bg: light-dark(#f4f1ea, #1c1a18);
-  --panel: light-dark(#fffdf8, #252220);
-  --border: light-dark(#ddd5c4, #3a3531);
-  --text: light-dark(#2a2622, #ece6dc);
-  --muted: light-dark(#7a7166, #a39a8e);
-  --accent: light-dark(#2f6f4f, #5fae84);
-  --accent-text: light-dark(#ffffff, #0f1a14);
-  --good: light-dark(#2f6f4f, #7cc79c);
-  --good-bg: light-dark(#e7f3ec, #1f3228);
-  --warn: light-dark(#8a5d00, #e6b555);
-  --warn-bg: light-dark(#fbf1dc, #3a3020);
-  --bad: light-dark(#b3261e, #f08a80);
-  --bad-bg: light-dark(#fbeceb, #3a2322);
-  --code-bg: light-dark(#f1ece1, #1f1d1b);
+  /* structure and text */
+  --bg: light-dark(#ecebf8, #090416);
+  --panel: light-dark(#f8f7fd, #110a24);
+  --border: light-dark(#b9b2e0, #33255e);
+  --text: light-dark(#14163a, #ecebff);
+  --muted: light-dark(#51497f, #a69ed6);
+  --code-bg: light-dark(#f0eefb, #0c061d);
+
+  /* the player and their code: cyan */
+  --accent: light-dark(#07708b, #3be0ff);
+  --accent-text: light-dark(#ffffff, #02131a);
   /* translucent, so the text selection drawn underneath stays visible (QA-007) */
-  --step-line: light-dark(rgb(255 214 0 / 0.28), rgb(240 200 40 / 0.18));
-  --error-line: light-dark(rgb(220 38 38 / 0.15), rgb(240 70 60 / 0.18));
-  --active-line: light-dark(rgb(47 111 79 / 0.06), rgb(255 255 255 / 0.04));
-  --selection: light-dark(rgb(47 111 79 / 0.28), rgb(95 174 132 / 0.35));
+  --step-line: light-dark(rgb(10 127 156 / 0.18), rgb(59 224 255 / 0.17));
+  --selection: light-dark(rgb(10 127 156 / 0.25), rgb(59 224 255 / 0.3));
+  --active-line: light-dark(rgb(10 127 156 / 0.05), rgb(255 255 255 / 0.04));
+
+  /* hostile: magenta / red, and only that */
+  --bad: light-dark(#c4144f, #ff5c86);
+  --bad-bg: light-dark(#fde6ee, #2a0b1b);
+  --error-line: light-dark(rgb(196 20 79 / 0.14), rgb(255 92 134 / 0.17));
+  --glitch-a: light-dark(#e0207f, #ff2a8a);
+  --glitch-b: light-dark(#5a3cff, #6a5cff);
+  --hot: light-dark(#d40f3c, #ff2a55);
+
+  /* amber: goals, gates, things to act on; green: text the world holds, and success */
+  --warn: light-dark(#8a5300, #ffb02e);
+  --warn-bg: light-dark(#fdf0d9, #2e1f06);
+  --good: light-dark(#157a3c, #4cf27a);
+  --good-bg: light-dark(#e1f6e8, #0a2a1a);
+  --star: light-dark(#935500, #ffb02e);
+  --game-message: light-dark(#8a5300, #ffb02e);
 
   /* syntax colours */
-  --syn-keyword: light-dark(#8f3f9e, #d49be0);
-  --syn-string: light-dark(#a3431f, #e8a37e);
-  --syn-number: light-dark(#1f6a8f, #7cc4e8);
-  --syn-comment: light-dark(#857a6c, #8f877b);
-  --syn-function: light-dark(#2c5d9e, #8fb8f0);
-  --syn-definition: light-dark(#1d6b4a, #7cc79c);
-  --syn-class: light-dark(#8a5d00, #e6b555);
+  --syn-keyword: light-dark(#7a3fc4, #c39bff);
+  --syn-string: light-dark(#157a3c, #7dfc9c);
+  --syn-number: light-dark(#0a6f8c, #6fe3ff);
+  --syn-comment: light-dark(#5f6699, #8189bd);
+  --syn-function: light-dark(#1f5fb8, #8fb4ff);
+  --syn-definition: light-dark(#157a3c, #7dfc9c);
+  --syn-class: light-dark(#8a5300, #ffb02e);
 
-  /* board */
-  --sq-light: light-dark(#eeeed2, #c9c9ad);
-  --sq-dark: light-dark(#b5c99a, #7f9868);
-  --wall: light-dark(#6b625a, #3d3833);
-  --wall-inner: light-dark(#7d746b, #4a443e);
-  --rune-stone: light-dark(#a9b4c2, #56606d);
-  --rune-glyph: light-dark(#3b4a5c, #d6dde6);
-  --goal: #d4a017;
-  --pawn: #fdfbf6;
-  --pawn-stroke: #2a2622;
-  --pointer: light-dark(#2f6f4f, #245a3f);
-  --coords: light-dark(#8a8175, #8f877b);
-  --gate-frame: light-dark(#c9b48e, #8a7658);
-  --gate-bars: light-dark(#3f3a36, #211d1a);
-  --gate-lock: light-dark(#c8961a, #e0b04a);
-  --pit-rim: light-dark(#5b4a3b, #3a2f26);
-  --pit-hole: light-dark(#1d1712, #0c0907);
-  --plank: light-dark(#b98a55, #9a6f40);
-  --plank-grain: light-dark(#8a6236, #6e4d2a);
-  --waypoint: light-dark(#2c6fb0, #7fb2e8);
-  --enemy: light-dark(#3b2f4a, #2a2233);
-  --enemy-rim: var(--bad);
-  --enemy-eye: light-dark(#ffd76a, #ffd76a);
-  --route: color-mix(in srgb, var(--bad) 60%, transparent);
-  --attacked: color-mix(in srgb, var(--bad) 26%, transparent); /* squares a chess piece attacks (M3.4) */
-  --badge-bg: light-dark(#fffaf0, #2a2521);
-  --badge-border: light-dark(#8a7658, #c9b48e);
-  --badge-text: light-dark(#3f3a36, #f3e2c7);
-  --gem: light-dark(#1f9d8a, #5fd3c0);
-  --gem-facets: light-dark(#d9f5ef, #1b4f47);
-  --game-message: light-dark(#8a4b00, #e6b555);
-  --star: light-dark(#c8961a, #e0b04a);
+  /* the board: a lit grid on two violet squares */
+  --sq-dark: light-dark(#bdb8ea, #110a2a);
+  --sq-light: light-dark(#e2dff6, #2e2466);
+  --coords: light-dark(#2f2a78, #a9b4ff);
+  --grid-line: light-dark(rgb(24 88 140 / 0.3), rgb(80 220 255 / 0.22));
+  --grid-tick: light-dark(rgb(20 96 150 / 0.8), rgb(110 232 255 / 0.7));
+  --grid-edge: light-dark(rgb(20 96 150 / 0.65), rgb(80 220 255 / 0.55));
+  --halftone-dot: light-dark(rgb(186 18 92 / 0.3), rgb(255 70 150 / 0.24));
+  --route: light-dark(rgb(196 20 79 / 0.7), rgb(255 92 134 / 0.7));
+  --badge-bg: light-dark(#f8f7fd, #110a24);
+  --badge-border: light-dark(#51497f, #6b73b8);
+  --badge-text: light-dark(#14163a, #ecebff);
+
+  /* the wire world: violet for structure, amber for things to act on, green for text, magenta for the hostile */
+  --wire-wall: light-dark(#4a3fa0, #8172e0);
+  --wire-amber: light-dark(#8a4f00, #ffb02e);
+  --wire-green: light-dark(#0b6b32, #4cf27a);
+  --wire-foe: light-dark(#b8166c, #e0479a);
+  --void: light-dark(#2a2350, #04020d);
+
+  /* the solid hero */
+  --solid-hi: light-dark(#5fd6f0, #9af5ff);
+  --solid-lo: light-dark(#06344c, #032a44);
+  --solid-edge: light-dark(#04506a, #7ff2ff);
+  --solid-hairline: light-dark(#e8f9ff, #031420);
+  --solid-lit: #ffffff;
+  --solid-lit-edge: light-dark(#04506a, transparent); /* on pale squares the lit visor needs an edge */
+  --shadow: light-dark(rgb(30 20 80 / 0.35), rgb(0 0 0 / 0.62));
+  --bracket: light-dark(#0a6f8a, #9af5ff);
+  --bracket-facing: light-dark(#04506a, #eafeff);
+
+  /* the goal's beacon */
+  --beacon: light-dark(#925600, #ffb02e);
+
+  /* glow belongs to the dark theme: in the light one these are transparent, so a drop-shadow draws nothing */
+  --glow-wall: light-dark(transparent, #6b5ec4);
+  --glow-amber: light-dark(transparent, #ffb02e);
+  --glow-amber-soft: light-dark(transparent, rgb(255 176 46 / 0.6));
+  --glow-green: light-dark(transparent, #4cf27a);
+  --glow-foe: light-dark(transparent, #ff3d9a);
+  --glow-hero: light-dark(transparent, #3be0ff);
+  --glow-hero-soft: light-dark(transparent, rgb(59 224 255 / 0.5));
+  --glow-grid: light-dark(transparent, rgb(80 220 255 / 0.7));
 }
 
 :root[data-theme="light"] {
@@ -1311,6 +1334,11 @@ pre {
   display: none;
 }
 
+/* at that size the dimmed back edges and the ghosts are only mush */
+.board-mini :is(.wb, .bw-back, .bw-ghost-a, .bw-ghost-b) {
+  display: none;
+}
+
 .sq-light {
   fill: var(--sq-light);
 }
@@ -1321,71 +1349,113 @@ pre {
 
 .coords text {
   fill: var(--coords);
-  font: 600 13px var(--font-ui);
+  font: 700 14px var(--font-code);
 }
 
-.wall-outer {
-  fill: var(--wall);
+/* the lit grid: thin lines between squares, a tick where they cross, a glow on the outer edge only */
+.grid-lines,
+.grid-ticks,
+.grid-edge {
+  fill: none;
+  vector-effect: non-scaling-stroke;
 }
 
-.wall-inner {
-  fill: var(--wall-inner);
+.grid-lines {
+  stroke: var(--grid-line);
+  stroke-width: 1;
 }
 
-.sign-post,
-.sign-board {
-  fill: #a0703f;
+.grid-ticks {
+  stroke: var(--grid-tick);
+  stroke-width: 1.1;
 }
 
-.sign-lines {
-  stroke: #f3e2c7;
-  stroke-width: 2.5;
+.grid-edge {
+  stroke: var(--grid-edge);
+  stroke-width: 1.8;
+  filter: drop-shadow(0 0 4px var(--glow-grid));
+}
+
+/* the squares chess pieces attack (M3.4): halftone dots, sized in squares (floor.ts picks the fine or the coarse one) */
+.attacked {
+  fill: var(--halftone);
+  pointer-events: none;
+}
+
+.ht-dot {
+  fill: var(--halftone-dot);
+}
+
+/* the wire world: clean glowing line art, back edges dimmed */
+.w path,
+.w polygon {
+  fill: none;
+  stroke-linejoin: round;
   stroke-linecap: round;
 }
 
-.rune-stone {
-  fill: var(--rune-stone);
+.w-wall {
+  --w: var(--wire-wall);
+  filter: drop-shadow(0 0 1.4px var(--glow-wall));
 }
 
-.rune-glyph {
-  fill: var(--rune-glyph);
-  font: 700 22px var(--font-ui);
+.w-amber {
+  --w: var(--wire-amber);
+  filter: drop-shadow(0 0 1.8px var(--glow-amber));
 }
 
-.rune.reading .rune-stone {
-  animation: read-rune 650ms ease-out;
+.w-green {
+  --w: var(--wire-green);
+  filter: drop-shadow(0 0 1.8px var(--glow-green));
 }
 
-@keyframes read-rune {
-  25% {
-    fill: var(--goal);
-  }
+.wf {
+  stroke: var(--w);
+  stroke-width: 0.85;
 }
 
-.goal-ring,
-.spot-ring {
-  fill: none;
-  stroke: var(--goal);
-  stroke-width: 3;
-  stroke-dasharray: 6 5;
+.wl {
+  stroke: var(--w);
+  stroke-width: 1.05;
 }
 
-.goal-pole {
-  fill: #5a4a3a;
+.wb {
+  stroke: var(--w);
+  stroke-width: 0.45;
+  opacity: 0.3;
 }
 
-.goal-flag {
-  fill: var(--goal);
+.w .wv {
+  fill: var(--void);
+  stroke: var(--w);
+  stroke-width: 1.2;
 }
 
-.celebrate .goal-ring {
-  stroke-dasharray: none;
-  animation: glow 1.2s ease-in-out infinite alternate;
+/* the goal is the board's one beacon: its wire is heavier and brighter than the rest of the world's */
+.beacon .wf,
+.beacon .wl {
+  stroke-width: 1.4;
+}
+
+.beacon .w-amber {
+  filter: drop-shadow(0 0 2.5px var(--glow-amber)) drop-shadow(0 0 6px var(--glow-amber-soft));
+}
+
+.beacon-column-base,
+.beacon-pad-in {
+  stop-color: var(--beacon);
+  stop-opacity: 0.75;
+}
+
+.beacon-column-top,
+.beacon-pad-out {
+  stop-color: var(--beacon);
+  stop-opacity: 0;
 }
 
 /* a square a hidden goal might be on (M2, src/ui/board.ts): ? before a run, then ✓ or ✗ */
 .spot {
-  --spot: var(--goal);
+  --spot: var(--beacon);
 }
 
 .spot-pass {
@@ -1397,39 +1467,75 @@ pre {
 }
 
 .spot-ring {
+  fill: none;
   stroke: var(--spot);
-  opacity: 0.8;
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  opacity: 0.85;
 }
 
 .spot-mark {
-  font: 700 26px var(--font-ui);
+  font: 700 24px var(--font-code);
   fill: var(--spot);
 }
 
-@keyframes glow {
-  to {
-    stroke-width: 7;
-    opacity: 0.6;
-  }
-}
-
+/* the hero: solid, the only solid thing on the board, with the only floor shadow */
 .piece {
   transition: transform var(--step-ms, 350ms) ease-in-out;
 }
 
-.piece-pointer {
-  transition: transform var(--step-ms, 350ms) ease-in-out;
-  fill: var(--pointer);
+.s-shadow {
+  fill: var(--shadow);
 }
 
-.pawn-fill {
-  fill: var(--pawn);
-  stroke: var(--pawn-stroke);
+/* the glowing edge: every face stroked wide; the faces then cover all but the outline */
+.s-glow polygon {
+  fill: var(--solid-edge);
+  stroke: var(--solid-edge);
+  stroke-width: 3.6;
+  stroke-linejoin: round;
+}
+
+.s-glow {
+  filter: drop-shadow(0 0 2.2px var(--glow-hero)) drop-shadow(0 0 5px var(--glow-hero-soft));
+}
+
+.s-hairline polygon {
+  fill: var(--solid-hairline);
+  stroke: var(--solid-hairline);
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+
+.s-lit {
+  fill: var(--solid-lit);
+  stroke: var(--solid-lit-edge);
+  stroke-width: 0.5;
+}
+
+/* HUD brackets: the facing side's corners bright, and a notch pointing out of it */
+.br path {
+  fill: none;
+  stroke-linecap: square;
+}
+
+.br-dim {
+  stroke: var(--bracket);
+  stroke-width: 1.8;
+  opacity: 0.45;
+}
+
+.br-facing {
+  stroke: var(--bracket-facing);
   stroke-width: 2.2;
 }
 
-.pawn-shadow {
-  fill: rgb(0 0 0 / 0.18);
+.br .br-notch {
+  fill: var(--bracket-facing);
+}
+
+.br :is(.br-facing, .br-notch) {
+  filter: drop-shadow(0 0 2px var(--glow-hero));
 }
 
 .piece-body.bumping {
@@ -1445,38 +1551,45 @@ pre {
   }
 }
 
-.gate-frame {
-  fill: var(--gate-frame);
+/* a gate and a waypoint show their state by swapping their art; a refused guard flashes the square */
+.gate .spr-open,
+.waypoint .spr-done {
+  display: none;
 }
 
-.gate-bars {
-  fill: var(--gate-bars);
-  transform-box: fill-box;
-  transform-origin: top;
-  transition: transform 450ms ease-in-out, opacity 450ms ease-in-out;
+.gate.open .spr-open,
+.waypoint.crossed .spr-done {
+  display: inline;
 }
 
-.gate-padlock {
-  fill: var(--gate-lock);
+.gate.open .spr-closed,
+.waypoint.crossed .spr-todo {
+  display: none;
 }
 
-.gate-shackle {
-  fill: none;
-  stroke: var(--gate-lock);
-  stroke-width: 3;
-}
-
-.gate-lock {
-  transition: opacity 300ms ease-in-out;
-}
-
-.gate.open .gate-bars {
-  transform: scaleY(0.12);
-  opacity: 0.55;
-}
-
-.gate.open .gate-lock {
+.gate-flash,
+.rune-flash {
   opacity: 0;
+  pointer-events: none;
+}
+
+.gate-flash {
+  fill: var(--bad);
+}
+
+.rune-flash {
+  fill: var(--wire-green);
+}
+
+.gate.refusing .gate-flash,
+.rune.reading .rune-flash {
+  animation: pulse 650ms ease-out;
+}
+
+@keyframes pulse {
+  25% {
+    opacity: 0.5;
+  }
 }
 
 /* a small label on a tile or an enemy, e.g. a timed gate's "every 3" (M3.1) */
@@ -1487,38 +1600,8 @@ pre {
 }
 
 .badge-text {
-  font: 700 10px var(--font-ui);
+  font: 700 10px var(--font-code);
   fill: var(--badge-text);
-}
-
-.gate.refusing .gate-frame {
-  animation: refuse 650ms ease-out;
-}
-
-@keyframes refuse {
-  25% {
-    fill: var(--bad);
-  }
-}
-
-/* obstacles (M3.1, src/ui/board.ts) */
-.pit-rim {
-  fill: var(--pit-rim);
-}
-
-.pit-hole {
-  fill: var(--pit-hole);
-}
-
-.plank-wood {
-  fill: var(--plank);
-}
-
-.plank-grain {
-  fill: none;
-  stroke: var(--plank-grain);
-  stroke-width: 1.5;
-  stroke-linecap: round;
 }
 
 /* a plank on the floor vanishes once picked up; one over a pit appears once laid */
@@ -1533,43 +1616,10 @@ pre {
   pointer-events: none; /* so its tooltip doesn't show */
 }
 
-.waypoint-ring {
-  fill: none;
-  stroke: var(--waypoint);
-  stroke-width: 4;
-}
-
-.waypoint-tick {
-  font: 700 24px var(--font-ui);
-  fill: var(--waypoint);
-  opacity: 0;
-  transition: opacity 250ms ease-in-out;
-}
-
-.waypoint.crossed .waypoint-tick {
-  opacity: 1;
-}
-
-.waypoint.crossed .waypoint-ring {
-  fill: var(--waypoint);
-  fill-opacity: 0.15;
-}
-
 .gem {
   transition: opacity 250ms ease-in-out, transform 250ms ease-in-out;
   transform-box: fill-box;
   transform-origin: center;
-}
-
-.gem-body {
-  fill: var(--gem);
-}
-
-.gem-facets {
-  fill: none;
-  stroke: var(--gem-facets);
-  stroke-width: 1.5;
-  stroke-linejoin: round;
 }
 
 .gem.collected {
@@ -1581,46 +1631,136 @@ pre {
 .route {
   fill: none;
   stroke: var(--route);
-  stroke-width: 3;
-  stroke-dasharray: 2 7;
+  stroke-width: 2.5;
+  stroke-dasharray: 2 6;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
+/* enemies: broken magenta wire. At rest they are already damaged (holes, missing edges, lines out
+   of register, colour-split ghosts); now and then they break and snap back. */
 .enemy {
   transition: transform var(--step-ms, 350ms) ease-in-out, opacity 250ms ease-in-out;
-}
-
-.enemy-body {
-  fill: var(--enemy);
-  stroke: var(--enemy-rim);
-  stroke-width: 3;
-}
-
-.enemy.armoured .enemy-body {
-  stroke-width: 5;
-  stroke-dasharray: 4 2;
-}
-
-.enemy-eye {
-  fill: var(--enemy-eye);
 }
 
 .enemy.gone {
   opacity: 0;
 }
 
-/* rooks and bishops (M3.4): the squares they attack, and the bishop's slit */
-.attacked {
-  fill: var(--attacked);
-  pointer-events: none;
+.bw path {
+  fill: none;
+  stroke-linecap: round;
 }
 
-.chess-mark {
-  fill: none;
-  stroke: var(--enemy-eye);
-  stroke-width: 2.5;
-  stroke-linecap: round;
+.bw {
+  filter: drop-shadow(0 0 1.4px var(--glow-foe));
+}
+
+.bw-front {
+  stroke: var(--wire-foe);
+  stroke-width: 0.8;
+}
+
+.bw-back {
+  stroke: var(--wire-foe);
+  stroke-width: 0.45;
+  opacity: 0.22;
+}
+
+.bw-ghost-a {
+  stroke: var(--glitch-a);
+  stroke-width: 0.6;
+  opacity: 0.35;
+}
+
+.bw-ghost-b {
+  stroke: var(--glitch-b);
+  stroke-width: 0.6;
+  opacity: 0.5;
+}
+
+.bw-after {
+  stroke: var(--wire-foe);
+  stroke-width: 0.6;
+  opacity: 0.22;
+}
+
+.bw-lit {
+  fill: var(--hot);
+}
+
+.bw-noise-a {
+  fill: var(--glitch-a);
+}
+
+.bw-noise-b {
+  fill: var(--glitch-b);
+}
+
+.bw-live .bf-break,
+.bw-live .bf-snap {
+  opacity: 0;
+}
+
+.bw-live .bf {
+  animation-duration: 5.6s;
+  animation-timing-function: steps(1);
+  animation-iteration-count: infinite;
+  animation-delay: var(--glitch-delay, 0s);
+}
+
+.bw-live .bf-rest {
+  animation-name: bf-rest;
+}
+
+.bw-live .bf-break {
+  animation-name: bf-break;
+}
+
+.bw-live .bf-snap {
+  animation-name: bf-snap;
+}
+
+@keyframes bf-rest {
+  0%,
+  88% {
+    opacity: 1;
+  }
+  89%,
+  95% {
+    opacity: 0;
+  }
+  96% {
+    opacity: 1;
+  }
+}
+
+@keyframes bf-break {
+  0%,
+  88% {
+    opacity: 0;
+  }
+  89%,
+  92% {
+    opacity: 1;
+  }
+  93% {
+    opacity: 0;
+  }
+}
+
+@keyframes bf-snap {
+  0%,
+  92% {
+    opacity: 0;
+  }
+  93%,
+  95% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0;
+  }
 }
 
 .lost-mark {
@@ -1667,30 +1807,168 @@ pre {
   animation: hop 600ms ease-in-out 2;
 }
 
+.celebrate .beacon {
+  animation: glow 1.2s ease-in-out infinite alternate;
+}
+
 @keyframes hop {
   50% {
     transform: translateY(-10px);
   }
 }
 
+@keyframes glow {
+  to {
+    opacity: 0.55;
+  }
+}
+
 /* Animations setting: "Reduced" always stops movement; "Match system" follows
-   the OS preference; "Full" ignores it. (Colour flashes stay: they aren't motion.) */
-:root[data-motion="reduced"] :is(.piece, .piece-pointer, .enemy, .gate-bars, .gate-lock, .gem, .plank, .pit-plank, .waypoint-tick, .level-left) {
+   the OS preference; "Full" ignores it. (Colour flashes stay: they aren't motion.)
+   An enemy's rest frame is already broken, so it needs no motion to read as hostile. */
+:root[data-motion="reduced"] :is(.piece, .enemy, .plank, .pit-plank, .gem, .level-left) {
   transition: none;
 }
 
-:root[data-motion="reduced"] :is(.celebrate .piece-body, .celebrate .goal-ring, .piece-body.bumping) {
+:root[data-motion="reduced"] :is(.celebrate .piece-body, .celebrate .beacon, .piece-body.bumping, .bw-live .bf) {
   animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion="full"]) :is(.piece, .piece-pointer, .enemy, .gate-bars, .gate-lock, .gem, .plank, .pit-plank, .waypoint-tick, .level-left) {
+  :root:not([data-motion="full"]) :is(.piece, .enemy, .plank, .pit-plank, .gem, .level-left) {
     transition: none;
   }
 
-  :root:not([data-motion="full"]) :is(.celebrate .piece-body, .celebrate .goal-ring, .piece-body.bumping) {
+  :root:not([data-motion="full"]) :is(.celebrate .piece-body, .celebrate .beacon, .piece-body.bumping, .bw-live .bf) {
     animation: none;
   }
+}
+
+/* ---- style guide (#/styleguide, src/ui/styleguide.ts) ---- */
+
+.styleguide {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.styleguide.sg-grey {
+  filter: grayscale(1);
+}
+
+.sg-controls {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.sg-controls > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.sg-controls strong {
+  width: 56px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sg-panes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* each pane forces its own theme: the tokens are light-dark(), so they follow the pane's color-scheme */
+.sg-pane {
+  padding: 16px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.sg-pane[data-scheme="dark"] {
+  color-scheme: dark;
+}
+
+.sg-pane[data-scheme="light"] {
+  color-scheme: light;
+}
+
+.sg-name {
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.sg-pane h3 {
+  margin: 22px 0 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sg-board-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 22px;
+}
+
+.sg-board {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 560px;
+}
+
+.sg-board .board {
+  max-height: none;
+}
+
+.sg-board-side {
+  flex: none;
+  width: 207px;
+}
+
+.sg-board-side p {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sg-board-min {
+  width: 207px; /* 20px squares: the smallest main board we ship */
+  flex: none;
+}
+
+.sg-sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 12px 10px;
+}
+
+.sg-sheet figure {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.sg-cell {
+  display: block;
+}
+
+.sg-sheet figcaption {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 /* ---- lesson ---- */

@@ -87,7 +87,7 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     const light = await background();
     await choose("theme", "system");
     const attribute = await b.evaluate(`document.documentElement.dataset.theme ?? 'none'`);
-    expect(dark === "rgb(28, 26, 24)" && light === "rgb(244, 241, 234)" && attribute === "none", `${dark} / ${light} / ${attribute}`);
+    expect(dark === "rgb(9, 4, 22)" && light === "rgb(236, 235, 248)" && attribute === "none", `${dark} / ${light} / ${attribute}`);
     return `dark ${dark} · light ${light}`;
   });
 

@@ -1,7 +1,6 @@
-// M3.7 step 0, round 6 (design prototype, never shipped): every Pawn-tier model in
-// the approved style. A shape is a mesh (faces) plus loose 3D lines (bars, text,
-// glyphs). The world is drawn as wire, the hero as solid, enemies as broken wire.
-import { box, lathe, merge, type Face, type Model, type V3 } from "../directions/mesh";
+// Every model of the look: each piece and tile as a mesh (faces) plus loose 3D lines (bars,
+// text, glyphs). The world is drawn as wire, the hero as solid, enemies as broken wire (draw.ts).
+import { box, lathe, merge, type Face, type Model, type V3 } from "./mesh";
 
 export interface Shape {
   model: Model;

@@ -4,6 +4,7 @@
 //   #/                 level select
 //   #/level/<id>       a level
 //   #/harness          the raw Python harness from Milestone 0
+//   #/styleguide       the look at every size, in both themes (M3.7)
 import { chapterName, chapters, findLevel } from "./content";
 import { mountHarness } from "./harness";
 import { progress } from "./progress";
@@ -15,6 +16,7 @@ import { renderLevelSelect } from "./ui/levelSelect";
 import { mountLevel, type LevelContext } from "./ui/levelView";
 import { ReplPanel } from "./ui/repl";
 import { SettingsDialog } from "./ui/settingsDialog";
+import { mountStyleguide } from "./ui/styleguide";
 
 export function startApp(root: HTMLElement): void {
   applyToDocument(settings.get());
@@ -83,6 +85,10 @@ export function startApp(root: HTMLElement): void {
       crumbs.replaceChildren(h("span", {}, "Python harness"));
       unmount = mountHarness(main, client);
       document.title = "Harness · Rank & File";
+    } else if (hash === "#/styleguide") {
+      crumbs.replaceChildren(h("span", {}, "Style guide"));
+      unmount = mountStyleguide(main);
+      document.title = "Style guide · Rank & File";
     } else {
       crumbs.replaceChildren();
       main.replaceChildren(renderLevelSelect(chapters, progress));

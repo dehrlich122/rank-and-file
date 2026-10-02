@@ -1,16 +1,16 @@
-// M3.7 step 0, round 6 (design prototype): every Pawn-tier sprite in the approved
-// style, each centred on (0, 0) in its 64-unit square and staying inside it.
+// Every sprite of the look, each centred on (0, 0) in its 64-unit square and staying inside it.
 //   the hero (pawn or knight skin): solid, the only floor shadow, HUD brackets that show its facing
 //   enemies (rook, bishop, chaser): broken magenta wire, glitching now and then
 //   tiles: clean wire. Violet for structure, amber for things to act on, green for text the world holds
-import type { Facing } from "../../src/py/protocol";
-import { el } from "../directions/looks";
-import { fit, floor, pawnModel, project, pts, rookModel, rookSlit, wallModel, yaw, type Model, type V3 } from "../directions/mesh";
+// The registry at the bottom says which sprite each tile kind and enemy kind uses (board.ts).
+import type { Enemy, Facing, TileKind } from "../../py/protocol";
+import { svg as el } from "./svg";
+import { fit, floor, pawnModel, project, pts, rookModel, rookSlit, wallModel, yaw, type Model, type V3 } from "./mesh";
 import { broken, fitShape, live, solid, wire, type Decal, type Frame } from "./draw";
 import { beaconShape, bishopCut, bishopModel, brickLines, gateShape, gemShape, knightEyes, knightModel, pitShape, plankShape, runeShape, signShape, virusEyes, virusModel, waypointShape, type Shape } from "./models";
 
 let ids = 0;
-const uid = (prefix: string) => `sh-${prefix}-${++ids}`;
+const uid = (prefix: string) => `sprite-${prefix}-${++ids}`;
 
 // -- the hero ---------------------------------------------------------------------------------------
 
@@ -177,3 +177,21 @@ export function crown(mastered: boolean): SVGElement {
   }
   return group;
 }
+
+// -- the registry -------------------------------------------------------------------------------------
+
+/** The sprite each kind of tile is drawn with (a floor has none). The board adds a gate's open state, a waypoint's crossed one. */
+export const TILE_SPRITE: Record<Exclude<TileKind, "floor">, TileName> = {
+  wall: "wall",
+  sign: "sign",
+  rune: "rune",
+  gate: "gate",
+  timed_gate: "gateTimed",
+  pit: "pit",
+  plank: "plank",
+  waypoint: "waypoint",
+  gem: "gem",
+};
+
+/** The sprite each kind of enemy is drawn with: patrols and chasers are both the faceted virus. */
+export const ENEMY_SPRITE: Record<Enemy["kind"], EnemyKind> = { patrol: "chaser", chaser: "chaser", rook: "rook", bishop: "bishop" };

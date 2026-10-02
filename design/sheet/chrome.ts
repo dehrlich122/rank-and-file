@@ -6,10 +6,9 @@ import { BoardView } from "../../src/ui/board";
 import { h } from "../../src/ui/dom";
 import { icon } from "../../src/ui/icons";
 import { el } from "../directions/looks";
-import { LEVEL } from "../sample";
+import { LEVEL } from "../../src/ui/styleguideSample";
 import type { Voice } from "../chrome";
-import { dress } from "./dress";
-import { crown, enemy, hero, type EnemyKind, type Skin } from "./sprites";
+import { crown, enemy, hero, type EnemyKind, type Skin } from "../../src/ui/sprites";
 
 const svgNode = (node: SVGElement) => node as unknown as Node;
 
@@ -131,7 +130,6 @@ function folder(voice: Voice, n: number, title: string, rows: Row[], open: boole
 
 export function lessonsMenu(voice: Voice): HTMLElement {
   const board = new BoardView({ ...LEVEL, start: { ...LEVEL.start, facing: "east" } }, { mini: true });
-  dress(board.element, LEVEL, { facing: "east" });
   const detail = h(
     "aside",
     { class: "detail" },

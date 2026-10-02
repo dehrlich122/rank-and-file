@@ -1,7 +1,7 @@
-// M3.7 step 0 (design prototype): one board that holds every Pawn-tier tile,
-// every enemy kind, a patrol's route, and the squares a rook and a bishop attack.
+// The sample level of the style guide (#/styleguide, src/ui/styleguide.ts): one board that holds
+// every Pawn-tier tile, every enemy kind, a patrol's route, and the squares a rook and a bishop attack.
 // It is a hand-built LevelInfo, so the real BoardView draws it.
-import type { Enemy, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../src/py/protocol";
+import type { Enemy, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
 
 // Top rank first. . floor  # wall  s sign  g guarded gate  t timed gate  o pit
 // O pit that gets bridged  p plank  w waypoint  m gem  r rune

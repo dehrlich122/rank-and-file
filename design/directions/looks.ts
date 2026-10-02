@@ -7,7 +7,7 @@
 //
 // Every piece is drawn centred on (0, 0) in its 64-unit square and stays inside it.
 // Colours are CSS custom properties only (design/directions.css).
-import { depth, facing, fit, floor, light, pawnModel, project, pts, rookModel, rookSlit, wallModel, type Face, type Fit, type Model, type Pt, type V3 } from "./mesh";
+import { depth, facing, fit, floor, light, pawnModel, project, pts, rookModel, rookSlit, wallModel, type Face, type Fit, type Model, type Pt, type V3 } from "../../src/ui/sprites/mesh";
 
 const NS = "http://www.w3.org/2000/svg";
 

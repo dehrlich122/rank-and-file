@@ -6,7 +6,7 @@
 // brighter and carries a notch, so the facing reads without a floating glyph.
 import type { Facing } from "../../src/py/protocol";
 import { el } from "../directions/looks";
-import { depth, facing, fit, floor, light, pawnModel, project, pts, yaw, type Face, type Fit, type Pt, type V3 } from "../directions/mesh";
+import { depth, facing, fit, floor, light, pawnModel, project, pts, yaw, type Face, type Fit, type Pt, type V3 } from "../../src/ui/sprites/mesh";
 
 const centroid = (face: Face): V3 => {
   const n = face.pts.length;

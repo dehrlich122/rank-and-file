@@ -20,7 +20,7 @@ import { h } from "../src/ui/dom";
 import { codeSlice, lessonsSlice, levelComplete, menuHero, spriteSheet, startMenu, VOICES } from "./chrome";
 import { painterFor, reskin, setHero, type Skin, type SpriteStyle, type TileName } from "./reskin";
 import { problems } from "./sprites";
-import { EVENTS, LEVEL, STATES, state } from "./sample";
+import { EVENTS, LEVEL, STATES, state } from "../src/ui/styleguideSample";
 
 const TILES: Record<TileName, { name: string; blurb: string }> = {
   noir: {

@@ -267,26 +267,6 @@ body.greyscale {
   filter: drop-shadow(0 0 4px rgb(80 220 255 / 0.7));
 }
 
-/* threatened squares: halftone dots sized in squares (dress.ts picks fine or coarse) */
-.dressed .attacked {
-  fill: var(--halftone);
-}
-
-.ht-dot {
-  fill: var(--halftone-dot);
-}
-
-/* the facing shows in the hero's brackets, so the old pointer goes */
-.dressed .piece-pointer {
-  display: none;
-}
-
-.dressed .route {
-  stroke: var(--route);
-  stroke-width: 2.5;
-  stroke-dasharray: 2 6;
-}
-
 .spot-ring {
   fill: none;
   stroke: var(--beacon);
@@ -1205,6 +1185,11 @@ body.greyscale {
 }
 
 /* ---- 12. motion -------------------------------------------------------------------------------------------- */
+
+/* the game animates enemies on its own (styles.css); ?still holds them for the screenshot */
+:root[data-still] .bw-live .bf {
+  animation: none;
+}
 
 /* an enemy rests, then now and then breaks and snaps back */
 .bw-live .bf-break,

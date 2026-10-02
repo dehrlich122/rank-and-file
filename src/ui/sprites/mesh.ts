@@ -1,9 +1,7 @@
-// M3.7 step 0, round 3 (design prototype, never shipped): a tiny 3D mesh kit.
-//
-// Pieces are turned on a lathe from a profile (height, radius), with a few boxes
-// added (the pawn's crest, the rook's merlons), then seen in a 3/4 view from
-// above and the front. Three of the four directions draw these same kinds of
-// model in different ways: as wire (A), as lit solid faces (B), as light (D).
+// A tiny 3D mesh kit (M3.7). Pieces are turned on a lathe from a profile (height, radius),
+// with a few boxes added (the pawn's crest, the rook's merlons), then seen in a 3/4 view from
+// above and the front, lit from the upper left. draw.ts draws these models three ways:
+// as wire (the world), as lit solid faces (the hero), as broken wire (enemies).
 // All units are one board square = 64, and a model is fitted into its square.
 
 export type V3 = [number, number, number]; // x right, y up, z toward the viewer
@@ -135,15 +133,17 @@ export interface Fit {
 
 const raw = ([x, y, z]: V3): Pt => [x, -y * COS + z * SIN];
 
-/** Fit a model into the square around (0, 0): at most `w` wide and `h` tall, its bottom at `bottom`. */
-export function fit(model: Model, w = 54, h = 58, bottom = 29): Fit {
-  const pts = model.faces.flatMap((f) => f.pts.map(raw));
-  const xs = pts.map((p) => p[0]);
-  const ys = pts.map((p) => p[1]);
+/** Fit screen points into the square around (0, 0): at most `w` wide and `h` tall, their bottom at `bottom`. */
+export function fitPoints(points: Pt[], w: number, h: number, bottom: number): Fit {
+  const xs = points.map((p) => p[0]);
+  const ys = points.map((p) => p[1]);
   const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   const k = Math.min(w / (maxX - minX), h / (maxY - minY));
   return { k, ox: -((minX + maxX) / 2) * k, oy: bottom - maxY * k };
 }
+
+/** Fit a model into the square around (0, 0). */
+export const fit = (model: Model, w = 54, h = 58, bottom = 29): Fit => fitPoints(model.faces.flatMap((f) => f.pts.map(raw)), w, h, bottom);
 
 export const project = (v: V3, f: Fit): Pt => {
   const [x, y] = raw(v);

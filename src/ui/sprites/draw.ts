@@ -1,10 +1,10 @@
-// M3.7 step 0, round 6 (design prototype): the three materials of the approved style.
+// The three materials of the look (DESIGN.md §9):
 //   wire()    the world: clean glowing line art, back edges dimmed
 //   solid()   the hero: flat-shaded faces, no lines inside, a glowing edge on the outline only
 //   broken()  enemies: wire that looks damaged at rest, with "break" and "snap" frames
-// Colours are CSS custom properties only (sheet.css), so both themes work.
-import { el } from "../directions/looks";
-import { depth, facing, light, project, pts, type Face, type Fit, type Model, type Pt, type V3 } from "../directions/mesh";
+// Colours are CSS custom properties only (styles.css), so both themes work.
+import { svg as el } from "./svg";
+import { depth, facing, fitPoints, light, project, pts, type Face, type Fit, type Model, type Pt, type V3 } from "./mesh";
 import type { Shape } from "./models";
 
 const seg = ([a, b]: [Pt, Pt]) => `M ${a[0].toFixed(2)} ${a[1].toFixed(2)} L ${b[0].toFixed(2)} ${b[1].toFixed(2)} `;
@@ -12,12 +12,7 @@ const seg = ([a, b]: [Pt, Pt]) => `M ${a[0].toFixed(2)} ${a[1].toFixed(2)} L ${b
 /** Fit a shape (its faces and its lines) into the square around (0, 0): at most w wide and h tall, its bottom at `bottom`. */
 export function fitShape(shape: Shape, w: number, h: number, bottom: number): Fit {
   const unit: Fit = { k: 1, ox: 0, oy: 0 };
-  const all = [...shape.model.faces.flatMap((f) => f.pts), ...(shape.lines ?? []).flat()].map((p) => project(p, unit));
-  const xs = all.map((p) => p[0]);
-  const ys = all.map((p) => p[1]);
-  const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-  const k = Math.min(w / (maxX - minX), h / (maxY - minY));
-  return { k, ox: -((minX + maxX) / 2) * k, oy: bottom - maxY * k };
+  return fitPoints([...shape.model.faces.flatMap((f) => f.pts), ...(shape.lines ?? []).flat()].map((p) => project(p, unit)), w, h, bottom);
 }
 
 interface Edge {

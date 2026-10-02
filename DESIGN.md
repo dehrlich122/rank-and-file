@@ -38,8 +38,8 @@ Built beyond the first brief:
   anyone reading them; an end-to-end suite that drives the real app.
 
 Next: the first design pass (§9), which also builds the promotion ceremony and
-the knight skin (§8). Its step 0, the direction, is under way: the brief is
-recorded in §9 and the style tiles are being built. Then the level editor and
+the knight skin (§8). Its step 0, the direction, is decided (§9: a wire world
+with one solid hero), and step 1 builds it into the game. Then the level editor and
 free play (§7).
 
 ---
@@ -251,12 +251,12 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 **Words and themes follow the art direction.** Flavour lives in the chrome: titles, chapter and tier headings, the intro, the start menu, folder names, the level-complete and promotion moments, and the theme names in Settings (for example a dark "Night shift" and a light "Daylight terminal"). The voice is terse, 80s-terminal and cyberpunk, with the player as the one writing the program and enemies as corrupted code. **Teaching text stays plain**: lessons, hints, error translations, the Codex and tooltips keep today's clear wording (§2), because a clever line that slows down understanding is a bug. Any label someone clicks still says plainly what it does. The voice guide, with before/after examples, is in `docs/M3/M3.7.md`.
 
 **Sprite system.**
-- A 16×16 pixel grid per sprite, drawn at 4 units per pixel so it fills a 64-unit square, with `shape-rendering: crispEdges`.
-- Sprites are data (grids or rects generated from a small palette map), so one is easy to read and diff and the level editor's palette can reuse it.
-- A sprite and skin registry sits beside `TILE_ART`. Pawn and knight are skins (§8). An enemy kind maps to a sprite plus a "corruption" effect layer.
+*(Revised after round 5: the pixel-grid plan was dropped for small 3D meshes.)*
+- Each sprite is a small 3D model (a lathe-turned body plus boxes, or an extruded outline), seen in a 3/4 view and fitted into its 64-unit square (`src/ui/sprites/mesh.ts`, `models.ts`). It is drawn one of three ways (`draw.ts`): clean wire for the world, flat-shaded solid for the hero, broken wire for enemies.
+- Sprites are code, not images, so they scale to any board size and the level editor's palette can reuse them.
+- The registry in `src/ui/sprites/index.ts` says which sprite each tile kind and enemy kind uses; `board.ts` calls it. Pawn and knight are skins (§8). An enemy is broken at rest and glitches now and then, so its rest frame still reads as hostile with reduced motion.
 - Every sprite takes its colours from CSS tokens (no hard-coded hex in TS), so the light theme and the contrast checks still work.
 - Every existing state class (open, crossed, collected, bridged, gone, lost, celebrate, bumping, reading, refusing), the badges and the tooltips stay, restyled, not replaced.
-- If the vector style wins (below), the same holds with polygons in place of pixel grids: each sprite is a list of faces in the 64-unit square, each face a tone.
 
 ### Step 0 feedback *(Designer, 2026-10-02)*
 

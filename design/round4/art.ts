@@ -11,7 +11,7 @@
 //                      vertices; "snap" is it snapping back.
 import type { Facing } from "../../src/py/protocol";
 import { el } from "../directions/looks";
-import { depth, facing, fit, floor, light, pawnModel, project, pts, rookModel, rookSlit, yaw, type Face, type Fit, type Model, type Pt, type V3 } from "../directions/mesh";
+import { depth, facing, fit, floor, light, pawnModel, project, pts, rookModel, rookSlit, yaw, type Face, type Fit, type Model, type Pt, type V3 } from "../../src/ui/sprites/mesh";
 
 let ids = 0;
 const uid = (prefix: string) => `r4-${prefix}-${++ids}`;
