@@ -266,6 +266,13 @@ After the first three style tiles (`docs/M3/M3.7.md`):
 - **The title screen** gets a rank of enemy chess pieces lined up in front of the sun, and the player's hero, at the rank they've reached, under the menu.
 - **Drawing style: to be compared.** The fourth tile switches between neon pixel sprites and vector "VR" figures (flat-shaded polygons with a lit edge), on the same board, before one is chosen.
 
+After round 2 *(Designer, 2026-10-02)*: neither style yet, and the noir tile is parked as it is. Four quite different directions come first, each a tiny sample (wireframe, low-poly solid, neon poster, hologram).
+- **Vector beat pixel:** larger models and more distinct silhouettes read as characters, not flat icons.
+- **Pieces must pop off the board**, not sit on it like paper dolls: better shading and a sense of perspective. They stay inside their squares but fill most of them.
+- **The threat hatch was overwhelming.** It can be quite subtle, especially once it has an animated pulse.
+- **Amber worked** when it stayed on objects that aren't a threat. **The goal needs to be more distinctive and eye-catching.**
+- The colours generally look good.
+
 ### The look *(directions to explore, not decisions)*
 - **Colour:** a near-black blue/violet base, with cyan, amber and phosphor green as role colours used sparingly (see the roles above), in the spirit of synthwave, 80s computer graphics and cyberpunk film. Magenta is reserved for hostile things and is never a general accent, except in the sunset of the big chrome moments.
 - **Board:** thin lit lines that glow slightly; squares that stay quiet so tiles and pieces read first.
