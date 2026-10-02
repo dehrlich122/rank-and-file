@@ -1,0 +1,6 @@
+pawn.move(2)
+text = pawn.read()
+print(text[4:])
+pawn.move(2)
+print(text[-3:])
+pawn.move(3)

@@ -31,6 +31,7 @@ TILE_DETAILS: dict[Tile, tuple[set[str], set[str]]] = {
     Tile.SIGN: ({"text"}, set()),
     Tile.GATE: ({"passphrase"}, {"question"}),
     Tile.TIMED_GATE: ({"every"}, {"clock", "open"}),
+    Tile.RUNE: ({"text"}, set()),
 }
 
 # Enemies (M3.1): the keys each kind takes, and the ground they can walk on.
@@ -40,7 +41,7 @@ ENEMY_KEYS = {
     "rook": {"kind", "start", "armoured"},  # chess pieces stand still (M3.4)
     "bishop": {"kind", "start", "armoured"},
 }
-OPEN_GROUND = (Tile.FLOOR, Tile.WAYPOINT, Tile.GEM, Tile.PLANK)
+OPEN_GROUND = (Tile.FLOOR, Tile.WAYPOINT, Tile.GEM, Tile.PLANK, Tile.RUNE)
 
 # What a code clock does while the code only repeats lines that have already run (QA-021).
 CLOCK_STILL = {"new_line": " While your code only repeats lines that have already run, it {still}."}
@@ -285,6 +286,7 @@ class Level:
                 for y in range(self.board.height)
             ],
             "signs": [{"pos": list(pos), "text": text} for pos, text in self.board.signs.items()],
+            "runes": [{"pos": list(pos), "text": text} for pos, text in self.board.runes.items()],
             "questions": [{"pos": list(pos), "text": text} for pos, text in self.board.questions.items()],
             "timed_gates": [{"pos": list(pos), **asdict(timer), "text": gate_rule(pos, timer)} for pos, timer in self.board.timers.items()],
             "enemies": [
@@ -415,6 +417,8 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
                 board.tiles[(x, y)] = tile
             if tile is Tile.SIGN:
                 board.signs[(x, y)] = details[symbol]["text"]
+            if tile is Tile.RUNE:
+                board.runes[(x, y)] = details[symbol]["text"]
             if tile is Tile.GATE:
                 board.gates[(x, y)] = details[symbol]["passphrase"]
                 if "question" in details[symbol]:

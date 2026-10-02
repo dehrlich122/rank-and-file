@@ -1,0 +1,62 @@
+id: ch06-l02
+chapter: 6
+title: "Cut It Out"
+trains: "Slicing text: a stretch of it from the start, the end or the middle"
+brief: "Every rune here starts with a label. The guards want only part of what it says."
+piece: pawn
+map: |
+  # G #
+  # . #
+  # B #
+  # . #
+  # A #
+  # R #
+  # . #
+  # P #
+legend: {"R": {"tile": "rune", "text": "key:amber"}, "A": {"tile": "gate", "question": "What is the word after the label?", "passphrase": "amber"}, "B": {"tile": "gate", "question": "What are the last three letters of that word?", "passphrase": "ber"}}
+start: {"facing": "north"}
+api: ["move", "read"]
+par: {"lines": 6}
+hints:
+- "Both answers are parts of the text. Look at where each part starts and where it ends."
+- "A slice takes a stretch of the text: the number before the colon is where it starts and the number after is where it stops. Leave one out to go to that end, and a minus counts back from the end."
+- "Here is the line that reads the rune:\ntext = pawn.read()"
+lesson: ch06/ch06-l02.md
+lesson_board:
+  map: |
+    # . #
+    # R #
+    # P #
+  legend: {"R": {"tile": "rune", "text": "ward:silver"}}
+  start: {"facing": "north"}
+variants:
+- map: |
+    # G #
+    # . #
+    # B #
+    # . #
+    # A #
+    # R #
+    # . #
+    # P #
+  legend: {"R": {"tile": "rune", "text": "key:willow"}, "A": {"tile": "gate", "question": "What is the word after the label?", "passphrase": "willow"}, "B": {"tile": "gate", "question": "What are the last three letters of that word?", "passphrase": "low"}}
+- map: |
+    # G #
+    # . #
+    # B #
+    # . #
+    # A #
+    # R #
+    # . #
+    # P #
+  legend: {"R": {"tile": "rune", "text": "key:crimson"}, "A": {"tile": "gate", "question": "What is the word after the label?", "passphrase": "crimson"}, "B": {"tile": "gate", "question": "What are the last three letters of that word?", "passphrase": "son"}}
+- map: |
+    # G #
+    # . #
+    # B #
+    # . #
+    # A #
+    # R #
+    # . #
+    # P #
+  legend: {"R": {"tile": "rune", "text": "key:lantern"}, "A": {"tile": "gate", "question": "What is the word after the label?", "passphrase": "lantern"}, "B": {"tile": "gate", "question": "What are the last three letters of that word?", "passphrase": "ern"}}

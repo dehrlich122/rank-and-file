@@ -340,6 +340,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
   const CH03 = ["ch03-l01", "ch03-l02", "ch03-l03", "ch03-l04", "ch03-l05", "ch03-l06"]; // Chapter 3 (M3.3)
   const CH04 = ["ch04-l01", "ch04-l02", "ch04-l03", "ch04-l04", "ch04-l05", "ch04-l06"]; // Chapter 4 (M3.4)
   const CH05 = ["ch05-l01", "ch05-l02", "ch05-l03", "ch05-l04", "ch05-l05", "ch05-l06"]; // Chapter 5 (M3.5)
+  const CH06 = ["ch06-l01", "ch06-l02", "ch06-l03", "ch06-l04", "ch06-l05", "ch06-l06"]; // Chapter 6 (M3.6)
   const drawn = () =>
     b.evaluate(`(() => {
       const board = document.querySelector('.board-host .board');
@@ -412,7 +413,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     "practice-02": (board) => expect(board.bridged === 1 && board.planksTaken === 1, `pits bridged: ${board.bridged}, planks taken: ${board.planksTaken}`),
     "practice-10": (board) => expect(board.gone === 1, `chasers gone: ${board.gone}`),
   };
-  for (const id of [...PRACTICE, ...CH02, ...CH03, ...CH04, ...CH05]) {
+  for (const id of [...PRACTICE, ...CH02, ...CH03, ...CH04, ...CH05, ...CH06]) {
     await check(`${id}: reference solution solves it`, async () => {
       await openLevel(id, { fresh: true });
       await setCode(solution(id));
@@ -877,17 +878,17 @@ export default async function appChecks({ browser: b, base, root, check }) {
   await check("Codex: help() works in Scratch Python, whose stand-in pawn has no board", async () => {
     await openLevel("ch01-l03", { fresh: true });
     await b.evaluate(`document.querySelector('.repl-drawer').open = true`);
-    for (const line of ["help(pawn.turn_left)", "pawn.move()", "help(len)"]) {
+    for (const line of ["help(pawn.turn_left)", "pawn.move()", "help(abs)"]) {
       await b.evaluate(`document.querySelector('.repl-editor .cm-content').focus()`);
       await b.send("Input.insertText", { text: line });
       await b.key("Enter");
-      await sleep(line === "help(len)" ? 1500 : 400); // Python's own help loads pydoc the first time
+      await sleep(line === "help(abs)" ? 1500 : 400); // Python's own help loads pydoc the first time
     }
     const log = await b.evaluate(`document.querySelector('.repl-log').innerText.replace(/\\s+/g, ' ')`);
     const facts = {
       entry: log.includes("Help on pawn.turn_left:"),
       noBoard: log.includes("Scratch Python has no board"),
-      pythonsOwn: log.includes("len(obj"),
+      pythonsOwn: log.includes("abs(x"),
     };
     expect(Object.values(facts).every(Boolean), JSON.stringify(facts));
   });
@@ -1159,6 +1160,81 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await challengeTab();
     const rules = await b.evaluate(`[...document.querySelectorAll('ul.rules li')].map((e) => e.textContent)`);
     expect(rules.some((rule) => rule.startsWith("At most 8 lines")), JSON.stringify(rules));
+  });
+
+  // -- M3.6: Chapter 6 ----------------------------------------------------------------------------
+  // Labels, counts and outcomes only. A rune's text and a level's code are never reported.
+
+  await check("M3.6: Chapter 6 is listed after Chapter 5, and The Written Route is its optional mastery challenge", async () => {
+    await levelCards();
+    const list = await b.evaluate(`({
+      chapters: [...document.querySelectorAll('.chapter h2')].map((e) => e.textContent),
+      cards: ${JSON.stringify(CH06)}.map((id) => !!document.querySelector('a[href="#/level/' + id + '"]')),
+      mastery: document.querySelector('a[href="#/level/ch06-l06"] .mastery-tag')?.textContent ?? null,
+    })`);
+    expect(list.chapters.indexOf("Chapter 6 · Runes") > list.chapters.indexOf("Chapter 5 · Keep Going") && list.cards.every(Boolean), JSON.stringify(list));
+    expect(list.mastery === "Mastery · optional", JSON.stringify(list));
+  });
+
+  await check("M3.6: a rune is drawn, its text is in the tooltip and the Challenge panel, and reading it lights it", async () => {
+    await openLevel("ch06-l01", { fresh: true });
+    const before = await b.evaluate(`({
+      runes: document.querySelector('.board-host .board').querySelectorAll('.rune').length,
+      tip: document.querySelector('.board-host .board .rune title')?.textContent ?? '',
+      lit: document.querySelector('.board-host .board').querySelectorAll('.rune.reading').length,
+    })`);
+    await challengeTab();
+    const panel = await b.evaluate(`[...document.querySelectorAll('blockquote.sign-text')].map((e) => e.querySelector('.muted')?.textContent ?? '')`);
+    // The board may be redrawn when the run ends, so watch for the rune lighting up as it happens.
+    await b.evaluate(`window.__runeLit = false; new MutationObserver((records) => { if (records.some((r) => r.target.classList?.contains("rune") && r.target.classList.contains("reading"))) window.__runeLit = true; }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["class"] })`);
+    await setCode("pawn.move(2)\ntext = pawn.read()\n"); // test code: walks onto the rune and reads it
+    await run({ jump: false }); // natural playback: jumping to the end plays no events
+    await b.waitFor(`window.__runeLit`, 10_000, "the rune lit").catch(() => {});
+    const lit = await b.evaluate(`window.__runeLit`);
+    expect(before.runes === 1 && before.lit === 0 && before.tip.includes("read()") && before.tip.length > 40, JSON.stringify({ ...before, tip: before.tip.length }));
+    expect(panel.length === 1 && /^Rune on [a-z]\d+$/.test(panel[0]), JSON.stringify(panel));
+    expect(lit === true, `the rune lit up while the code read it: ${lit}`);
+  });
+
+  await check("M3.6: reading away from a rune explains that the pawn isn't standing on one", async () => {
+    await openLevel("ch06-l01", { fresh: true });
+    await setCode("print(pawn.read()[0])\n"); // test code: the pawn starts off the rune
+    const r = await run();
+    expect(r.head === "Python stopped" && r.text.includes("isn't standing on a rune"), brief(r));
+  });
+
+  await check("M3.6: the Codex lists text methods under Text once a lesson has taught them, and hovering one shows its entry", async () => {
+    await openLevel("ch06-l02", { fresh: true });
+    const early = (await codexEntries()).map((e) => e.name);
+    await openLevel("ch06-l03", { fresh: true });
+    const entries = await codexEntries();
+    const names = entries.map((e) => e.name);
+    const heading = await b.evaluate(`[...document.querySelectorAll('.codex h3')].map((e) => e.textContent)`);
+    await setCode("text = 'ab'\nprint(text.upper())\n");
+    await sleep(300);
+    await hover(await wordAt("upper"));
+    await sleep(900);
+    const card = await b.evaluate(`document.querySelector('.cm-tooltip .codex-card .codex-call')?.textContent ?? null`);
+    await hoverAway();
+    expect(!early.some((name) => name.startsWith("str.")) && early.includes("len"), early.join());
+    expect(["str.strip", "str.upper", "str.lower", "str.replace"].every((name) => names.includes(name)) && !names.includes("str.split"), names.join());
+    expect(heading.includes("Text") && entries.find((e) => e.name === "str.upper")?.isNew, JSON.stringify(heading));
+    expect(card === "text.upper()", String(card));
+  });
+
+  await check("M3.6: a lesson snippet that takes the wrong road loses at the pit", async () => {
+    await openLevel("ch06-l04", { fresh: true });
+    const board = await runSnippet(1);
+    expect(/lost/i.test(board.status), JSON.stringify(board).slice(0, 160));
+  });
+
+  await check("QA-035: 6.6's lesson has three panels, and the first shows that split() gives a list", async () => {
+    await openLevel("ch06-l06", { fresh: true });
+    const steps = await b.evaluate(`document.querySelectorAll('.lesson-step').length`);
+    const ran = await runSnippet(0);
+    const output = await b.evaluate(`${snippet(0)}.querySelector('.snippet-output')?.innerText ?? ''`);
+    expect(steps === 3, `${steps} lesson steps`);
+    expect(/Finished/i.test(ran.status) && output.includes("[") && output.includes("]"), `${ran.status} | ${output.length} characters of output`);
   });
 
   await check("no console errors during the app checks", async () => {

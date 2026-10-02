@@ -66,11 +66,15 @@ def test_how_to_call_an_ability_comes_from_its_signature():
     assert (position.calls, position.kind) == (["pawn.position"], "property")  # no parentheses
 
 
-@pytest.mark.parametrize("name", codex.BUILTINS)
-def test_every_documented_builtin_is_real_and_has_a_full_entry(name):
-    assert hasattr(builtins, name)
-    entry = codex.builtin_entry(name)
-    assert entry.calls and entry.paragraphs and entry.args and entry.returns and entry.example
+@pytest.mark.parametrize("name", codex.PYTHON)
+def test_every_documented_builtin_and_method_is_real_and_has_a_full_entry(name):
+    entry = codex.python_entry(name)
+    if name in codex.BUILTINS:
+        assert hasattr(builtins, name) and entry.kind == "builtin"
+    else:
+        assert hasattr(str, name.removeprefix("str.")) and entry.kind == "method"
+    assert entry.calls and entry.paragraphs and entry.returns and entry.example
+    assert bool(entry.args) == ("()" not in entry.calls[0]), f"{name}: its entry lists arguments exactly when it takes some"
 
 
 def test_taught_so_far_is_the_curriculum_before_a_level_then_its_own_chapter_up_to_it():
@@ -99,10 +103,29 @@ def test_only_this_levels_abilities_are_listed():
 
 
 def test_a_lessons_built_ins_are_found_with_ast():
-    assert codex.builtins_called("for i in range(2):\n    print(len('ab'))\nx = print") == {"range", "print", "len"}
-    assert codex.builtins_called("this is not Python") == set()
-    lesson = f"{FENCE}python run\nprint(len('ab'))\n{FENCE}\n\n{FENCE}python\nrange(3)\n{FENCE}\n"
+    assert codex.python_called("for i in range(2):\n    print(abs(i))\nx = print") == {"range", "print", "abs"}
+    assert codex.python_called("this is not Python") == set()
+    lesson = f"{FENCE}python run\nprint(abs(-2))\n{FENCE}\n\n{FENCE}python\nrange(3)\n{FENCE}\n"
     assert codex.taught(lesson) == {"print"}  # only documented built-ins, and only in runnable snippets
+
+
+def test_a_lessons_text_methods_are_found_with_ast():
+    code = "text = pawn.read()\nprint(text.upper().replace('a', 'b'), pawn.move(), text.nonsense())"
+    assert codex.python_called(code) == {"print", "str.upper", "str.replace"}  # not the pawn's, and not made-up ones
+    lesson = f"{FENCE}python run\nprint('x'.strip(), len('x'))\n{FENCE}\n"
+    assert codex.taught(lesson) == {"print", "len", "str.strip"}
+
+
+def test_a_levels_codex_lists_text_methods_after_the_builtins_once_taught():
+    chapters = [{"curriculum": True, "levels": [level("r1", ["move"], "print(int('4'.strip()))")]}]
+    entries = codex.entries("r1", chapters)
+    assert [(entry.name, entry.kind) for entry in entries] == [("pawn.move", "ability"), ("print", "builtin"), ("int", "builtin"), ("str.strip", "method")]
+
+
+def test_help_shows_a_text_method_however_it_is_asked_for():
+    output = run_sandbox("help('abc'.upper)\nhelp(str.lower)\nhelp('str.split')", ["move"]).output
+    for heading in ("Help on str.upper:", "text.upper()", "Help on str.lower:", "Help on str.split:"):
+        assert heading in output
 
 
 def test_help_shows_an_entry_in_player_code():

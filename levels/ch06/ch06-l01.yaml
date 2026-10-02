@@ -1,0 +1,62 @@
+id: ch06-l01
+chapter: 6
+title: "The Runestone"
+trains: "Reading a rune: read(), a variable holding text, and indexing one character"
+brief: "A rune is a stone with writing on it. Stand on it, and your pawn can read it."
+piece: pawn
+map: |
+  # G #
+  # . #
+  # B #
+  # . #
+  # A #
+  # R #
+  # . #
+  # P #
+legend: {"R": {"tile": "rune", "text": "ember"}, "A": {"tile": "gate", "question": "What does the rune say?", "passphrase": "ember"}, "B": {"tile": "gate", "question": "What is the first letter of the rune?", "passphrase": "e"}}
+start: {"facing": "north"}
+api: ["move", "read"]
+par: {"lines": 6}
+hints:
+- "The rune is only readable while your pawn stands on it. Keep what it says somewhere safe."
+- "Store the text in a variable when you read it. Text in a variable can be printed later, and a position in square brackets picks out one character, counting from 0."
+- "Here is the line that reads the rune:\ntext = pawn.read()"
+lesson: ch06/ch06-l01.md
+lesson_board:
+  map: |
+    # . #
+    # R #
+    # P #
+  legend: {"R": {"tile": "rune", "text": "dawn"}}
+  start: {"facing": "north"}
+variants:
+- map: |
+    # G #
+    # . #
+    # B #
+    # . #
+    # A #
+    # R #
+    # . #
+    # P #
+  legend: {"R": {"tile": "rune", "text": "willow"}, "A": {"tile": "gate", "question": "What does the rune say?", "passphrase": "willow"}, "B": {"tile": "gate", "question": "What is the first letter of the rune?", "passphrase": "w"}}
+- map: |
+    # G #
+    # . #
+    # B #
+    # . #
+    # A #
+    # R #
+    # . #
+    # P #
+  legend: {"R": {"tile": "rune", "text": "oracle"}, "A": {"tile": "gate", "question": "What does the rune say?", "passphrase": "oracle"}, "B": {"tile": "gate", "question": "What is the first letter of the rune?", "passphrase": "o"}}
+- map: |
+    # G #
+    # . #
+    # B #
+    # . #
+    # A #
+    # R #
+    # . #
+    # P #
+  legend: {"R": {"tile": "rune", "text": "tin"}, "A": {"tile": "gate", "question": "What does the rune say?", "passphrase": "tin"}, "B": {"tile": "gate", "question": "What is the first letter of the rune?", "passphrase": "t"}}

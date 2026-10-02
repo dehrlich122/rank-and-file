@@ -1,0 +1,5 @@
+pawn.move()
+parts = pawn.read().split(",")
+pawn.move(int(parts[0]))
+pawn.turn_left()
+pawn.move(int(parts[1]))

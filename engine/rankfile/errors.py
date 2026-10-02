@@ -62,6 +62,10 @@ def friendly_message(exc: BaseException, namespace: dict) -> str:
         return _explain_attribute(exc)
     if isinstance(exc, TypeError):
         return _explain_type(exc)
+    if isinstance(exc, IndexError):
+        return _explain_index(exc)
+    if isinstance(exc, ValueError):
+        return _explain_value(exc)
     if isinstance(exc, ZeroDivisionError):
         return "You divided by zero. That has no answer, in maths or in Python."
     if isinstance(exc, RecursionError):
@@ -179,6 +183,8 @@ def _explain_attribute(exc: AttributeError) -> str:
         if suggestion:
             return f"The {piece} doesn't know `{name}`. Did you mean `{suggestion}`? (The {piece} hasn't learned that yet.)"
         return f"The {piece} doesn't have an ability called `{name}`. In this level it knows: {', '.join(unlocked)}."
+    if obj is None and name:
+        return f"The value here is None, which has no `{name}`. {_NONE_FROM_READ}"
     if name and obj is not None:
         type_name = type(obj).__name__
         options = [attr for attr in dir(obj) if not attr.startswith("_")]
@@ -186,6 +192,31 @@ def _explain_attribute(exc: AttributeError) -> str:
             return f"A {type_name} value doesn't have `{name}`. Did you mean `{suggestion}`?"
         return f"A {type_name} value doesn't have anything called `{name}`."
     return f"Python stopped with an AttributeError: {exc}"
+
+
+# What a None usually means in the game (M3.6): read() gives None off a rune.
+_NONE_FROM_READ = "If it came from `read()`, your pawn isn't standing on a rune: walk onto one first."
+
+
+# -- text: positions and numbers read from it (M3.6) ----------------------------
+
+
+def _explain_index(exc: IndexError) -> str:
+    if "string index out of range" in str(exc):
+        return (
+            "That position is past the end of the text. Positions start at 0, so text with 4 characters "
+            "ends at position 3. A negative position counts back from the end: -1 is the last character."
+        )
+    return f"Python stopped with an IndexError: {exc}"
+
+
+def _explain_value(exc: ValueError) -> str:
+    if match := re.match(r"invalid literal for int\(\) with base 10: (.+)", str(exc)):
+        return (
+            f"`int()` can only read text made of digits, like \"42\", and it was given {match.group(1)}. "
+            "Spaces, letters and anything else in the text have to be taken out first."
+        )
+    return f"Python stopped with a ValueError: {exc}"
 
 
 # -- type errors: the right thing used the wrong way -----------------------------
@@ -231,7 +262,15 @@ def _explain_type(exc: TypeError) -> str:
         return "You can only join text to text with +. To join a number to text, turn it into text first with str()."
     if match := re.match(r"unsupported operand type\(s\) for (.+): '(\w+)' and '(\w+)'", msg):
         op, left, right = match.groups()
-        return f"Python can't use {op} between {_kind(left)} and {_kind(right)}."
+        join = " To join a number to text, turn it into text first with str(), or use an f-string." if op == "+" and "str" in (left, right) else ""
+        return f"Python can't use {op} between {_kind(left)} and {_kind(right)}.{join}"
+    if "'str' object does not support item assignment" in msg:
+        return (
+            "Text can't be changed once it's made: you can't put a new character into a position. "
+            "Make a new text instead, with a method like replace() or by joining pieces together."
+        )
+    if msg in ("'NoneType' object is not subscriptable", "object of type 'NoneType' has no len()"):
+        return f"There's no text here: the value is None. {_NONE_FROM_READ}"
     if match := re.match(r"'(\w+)' object is not iterable", msg):
         return (
             f"Python can't go through {_kind(match.group(1))} one item at a time, "

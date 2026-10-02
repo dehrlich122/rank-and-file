@@ -56,7 +56,7 @@ class Pawn(Piece):
     NAME = "pawn"
     ABILITIES = (
         "move", "turn_left", "turn_right", "squares_ahead", "at_goal", "position", "facing", "wait",
-        "capture_left", "capture_right", "bridge", "look",
+        "capture_left", "capture_right", "bridge", "look", "read",
     )  # fmt: skip
 
     # These docstrings are the Codex's entries for the pawn (codex.py): the
@@ -132,8 +132,8 @@ class Pawn(Piece):
 
         Returns:
             What's there, as a word (a str): "wall", "edge", "pit", "gate",
-            "portcullis", "signpost", "gem", "plank", or an enemy such as
-            "rook". None if the square is empty.
+            "portcullis", "signpost", "rune", "gem", "plank", or an enemy
+            such as "rook". None if the square is empty.
 
         Example:
             if pawn.look() == "pit":
@@ -142,6 +142,22 @@ class Pawn(Piece):
         if side not in (None, "left", "right"):
             raise GameArgumentError(f'look() takes "left" or "right", or nothing to look straight ahead, not {side!r}.')
         return self._world.look(side)
+
+    def read(self) -> str | None:
+        """Read the rune your pawn is standing on.
+
+        A rune is a square with text written on it. Walk onto it, then read
+        it. Reading is free: it doesn't take a tick.
+
+        Returns:
+            The rune's text (a str), or None if your pawn isn't standing on a
+            rune.
+
+        Example:
+            text = pawn.read()
+            print(text)
+        """
+        return self._world.read()
 
     def wait(self, ticks=1):
         """Stand still while everything else on the board takes its turn.

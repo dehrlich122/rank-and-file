@@ -1558,6 +1558,36 @@ level generator, the lint's property check and the tests, and Chapter 5's
 levels, solutions and lessons are byte for byte the same (sha256). The
 designer asked to merge after the retest list.
 
+## Session 11 — 2026-10-02 · M3.6 play-test (`m3-6-chapter-6`)
+
+The designer played Chapter 6: "mostly excellent", with one note.
+
+- **QA-035 · 6.6: nothing says that a `for` loop goes through `split()`'s pieces** *(Designer, 2026-10-02)*
+  - 6.6 is a great challenge, but lists haven't been taught, so it isn't clear
+    that `split()` on its own works as the thing a `for` loop goes through. The
+    intended solution is out of reach without that. They suggested one more panel
+    in the Learn portion.
+  - **Fixed:** 6.6's lesson now has three panels. The first shows that `split()`
+    gives back a list (the pieces in square brackets, and a list is a row of
+    items picked by position). The second shows a `for` loop going through it one
+    piece at a time. The third is the old one, on a piece's first character and
+    the rest. 6.5's lesson also says the pieces come back as a list, so the idea
+    starts a level earlier. Only the lessons changed: the levels, references and
+    pars are the same.
+- **Pre-merge pass** *(2026-10-02, after the designer called M3.6 feature-complete)*:
+  - `/simplify` cleaned up the Codex's call finder (one parse per snippet, one
+    branch for text methods in `help()`), the generators' shared pieces (`said`
+    and the line budget now live in `levelgen.py`), and merged the signpost and
+    rune blocks in the Challenge panel. Chapter 5 and 6's levels, solutions and
+    lessons are byte for byte the same (sha256).
+  - Eight e2e checks were added (all 194 pass): the six reference solves, the
+    chapter list and mastery tag, the rune on the board (tooltip, Challenge panel,
+    lighting up as it is read), the "not standing on a rune" message, the Codex's
+    Text group and method hover, the pit snippet in 6.4, and QA-035's three panels.
+  - One thing a player can notice: `help(len)` now shows the game's own entry,
+    since `len` is in the Codex, instead of Python's. The e2e check for Python's
+    own help now uses `abs`.
+
 ---
 
 ## Queued work

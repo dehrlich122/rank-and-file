@@ -20,6 +20,10 @@
   title: Keep Going
   tier: pawn
   summary: while loops, a counter kept inside one, break and continue, and a pawn that goes on until it's done.
+- chapter: 6
+  title: Runes
+  tier: pawn
+  summary: Reading runes, text as characters, slices and methods, asking text questions with in, and turning text into numbers and routes.
 - chapter: 0
   title: Testing ground
   tier: practice

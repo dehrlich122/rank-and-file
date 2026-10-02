@@ -1,0 +1,76 @@
+id: ch06-l06
+chapter: 6
+title: "The Written Route"
+trains: "Everything on text: a whole route written on a rune, followed one leg at a time"
+brief: "A rune writes out the whole route: L or R for the turn, then the number of squares. Follow it to the goal."
+piece: pawn
+map: |
+  . . . . . . . . . . .
+  . . . . . . . . . . .
+  . . . . . . . . . . .
+  . . . . . . . . . . .
+  . . . . . . . . . . .
+  . . . . . . . . . . .
+  . . . . . . . . . G .
+  . . . . . . . . . . .
+  . . . . . . . . . . .
+  . . . . . R . . . . .
+  . . . . . P . . . . .
+legend: {"R": {"tile": "rune", "text": "R4,L3"}}
+start: {"facing": "north"}
+api: ["move", "turn_left", "turn_right", "read"]
+par: {"lines": 7}
+hints:
+- "The route is a list of legs in one text. Do the same thing for each leg, however many there are."
+- "Cut the text into legs, and let a loop take them one at a time. For each leg, the first character says which way to turn and the rest of it says how far to walk."
+- "One way to start:\npawn.move()\nfor leg in pawn.read().split(\",\"):"
+lesson: ch06/ch06-l06.md
+mastery: true
+lesson_board:
+  map: |
+    . . . . .
+    . . . . .
+    . . R . .
+    . . P . .
+  legend: {"R": {"tile": "rune", "text": "R2,L3"}}
+  start: {"facing": "north"}
+variants:
+- map: |
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    G . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . R . . . . .
+    . . . . . P . . . . .
+  legend: {"R": {"tile": "rune", "text": "L3,R5,L2"}}
+- map: |
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . G .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . R . . . . .
+    . . . . . P . . . . .
+  legend: {"R": {"tile": "rune", "text": "R2,L4,R2,L1"}}
+- map: |
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . G .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . R . . . . .
+    . . . . . P . . . . .
+  legend: {"R": {"tile": "rune", "text": "R1,L5,R2,L2,R1"}}

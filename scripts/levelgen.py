@@ -2,6 +2,7 @@
 level's YAML and files, and checking how a wrong attempt fails. Nothing here
 prints code: the designer is also the game's learner (see CLAUDE.md)."""
 
+import codecs
 import json
 import sys
 from collections.abc import Callable
@@ -15,6 +16,14 @@ sys.path.insert(0, str(ROOT / "engine"))  # so the generators, which import this
 from rankfile.constraints import code_lines  # noqa: E402
 from rankfile.levels import Level, parse_level  # noqa: E402
 from rankfile.runner import run_level  # noqa: E402
+
+BUDGET = 400  # lines of player code a candidate may run before it counts as endless
+
+
+def said(text: str) -> str:
+    """Hints, notes and fixed lines of code are stored in ROT13, so the generators never show them."""
+    return codecs.decode(text, "rot13")
+
 
 # What a generator hands `build`: from the drafted level, the reference, a few words on
 # its shape for the printout, and how to write each kind of wrong attempt. None if no
@@ -64,6 +73,17 @@ def run_all(levels: list[dict], build_one: Callable[[dict], list[str]], ids: lis
     for problem in problems:
         print(f"PROBLEM: {problem}")
     sys.exit(1 if problems else 0)
+
+
+def main(levels: list[dict], build_one: Callable[[dict], list[str]], probe: Callable[[dict], None]) -> None:
+    """A generator's command line: no arguments for every level, level ids for some, or `probe [ids]` to check the boards only."""
+    args = sys.argv[1:]
+    if args and args[0] == "probe":
+        for spec in levels:
+            if len(args) == 1 or spec["id"] in args[1:]:
+                probe(spec)
+    else:
+        run_all(levels, build_one, args)
 
 
 def third_hint(spec: dict, reference: str) -> str:

@@ -50,6 +50,27 @@ def test_friendly_messages(corridor, code, friendly, line):
     assert result.error.line == line
 
 
+@pytest.mark.parametrize(
+    ("code", "friendly", "line"),
+    [
+        # text (M3.6)
+        ("pawn.move()\ntext = pawn.read()\nprint(text[7])", "That position is past the end of the text. Positions start at 0", 3),
+        ("pawn.move()\ntext = pawn.read()\ntext[0] = 'S'", "Text can't be changed once it's made", 3),
+        ("text = pawn.read()\nprint(text[0])", "There's no text here: the value is None. If it came from `read()`, your pawn isn't standing on a rune", 2),
+        ("text = pawn.read()\nprint(len(text))", "There's no text here: the value is None. If it came from `read()`", 2),
+        ("text = pawn.read()\nprint(text.upper())", "The value here is None, which has no `upper`. If it came from `read()`", 2),
+        ("pawn.move()\nprint(int(pawn.read()))", 'only read text made of digits, like "42", and it was given \'north-3\'', 2),
+        ("pawn.move()\nprint(pawn.read().upr())", "A str value doesn't have `upr`. Did you mean `upper`?", 2),
+        ('print(3 + "4")', "turn it into text first with str(), or use an f-string.", 1),
+    ],
+)
+def test_text_friendly_messages(rune_corridor, code, friendly, line):
+    result = run_level(rune_corridor, code)
+    assert result.status == "error"
+    assert friendly in result.error.friendly
+    assert result.error.line == line
+
+
 def test_real_traceback_is_kept_and_trimmed(corridor):
     result = run_level(corridor, "pawn.move()\npawn.mvoe()")
     traceback = result.error.traceback
