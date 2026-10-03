@@ -69,20 +69,73 @@ export const virusEyes: V3[][] = [
   [[3, 30, 11.5], [8, 30, 9.5], [8, 27.5, 9.8], [3, 27.5, 11.8]],
 ];
 
-/**
- * The knight skin: a horse-head helm in profile, extruded, on the pawn's plinth.
- * Its head points along -x; turning it (yaw) makes it face the other ways.
- */
-export function knightModel(): Model {
-  const head: Array<[number, number]> = [[-11, 10], [-12.5, 20], [-9, 27], [-19, 30], [-24, 33.5], [-23.5, 40], [-15, 46.5], [-7, 52], [-4.5, 59], [-0.5, 52.5], [6, 50.5], [10.5, 41], [12.5, 28], [13.5, 10]];
-  const base: Array<[number, number]> = [[0, 19], [3.5, 19], [6, 15.5], [10, 13.5], [10.5, 0]];
-  return merge(lathe(base, 8), extrude(head, -6.5, 6.5));
+// -- the knight skin ------------------------------------------------------------------------------------
+
+const norm3 = ([x, y, z]: V3): V3 => {
+  const l = Math.hypot(x, y, z) || 1;
+  return [x / l, y / l, z / l];
+};
+const sub3 = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const cross3 = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+
+/** A face from points, its normal worked out and made to point away from `inside`. */
+function faceAwayFrom(pts: V3[], inside: V3, part: string): Face {
+  let n = norm3(cross3(sub3(pts[1]!, pts[0]!), sub3(pts[2]!, pts[0]!)));
+  const c = pts.reduce<V3>((s, p) => [s[0] + p[0] / pts.length, s[1] + p[1] / pts.length, s[2] + p[2] / pts.length], [0, 0, 0]);
+  if (n[0] * (c[0] - inside[0]) + n[1] * (c[1] - inside[1]) + n[2] * (c[2] - inside[2]) < 0) n = [-n[0], -n[1], -n[2]];
+  return { pts, n, part };
 }
 
-/** The knight's lit eye-slit, on both sides of the helm, each with the way its side faces. */
+/** A four-sided spike: a rectangle on the level y0 at (cx, cz), half-sizes w and d, rising to `apex`. */
+function spike(cx: number, y0: number, cz: number, w: number, d: number, apex: V3, part: string): Model {
+  const base: V3[] = [[cx - w, y0, cz - d], [cx + w, y0, cz - d], [cx + w, y0, cz + d], [cx - w, y0, cz + d]];
+  const inside: V3 = [cx, y0 + (apex[1] - y0) * 0.3, cz];
+  return { faces: [...base.map((p, i) => faceAwayFrom([p, base[(i + 1) % 4]!, apex], inside, part)), faceAwayFrom(base, apex, part)], ...NO_CONTOUR };
+}
+
+/** Turn a model about the z axis through (px, py) by `angle`, then move it by (dx, dy): a tilt in the head's own plane. */
+function tiltAndMove(model: Model, angle: number, px: number, py: number, dx: number, dy: number): Model {
+  const [c, s] = [Math.cos(angle), Math.sin(angle)];
+  const point = ([x, y, z]: V3): V3 => [px + (x - px) * c - (y - py) * s + dx, py + (x - px) * s + (y - py) * c + dy, z];
+  const normal = ([x, y, z]: V3): V3 => [x * c - y * s, x * s + y * c, z];
+  return { faces: model.faces.map((f) => ({ ...f, pts: f.pts.map(point), n: normal(f.n) })), ...NO_CONTOUR };
+}
+
+const KNIGHT_HEAD: Array<[number, number]> = [[-11, 10], [-12.5, 20], [-9, 27], [-19, 30], [-24, 33.5], [-23.5, 40], [-15, 46.5], [-7, 52], [-4.5, 59], [-0.5, 52.5], [6, 50.5], [10.5, 41], [12.5, 28], [13.5, 10]];
+/** The points along the back of the neck, where the spikes stand. */
+const KNIGHT_NECK: Array<[number, number]> = [[-1, 55], [4, 51], [8, 45.5], [10.5, 39], [12, 32], [12.8, 25], [13.4, 18]];
+
+/**
+ * The knight skin, the charger (M3.7): a horse-head helm with cheek plates, ears, a long horn and spikes up the
+ * back of its neck, so it has a silhouette from every side, the back included. Its head points along -x;
+ * turning it (yaw) makes it face the other ways.
+ */
+export function knightModel(): Model {
+  const base: Array<[number, number]> = [[0, 19], [3.5, 19], [6, 15.5], [10, 13.5], [10.5, 0]];
+  const ear: Array<[number, number]> = [[-8, 51], [-7, 60], [-3.5, 52]];
+  const horn = tiltAndMove(spike(-14, 0, 0, 3.4, 3.4, [-14, 20, 0], "horn"), 1.15, -14, 0, -1, 47);
+  const spines = KNIGHT_NECK.filter((_, i) => i % 2 === 0).map(([x, y], i) => spike(x + 1, y - 1, 0, 3.2 - i * 0.3, 3.2 - i * 0.3, [x + 8 - i, y + 12 - i * 1.5, 0], "spine"));
+  return merge(
+    lathe(base, 8),
+    extrude(KNIGHT_HEAD, -6, 6),
+    extrude([[-19, 30], [-24, 33.5], [-23.5, 40], [-15, 44], [-9, 33]], -8, 8, "cheek"),
+    extrude(ear, 2.5, 4.5, "ear"),
+    extrude(ear, -4.5, -2.5, "ear"),
+    horn,
+    ...spines,
+    box([1, 14], [12, 18], [-12, 12], "pauldron"),
+  );
+}
+
+/**
+ * The knight's lit eyes, which show from the side and from the front: a slit on each cheek, and a pair of
+ * slanted slits on the face for when it looks toward us. Each has the way its surface faces.
+ */
 export const knightEyes: Array<{ pts: V3[]; n: V3 }> = [
-  { pts: [[-17, 41.5, 6.7], [-10, 43.5, 6.7], [-10, 41, 6.7], [-17, 39.5, 6.7]], n: [0, 0, 1] },
-  { pts: [[-17, 41.5, -6.7], [-10, 43.5, -6.7], [-10, 41, -6.7], [-17, 39.5, -6.7]], n: [0, 0, -1] },
+  { pts: [[-17, 41.5, 8.2], [-10, 43.5, 8.2], [-10, 41, 8.2], [-17, 39.5, 8.2]], n: [0, 0, 1] },
+  { pts: [[-17, 41.5, -8.2], [-10, 43.5, -8.2], [-10, 41, -8.2], [-17, 39.5, -8.2]], n: [0, 0, -1] },
+  { pts: [[-24.3, 36.6, 2.2], [-24.3, 39.4, 7.4], [-24.3, 37.6, 7.4], [-24.3, 35, 2.2]], n: [-1, 0, 0] },
+  { pts: [[-24.3, 36.6, -2.2], [-24.3, 39.4, -7.4], [-24.3, 37.6, -7.4], [-24.3, 35, -2.2]], n: [-1, 0, 0] },
 ];
 
 // -- tiles ---------------------------------------------------------------------------------------

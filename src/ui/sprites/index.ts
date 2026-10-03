@@ -54,7 +54,7 @@ export function hero(skin: Skin, face: Facing, withBrackets = true): SVGElement 
 }
 
 /** A knight (a model whose head points along -x, with its lit details) turned to `face` and drawn as the hero. */
-export function knightHero(model: Model, eyes: Decal[], face: Facing, withBrackets = true): SVGElement {
+function knightHero(model: Model, eyes: Decal[], face: Facing, withBrackets = true): SVGElement {
   const angle = KNIGHT_TURN[face];
   const lit = eyes.map((d) => ({ pts: d.pts.map(turn(angle)), n: turn(angle)(d.n) }));
   return drawHero(yaw(model, angle), lit, face, withBrackets);
