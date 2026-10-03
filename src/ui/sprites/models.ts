@@ -10,7 +10,7 @@ export interface Shape {
 const NO_CONTOUR = { contour: [] as V3[][] };
 
 /** A polygon in the x/y plane, extruded from z0 to z1: front, back and side faces. */
-function extrude(outline: Array<[number, number]>, z0: number, z1: number, part = "body"): Model {
+export function extrude(outline: Array<[number, number]>, z0: number, z1: number, part = "body"): Model {
   const faces: Face[] = [
     { pts: outline.map(([x, y]): V3 => [x, y, z1]), n: [0, 0, 1], part },
     { pts: [...outline].reverse().map(([x, y]): V3 => [x, y, z0]), n: [0, 0, -1], part },

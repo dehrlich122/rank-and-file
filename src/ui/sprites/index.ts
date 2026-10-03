@@ -49,15 +49,19 @@ function brackets(face: Facing): SVGElement {
 }
 
 export function hero(skin: Skin, face: Facing, withBrackets = true): SVGElement {
-  let model: Model;
-  let lit: Decal[] = [];
-  if (skin === "pawn") {
-    model = yaw(pawnModel("low"), PAWN_FACING[face] - VISOR);
-  } else {
-    const angle = KNIGHT_TURN[face];
-    model = yaw(knightModel(), angle);
-    lit = knightEyes.map((d) => ({ pts: d.pts.map(turn(angle)), n: turn(angle)(d.n) }));
-  }
+  if (skin === "pawn") return drawHero(yaw(pawnModel("low"), PAWN_FACING[face] - VISOR), [], face, withBrackets);
+  return knightHero(knightModel(), knightEyes, face, withBrackets);
+}
+
+/** A knight (a model whose head points along -x, with its lit details) turned to `face` and drawn as the hero. */
+export function knightHero(model: Model, eyes: Decal[], face: Facing, withBrackets = true): SVGElement {
+  const angle = KNIGHT_TURN[face];
+  const lit = eyes.map((d) => ({ pts: d.pts.map(turn(angle)), n: turn(angle)(d.n) }));
+  return drawHero(yaw(model, angle), lit, face, withBrackets);
+}
+
+/** The hero's drawing: brackets that show the facing, the floor shadow, and the solid model. */
+function drawHero(model: Model, lit: Decal[], face: Facing, withBrackets: boolean): SVGElement {
   const f = fit(model, 52, 55, 27.5);
   const { c, rx, ry } = floor(f, 20);
   return el(
