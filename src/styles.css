@@ -1551,20 +1551,45 @@ pre {
   }
 }
 
-/* a gate and a waypoint show their state by swapping their art; a refused guard flashes the square */
-.gate .spr-open,
-.waypoint .spr-done {
-  display: none;
+/* a gate and a waypoint show their state by swapping their art, as a crossfade: the closed gate
+   lifts away and the open one settles in; a crossed waypoint turns green with a ping.
+   A refused guard flashes the square. */
+.spr-closed,
+.spr-open,
+.spr-todo,
+.spr-done {
+  transition: opacity 350ms ease-in-out, transform 350ms ease-in-out;
+}
+
+.spr-open,
+.spr-done {
+  opacity: 0;
 }
 
 .gate.open .spr-open,
 .waypoint.crossed .spr-done {
-  display: inline;
+  opacity: 1;
 }
 
-.gate.open .spr-closed,
+.gate.open .spr-closed {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
 .waypoint.crossed .spr-todo {
-  display: none;
+  opacity: 0;
+}
+
+.waypoint.crossed .spr-done {
+  animation: ping 500ms ease-out;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes ping {
+  from {
+    transform: scale(0.7);
+  }
 }
 
 .gate-flash,
@@ -1584,6 +1609,27 @@ pre {
 .gate.refusing .gate-flash,
 .rune.reading .rune-flash {
   animation: pulse 650ms ease-out;
+}
+
+/* a rune is read as a scan: a green line sweeps down the slab */
+.rune-scan {
+  fill: var(--wire-green);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rune.reading .rune-scan {
+  animation: scan 650ms ease-in-out;
+}
+
+@keyframes scan {
+  15%,
+  85% {
+    opacity: 1;
+  }
+  to {
+    transform: translateY(22px);
+  }
 }
 
 @keyframes pulse {
@@ -1626,6 +1672,85 @@ pre {
   opacity: 0;
   pointer-events: none;
   transform: scale(1.4);
+}
+
+/* the trail behind a move: it appears as the piece sets off and fades as it arrives (nothing shows without motion) */
+.trail-hero,
+.trail-foe {
+  opacity: 0;
+  stroke-linecap: round;
+  pointer-events: none;
+  animation: trail-fade calc(var(--step-ms, 350ms) * 2.2) ease-out;
+}
+
+.trail-hero {
+  stroke: var(--accent);
+  stroke-width: 7;
+  filter: drop-shadow(0 0 3px var(--glow-hero));
+}
+
+.trail-foe {
+  stroke: var(--wire-foe);
+  stroke-width: 3;
+  stroke-dasharray: 3 5;
+}
+
+@keyframes trail-fade {
+  from {
+    opacity: 0.5;
+  }
+}
+
+/* a turn: the hero squares up to its new facing */
+.pawn {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.pawn.turning {
+  animation: turn 260ms ease-out;
+}
+
+@keyframes turn {
+  from {
+    transform: scaleX(0.55);
+  }
+}
+
+/* the goal's beacon breathes: its pad and its column of light, never its wire or any text */
+.beacon > :is(rect, ellipse) {
+  animation: breathe 3.2s ease-in-out infinite alternate;
+}
+
+@keyframes breathe {
+  from {
+    opacity: 0.6;
+  }
+}
+
+/* level complete: a ring of green spreads from the hero as it hops */
+.cheer-ring {
+  fill: none;
+  stroke: var(--good);
+  stroke-width: 3;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.celebrate .cheer-ring {
+  animation: cheer 900ms ease-out 2;
+}
+
+@keyframes cheer {
+  from {
+    opacity: 0.9;
+    transform: scale(0.5);
+  }
+  to {
+    transform: scale(1.7);
+  }
 }
 
 .route {
@@ -1787,6 +1912,20 @@ pre {
   opacity: 0.45;
 }
 
+/* a lost run: the ring pops onto the square (and, if a chess piece took the pawn, the piece has just moved in) */
+.board.lost .lost-ring {
+  animation: lost-pop 450ms ease-out;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes lost-pop {
+  from {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
 .bump-flash {
   fill: var(--bad);
   opacity: 0;
@@ -1826,20 +1965,20 @@ pre {
 /* Animations setting: "Reduced" always stops movement; "Match system" follows
    the OS preference; "Full" ignores it. (Colour flashes stay: they aren't motion.)
    An enemy's rest frame is already broken, so it needs no motion to read as hostile. */
-:root[data-motion="reduced"] :is(.piece, .enemy, .plank, .pit-plank, .gem, .level-left) {
+:root[data-motion="reduced"] :is(.piece, .enemy, .plank, .pit-plank, .gem, .level-left, .spr-closed, .spr-open, .spr-todo, .spr-done) {
   transition: none;
 }
 
-:root[data-motion="reduced"] :is(.celebrate .piece-body, .celebrate .beacon, .piece-body.bumping, .bw-live .bf) {
+:root[data-motion="reduced"] :is(.celebrate .piece-body, .celebrate .beacon, .celebrate .cheer-ring, .piece-body.bumping, .bw-live .bf, .beacon > *, .trail-hero, .trail-foe, .pawn.turning, .rune.reading .rune-scan, .waypoint.crossed .spr-done, .board.lost .lost-ring) {
   animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion="full"]) :is(.piece, .enemy, .plank, .pit-plank, .gem, .level-left) {
+  :root:not([data-motion="full"]) :is(.piece, .enemy, .plank, .pit-plank, .gem, .level-left, .spr-closed, .spr-open, .spr-todo, .spr-done) {
     transition: none;
   }
 
-  :root:not([data-motion="full"]) :is(.celebrate .piece-body, .celebrate .beacon, .piece-body.bumping, .bw-live .bf) {
+  :root:not([data-motion="full"]) :is(.celebrate .piece-body, .celebrate .beacon, .celebrate .cheer-ring, .piece-body.bumping, .bw-live .bf, .beacon > *, .trail-hero, .trail-foe, .pawn.turning, .rune.reading .rune-scan, .waypoint.crossed .spr-done, .board.lost .lost-ring) {
     animation: none;
   }
 }

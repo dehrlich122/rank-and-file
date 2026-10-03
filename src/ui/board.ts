@@ -27,6 +27,8 @@ export class BoardView {
   private readonly lostMark: SVGGElement; // where the run was lost (M3.1)
   private readonly enemies: SVGGElement[]; // one per level.enemies, moved like the piece
   private attackedKey: string | undefined;
+  private readonly trails: SVGGElement; // fading streaks behind a move: the piece's, and the enemies' (M3.7)
+  private last: WorldState | undefined; // the state before this one, to see what moved
   private readonly attacks: SVGGElement; // the squares enemy chess pieces attack, shaded (M3.4)
   private readonly counters: SVGGElement[]; // badges that count a clock's ticks: clockwork's (QA-021), timed gates' (M3.2)
   private readonly art = new Map<TileKind, Map<string, SVGGElement>>(); // tile kind -> "x,y" -> its art
@@ -89,12 +91,13 @@ export class BoardView {
 
     this.attacks = svg("g", { class: "attacks", "aria-hidden": "true" });
     this.flash = svg("rect", { class: "bump-flash", width: S, height: S, x: 0, y: 0 });
-    this.element.append(this.attacks, this.flash, ...this.enemies);
+    this.trails = svg("g", { class: "trails", "aria-hidden": "true" });
+    this.element.append(this.attacks, this.trails, this.flash, ...this.enemies);
 
     this.piece = svg("g", { class: "piece" });
     this.body = svg("g", { class: "piece-body" });
     this.pawn = svg("g", { class: "pawn" });
-    this.body.append(this.pawn);
+    this.body.append(svg("circle", { r: 26, class: "cheer-ring" }), this.pawn);
     this.piece.append(this.body);
     this.element.append(this.piece);
 
@@ -132,7 +135,8 @@ export class BoardView {
   }
 
   private apply(event: GameEvent): void {
-    this.place(event.state);
+    this.place(event.state, true);
+    if (event.kind === "lost" && event.by && event.at) this.strike(event.by, event.at);
     if (event.kind === "bump" && event.at) this.bump(event.state.pos, event.at);
     if (event.kind === "guard" && event.at) {
       const gate = this.art.get("gate")?.get(`${event.at[0]},${event.at[1]}`);
@@ -144,11 +148,23 @@ export class BoardView {
     }
   }
 
-  private place(state: WorldState): void {
+  /** `animate`: a step of the replay, so a move leaves a trail and a turn plays; a jump to a state does neither. */
+  private place(state: WorldState, animate = false): void {
+    const before = this.last;
+    this.last = state;
     this.piece.style.transform = centre(state.pos, this.level.height);
     if (state.facing !== this.facing) {
+      const turned = this.facing !== undefined;
       this.facing = state.facing;
       this.pawn.replaceChildren(this.heroArt(state.facing));
+      if (animate && turned) restartAnimation(this.pawn, "turning");
+    }
+    if (animate && before) {
+      if (before.pos[0] !== state.pos[0] || before.pos[1] !== state.pos[1]) this.trail(before.pos, state.pos, "trail-hero");
+      state.enemies?.forEach((pos, i) => {
+        const was = before.enemies?.[i];
+        if (pos && was && (pos[0] !== was[0] || pos[1] !== was[1])) this.trail(was, pos, "trail-foe");
+      });
     }
     this.mark("gate", "open", state.opened);
     this.mark("timed_gate", "open", state.opened);
@@ -193,6 +209,23 @@ export class BoardView {
     for (const [key, art] of tiles) art.classList.toggle(className, on.has(key));
   }
 
+  /** A streak from one square's centre to another's that fades as the piece arrives (it lasts a little longer than the step). */
+  private trail(from: Pos, to: Pos, className: string): void {
+    const [a, b] = [from, to].map((pos) => corner(pos, this.level.height).map((n) => n + S / 2));
+    const line = svg("line", { x1: a![0]!, y1: a![1]!, x2: b![0]!, y2: b![1]!, class: className });
+    this.trails.append(line);
+    this.timers.push(window.setTimeout(() => line.remove(), 1500));
+  }
+
+  /** A chess piece takes the piece: it moves in from its own square (`by`) onto the square it took (`at`). */
+  private strike(by: Pos, at: Pos): void {
+    const index = this.last?.enemies?.findIndex((pos) => pos && pos[0] === by[0] && pos[1] === by[1]) ?? -1;
+    const enemy = this.enemies[index];
+    if (!enemy) return;
+    enemy.style.transform = centre(at, this.level.height);
+    this.lostMark.before(enemy); // it takes the square, so it is drawn over the piece (and under the lost ring)
+  }
+
   private bump(from: Pos, at: Pos): void {
     const dx = Math.sign(at[0] - from[0]);
     const dy = Math.sign(at[1] - from[1]);
@@ -208,6 +241,7 @@ export class BoardView {
   private cancel(): void {
     this.timers.forEach((timer) => window.clearTimeout(timer));
     this.timers = [];
+    this.trails.replaceChildren();
   }
 
   dispose(): void {
@@ -310,6 +344,7 @@ function rune(left: number, top: number, text: string): SVGGElement {
     tooltip(`A rune. Stand on it and use read() to get its text: "${text}"`),
     tile(left, top, TILE_SPRITE.rune),
     svg("rect", { x: left + 8, y: top + 18, width: S - 16, height: S - 30, class: "rune-flash" }),
+    svg("rect", { x: left + 10, y: top + 24, width: S - 20, height: 2.5, class: "rune-scan" }),
   );
 }
 

@@ -62,10 +62,12 @@ describe("SettingsStore", () => {
 
   it("puts the layout, theme and animation choices on the page as data attributes", () => {
     const root = { dataset: {} as Record<string, string>, style: { setProperty: () => {} } };
-    applyToDocument({ ...DEFAULTS, codePanel: "bottom", theme: "dark" }, root as unknown as HTMLElement);
-    expect(root.dataset).toEqual({ codePanel: "bottom", theme: "dark" });
+    applyToDocument({ ...DEFAULTS, codePanel: "bottom", theme: "light" }, root as unknown as HTMLElement);
+    expect(root.dataset).toEqual({ codePanel: "bottom", theme: "light" });
+    applyToDocument({ ...DEFAULTS, theme: "system" }, root as unknown as HTMLElement);
+    expect(root.dataset).toEqual({}); // following the system leaves no attributes behind
     applyToDocument(DEFAULTS, root as unknown as HTMLElement);
-    expect(root.dataset).toEqual({}); // defaults leave no attributes behind
+    expect(root.dataset).toEqual({ theme: "dark" }); // dark is the default theme (M3.7)
   });
 
   it("ignores corrupted or unknown saved values", () => {

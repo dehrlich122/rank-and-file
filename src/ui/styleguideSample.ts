@@ -134,8 +134,17 @@ export const STATES: Record<string, Partial<WorldState>> = {
 
 export const state = (name: string): WorldState => ({ ...START, ...STATES[name] });
 
-/** Events the buttons play: a bump, a refused guard and a rune read. */
+/** Events the buttons play: a walk with a turn (a trail and a turn), a bump, a refused guard, a rune read, and the rook taking the piece. */
 export const EVENTS: Record<string, GameEvent[]> = {
+  walk: [
+    { kind: "move", state: { ...START, pos: [0, 2] } },
+    { kind: "turn", state: { ...START, pos: [0, 2], facing: "east" } },
+    { kind: "move", state: { ...START, pos: [3, 2], facing: "east" } },
+  ],
+  strike: [
+    { kind: "move", state: { ...START, pos: [0, 3], facing: "east" } },
+    { kind: "lost", state: { ...START, pos: [4, 3], facing: "east", lost: [4, 3] }, at: [4, 3], by: ROOK, message: "The rook on g4 took your pawn on e4." },
+  ],
   bump: [{ kind: "bump", state: { ...START, pos: [1, 3] }, at: [1, 4] }],
   refuse: [{ kind: "guard", state: { ...START, pos: [7, 3] }, at: GATE, message: "No." }],
   read: [{ kind: "read", state: { ...START, pos: RUNE }, at: RUNE }],

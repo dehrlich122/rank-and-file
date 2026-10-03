@@ -109,6 +109,8 @@ export function mountStyleguide(main: HTMLElement): () => void {
         "div",
         {},
         h("strong", {}, "Play"),
+        button("walk + turn", () => all((view) => view.animate(EVENTS.walk!, 1400))),
+        button("rook takes pawn", () => all((view) => view.animate(EVENTS.strike!, 1000))),
         button("bump", () => all((view) => view.animate(EVENTS.bump!, 700))),
         button("guard refuses", () => all((view) => view.animate(EVENTS.refuse!, 700))),
         button("read rune", () => all((view) => view.animate(EVENTS.read!, 700))),

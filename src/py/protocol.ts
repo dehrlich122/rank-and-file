@@ -95,6 +95,7 @@ type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: stri
 export interface GameEvent {
   kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "capture" | "tick" | "lost" | "pick_up" | "bridge" | "fall" | "crush" | "read";
   state: WorldState; // the whole world's state after the event
+  by?: Pos; // lost, when a chess piece took the piece: the square it took it from
   at?: Pos; // bump: the square bumped into; gate_open/guard: the gate; capture, fall: the enemy's square; bridge: the pit; pick_up, lost: where; read: the rune
   message?: string; // guard: what the guard said; pick_up, fall, crush, lost: what happened
 }
