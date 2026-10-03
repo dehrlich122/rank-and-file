@@ -4,9 +4,10 @@
 // Like #/harness it is a page for the designer and for tests, not part of the game's flow.
 import type { Facing } from "../py/protocol";
 import { BoardView } from "./board";
+import { contrastRatio } from "../contrast";
 import { h } from "./dom";
 import { crown, enemy, goal, hero, tile, type EnemyKind, type Skin, type TileName } from "./sprites";
-import { svg } from "./sprites/svg";
+import { svg } from "./svg";
 import { EVENTS, LEVEL, STATES, state } from "./styleguideSample";
 
 const FACINGS: Facing[] = ["north", "east", "south", "west"];
@@ -45,13 +46,7 @@ function cell(art: () => SVGElement, px: number): SVGElement {
 const SWATCHES = ["text", "muted", "accent", "bad", "good", "warn", "wire-wall", "wire-amber", "wire-green", "wire-foe", "beacon", "solid-edge"];
 
 /** A computed "rgb(r, g, b)" as [r, g, b]. */
-const channels = (css: string): number[] => (css.match(/[d.]+/g) ?? []).slice(0, 3).map(Number);
-const luminance = (rgb: number[]): number => {
-  const [r, g, b] = rgb.map((v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
-  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
-};
-const contrast = (a: number[], b: number[]): number => (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
-
+const channels = (css: string): number[] => (css.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
 /** Fill each pane's swatch strip once it is on the page, because a token's colour depends on its pane's theme. */
 function fillSwatches(root: HTMLElement): void {
   for (const strip of root.querySelectorAll<HTMLElement>(".sg-swatches")) {
@@ -66,7 +61,7 @@ function fillSwatches(root: HTMLElement): void {
     const against = ["panel", "sq-dark", "sq-light"].map((token) => colour(token, "backgroundColor"));
     for (const token of SWATCHES) {
       const mine = colour(token, "color");
-      const ratios = against.map((other) => contrast(mine, other).toFixed(1));
+      const ratios = against.map((other) => contrastRatio(mine, other).toFixed(1));
       strip.append(
         h("div", { class: "sg-swatch" }, h("span", { class: "sg-chip", style: `background: var(--${token})` }), h("span", { class: "sg-token" }, token), h("span", { class: "sg-ratios", title: "contrast against the panel, the dark square and the light square" }, ratios.join(" · "))),
       );

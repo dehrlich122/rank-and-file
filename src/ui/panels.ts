@@ -126,7 +126,7 @@ export function outcomeCard(run: LevelResult, shown: LevelResult, actions: HTMLE
     h("div", { class: "outcome-head" }, h("strong", {}, HEADLINE[run.status]), ...actions),
     ...body,
   );
-  return run.status === "solved" ? h("div", { class: "complete-mock" }, h("div", { class: "complete-banner play", "aria-hidden": "true" }, h("span", { class: "complete-text", "data-text": VOICE.complete }, VOICE.complete)), card) : card;
+  return run.status === "solved" ? h("div", { class: "complete-wrap" }, h("div", { class: "complete-banner play", "aria-hidden": "true" }, h("span", { class: "complete-text", "data-text": VOICE.complete }, VOICE.complete)), card) : card;
 }
 
 /** A solved run's stars, each with what it's for (M2). */

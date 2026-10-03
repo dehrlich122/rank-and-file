@@ -143,7 +143,8 @@ export const EVENTS: Record<string, GameEvent[]> = {
   ],
   strike: [
     { kind: "move", state: { ...START, pos: [0, 3], facing: "east" } },
-    { kind: "lost", state: { ...START, pos: [4, 3], facing: "east", lost: [4, 3] }, at: [4, 3], by: ROOK, message: "The rook on g4 took your pawn on e4." },
+    { kind: "lost", state: { ...START, pos: [4, 3], facing: "east", lost: [4, 3] }, at: [4, 3], by: 0, // the rook is the level's first enemy
+       message: "The rook on g4 took your pawn on e4." },
   ],
   bump: [{ kind: "bump", state: { ...START, pos: [1, 3] }, at: [1, 4] }],
   refuse: [{ kind: "guard", state: { ...START, pos: [7, 3] }, at: GATE, message: "No." }],

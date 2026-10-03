@@ -5,7 +5,7 @@ import { wornPiece } from "../promotion";
 import { settings } from "../settings";
 import { h } from "./dom";
 import { enemy, hero, type EnemyKind, type Skin } from "./sprites";
-import { svg } from "./sprites/svg";
+import { svg } from "./svg";
 import { VOICE } from "./voice";
 
 const RANK: EnemyKind[] = ["rook", "bishop", "rook", "bishop", "bishop", "rook", "bishop", "rook"];
@@ -19,10 +19,10 @@ interface Entry {
 /** Mount the title in `main`. Returns what to call to leave it. */
 export function mountTitle(main: HTMLElement, options: { lessons: () => void; settings: () => void }): () => void {
   const entries: Entry[] = [
-    { label: VOICE.menu[0], open: options.lessons },
-    { label: VOICE.menu[1] }, // Free Play (M4.x)
-    { label: VOICE.menu[2] }, // Level Editor (M4)
-    { label: VOICE.menu[3], open: options.settings },
+    { label: VOICE.menu.lessons, open: options.lessons },
+    { label: VOICE.menu.freePlay }, // (M4.x)
+    { label: VOICE.menu.levelEditor }, // (M4)
+    { label: VOICE.menu.settings, open: options.settings },
   ];
   let selected = 0;
   const note = h("p", { class: "ts-note", "aria-live": "polite" }, "↑ ↓ to choose, Enter to open");

@@ -5,7 +5,7 @@ export const VOICE = {
   lessons: "Lessons",
   outside: "Off the grid",
   subtitle: "rank_and_file()",
-  menu: ["Lessons", "Free Play", "Level Editor", "Settings"],
+  menu: { lessons: "Lessons", freePlay: "Free Play", levelEditor: "Level Editor", settings: "Settings" },
   comingSoon: "coming soon",
   complete: "Run complete",
   lost: "Run lost",

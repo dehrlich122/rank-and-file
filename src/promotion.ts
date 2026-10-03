@@ -25,9 +25,12 @@ export const PROMOTIONS: Promotion[] = [
   },
 ];
 
+/** The chapter that closes `tier`: clearing it earns the promotion. */
+export const lastChapterOf = (tier: string) => chapters.filter((chapter) => chapter.curriculum && chapter.tier === tier).at(-1);
+
 /** Every core level of the tier's last chapter is solved. */
 export function tierCleared(tier: string, store: ProgressStore = progress): boolean {
-  const last = chapters.filter((chapter) => chapter.curriculum && chapter.tier === tier).at(-1);
+  const last = lastChapterOf(tier);
   const core = last?.levels.filter((level) => !level.mastery) ?? [];
   return core.length > 0 && core.every((level) => store.solved(level.id));
 }

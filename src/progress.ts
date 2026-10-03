@@ -20,11 +20,12 @@ const UNTOUCHED: LevelProgress = { stars: 0, hints: 0, failedAfterHints: 0, help
 
 export class ProgressStore {
   private levels: Record<string, LevelProgress>;
-  private seen: { promotions: string[]; crowns: number[] };
+  private seen: string[]; // "promotion:pawn", "crown:3"
 
   constructor(private readonly storage: StorageLike | null = browserStorage()) {
     this.levels = sanitize(readJson(storage, STORAGE_KEY));
-    this.seen = sanitizeSeen(readJson(storage, SEEN_KEY));
+    const seen = readJson(storage, SEEN_KEY);
+    this.seen = Array.isArray(seen) ? seen.filter((key): key is string => typeof key === "string") : [];
   }
 
   level(id: string): LevelProgress {
@@ -43,18 +44,18 @@ export class ProgressStore {
 
   /** Whether the player has already been shown `tier`'s promotion ceremony, or `chapter`'s crown. */
   hasSeen(kind: "promotion" | "crown", key: string | number): boolean {
-    return kind === "promotion" ? this.seen.promotions.includes(String(key)) : this.seen.crowns.includes(Number(key));
+    return this.seen.includes(`${kind}:${key}`);
   }
 
   markSeen(kind: "promotion" | "crown", key: string | number): void {
     if (this.hasSeen(kind, key)) return;
-    this.seen = kind === "promotion" ? { ...this.seen, promotions: [...this.seen.promotions, String(key)] } : { ...this.seen, crowns: [...this.seen.crowns, Number(key)] };
+    this.seen = [...this.seen, `${kind}:${key}`];
     writeJson(this.storage, SEEN_KEY, this.seen);
   }
 
   reset(): void {
     this.levels = {};
-    this.seen = { promotions: [], crowns: [] };
+    this.seen = [];
     writeJson(this.storage, STORAGE_KEY, this.levels);
     writeJson(this.storage, SEEN_KEY, this.seen);
   }
@@ -75,16 +76,6 @@ export function sanitize(raw: unknown): Record<string, LevelProgress> {
     };
   }
   return levels;
-}
-
-/** Keep only well-formed entries of what has been shown once. */
-function sanitizeSeen(raw: unknown): { promotions: string[]; crowns: number[] } {
-  const input = asRecord(raw);
-  const list = <T>(value: unknown, ok: (item: unknown) => item is T): T[] => (Array.isArray(value) ? value.filter(ok) : []);
-  return {
-    promotions: list(input.promotions, (item): item is string => typeof item === "string"),
-    crowns: list(input.crowns, (item): item is number => typeof item === "number"),
-  };
 }
 
 /** A whole number from 0 to `max`; anything else is 0. */

@@ -4,7 +4,7 @@
 //   tiles: clean wire. Violet for structure, amber for things to act on, green for text the world holds
 // The registry at the bottom says which sprite each tile kind and enemy kind uses (board.ts).
 import type { Enemy, Facing, TileKind } from "../../py/protocol";
-import { svg as el } from "./svg";
+import { svg as el } from "../svg";
 import { fit, floor, pawnModel, project, pts, rookModel, rookSlit, wallModel, yaw, type Model, type V3 } from "./mesh";
 import { broken, fitShape, live, solid, wire, type Decal, type Frame } from "./draw";
 import { beaconShape, bishopCut, bishopModel, brickLines, gateShape, gemShape, knightEyes, knightModel, pitShape, plankShape, runeShape, signShape, virusEyes, virusModel, waypointShape, type Shape } from "./models";
@@ -48,26 +48,35 @@ function brackets(face: Facing): SVGElement {
   );
 }
 
-export function hero(skin: Skin, face: Facing, withBrackets = true): SVGElement {
-  if (skin === "pawn") return drawHero(yaw(pawnModel("low"), PAWN_FACING[face] - VISOR), [], face, withBrackets);
-  return knightHero(knightModel(), knightEyes, face, withBrackets);
+/**
+ * Sprites are built once and handed out as copies: the same wall, enemy or hero is needed by every tile of
+ * every board, every thumbnail and every Lessons selection. (Not the goal: its gradients have ids.)
+ */
+const memo = new Map<string, SVGElement>();
+function cached(key: string, build: () => SVGElement): SVGElement {
+  let art = memo.get(key);
+  if (!art) memo.set(key, (art = build()));
+  return art.cloneNode(true) as SVGElement;
 }
 
-/** A knight (a model whose head points along -x, with its lit details) turned to `face` and drawn as the hero. */
-function knightHero(model: Model, eyes: Decal[], face: Facing, withBrackets = true): SVGElement {
+export const hero = (skin: Skin, face: Facing): SVGElement => cached(`hero:${skin}:${face}`, () => buildHero(skin, face));
+
+function buildHero(skin: Skin, face: Facing): SVGElement {
+  if (skin === "pawn") return drawHero(yaw(pawnModel("low"), PAWN_FACING[face] - VISOR), [], face);
+  // the knight's head points along -x; a facing turns it, and its lit details turn with it
   const angle = KNIGHT_TURN[face];
-  const lit = eyes.map((d) => ({ pts: d.pts.map(turn(angle)), n: turn(angle)(d.n) }));
-  return drawHero(yaw(model, angle), lit, face, withBrackets);
+  const lit = knightEyes.map((d) => ({ pts: d.pts.map(turn(angle)), n: turn(angle)(d.n) }));
+  return drawHero(yaw(knightModel(), angle), lit, face);
 }
 
 /** The hero's drawing: brackets that show the facing, the floor shadow, and the solid model. */
-function drawHero(model: Model, lit: Decal[], face: Facing, withBrackets: boolean): SVGElement {
+function drawHero(model: Model, lit: Decal[], face: Facing): SVGElement {
   const f = fit(model, 52, 55, 27.5);
   const { c, rx, ry } = floor(f, 20);
   return el(
     "g",
     { class: "hero" },
-    withBrackets ? brackets(face) : el("g", {}),
+    brackets(face),
     // the only floor shadow on the board: the hero is the only solid thing
     el("ellipse", { cx: c[0] + rx * 0.2, cy: c[1] + ry * 0.35, rx: rx * 1.1, ry: ry * 1.25, class: "s-shadow" }),
     solid(model, f, lit),
@@ -89,11 +98,18 @@ const ENEMIES: Record<EnemyKind, () => { shape: Shape; fitBox: [number, number, 
  * `backlit`: a dark shape behind the wire, for the title screen, where the enemies stand against the sun.
  */
 export function enemy(kind: EnemyKind, frame: Frame | "live" = "live", delay = 0, backlit = false): SVGElement {
+  const art = cached(`enemy:${kind}:${frame}:${backlit}`, () => buildEnemy(kind, frame, backlit));
+  // an enemy's glitch beat is only a CSS variable, so copies of one drawing can each have their own
+  if (frame === "live") art.querySelector<SVGElement>(".bw-live")?.style.setProperty("--glitch-delay", `${delay}s`);
+  return art;
+}
+
+function buildEnemy(kind: EnemyKind, frame: Frame | "live", backlit: boolean): SVGElement {
   const { shape, fitBox, lit } = ENEMIES[kind]();
   const f = fitShape(shape, ...fitBox);
   const group = el("g", { class: "enemy-art" });
   if (backlit) group.append(el("g", { class: "bw-backing" }, ...shape.model.faces.map((x) => el("polygon", { points: pts(x.pts.map((q) => project(q, f))) }))));
-  group.append(frame === "live" ? live(shape, f, lit, delay) : broken(shape, f, frame, lit));
+  group.append(frame === "live" ? live(shape, f, lit, 0) : broken(shape, f, frame, lit));
   return group;
 }
 
@@ -103,7 +119,9 @@ export type TileName = "wall" | "sign" | "rune" | "gate" | "gateTimed" | "gateOp
 
 const GATE_FIT = fitShape(gateShape("guarded"), 54, 56, 28);
 
-export function tile(name: TileName): SVGElement {
+export const tile = (name: TileName): SVGElement => cached(`tile:${name}`, () => buildTile(name));
+
+function buildTile(name: TileName): SVGElement {
   switch (name) {
     case "wall": {
       const model = wallModel();
@@ -137,8 +155,9 @@ export function tile(name: TileName): SVGElement {
     }
     case "waypoint":
     case "waypointDone": {
-      const f = fitShape(waypointShape(false), 40, 50, 24);
-      return name === "waypoint" ? wire(waypointShape(false), f, "amber") : wire(waypointShape(true), f, "green");
+      const todo = waypointShape(false);
+      const f = fitShape(todo, 40, 50, 24);
+      return name === "waypoint" ? wire(todo, f, "amber") : wire(waypointShape(true), f, "green");
     }
     case "gem": {
       const shape = gemShape();

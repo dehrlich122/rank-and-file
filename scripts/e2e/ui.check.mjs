@@ -749,11 +749,83 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     await openLevel("ch01-l01", { reload: true });
     await setCode("pawn.move()\n");
     await b.evaluate(`window.__trails = 0; setInterval(() => { window.__trails = Math.max(window.__trails, document.querySelectorAll('.board .trail-hero').length); }, 20); document.querySelector('.level-right .btn-primary').click()`);
-    await sleep(1500);
+    await b.waitFor(`document.querySelector('.outcome')`, 30_000, "the run's result"); // the run played to its end
     const trails = await b.evaluate(`window.__trails`);
     await b.evaluate(`localStorage.setItem("rank-and-file:settings", JSON.stringify({ motion: "system" })); true`);
     expect(trails === 0, `${trails} trail elements`);
     return "no trail elements";
+  });
+
+  // -- M3.7 pre-merge: the look, the chrome and the motion, end to end -----------------------------------
+  const solvedChapter6 = Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`ch06-l0${n}`, { stars: 3, hints: 0, failedAfterHints: 0, helped: false, solutionSeen: false, code: null }]));
+  const setStorage = (key, value) => b.evaluate(`localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(JSON.stringify(value))}); true`);
+
+  await check("M3.7: the style guide shows the board, the sprites and a colour strip in both themes", async () => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/styleguide` });
+    await b.waitFor(`document.querySelectorAll('.sg-pane .board').length >= 4`, 30_000, "style guide");
+    const seen = await b.evaluate(`({ panes: [...document.querySelectorAll('.sg-pane')].map((p) => p.dataset.scheme).join(), swatches: document.querySelectorAll('.sg-swatch').length, ratios: [...document.querySelectorAll('.sg-ratios')].every((e) => /^[\\d.]+ · [\\d.]+ · [\\d.]+$/.test(e.textContent)) })`);
+    expect(seen.panes === "dark,light" && seen.swatches === 24 && seen.ratios, JSON.stringify(seen));
+    return `${seen.panes}, ${seen.swatches} swatches`;
+  });
+
+  await check("M3.7: the promotion: refused until earned, then shown, remembered, replayable from Lessons; the knight skin follows", async () => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/promotion/pawn` });
+    await b.waitFor(`location.hash === '#/lessons'`, 10_000, "redirect to Lessons");
+    await setStorage("rank-and-file:progress", solvedChapter6);
+    await b.send("Page.navigate", { url: `${base}?reload=${Date.now()}#/promotion/pawn` });
+    await b.waitFor(`document.querySelector('.promotion .pr-to')`, 30_000, "the ceremony");
+    await b.evaluate(`[...document.querySelectorAll('.pr-actions button')].find((e) => e.textContent.startsWith('Wear the knight')).click()`);
+    const worn = await b.evaluate(`JSON.parse(localStorage.getItem('rank-and-file:settings')).piece`);
+    await b.send("Page.navigate", { url: `${base}?reload=${Date.now()}#/lessons/6` });
+    await b.waitFor(`document.querySelector('.folder[data-chapter="6"]')`, 30_000, "Lessons");
+    const lessons = await b.evaluate(`({ replay: !!document.querySelector('.promo-link'), crown: !!document.querySelector('.folder[data-chapter="6"] .victory'), seen: JSON.parse(localStorage.getItem('rank-and-file:seen')) })`);
+    // the knight on a level's board is a different drawing from the pawn
+    await openLevel("ch06-l01", { reload: true });
+    const knight = await b.evaluate(`document.querySelector('.level-middle .board .pawn').innerHTML.length`);
+    await setStorage("rank-and-file:settings", { piece: "pawn" });
+    await openLevel("ch06-l01", { reload: true });
+    const pawn = await b.evaluate(`document.querySelector('.level-middle .board .pawn').innerHTML.length`);
+    expect(worn === "knight" && lessons.replay && lessons.crown && lessons.seen.includes("promotion:pawn") && knight !== pawn, JSON.stringify({ worn, lessons, knight, pawn }));
+    return `worn ${worn}, replay link, crown, board ${knight} vs ${pawn}`;
+  });
+
+  await check("M3.7: a solved run gets the Run complete banner above its card; an error flickers the card's frame", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    await setCode(solution("ch01-l01"));
+    await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
+    await b.waitFor(`document.querySelector('.complete-wrap .complete-banner')`, 30_000, "the banner");
+    const banner = await b.evaluate(`document.querySelector('.complete-banner').textContent`);
+    await setCode("pawn.mvoe()\n");
+    await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
+    await b.waitFor(`document.querySelector('.outcome-bad.glitch-frame')`, 30_000, "the error card");
+    expect(banner === "Run complete", banner);
+    return `${banner}; error card flickers`;
+  });
+
+  await check("M3.7 (QA-036): with Animations full a move leaves a trail, the goal breathes, a gate crossfades and the rook slides in", async () => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/level/ch01-l01` });
+    await b.waitFor(`document.querySelector('.level .board .piece')`, 30_000, "level");
+    await setStorage("rank-and-file:settings", { motion: "full" });
+    await openLevel("ch01-l01", { reload: true });
+    const beacon = await b.evaluate(`document.querySelector('.level-middle .beacon > rect').getAnimations().length`);
+    await setCode("pawn.move()\n");
+    await b.evaluate(`window.__trails = 0; setInterval(() => { window.__trails = Math.max(window.__trails, document.querySelectorAll('.board .trail-hero').length); }, 20); document.querySelector('.level-right .btn-primary').click()`);
+    await b.waitFor(`document.querySelector('.outcome')`, 30_000, "the run's result");
+    const trails = await b.evaluate(`window.__trails`);
+    // a gate's closed art lifts away over time when it opens, and a rook that takes the piece slides in rather than jumping
+    await b.send("Page.navigate", { url: `${base}#/styleguide` });
+    await b.waitFor(`document.querySelectorAll('.sg-pane .board').length >= 2`, 30_000, "style guide");
+    await b.evaluate(`[...document.querySelectorAll('.sg-controls button')].find((e) => e.textContent === 'gates open').click()`);
+    const gate = await b.evaluate(`document.querySelector('.sg-pane .board .gate .spr-closed').getAnimations().length`);
+    await b.evaluate(`[...document.querySelectorAll('.sg-controls button')].find((e) => e.textContent === 'rook takes pawn').click()`);
+    let slid = false;
+    for (let i = 0; i < 30 && !slid; i++) {
+      await sleep(60);
+      slid = await b.evaluate(`[...document.querySelectorAll('.sg-pane .board > .enemy')].some((e) => e.getAnimations().length > 0)`);
+    }
+    await setStorage("rank-and-file:settings", { motion: "system" });
+    expect(beacon > 0 && trails > 0 && gate > 0 && slid, JSON.stringify({ beacon, trails, gate, slid }));
+    return `beacon ${beacon}, trail elements ${trails}, gate transitions ${gate}, rook slides`;
   });
 
   await check("settings are reset after the checks", async () => {

@@ -1640,6 +1640,22 @@ The designer ran step 2 with Animations on Full. Rook glitch: "looks great", don
 - **QA-041 · Changing the piece in Settings didn't change the start menu's piece** *(Designer, 2026-10-03)*
   - **Cause:** the start menu drew its piece once, when it opened.
   - **Fixed:** it follows Settings → Piece while it is open (the same way the boards do). An e2e check covers it.
+- **Pre-merge pass** *(2026-10-03, after the designer called M3.7 feature-complete)*:
+  - `/simplify` (four reviews) fixed: sprites are built once and copied (a wall, an enemy or the hero was rebuilt for every tile, board and
+    thumbnail); the lost event names the enemy by its place in the level's list rather than by square, and enemies are drawn over the piece
+    from the start, which removes the DOM reorder and forced reflow in the rook's capture; the board's facing is read from the previous state
+    instead of kept twice; the "seen" record is one list of keys; the tier's last chapter is worked out once (`lastChapterOf`); `svg()` moved to
+    `src/ui/svg.ts` and the icons use it; contrast maths is one file (`src/contrast.ts`) shared by the build check and the style guide; named
+    menu entries in the voice; `complete-mock` became `complete-wrap`; a Lessons board that loads after leaving isn't built; dead options
+    removed. Skipped on purpose: `pawnModel("high")` and `rookModel` options (the kept `design/` pages use them); the
+    pawn-only slide rule in `motion.ts` (the designer's decision, for pieces that don't exist yet); skin choice inside the board; the route table;
+    the promotion's timed jump; the light-theme filter list; lazy-loading the style guide.
+  - Nine e2e checks were added for the look, chrome and motion (style guide and its colour strip; the promotion refused, shown, remembered and
+    replayable; the knight on a level's board; the Run complete banner and the frame flicker; the trail, the beacon, the gate and the rook's
+    slide under Full motion; plus step 4's keyboard checks). They caught a real bug in the style guide's colour strip (a lost backslash made every
+    ratio NaN), fixed. Full e2e: 205/205.
+  - What a player may notice: enemies are now drawn over the piece (only visible when they share a square); the record of what has been shown once
+    changed shape, so a browser that has already seen the promotion or a crown will see each once more.
 
 ---
 

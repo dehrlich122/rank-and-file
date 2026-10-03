@@ -12,6 +12,9 @@ interface Node {
   setAttribute(name: string, value: string): void;
   append(...nodes: Array<Node | string>): void;
   prepend(...nodes: Array<Node | string>): void;
+  cloneNode(deep: boolean): Node;
+  querySelector(selector: string): Node | null; // only ".class"
+  style: { setProperty(name: string, value: string): void };
 }
 
 const fake = (tag: string): Node => ({
@@ -26,6 +29,19 @@ const fake = (tag: string): Node => ({
   },
   prepend(...nodes) {
     this.children.unshift(...nodes);
+  },
+  cloneNode(deep) {
+    const copy = fake(this.tag);
+    Object.assign(copy.attrs, this.attrs);
+    if (deep) copy.children = this.children.map((child) => (typeof child === "string" ? child : child.cloneNode(true)));
+    return copy;
+  },
+  querySelector(selector) {
+    const found = (node: Node | string): Node | null => (typeof node === "string" ? null : node.attrs.class?.split(" ").includes(selector.slice(1)) ? node : node.children.map(found).find(Boolean) ?? null);
+    return this.children.map(found).find(Boolean) ?? null;
+  },
+  style: {
+    setProperty() {},
   },
 });
 
@@ -95,10 +111,6 @@ describe("the hero", () => {
 
   it("draws both skins differently", () => {
     expect(text(draw(hero("pawn", "east")))).not.toBe(text(draw(hero("knight", "east"))));
-  });
-
-  it("can leave the brackets off", () => {
-    expect(text(draw(hero("pawn", "east", false)))).not.toContain("br-facing");
   });
 });
 

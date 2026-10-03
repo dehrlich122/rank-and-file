@@ -6,7 +6,7 @@ import "./knights.css";
 import type { Facing } from "../src/py/protocol";
 import { h } from "../src/ui/dom";
 import { hero } from "../src/ui/sprites";
-import { svg } from "../src/ui/sprites/svg";
+import { svg } from "../src/ui/svg";
 
 const FACINGS: Facing[] = ["north", "east", "south", "west"];
 const LABEL: Record<Facing, string> = { north: "from behind (north)", east: "east", south: "facing us (south)", west: "west" };

@@ -5,17 +5,17 @@
 // The board never decides anything. It draws the states the engine reported:
 // `show()` jumps straight to a state, `animate()` plays a step's events in order.
 //
-// Each tile type has its own draw function (TILE_ART below) and CSS classes, and
-// every colour comes from the CSS custom properties in styles.css, so a visual
-// redesign can reskin tiles without touching the logic. What each tile, enemy and
-// the hero look like is in ./sprites (the registry there maps a kind to its drawing).
+// Each tile type has its own function (TILE_ART below) that builds its group, tooltip and
+// state classes; what it, the enemies and the hero look like is in ./sprites (its registry
+// maps a kind to its drawing). Every colour comes from the CSS custom properties in
+// styles.css, so a visual redesign can reskin them without touching the logic.
 import type { Clock, Enemy, Facing, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
 import { wornPiece } from "../promotion";
 import { motionReduced, settings } from "../settings";
 import { playableEvents } from "./motion";
 import { halftone, litGrid, M, S } from "./sprites/floor";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite, type Skin, type TileName } from "./sprites";
-import { svg } from "./sprites/svg";
+import { svg } from "./svg";
 
 let trails = 0; // numbers each trail's gradient
 
@@ -38,7 +38,6 @@ export class BoardView {
   private readonly counters: SVGGElement[]; // badges that count a clock's ticks: clockwork's (QA-021), timed gates' (M3.2)
   private readonly art = new Map<TileKind, Map<string, SVGGElement>>(); // tile kind -> "x,y" -> its art
   private readonly heroes = new Map<Facing, SVGElement>(); // the hero drawn facing each way, made when first needed
-  private facing: Facing | undefined;
   private skin: Skin;
   private readonly stopSettings: () => void;
   private readonly stopHalftone: () => void;
@@ -100,14 +99,15 @@ export class BoardView {
     this.attacks = svg("g", { class: "attacks", "aria-hidden": "true" });
     this.flash = svg("rect", { class: "bump-flash", width: S, height: S, x: 0, y: 0 });
     this.trails = svg("g", { class: "trails", "aria-hidden": "true" });
-    this.element.append(this.attacks, this.trails, this.flash, ...this.enemies);
+    this.element.append(this.attacks, this.trails, this.flash);
 
     this.piece = svg("g", { class: "piece" });
     this.body = svg("g", { class: "piece-body" });
     this.pawn = svg("g", { class: "pawn" });
     this.body.append(svg("circle", { r: 26, class: "cheer-ring" }), this.pawn);
     this.piece.append(this.body);
-    this.element.append(this.piece);
+    // the enemies are drawn over the piece, so one that takes it is on top without any reordering
+    this.element.append(this.piece, ...this.enemies);
 
     this.lostMark = lostMark();
     this.element.append(this.lostMark);
@@ -145,7 +145,7 @@ export class BoardView {
 
   private apply(event: GameEvent): void {
     this.place(event.state, true);
-    if (event.kind === "lost" && event.by && event.at) this.strike(event.by, event.at);
+    if (event.kind === "lost" && event.by !== undefined && event.at) this.strike(event.by, event.at);
     if (event.kind === "bump" && event.at) this.bump(event.state.pos, event.at);
     if (event.kind === "guard" && event.at) {
       const gate = this.art.get("gate")?.get(`${event.at[0]},${event.at[1]}`);
@@ -163,11 +163,9 @@ export class BoardView {
     this.last = state;
     this.element.setAttribute("aria-label", this.describe(state));
     this.piece.style.transform = centre(state.pos, this.level.height);
-    if (state.facing !== this.facing) {
-      const turned = this.facing !== undefined;
-      this.facing = state.facing;
+    if (state.facing !== before?.facing) {
       this.pawn.replaceChildren(this.heroArt(state.facing));
-      if (animate && turned) restartAnimation(this.pawn, "turning");
+      if (animate && before) restartAnimation(this.pawn, "turning");
     }
     if (animate && before) {
       if (before.pos[0] !== state.pos[0] || before.pos[1] !== state.pos[1]) this.trail(before.pos, state.pos, "trail-hero");
@@ -247,16 +245,10 @@ export class BoardView {
     this.timers.push(window.setTimeout(() => group.remove(), 1500));
   }
 
-  /** A chess piece takes the piece: it moves in from its own square (`by`) onto the square it took (`at`). */
-  private strike(by: Pos, at: Pos): void {
-    const index = this.last?.enemies?.findIndex((pos) => pos && pos[0] === by[0] && pos[1] === by[1]) ?? -1;
-    const enemy = this.enemies[index];
-    if (!enemy) return;
-    // it takes the square, so it is drawn over the piece (and under the lost ring). Moving a node in the
-    // document cancels its transitions, so reorder it first and let the browser see it there before it slides.
-    this.lostMark.before(enemy);
-    this.element.getBoundingClientRect();
-    enemy.style.transform = centre(at, this.level.height);
+  /** A chess piece takes the piece: the enemy `by` slides in from its own square onto the square it took (`at`). */
+  private strike(by: number, at: Pos): void {
+    const enemy = this.enemies[by];
+    if (enemy) enemy.style.transform = centre(at, this.level.height);
   }
 
   private bump(from: Pos, at: Pos): void {
@@ -288,7 +280,7 @@ export class BoardView {
     if (skin === this.skin) return;
     this.skin = skin;
     this.heroes.clear();
-    if (this.facing) this.pawn.replaceChildren(this.heroArt(this.facing));
+    if (this.last) this.pawn.replaceChildren(this.heroArt(this.last.facing));
   }
 
   /** The hero turned to face `face`: the brackets and the model both show it. */

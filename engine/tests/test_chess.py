@@ -105,10 +105,10 @@ def test_stepping_onto_an_attacked_square_loses_the_run():
     assert result.final["pos"] == [1, 2] and result.final["lost"] == [1, 2]
 
 
-def test_the_loss_names_the_square_of_the_piece_that_took_it():
-    # so the board can show the rook moving in (M3.7)
+def test_the_loss_names_the_enemy_that_took_the_piece():
+    # so the board can show that rook moving in (M3.7)
     (lost,) = events(run_level(rook_level(), "pawn.move(2)"), "lost")
-    assert lost["at"] == [1, 2] and lost["by"] == [2, 2]
+    assert lost["at"] == [1, 2] and lost["by"] == 0  # the level's only enemy
 
 
 def test_a_rook_taken_from_the_diagonal_attacks_nothing_more():

@@ -68,7 +68,7 @@
 }
 
 /* success: a sunset banner (a big chrome moment), above the plain green card */
-.complete-mock {
+.complete-wrap {
   display: grid;
 }
 
@@ -108,7 +108,7 @@
   transform: translate(3px, 3px);
 }
 
-.complete-mock .outcome {
+.complete-wrap .outcome {
   border-top-left-radius: 0;
   border-top-right-radius: 0;
 }

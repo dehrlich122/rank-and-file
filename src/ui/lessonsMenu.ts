@@ -5,13 +5,13 @@ import type { Chapter } from "../content";
 import type { PyClient } from "../py/client";
 import type { LevelInfo } from "../py/protocol";
 import type { ProgressStore } from "../progress";
-import { PROMOTIONS, tierCleared } from "../promotion";
-import { browserStorage, readJson, writeJson } from "../storage";
+import { lastChapterOf, PROMOTIONS, tierCleared } from "../promotion";
+import { asRecord, browserStorage, readJson, writeJson } from "../storage";
 import { BoardView } from "./board";
 import { h } from "./dom";
 import { icon } from "./icons";
 import { crown } from "./sprites";
-import { svg } from "./sprites/svg";
+import { svg } from "./svg";
 import { folderName, tierName, VOICE } from "./voice";
 
 /** The tag on a chapter's optional mastery challenge (M3.2): on its row, and in its Challenge panel. */
@@ -34,9 +34,8 @@ const crownIcon = (mastered: boolean) => svg("svg", { viewBox: "-32 -26 64 44", 
 
 /** The chapters the player opened by hand, from storage. */
 function openedByHand(): Set<number> {
-  const saved = readJson(browserStorage(), FOLDERS_KEY);
-  const list = saved && typeof saved === "object" && "open" in saved && Array.isArray(saved.open) ? saved.open : [];
-  return new Set(list.filter((n): n is number => typeof n === "number"));
+  const { open } = asRecord(readJson(browserStorage(), FOLDERS_KEY));
+  return new Set(Array.isArray(open) ? open.filter((n): n is number => typeof n === "number") : []);
 }
 
 /** Mount Lessons in `main`, with `focus` (a chapter number from the URL) open. Returns what to call to leave it. */
@@ -48,6 +47,7 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
   let selected: Level | undefined = (focus !== undefined ? chapters.find((c) => c.chapter === focus)?.levels[0] : undefined) ?? next ?? chapters[0]?.levels[0];
   const boards = new Map<string, Promise<LevelInfo | null>>();
   let board: BoardView | undefined;
+  let leaving = false; // set on unmount, so a board that loads late isn't built on a screen that has gone
 
   const crumbs = h("nav", { class: "lcrumbs", "aria-label": "Lessons path" });
   const detail = h("aside", { class: "detail", "aria-label": "Selected level" });
@@ -98,7 +98,7 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
       h("div", { class: "detail-actions" }, h("a", { class: "btn btn-primary", href: `#/level/${level.id}` }, icon("play"), best > 0 ? "Replay this level" : "Run this level")),
     );
     void boardFor(level).then((info) => {
-      if (!info || selected !== level) return;
+      if (!info || leaving || selected !== level) return;
       board = new BoardView(info, { mini: true });
       boardHost.replaceChildren(board.element);
     });
@@ -149,8 +149,7 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
     // the crown gets a short flourish the first time it is shown, and is still afterwards
     const fresh = cleared && !progress.hasSeen("crown", chapter.chapter);
     if (cleared) progress.markSeen("crown", chapter.chapter);
-    const lastOfTier = chapters.filter((c) => c.curriculum && c.tier === chapter.tier).at(-1) === chapter;
-    const promotion = lastOfTier ? PROMOTIONS.find((p) => p.tier === chapter.tier && tierCleared(p.tier, progress)) : undefined;
+    const promotion = lastChapterOf(chapter.tier) === chapter ? PROMOTIONS.find((p) => p.tier === chapter.tier && tierCleared(p.tier, progress)) : undefined;
     const head = h(
       "button",
       { class: "folder-head", "aria-expanded": String(open), title: chapter.summary },
@@ -229,5 +228,8 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
     ),
   );
   if (selected) rowOf.get(selected.id)?.scrollIntoView?.({ block: "center" });
-  return () => board?.dispose();
+  return () => {
+    leaving = true;
+    board?.dispose();
+  };
 }

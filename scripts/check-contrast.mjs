@@ -7,6 +7,7 @@
 // The thresholds are the project's own rules (text 4.5 as in WCAG AA, graphics 3 as in
 // WCAG 1.4.11, the rest chosen by the designer's brief), kept in one place below.
 import { readFileSync } from "node:fs";
+import { contrastRatio as ratio } from "../src/contrast.ts"; // the same maths the style guide shows
 
 const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
 const root = /(?:^|\n):root \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? "";
@@ -50,12 +51,6 @@ function parse(text) {
 }
 
 const over = (top, under) => [0, 1, 2].map((i) => top[i] * top[3] + under[i] * (1 - top[3])).concat(1);
-const channel = (v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-const luminance = ([r, g, b]) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-const ratio = (a, b) => {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-};
 
 const rows = [];
 for (const theme of ["dark", "light"]) {

@@ -7,7 +7,7 @@ import { PROMOTIONS, tierCleared } from "../promotion";
 import type { SettingsStore } from "../settings";
 import { h } from "./dom";
 import { hero } from "./sprites";
-import { svg } from "./sprites/svg";
+import { svg } from "./svg";
 
 /** Mount the ceremony for `tier`. Without a promotion earned there is nothing to show, so it goes back to Lessons. */
 export function mountPromotion(main: HTMLElement, tier: string, progress: ProgressStore, settings: SettingsStore): () => void {

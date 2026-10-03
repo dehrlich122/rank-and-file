@@ -1,5 +1,5 @@
 // The board's floor: the lit grid and the halftone on threatened squares (M3.7).
-import { svg } from "./svg";
+import { svg } from "../svg";
 
 export const S = 64; // size of one square, in SVG units
 export const M = 22; // margin for the file letters and rank numbers

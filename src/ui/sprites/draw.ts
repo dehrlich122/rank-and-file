@@ -3,7 +3,7 @@
 //   solid()   the hero: flat-shaded faces, no lines inside, a glowing edge on the outline only
 //   broken()  enemies: wire that looks damaged at rest, with "break" and "snap" frames
 // Colours are CSS custom properties only (styles.css), so both themes work.
-import { svg as el } from "./svg";
+import { svg as el } from "../svg";
 import { depth, facing, fitPoints, light, project, pts, type Face, type Fit, type Model, type Pt, type V3 } from "./mesh";
 import type { Shape } from "./models";
 
