@@ -1692,11 +1692,11 @@ pre {
 }
 
 .trail-hero line {
-  stroke-width: 5;
+  stroke-width: 8;
 }
 
 .trail-foe line {
-  stroke-width: 3;
+  stroke-width: 4.5;
 }
 
 .trail-hero .trail-tail,
@@ -1710,11 +1710,11 @@ pre {
 }
 
 .trail-tail {
-  stop-opacity: 0;
+  stop-opacity: 0.2;
 }
 
 .trail-head {
-  stop-opacity: 0.8;
+  stop-opacity: 1;
 }
 
 @keyframes trail-draw {

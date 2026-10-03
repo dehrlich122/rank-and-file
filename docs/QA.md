@@ -1614,6 +1614,14 @@ The designer ran step 2 with Animations on Full. Rook glitch: "looks great", don
     the pace the piece slides, so the piece is always its head and it never gets ahead. It is
     thinner, fades from nothing at the tail to its colour at the head, and fades away after the
     piece arrives. Enemies' is the same in magenta and a little thinner.
+- **QA-038 · Multi-square moves, and a bolder trail** *(Designer, 2026-10-03)*
+  - A pawn's hops are right as they are, since it only ever takes one step. When pieces with other
+    movement come, `move()` with a number should be one smooth motion, as in chess. The trail
+    could be bolder in opacity and width.
+  - **Done:** for any piece but the pawn, a run of moves the same way is played as one slide to
+    where it ends (`playableEvents` in `src/ui/motion.ts`, with tests); the pawn is unchanged.
+    No level uses another piece yet, so it can't be seen in play until one does. The trail is
+    wider (8 and 4.5, from 5 and 3) and more opaque (a faint tail from the start, a solid head).
 
 ---
 

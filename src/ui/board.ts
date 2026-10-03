@@ -10,6 +10,7 @@
 // redesign can reskin tiles without touching the logic. What each tile, enemy and
 // the hero look like is in ./sprites (the registry there maps a kind to its drawing).
 import type { Clock, Enemy, Facing, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
+import { playableEvents } from "./motion";
 import { halftone, litGrid, M, S } from "./sprites/floor";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite, type Skin, type TileName } from "./sprites";
 import { svg } from "./sprites/svg";
@@ -122,8 +123,9 @@ export class BoardView {
   }
 
   /** Play a step's events one after another, spread over `totalMs`. */
-  animate(events: GameEvent[], totalMs: number): void {
+  animate(all: GameEvent[], totalMs: number): void {
     this.cancel();
+    const events = playableEvents(all, this.level.piece);
     if (events.length === 0) return;
     const each = totalMs / events.length;
     this.element.style.setProperty("--step-ms", `${Math.round(each * 0.9)}ms`);
