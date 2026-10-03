@@ -14,6 +14,8 @@ import { halftone, litGrid, M, S } from "./sprites/floor";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite, type Skin, type TileName } from "./sprites";
 import { svg } from "./sprites/svg";
 
+let trails = 0; // numbers each trail's gradient
+
 export function squareName([x, y]: Pos): string {
   return `${String.fromCharCode(97 + x)}${y + 1}`;
 }
@@ -209,12 +211,22 @@ export class BoardView {
     for (const [key, art] of tiles) art.classList.toggle(className, on.has(key));
   }
 
-  /** A streak from one square's centre to another's that fades as the piece arrives (it lasts a little longer than the step). */
+  /**
+   * A comet tail behind a moving piece: it is drawn out from the square the piece left at the pace the
+   * piece slides, so its head is always the piece, then it fades (it lasts a little longer than the step).
+   */
   private trail(from: Pos, to: Pos, className: string): void {
     const [a, b] = [from, to].map((pos) => corner(pos, this.level.height).map((n) => n + S / 2));
-    const line = svg("line", { x1: a![0]!, y1: a![1]!, x2: b![0]!, y2: b![1]!, class: className });
-    this.trails.append(line);
-    this.timers.push(window.setTimeout(() => line.remove(), 1500));
+    const id = `trail-${++trails}`;
+    const [x1, y1, x2, y2] = [a![0]!, a![1]!, b![0]!, b![1]!];
+    const group = svg(
+      "g",
+      { class: className },
+      svg("linearGradient", { id, gradientUnits: "userSpaceOnUse", x1, y1, x2, y2 }, svg("stop", { offset: "0%", class: "trail-tail" }), svg("stop", { offset: "100%", class: "trail-head" })),
+      svg("line", { x1, y1, x2, y2, pathLength: 1, stroke: `url(#${id})` }),
+    );
+    this.trails.append(group);
+    this.timers.push(window.setTimeout(() => group.remove(), 1500));
   }
 
   /** A chess piece takes the piece: it moves in from its own square (`by`) onto the square it took (`at`). */

@@ -1607,6 +1607,13 @@ The designer ran step 2 with Animations on Full. Rook glitch: "looks great", don
     a green ring animate on a solved run, and the gate has running transitions.
     If the page still looks unchanged, restart the dev server (`npx vite --force`)
     and hard-refresh.
+- **QA-037 · The streak led the piece, like a beam** *(Designer, 2026-10-03)*
+  - The hero's cyan streak and the enemies' magenta one appeared in full at the start of a move,
+    ahead of the piece, and looked odd in width.
+  - **Fixed:** the streak is now a comet tail: it is drawn out from the square the piece left at
+    the pace the piece slides, so the piece is always its head and it never gets ahead. It is
+    thinner, fades from nothing at the tail to its colour at the head, and fades away after the
+    piece arrives. Enemies' is the same in magenta and a little thinner.
 
 ---
 

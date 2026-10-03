@@ -1674,30 +1674,62 @@ pre {
   transform: scale(1.4);
 }
 
-/* the trail behind a move: it appears as the piece sets off and fades as it arrives (nothing shows without motion) */
+/* the trail behind a move: a comet tail drawn out behind the piece at the pace it slides (the piece is its head),
+   fading after it arrives. Nothing shows without motion. */
 .trail-hero,
 .trail-foe {
   opacity: 0;
-  stroke-linecap: round;
   pointer-events: none;
-  animation: trail-fade calc(var(--step-ms, 350ms) * 2.2) ease-out;
+  animation: trail-fade calc(var(--step-ms, 350ms) * 2.4) ease-out;
 }
 
-.trail-hero {
-  stroke: var(--accent);
-  stroke-width: 7;
-  filter: drop-shadow(0 0 3px var(--glow-hero));
+.trail-hero line,
+.trail-foe line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  animation: trail-draw var(--step-ms, 350ms) ease-in-out both;
 }
 
-.trail-foe {
-  stroke: var(--wire-foe);
+.trail-hero line {
+  stroke-width: 5;
+}
+
+.trail-foe line {
   stroke-width: 3;
-  stroke-dasharray: 3 5;
+}
+
+.trail-hero .trail-tail,
+.trail-hero .trail-head {
+  stop-color: var(--accent);
+}
+
+.trail-foe .trail-tail,
+.trail-foe .trail-head {
+  stop-color: var(--wire-foe);
+}
+
+.trail-tail {
+  stop-opacity: 0;
+}
+
+.trail-head {
+  stop-opacity: 0.8;
+}
+
+@keyframes trail-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 @keyframes trail-fade {
-  from {
-    opacity: 0.5;
+  0%,
+  42% {
+    opacity: 1;
   }
 }
 
