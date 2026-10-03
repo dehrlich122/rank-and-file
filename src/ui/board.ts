@@ -215,7 +215,7 @@ export class BoardView {
 
   /**
    * A comet tail behind a moving piece: it is drawn out from the square the piece left at the pace the
-   * piece slides, so its head is always the piece, then it fades (it lasts a little longer than the step).
+   * piece slides, so its head is always the piece, then it is rubbed out from its tail forward to the piece.
    */
   private trail(from: Pos, to: Pos, className: string): void {
     const [a, b] = [from, to].map((pos) => corner(pos, this.level.height).map((n) => n + S / 2));
@@ -228,7 +228,9 @@ export class BoardView {
       svg("line", { x1, y1, x2, y2, pathLength: 1, stroke: `url(#${id})` }),
     );
     this.trails.append(group);
-    this.timers.push(window.setTimeout(() => group.remove(), 1500));
+    // gone when its animation ends; the timer is for when there is no animation (and cancel() clears them all)
+    group.addEventListener("animationend", (event) => event.target === group && group.remove());
+    this.timers.push(window.setTimeout(() => group.remove(), 8000));
   }
 
   /** A chess piece takes the piece: it moves in from its own square (`by`) onto the square it took (`at`). */
