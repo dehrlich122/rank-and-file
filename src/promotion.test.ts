@@ -5,11 +5,11 @@ import { tierCleared, unlockedPieces } from "./promotion";
 import { sanitize } from "./settings";
 import { memoryStorage } from "./storage.fake";
 
-const tier = (name: string) => chapters.filter((c) => c.curriculum && c.tier === name).flatMap((c) => c.levels);
+const tier = (name: string) => chapters.filter((c) => c.curriculum && c.tier === name).at(-1)!.levels; // the tier's last chapter
 const solve = (store: ProgressStore, ids: string[]) => ids.forEach((id) => store.update(id, { stars: 1 }));
 
 describe("promotion", () => {
-  it("is earned when every core level of the tier is solved, and not before", () => {
+  it("is earned when every core level of the tier's last chapter is solved, and not before", () => {
     const store = new ProgressStore(memoryStorage());
     const core = tier("pawn").filter((l) => !l.mastery);
     solve(store, core.slice(0, -1).map((l) => l.id));
@@ -18,7 +18,7 @@ describe("promotion", () => {
     expect(tierCleared("pawn", store)).toBe(true);
   });
 
-  it("doesn't wait for the optional mastery challenges", () => {
+  it("doesn't wait for the optional mastery challenge, or for earlier chapters", () => {
     const store = new ProgressStore(memoryStorage());
     solve(store, tier("pawn").filter((l) => !l.mastery).map((l) => l.id));
     expect(tierCleared("pawn", store)).toBe(true);

@@ -1,5 +1,6 @@
-// Tiers, promotions and the skins they unlock (DESIGN.md §8). A tier is cleared when the core levels of
-// all its chapters are solved (the mastery challenges stay optional); clearing one earns its promotion.
+// Tiers, promotions and the skins they unlock (DESIGN.md §8). A tier's promotion is earned by clearing its
+// last chapter: the five core levels solved (the mastery challenge stays optional). Nothing is locked, so
+// earlier chapters may be skipped, and they don't hold the promotion back.
 // What is unlocked is worked out from the saved progress, so Reset progress locks it again.
 import { chapters } from "./content";
 import { progress, type ProgressStore } from "./progress";
@@ -24,9 +25,10 @@ export const PROMOTIONS: Promotion[] = [
   },
 ];
 
-/** Every core level of every curriculum chapter in `tier` is solved. */
+/** Every core level of the tier's last chapter is solved. */
 export function tierCleared(tier: string, store: ProgressStore = progress): boolean {
-  const core = chapters.filter((chapter) => chapter.curriculum && chapter.tier === tier).flatMap((chapter) => chapter.levels.filter((level) => !level.mastery));
+  const last = chapters.filter((chapter) => chapter.curriculum && chapter.tier === tier).at(-1);
+  const core = last?.levels.filter((level) => !level.mastery) ?? [];
   return core.length > 0 && core.every((level) => store.solved(level.id));
 }
 

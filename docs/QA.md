@@ -1627,6 +1627,17 @@ The designer ran step 2 with Animations on Full. Rook glitch: "looks great", don
     (`055d116`); the designer said it looked worse, so it was **reverted** (`git revert`).
     The trail fades all at once, as in QA-038. Revisit only if the designer asks.
 
+## Session 13 — 2026-10-03 · M3.7 step 3 (chrome) play-test (`m3-7-look-and-feel`)
+
+- **QA-040 · Clearing Chapter 6 gave no promotion** *(Designer, 2026-10-03)*
+  - Chapter 6 was cleared, but earlier chapters weren't, and neither the ceremony nor the knight came.
+  - **Cause:** I made the pawn tier's promotion wait for every chapter in the tier. Nothing is locked, so
+    that held it back for anyone who plays out of order.
+  - **Fixed:** the promotion is earned by clearing the tier's last chapter (Chapter 6's five core levels).
+    The knight unlocks with it, and Lessons shows "watch again" on Chapter 6. The ceremony plays after the
+    next solved run (any level) if it hasn't been shown yet, so a player who has already cleared Chapter 6
+    can open it from Lessons now.
+
 ---
 
 ## Queued work
