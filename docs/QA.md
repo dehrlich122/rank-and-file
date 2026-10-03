@@ -1588,6 +1588,75 @@ The designer played Chapter 6: "mostly excellent", with one note.
     since `len` is in the Codex, instead of Python's. The e2e check for Python's
     own help now uses `abs`.
 
+## Session 12 — 2026-10-03 · M3.7 step 2 (motion) play-test (`m3-7-look-and-feel`)
+
+The designer ran step 2 with Animations on Full. Rook glitch: "looks great", don't touch.
+
+- **QA-036 · Step 2's motion mostly didn't show** *(Designer, 2026-10-03)*
+  - No cyan streak behind the hero or magenta one behind enemies; the rook jumped
+    instead of sliding; no green ring or glowing goal on completion; the gate
+    went from closed to open at once. The rune's green flash did show.
+  - **Cause, two things.** (1) The dev server hadn't picked up the CSS edit, so the
+    page had the new board code but the old styles; that is why the check I ran
+    first looked fine (it only counted streak elements). (2) The rook's slide was
+    cancelled by my own code: moving its element in the document (to draw it over
+    the pawn) resets its transition.
+  - **Fixed:** the rook is reordered first and the browser sees it there before it
+    slides. Checked in headless Chrome with Animations on Full: the streak fades
+    in and out, the rook's position moves through in-between values, the goal and
+    a green ring animate on a solved run, and the gate has running transitions.
+    If the page still looks unchanged, restart the dev server (`npx vite --force`)
+    and hard-refresh.
+- **QA-037 · The streak led the piece, like a beam** *(Designer, 2026-10-03)*
+  - The hero's cyan streak and the enemies' magenta one appeared in full at the start of a move,
+    ahead of the piece, and looked odd in width.
+  - **Fixed:** the streak is now a comet tail: it is drawn out from the square the piece left at
+    the pace the piece slides, so the piece is always its head and it never gets ahead. It is
+    thinner, fades from nothing at the tail to its colour at the head, and fades away after the
+    piece arrives. Enemies' is the same in magenta and a little thinner.
+- **QA-038 · Multi-square moves, and a bolder trail** *(Designer, 2026-10-03)*
+  - A pawn's hops are right as they are, since it only ever takes one step. When pieces with other
+    movement come, `move()` with a number should be one smooth motion, as in chess. The trail
+    could be bolder in opacity and width.
+  - **Done:** for any piece but the pawn, a run of moves the same way is played as one slide to
+    where it ends (`playableEvents` in `src/ui/motion.ts`, with tests); the pawn is unchanged.
+    No level uses another piece yet, so it can't be seen in play until one does. The trail is
+    wider (8 and 4.5, from 5 and 3) and more opaque (a faint tail from the start, a solid head).
+- **QA-039 · The trail's fade** *(Designer, 2026-10-03)*
+  - Asked for a gentler fade, back to front. I rubbed the trail out from its tail to the piece
+    (`055d116`); the designer said it looked worse, so it was **reverted** (`git revert`).
+    The trail fades all at once, as in QA-038. Revisit only if the designer asks.
+
+## Session 13 — 2026-10-03 · M3.7 step 3 (chrome) play-test (`m3-7-look-and-feel`)
+
+- **QA-040 · Clearing Chapter 6 gave no promotion** *(Designer, 2026-10-03)*
+  - Chapter 6 was cleared, but earlier chapters weren't, and neither the ceremony nor the knight came.
+  - **Cause:** I made the pawn tier's promotion wait for every chapter in the tier. Nothing is locked, so
+    that held it back for anyone who plays out of order.
+  - **Fixed:** the promotion is earned by clearing the tier's last chapter (Chapter 6's five core levels).
+    The knight unlocks with it, and Lessons shows "watch again" on Chapter 6. The ceremony plays after the
+    next solved run (any level) if it hasn't been shown yet, so a player who has already cleared Chapter 6
+    can open it from Lessons now.
+- **QA-041 · Changing the piece in Settings didn't change the start menu's piece** *(Designer, 2026-10-03)*
+  - **Cause:** the start menu drew its piece once, when it opened.
+  - **Fixed:** it follows Settings → Piece while it is open (the same way the boards do). An e2e check covers it.
+- **Pre-merge pass** *(2026-10-03, after the designer called M3.7 feature-complete)*:
+  - `/simplify` (four reviews) fixed: sprites are built once and copied (a wall, an enemy or the hero was rebuilt for every tile, board and
+    thumbnail); the lost event names the enemy by its place in the level's list rather than by square, and enemies are drawn over the piece
+    from the start, which removes the DOM reorder and forced reflow in the rook's capture; the board's facing is read from the previous state
+    instead of kept twice; the "seen" record is one list of keys; the tier's last chapter is worked out once (`lastChapterOf`); `svg()` moved to
+    `src/ui/svg.ts` and the icons use it; contrast maths is one file (`src/contrast.ts`) shared by the build check and the style guide; named
+    menu entries in the voice; `complete-mock` became `complete-wrap`; a Lessons board that loads after leaving isn't built; dead options
+    removed. Skipped on purpose: `pawnModel("high")` and `rookModel` options (the kept `design/` pages use them); the
+    pawn-only slide rule in `motion.ts` (the designer's decision, for pieces that don't exist yet); skin choice inside the board; the route table;
+    the promotion's timed jump; the light-theme filter list; lazy-loading the style guide.
+  - Nine e2e checks were added for the look, chrome and motion (style guide and its colour strip; the promotion refused, shown, remembered and
+    replayable; the knight on a level's board; the Run complete banner and the frame flicker; the trail, the beacon, the gate and the rook's
+    slide under Full motion; plus step 4's keyboard checks). They caught a real bug in the style guide's colour strip (a lost backslash made every
+    ratio NaN), fixed. Full e2e: 205/205.
+  - What a player may notice: enemies are now drawn over the piece (only visible when they share a square); the record of what has been shown once
+    changed shape, so a browser that has already seen the promotion or a crown will see each once more.
+
 ---
 
 ## Queued work
@@ -1658,6 +1727,9 @@ Planned tasks that aren't QA findings, in the order they should happen.
 ---
 
 ## Revisit later
+
+- **CRT scanlines option** (design pass). Faint scanlines over the board only, off by default, never over code or text. A good idea, but not
+  urgent: saved for a future design pass. *(Designer, 2026-10-03)*
 
 Deferred on purpose. Not bugs, but don't lose them.
 

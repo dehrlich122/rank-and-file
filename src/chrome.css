@@ -1,0 +1,857 @@
+/* The chrome of the look (M3.7): the start menu, Lessons, the promotion ceremony, the cards a run ends in, and
+   the way screens arrive. Tokens are in styles.css. Glow stays off text; pink lives only in the title,
+   the promotion and the level-complete banner. Motion is on unless the Animations setting (or, under
+   Match system, the OS) asks for less: the rules that stop it are at the end. */
+
+/* ---- headings and shape --------------------------------------------------------------------------- */
+
+.brand,
+.lessons-title,
+.tier-head,
+.folder-title,
+.detail h2,
+.detail-kicker,
+.pr-kicker,
+.pr-headline {
+  font-family: var(--font-display);
+}
+
+.brand {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.btn,
+.outcome {
+  border-radius: var(--radius);
+}
+
+.screen.screen-in {
+  animation: screen-in 260ms ease-out;
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ---- the cards a run ends in ------------------------------------------------------------------------ */
+
+/* the error card's frame flickers once when code throws: never its text */
+.outcome.glitch-frame {
+  animation: frame-flicker 650ms steps(1) 1;
+}
+
+@keyframes frame-flicker {
+  0% {
+    box-shadow: -4px 0 0 var(--glitch-a), 4px 0 0 var(--glitch-b);
+  }
+  18% {
+    box-shadow: none;
+  }
+  32% {
+    box-shadow: 4px 0 0 var(--glitch-a), -4px 0 0 var(--glitch-b);
+  }
+  48% {
+    box-shadow: none;
+  }
+  64% {
+    box-shadow: -3px 0 0 var(--glitch-a), 3px 0 0 var(--glitch-b);
+  }
+  80%,
+  100% {
+    box-shadow: none;
+  }
+}
+
+/* success: a sunset banner (a big chrome moment), above the plain green card */
+.complete-wrap {
+  display: grid;
+}
+
+.complete-banner {
+  position: relative;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    linear-gradient(to bottom, transparent 0 82%, var(--floor-bg) 82% 85%, transparent 85% 91%, var(--floor-bg) 91% 93%, transparent 93%),
+    linear-gradient(90deg, var(--sky-1), var(--sky-3) 35%, var(--sky-4) 60%, var(--sky-2));
+  border: 1px solid var(--border);
+  border-bottom: none;
+}
+
+.complete-text {
+  position: relative;
+  font: 900 30px var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: skewX(-9deg);
+  color: transparent;
+  background: linear-gradient(to bottom, #f4feff 0%, #a8eeff 40%, #2a5bd0 50%, #1b1350 52%, #b83cff 66%, #fff1fa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-stroke: 1px #07031a;
+}
+
+.complete-text::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  color: var(--logo-shadow-2);
+  transform: translate(3px, 3px);
+}
+
+.complete-wrap .outcome {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.complete-banner.play {
+  animation: banner-in 2.4s ease-out 1;
+}
+
+@keyframes banner-in {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  14%,
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* ---- the start menu ------------------------------------------------------------------------------------ */
+
+.title-scene {
+  --horizon: 396px;
+  position: relative;
+  min-height: max(780px, 100%);
+  overflow: hidden;
+  background: var(--floor-bg);
+  color: var(--plate-text);
+  isolation: isolate;
+}
+
+.ts-sky {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* the sky alone colour-cycles, so the enemies and the sun keep their colours */
+.ts-sky::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--horizon);
+  background: linear-gradient(to bottom, var(--sky-0), var(--sky-1) 34%, var(--sky-2) 64%, var(--sky-3) 86%, var(--sky-4));
+  animation: sky-cycle 22s ease-in-out infinite alternate;
+}
+
+/* faint scanlines on the sky only, never over the logo or the menu */
+.ts-sky::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--horizon);
+  background: repeating-linear-gradient(to bottom, var(--scanline) 0 1px, transparent 1px 3px);
+}
+
+.ts-sun {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--horizon) - 236px);
+  width: 300px;
+  height: 300px;
+  margin-left: -150px;
+  border-radius: 50%;
+  background: linear-gradient(to bottom, var(--sun-a), var(--sun-b) 48%, var(--sun-c) 78%);
+  -webkit-mask-image: linear-gradient(#000 0 52%, transparent 52% 55%, #000 55% 63%, transparent 63% 67%, #000 67% 73%, transparent 73% 78%, #000 78%);
+  mask-image: linear-gradient(#000 0 52%, transparent 52% 55%, #000 55% 63%, transparent 63% 67%, #000 67% 73%, transparent 73% 78%, #000 78%);
+}
+
+/* the enemy rank stands on the horizon, in front of the sun (viewBox 512 by 64) */
+.ts-rank {
+  --rank-width: min(620px, 88%);
+  position: absolute;
+  left: 50%;
+  width: var(--rank-width);
+  top: calc(var(--horizon) - var(--rank-width) / 8);
+  transform: translateX(-50%);
+  overflow: visible;
+}
+
+/* on the title, each enemy is backlit by the sun: a dark shape behind its broken wire */
+.bw-backing polygon {
+  fill: var(--title-silhouette);
+  stroke: var(--title-silhouette);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.ts-floor {
+  position: absolute;
+  top: var(--horizon);
+  height: calc(100% - var(--horizon));
+  left: -60%;
+  right: -60%;
+  transform-origin: 50% 0;
+  transform: perspective(240px) rotateX(62deg);
+  background:
+    repeating-linear-gradient(90deg, var(--floor-line) 0 2px, transparent 2px 60px),
+    repeating-linear-gradient(0deg, var(--floor-line) 0 2px, transparent 2px 42px),
+    var(--floor-bg);
+  border-top: 2px solid var(--floor-line);
+  animation: floor-scroll 1.4s linear infinite;
+}
+
+.ts-vhs {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 22px;
+  top: -30px;
+  background: linear-gradient(to bottom, transparent, rgb(255 255 255 / 0.14) 40%, rgb(255 255 255 / 0.05) 60%, transparent);
+  mix-blend-mode: screen;
+  animation: vhs 9s linear infinite;
+}
+
+.ts-body {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding-top: 34px;
+}
+
+.ts-logo {
+  margin: 0;
+  position: relative;
+  transform: skewX(-9deg);
+  animation: logo-sway 5.5s ease-in-out infinite alternate;
+}
+
+/* chrome lettering with a hard two-step shadow: offsets, not blur, so not glow on text */
+.ts-logo-text {
+  position: relative;
+  display: inline-block;
+  font: 900 66px/1.05 var(--font-display);
+  letter-spacing: 0.02em;
+  color: transparent;
+  background: linear-gradient(to bottom, #f4feff 0%, #a8eeff 38%, #2a5bd0 49%, #1b1350 51%, #b83cff 64%, #ff7ad0 86%, #fff1fa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.ts-logo-text::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  color: var(--logo-shadow-1);
+  transform: translate(5px, 5px);
+  text-shadow: 5px 5px 0 var(--logo-shadow-2);
+}
+
+.ts-sub {
+  margin: 4px 0 0;
+  padding: 1px 10px;
+  font: 16px var(--font-code);
+  letter-spacing: 0.08em;
+  color: var(--plate-text);
+  background: var(--plate-bg);
+  border: 1px solid var(--plate-accent);
+}
+
+.ts-menu:focus-visible {
+  outline-offset: 4px;
+}
+
+.ts-menu {
+  list-style: none;
+  margin: 268px 0 0;
+  min-width: 380px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 8px;
+  background: var(--plate-bg);
+  border: 1px solid var(--plate-accent);
+}
+
+.ts-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: 700 17px var(--font-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--plate-text);
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.ts-item.soon {
+  color: var(--plate-muted);
+}
+
+.ts-item.selected {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--plate-accent) 28%, transparent), transparent 85%);
+  box-shadow: inset 3px 0 0 var(--plate-accent);
+}
+
+.ts-cursor {
+  width: 1.2em;
+  color: var(--plate-accent);
+  visibility: hidden;
+}
+
+.ts-item.selected .ts-cursor {
+  visibility: visible;
+  animation: blink 1s steps(1) infinite;
+}
+
+.ts-tag {
+  margin-left: auto;
+  font: 600 11px var(--font-ui);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--plate-muted);
+  border: 1px solid var(--plate-muted);
+  padding: 1px 6px;
+}
+
+.ts-note {
+  margin: 6px 0 0;
+  padding: 2px 8px;
+  font-size: 13px;
+  color: var(--plate-text);
+  background: var(--plate-bg);
+}
+
+.ts-hero-slot {
+  margin-top: 6px;
+}
+
+.ts-hero {
+  display: block;
+  width: 130px;
+  height: 130px;
+  overflow: visible;
+}
+
+@keyframes sky-cycle {
+  to {
+    filter: hue-rotate(-28deg) saturate(1.15);
+  }
+}
+
+@keyframes floor-scroll {
+  to {
+    background-position: 0 0, 0 42px, 0 0;
+  }
+}
+
+@keyframes vhs {
+  0% {
+    top: -30px;
+  }
+  30%,
+  100% {
+    top: var(--horizon);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes logo-sway {
+  from {
+    transform: skewX(-9deg) rotate(-1.4deg);
+  }
+  to {
+    transform: skewX(-9deg) rotate(1.4deg);
+  }
+}
+
+@keyframes blink {
+  50% {
+    visibility: hidden;
+  }
+}
+
+/* ---- the promotion ceremony --------------------------------------------------------------------------- */
+
+.pr-body {
+  gap: 10px;
+  padding-bottom: 40px;
+}
+
+.pr-kicker {
+  margin: 0;
+  padding: 1px 10px;
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--plate-text);
+  background: var(--plate-bg);
+  border: 1px solid var(--plate-accent);
+}
+
+.pr-title {
+  font-size: 54px;
+}
+
+.pr-stage {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 150px;
+}
+
+.pr-piece {
+  display: block;
+  width: 130px;
+  height: 130px;
+  overflow: visible;
+}
+
+.pr-from {
+  opacity: 0.55;
+}
+
+.pr-arrow {
+  font-size: 28px;
+  color: var(--plate-accent);
+}
+
+.pr-to {
+  animation: promote-in 1.4s ease-out 1 both;
+}
+
+.pr-headline {
+  margin: 0;
+  padding: 2px 12px;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--plate-text);
+  background: var(--plate-bg);
+  border: 1px solid var(--plate-accent);
+}
+
+.pr-card {
+  max-width: 640px;
+  padding: 12px 18px;
+  background: var(--plate-bg);
+  border: 1px solid var(--plate-accent);
+  color: var(--plate-text);
+}
+
+.pr-card h2 {
+  margin: 0 0 6px;
+  font: 700 12px var(--font-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--plate-accent);
+}
+
+.pr-card ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  display: grid;
+  gap: 3px;
+  font-size: 14px;
+}
+
+.pr-card .muted {
+  color: var(--plate-muted);
+}
+
+.pr-teaser {
+  max-width: 640px;
+  margin: 0;
+  padding: 4px 12px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--plate-text);
+  background: var(--plate-bg);
+}
+
+.pr-actions {
+  display: flex;
+  gap: 10px;
+}
+
+@keyframes promote-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+/* ---- Lessons ------------------------------------------------------------------------------------------- */
+
+.lessons {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.lessons-title {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.lessons > p {
+  margin: 0 0 6px;
+}
+
+.lcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.lcrumbs a {
+  color: var(--muted);
+}
+
+.lessons-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(240px, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.lessons-foot {
+  margin-top: 18px;
+  text-align: center;
+}
+
+.hud-frame {
+  position: relative;
+  padding: 16px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(var(--accent), var(--accent)) top left / 16px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) top left / 2px 16px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) top right / 16px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) top right / 2px 16px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) bottom left / 16px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) bottom left / 2px 16px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) bottom right / 16px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) bottom right / 2px 16px no-repeat,
+    var(--panel);
+  box-shadow: 0 0 16px var(--glow-frame), inset 0 0 16px var(--glow-frame);
+}
+
+.tier-head {
+  margin: 14px 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tier-head:first-child {
+  margin-top: 0;
+}
+
+.folder-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: none;
+  border: 1px solid transparent;
+  padding: 7px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.folder-head:hover {
+  border-color: var(--border);
+}
+
+.folder-caret {
+  display: inline-block;
+  width: 1em;
+  color: var(--accent);
+  transition: transform 200ms ease-out;
+}
+
+.folder.open .folder-caret {
+  transform: rotate(90deg);
+}
+
+.folder-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.victory {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: 700 10px var(--font-display);
+  letter-spacing: 0.06em;
+  color: var(--star);
+}
+
+.crown-icon {
+  display: block;
+  overflow: visible;
+}
+
+/* the crown's first appearance: it pops in once, and is still afterwards */
+.victory.fresh .crown-icon {
+  animation: crown-pop 900ms ease-out 1;
+}
+
+@keyframes crown-pop {
+  0% {
+    transform: scale(0.2) rotate(-12deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.35);
+    opacity: 1;
+  }
+}
+
+.segments {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.seg {
+  width: 14px;
+  height: 9px;
+  border: 1px solid var(--muted);
+}
+
+.seg.on {
+  background: var(--good);
+  border-color: var(--good);
+}
+
+.seg.mastery {
+  border-style: dashed;
+}
+
+.folder-slide {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 260ms ease-out;
+}
+
+.folder.open .folder-slide {
+  grid-template-rows: 1fr;
+}
+
+.folder-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.promo-link {
+  display: inline-block;
+  margin: 2px 0 6px 16px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--star);
+}
+
+.lrows {
+  list-style: none;
+  margin: 0 0 6px 16px;
+  padding: 0 0 0 14px;
+  border-left: 1px dashed var(--frame);
+  display: grid;
+  gap: 4px;
+}
+
+.folder:not(.open) .lrows {
+  border-left-color: transparent;
+}
+
+.lrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  cursor: pointer;
+}
+
+/* rows sit inside an overflow-hidden folder, so their focus ring is drawn inside them */
+.lrow:focus-visible,
+.folder-head:focus-visible,
+.promo-link:focus-visible {
+  outline-offset: -2px;
+}
+
+.lrow:hover {
+  border-color: var(--accent);
+}
+
+.lrow.selected {
+  border-color: var(--accent);
+  background: var(--step-line);
+}
+
+.lrow-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  font-weight: 700;
+}
+
+.lrow.solved .lrow-num {
+  background: var(--good);
+  border-color: var(--good);
+  color: var(--accent-text);
+}
+
+.lrow-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lrow .mastery-tag,
+.detail .mastery-tag {
+  margin-left: 8px;
+}
+
+.lrow .card-stars,
+.lrow .card-tag {
+  margin-left: auto;
+  flex: none;
+}
+
+.detail {
+  position: sticky;
+  top: 12px;
+  border: 1px solid var(--frame);
+  background: var(--panel);
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.detail h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.detail p {
+  margin: 0;
+}
+
+.detail-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.detail-board {
+  min-height: 40px;
+}
+
+.detail-board .board-mini {
+  width: 100%;
+  max-width: 260px;
+}
+
+.detail-stars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 18px;
+  color: var(--star);
+}
+
+.detail-stars .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.detail-actions .btn {
+  text-decoration: none;
+}
+
+/* ---- less motion ------------------------------------------------------------------------------------------ */
+
+:root[data-motion="reduced"] :is(.screen.screen-in, .outcome.glitch-frame, .complete-banner.play, .ts-floor, .ts-vhs, .ts-logo, .ts-item.selected .ts-cursor, .pr-to, .victory.fresh .crown-icon) {
+  animation: none;
+}
+
+:root[data-motion="reduced"] .ts-sky::before {
+  animation: none;
+}
+
+:root[data-motion="reduced"] :is(.folder-slide, .folder-caret) {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) :is(.screen.screen-in, .outcome.glitch-frame, .complete-banner.play, .ts-floor, .ts-vhs, .ts-logo, .ts-item.selected .ts-cursor, .pr-to, .victory.fresh .crown-icon) {
+    animation: none;
+  }
+
+  :root:not([data-motion="full"]) .ts-sky::before {
+    animation: none;
+  }
+
+  :root:not([data-motion="full"]) :is(.folder-slide, .folder-caret) {
+    transition: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .lessons-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .detail {
+    position: static;
+  }
+}

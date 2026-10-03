@@ -5,16 +5,19 @@
 // The board never decides anything. It draws the states the engine reported:
 // `show()` jumps straight to a state, `animate()` plays a step's events in order.
 //
-// Each tile type has its own draw function (TILE_ART below) and CSS classes, and
-// every colour comes from the CSS custom properties in styles.css, so a visual
-// redesign can reskin tiles without touching the logic.
+// Each tile type has its own function (TILE_ART below) that builds its group, tooltip and
+// state classes; what it, the enemies and the hero look like is in ./sprites (its registry
+// maps a kind to its drawing). Every colour comes from the CSS custom properties in
+// styles.css, so a visual redesign can reskin them without touching the logic.
 import type { Clock, Enemy, Facing, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
+import { wornPiece } from "../promotion";
+import { motionReduced, settings } from "../settings";
+import { playableEvents } from "./motion";
+import { halftone, litGrid, M, S } from "./sprites/floor";
+import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite, type Skin, type TileName } from "./sprites";
+import { svg } from "./svg";
 
-const SVG = "http://www.w3.org/2000/svg";
-const S = 64; // size of one square, in SVG units
-const M = 22; // margin for the file letters and rank numbers
-
-const FACING_ANGLE: Record<Facing, number> = { north: 0, east: 90, south: 180, west: 270 };
+let trails = 0; // numbers each trail's gradient
 
 export function squareName([x, y]: Pos): string {
   return `${String.fromCharCode(97 + x)}${y + 1}`;
@@ -24,15 +27,20 @@ export class BoardView {
   readonly element: SVGSVGElement;
   private readonly piece: SVGGElement; // moves between squares
   private readonly body: SVGGElement; // shakes on a bump
-  private readonly pointer: SVGGElement; // rotates to show the facing
+  private readonly pawn: SVGGElement; // the hero, redrawn when the facing changes
   private readonly flash: SVGRectElement;
   private readonly lostMark: SVGGElement; // where the run was lost (M3.1)
   private readonly enemies: SVGGElement[]; // one per level.enemies, moved like the piece
   private attackedKey: string | undefined;
+  private readonly trails: SVGGElement; // fading streaks behind a move: the piece's, and the enemies' (M3.7)
+  private last: WorldState | undefined; // the state before this one, to see what moved
   private readonly attacks: SVGGElement; // the squares enemy chess pieces attack, shaded (M3.4)
   private readonly counters: SVGGElement[]; // badges that count a clock's ticks: clockwork's (QA-021), timed gates' (M3.2)
   private readonly art = new Map<TileKind, Map<string, SVGGElement>>(); // tile kind -> "x,y" -> its art
-  private angle = 0; // cumulative, so turns always take the short way round
+  private readonly heroes = new Map<Facing, SVGElement>(); // the hero drawn facing each way, made when first needed
+  private skin: Skin;
+  private readonly stopSettings: () => void;
+  private readonly stopHalftone: () => void;
   private timers: number[] = [];
 
   /**
@@ -41,16 +49,20 @@ export class BoardView {
    */
   constructor(
     private readonly level: LevelInfo,
-    options: { mini?: boolean; spots?: ReadonlyMap<string, boolean> } = {},
+    private readonly options: { mini?: boolean; spots?: ReadonlyMap<string, boolean>; skin?: Skin } = {},
   ) {
+    // without a skin of its own, a board wears the piece chosen in Settings, and follows that choice
+    this.skin = options.skin ?? wornPiece();
+    this.stopSettings = options.skin ? () => {} : settings.subscribe(() => this.setSkin(wornPiece()));
     const { width, height } = level;
     this.element = svg("svg", {
-      class: options.mini ? "board board-mini" : "board",
+      class: this.options.mini ? "board board-mini" : "board",
       viewBox: `0 0 ${M + width * S} ${height * S + M}`,
       role: "img",
       "aria-label": `${width} by ${height} board`,
     });
 
+    this.stopHalftone = halftone(this.element);
     const squares = svg("g", { class: "squares" });
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
@@ -66,14 +78,14 @@ export class BoardView {
         }
       }
     }
-    this.element.append(squares, labels(width, height));
+    this.element.append(squares, litGrid(width, height), labels(width, height));
 
     // A hidden goal (M2): a mark on every square it might be on, except the
     // one where it is in the case being shown (that one gets the flag).
     for (const pos of level.goal_spots) {
       if (level.goal && squareName(pos) === squareName(level.goal)) continue;
       const [left, top] = corner(pos, height);
-      squares.append(spot(left, top, options.spots?.get(squareName(pos))));
+      squares.append(spot(left, top, this.options.spots?.get(squareName(pos))));
     }
     if (level.goal) {
       const [left, top] = corner(level.goal, height);
@@ -82,19 +94,20 @@ export class BoardView {
 
     // Enemies (M3.1): every patrol's route, dotted, and the enemies themselves, under the piece.
     for (const enemy of level.enemies) if (enemy.route.length > 1) squares.append(route(enemy, height));
-    this.enemies = level.enemies.map((enemy) => enemyPiece(enemy, level));
+    this.enemies = level.enemies.map((enemy, i) => enemyPiece(enemy, level, i));
 
     this.attacks = svg("g", { class: "attacks", "aria-hidden": "true" });
     this.flash = svg("rect", { class: "bump-flash", width: S, height: S, x: 0, y: 0 });
-    this.element.append(this.attacks, this.flash, ...this.enemies);
+    this.trails = svg("g", { class: "trails", "aria-hidden": "true" });
+    this.element.append(this.attacks, this.trails, this.flash);
 
     this.piece = svg("g", { class: "piece" });
     this.body = svg("g", { class: "piece-body" });
-    this.pointer = svg("g", { class: "piece-pointer" });
-    this.pointer.append(svg("path", { d: `M 0 ${-S * 0.47} L 7 ${-S * 0.36} L -7 ${-S * 0.36} Z` }));
-    this.body.append(this.pointer, pawnShape());
+    this.pawn = svg("g", { class: "pawn" });
+    this.body.append(svg("circle", { r: 26, class: "cheer-ring" }), this.pawn);
     this.piece.append(this.body);
-    this.element.append(this.piece);
+    // the enemies are drawn over the piece, so one that takes it is on top without any reordering
+    this.element.append(this.piece, ...this.enemies);
 
     this.lostMark = lostMark();
     this.element.append(this.lostMark);
@@ -106,9 +119,8 @@ export class BoardView {
   /** Jump straight to a state, with no animation. */
   show(state: WorldState): void {
     this.cancel();
-    const moving = [this.piece, this.pointer, ...this.enemies];
+    const moving = [this.piece, ...this.enemies];
     for (const element of moving) element.style.transition = "none";
-    this.angle = FACING_ANGLE[state.facing];
     this.place(state);
     this.element.getBoundingClientRect(); // apply now, before transitions come back
     for (const element of moving) element.style.transition = "";
@@ -116,8 +128,9 @@ export class BoardView {
   }
 
   /** Play a step's events one after another, spread over `totalMs`. */
-  animate(events: GameEvent[], totalMs: number): void {
+  animate(all: GameEvent[], totalMs: number): void {
     this.cancel();
+    const events = playableEvents(all, this.level.piece);
     if (events.length === 0) return;
     const each = totalMs / events.length;
     this.element.style.setProperty("--step-ms", `${Math.round(each * 0.9)}ms`);
@@ -131,12 +144,8 @@ export class BoardView {
   }
 
   private apply(event: GameEvent): void {
-    if (event.kind === "turn") {
-      const target = FACING_ANGLE[event.state.facing];
-      const current = ((this.angle % 360) + 360) % 360;
-      this.angle += ((target - current + 540) % 360) - 180;
-    }
-    this.place(event.state);
+    this.place(event.state, true);
+    if (event.kind === "lost" && event.by !== undefined && event.at) this.strike(event.by, event.at);
     if (event.kind === "bump" && event.at) this.bump(event.state.pos, event.at);
     if (event.kind === "guard" && event.at) {
       const gate = this.art.get("gate")?.get(`${event.at[0]},${event.at[1]}`);
@@ -148,9 +157,23 @@ export class BoardView {
     }
   }
 
-  private place(state: WorldState): void {
+  /** `animate`: a step of the replay, so a move leaves a trail and a turn plays; a jump to a state does neither. */
+  private place(state: WorldState, animate = false): void {
+    const before = this.last;
+    this.last = state;
+    this.element.setAttribute("aria-label", this.describe(state));
     this.piece.style.transform = centre(state.pos, this.level.height);
-    this.pointer.style.transform = `rotate(${this.angle}deg)`;
+    if (state.facing !== before?.facing) {
+      this.pawn.replaceChildren(this.heroArt(state.facing));
+      if (animate && before) restartAnimation(this.pawn, "turning");
+    }
+    if (animate && before) {
+      if (before.pos[0] !== state.pos[0] || before.pos[1] !== state.pos[1]) this.trail(before.pos, state.pos, "trail-hero");
+      state.enemies?.forEach((pos, i) => {
+        const was = before.enemies?.[i];
+        if (pos && was && (pos[0] !== was[0] || pos[1] !== was[1])) this.trail(was, pos, "trail-foe");
+      });
+    }
     this.mark("gate", "open", state.opened);
     this.mark("timed_gate", "open", state.opened);
     this.mark("waypoint", "crossed", state.crossed);
@@ -194,6 +217,40 @@ export class BoardView {
     for (const [key, art] of tiles) art.classList.toggle(className, on.has(key));
   }
 
+  /** What the board says to a screen reader: its size, where the piece and the goal are, and a lost run. */
+  private describe(state: WorldState): string {
+    const { width, height, goal, piece } = this.level;
+    const parts = [`${width} by ${height} board`, `Your ${piece} is on ${squareName(state.pos)}, facing ${state.facing}`];
+    if (goal) parts.push(`The goal is on ${squareName(goal)}`);
+    if (state.lost) parts.push(`The run was lost on ${squareName(state.lost)}`);
+    return `${parts.join(". ")}.`;
+  }
+
+  /**
+   * A comet tail behind a moving piece: it is drawn out from the square the piece left at the pace the
+   * piece slides, so its head is always the piece, then it fades (it lasts a little longer than the step).
+   */
+  private trail(from: Pos, to: Pos, className: string): void {
+    if (motionReduced()) return; // nothing would show, so don't build it
+    const [a, b] = [from, to].map((pos) => corner(pos, this.level.height).map((n) => n + S / 2));
+    const id = `trail-${++trails}`;
+    const [x1, y1, x2, y2] = [a![0]!, a![1]!, b![0]!, b![1]!];
+    const group = svg(
+      "g",
+      { class: className },
+      svg("linearGradient", { id, gradientUnits: "userSpaceOnUse", x1, y1, x2, y2 }, svg("stop", { offset: "0%", class: "trail-tail" }), svg("stop", { offset: "100%", class: "trail-head" })),
+      svg("line", { x1, y1, x2, y2, pathLength: 1, stroke: `url(#${id})` }),
+    );
+    this.trails.append(group);
+    this.timers.push(window.setTimeout(() => group.remove(), 1500));
+  }
+
+  /** A chess piece takes the piece: the enemy `by` slides in from its own square onto the square it took (`at`). */
+  private strike(by: number, at: Pos): void {
+    const enemy = this.enemies[by];
+    if (enemy) enemy.style.transform = centre(at, this.level.height);
+  }
+
   private bump(from: Pos, at: Pos): void {
     const dx = Math.sign(at[0] - from[0]);
     const dy = Math.sign(at[1] - from[1]);
@@ -209,10 +266,31 @@ export class BoardView {
   private cancel(): void {
     this.timers.forEach((timer) => window.clearTimeout(timer));
     this.timers = [];
+    this.trails.replaceChildren();
   }
 
   dispose(): void {
     this.cancel();
+    this.stopHalftone();
+    this.stopSettings();
+  }
+
+  /** Draw the hero as another skin (Settings → Piece, step 3 of M3.7). */
+  setSkin(skin: Skin): void {
+    if (skin === this.skin) return;
+    this.skin = skin;
+    this.heroes.clear();
+    if (this.last) this.pawn.replaceChildren(this.heroArt(this.last.facing));
+  }
+
+  /** The hero turned to face `face`: the brackets and the model both show it. */
+  private heroArt(face: Facing): SVGElement {
+    let art = this.heroes.get(face);
+    if (!art) {
+      art = hero(this.skin, face);
+      this.heroes.set(face, art);
+    }
+    return art;
   }
 }
 
@@ -269,38 +347,31 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
   rune: (left, top, level, pos) => rune(left, top, find(level.runes, pos)?.text ?? ""),
 };
 
+/** A tile's sprite, centred on its square. */
+function sprite(left: number, top: number, art: SVGElement): SVGGElement {
+  return svg("g", { class: "spr", transform: `translate(${left + S / 2} ${top + S / 2})` }, art);
+}
+
+const tile = (left: number, top: number, name: TileName) => sprite(left, top, tileSprite(name));
+
 function wall(left: number, top: number): SVGGElement {
-  const group = svg("g", { class: "wall" });
-  group.append(
-    svg("rect", { x: left + 1, y: top + 1, width: S - 2, height: S - 2, rx: 4, class: "wall-outer" }),
-    svg("rect", { x: left + 6, y: top + 6, width: S - 12, height: S - 12, rx: 3, class: "wall-inner" }),
-  );
-  return group;
+  return svg("g", { class: "wall" }, tile(left, top, TILE_SPRITE.wall));
 }
 
 function signpost(left: number, top: number, text: string): SVGGElement {
-  const group = svg("g", { class: "signpost" });
-  const title = tooltip(text);
-  group.append(
-    title,
-    svg("rect", { x: left + S / 2 - 3, y: top + S * 0.35, width: 6, height: S * 0.55, class: "sign-post" }),
-    svg("rect", { x: left + 8, y: top + 10, width: S - 16, height: S * 0.34, rx: 3, class: "sign-board" }),
-    svg("path", { d: `M ${left + 14} ${top + 18} h ${S - 28} M ${left + 14} ${top + 25} h ${S - 36}`, class: "sign-lines" }),
-  );
-  return group;
+  return svg("g", { class: "signpost" }, tooltip(text), tile(left, top, TILE_SPRITE.sign));
 }
 
-/** A rune (M3.6): a stone slab with text on it, which the pawn reads by standing on it. Hover shows the text. */
+/** A rune (M3.6): a slab with a prompt on it, which the pawn reads by standing on it. Hover shows the text. */
 function rune(left: number, top: number, text: string): SVGGElement {
-  const group = svg("g", { class: "rune" });
-  const glyph = svg("text", { x: left + S / 2, y: top + S / 2 + 8, "text-anchor": "middle", class: "rune-glyph" });
-  glyph.textContent = "ᚱ";
-  group.append(
+  return svg(
+    "g",
+    { class: "rune" },
     tooltip(`A rune. Stand on it and use read() to get its text: "${text}"`),
-    svg("rect", { x: left + 9, y: top + 9, width: S - 18, height: S - 18, rx: 5, class: "rune-stone" }),
-    glyph,
+    tile(left, top, TILE_SPRITE.rune),
+    svg("rect", { x: left + 8, y: top + 18, width: S - 16, height: S - 30, class: "rune-flash" }),
+    svg("rect", { x: left + 10, y: top + 24, width: S - 20, height: 2.5, class: "rune-scan" }),
   );
-  return group;
 }
 
 /** The entry for the square `pos`, from one of the level's lists of details. */
@@ -325,69 +396,34 @@ function counts(level: LevelInfo, clock: Clock | undefined): boolean {
  */
 function gate(left: number, top: number, text: string, label = "", timed = false, clock?: Clock): SVGGElement {
   const group = svg("g", { class: timed ? "gate timed-gate" : "gate" });
-  const title = tooltip(text);
-  const bars = svg("g", { class: "gate-bars" });
-  for (let i = 0; i < 5; i++) {
-    bars.append(svg("rect", { x: left + 9 + i * 10.5, y: top + 6, width: 4, height: S - 12, rx: 1.5 }));
-  }
-  bars.append(svg("rect", { x: left + 6, y: top + 16, width: S - 12, height: 4, rx: 1.5 }));
-  bars.append(svg("rect", { x: left + 6, y: top + S - 20, width: S - 12, height: 4, rx: 1.5 }));
-  const lock = svg("g", { class: "gate-lock" });
-  lock.append(
-    svg("path", { d: `M ${left + S / 2 - 6} ${top + S / 2 - 2} v -5 a 6 6 0 0 1 12 0 v 5`, class: "gate-shackle" }),
-    svg("rect", { x: left + S / 2 - 9, y: top + S / 2 - 2, width: 18, height: 14, rx: 2.5, class: "gate-padlock" }),
+  group.append(
+    tooltip(text),
+    sprite(left, top, svg("g", {}, svg("g", { class: "spr-closed" }, tileSprite(TILE_SPRITE[timed ? "timed_gate" : "gate"])), svg("g", { class: "spr-open" }, tileSprite("gateOpen")))),
+    svg("rect", { x: left + 4, y: top + 4, width: S - 8, height: S - 8, class: "gate-flash" }),
   );
-  group.append(title, svg("rect", { x: left + 2, y: top + 2, width: S - 4, height: S - 4, rx: 3, class: "gate-frame" }), bars);
-  if (!timed) group.append(lock);
   if (label) group.append(badge(left + S / 2, top + S - 16, label, clock));
   return group;
 }
 
 /** A plank (QA-017), lying on the floor or laid over a pit (`className` "pit-plank"). */
 function plank(left: number, top: number, className: string, text: string): SVGGElement {
-  const group = svg("g", { class: className });
-  group.append(
-    tooltip(text),
-    svg("rect", { x: left + 8, y: top + S / 2 - 9, width: S - 16, height: 18, rx: 3, class: "plank-wood" }),
-    svg("path", { d: `M ${left + 12} ${top + S / 2 - 3} h ${S - 24} M ${left + 12} ${top + S / 2 + 3} h ${S - 30}`, class: "plank-grain" }),
-  );
-  return group;
+  return svg("g", { class: className }, tooltip(text), tile(left, top, TILE_SPRITE.plank));
 }
 
 /** A pit (M3.1): stepping in loses the run. The `bridged` class shows a plank laid over it (QA-017). */
 function pit(left: number, top: number): SVGGElement {
-  const group = svg("g", { class: "pit" });
-  const title = tooltip("A pit. Step in and the run is lost.");
-  group.append(
-    title,
-    svg("ellipse", { cx: left + S / 2, cy: top + S / 2, rx: S * 0.42, ry: S * 0.38, class: "pit-rim" }),
-    svg("ellipse", { cx: left + S / 2, cy: top + S / 2 + 3, rx: S * 0.33, ry: S * 0.28, class: "pit-hole" }),
-    plank(left, top, "pit-plank", "A pit with a plank over it: safe to cross."),
-  );
-  return group;
+  return svg("g", { class: "pit" }, tooltip("A pit. Step in and the run is lost."), tile(left, top, TILE_SPRITE.pit), plank(left, top, "pit-plank", "A pit with a plank over it: safe to cross."));
 }
 
-/** A waypoint (M3.1): a ring to pass over on the way to the goal; ✓ once crossed. */
+/** A waypoint (M3.1): a diamond to pass over on the way to the goal; crossed, it turns green with a check. */
 function waypoint(left: number, top: number): SVGGElement {
-  const group = svg("g", { class: "waypoint" });
-  const title = tooltip("A waypoint. Pass over it on the way to the goal.");
-  const tick = svg("text", { x: left + S / 2, y: top + S / 2 + 8, "text-anchor": "middle", class: "waypoint-tick" });
-  tick.textContent = "✓";
-  group.append(title, svg("circle", { cx: left + S / 2, cy: top + S / 2, r: S * 0.3, class: "waypoint-ring" }), tick);
-  return group;
+  const art = svg("g", {}, svg("g", { class: "spr-todo" }, tileSprite("waypoint")), svg("g", { class: "spr-done" }, tileSprite("waypointDone")));
+  return svg("g", { class: "waypoint" }, tooltip("A waypoint. Pass over it on the way to the goal."), sprite(left, top, art));
 }
 
 /** A gem (M3.1): picked up by walking over it, so it vanishes once collected. */
 function gem(left: number, top: number): SVGGElement {
-  const group = svg("g", { class: "gem" });
-  const title = tooltip("A gem. Walk over it to collect it.");
-  const [cx, cy] = [left + S / 2, top + S / 2];
-  group.append(
-    title,
-    svg("path", { d: `M ${cx - 13} ${cy - 5} L ${cx - 6} ${cy - 13} L ${cx + 6} ${cy - 13} L ${cx + 13} ${cy - 5} L ${cx} ${cy + 14} Z`, class: "gem-body" }),
-    svg("path", { d: `M ${cx - 13} ${cy - 5} H ${cx + 13} M ${cx - 6} ${cy - 13} L ${cx - 3} ${cy - 5} L ${cx} ${cy + 14} M ${cx + 6} ${cy - 13} L ${cx + 3} ${cy - 5}`, class: "gem-facets" }),
-  );
-  return group;
+  return svg("g", { class: "gem" }, tooltip("A gem. Walk over it to collect it."), tile(left, top, TILE_SPRITE.gem));
 }
 
 /** A patrol's route (M3.1): a dotted line through its corners, closed for a loop. */
@@ -403,49 +439,21 @@ const CHESS_LINES: Partial<Record<Enemy["kind"], string>> = {
 };
 
 /**
- * An enemy (M3.1), centred on (0, 0) and moved by `place()`. Its badges: a
- * chaser's "chases", a gear for clockwork (it keeps time with the code), and
- * "armoured". Rooks and bishops are drawn as chess pieces (M3.4).
+ * An enemy (M3.1), centred on (0, 0) and moved by `place()`: broken wire, each glitching
+ * on its own beat (`index` staggers them). Its badges: a chaser's "chases", a gear for
+ * clockwork (it keeps time with the code), and "armoured". Rooks and bishops are drawn as
+ * chess pieces (M3.4).
  */
-function enemyPiece(enemy: Enemy, level: LevelInfo): SVGGElement {
+function enemyPiece(enemy: Enemy, level: LevelInfo, index: number): SVGGElement {
   const group = svg("g", { class: `enemy enemy-${enemy.kind}${enemy.armoured ? " armoured" : ""}` });
   const counted = counts(level, enemy.clock);
   const clock = counted ? ", keeping time with your code" : "";
   const lines = CHESS_LINES[enemy.kind];
   const title = tooltip(`A ${enemy.kind}${clock}${enemy.armoured ? ". It's armoured" : ""}.${lines ? ` ${lines}` : ""}`);
-  group.append(title, ...(lines ? chessShape(enemy.kind) : eyedShape()));
+  group.append(title, enemySprite(ENEMY_SPRITE[enemy.kind], "live", index * 1.9));
   const badges = [enemy.kind === "chaser" ? "chases" : "", counted ? `${GEAR} {n}` : "", enemy.armoured ? "armoured" : ""].filter(Boolean);
   if (badges.length) group.append(badge(0, -S * 0.3 - 12, badges.join(" "), counted ? enemy.clock : undefined));
   return group;
-}
-
-/** A patrol's or chaser's body: a round piece with two eyes. */
-function eyedShape(): SVGElement[] {
-  return [
-    svg("circle", { cx: 0, cy: 2, r: S * 0.3, class: "enemy-body" }),
-    svg("circle", { cx: -6, cy: -2, r: 3.2, class: "enemy-eye" }),
-    svg("circle", { cx: 6, cy: -2, r: 3.2, class: "enemy-eye" }),
-  ];
-}
-
-/** A rook's or bishop's silhouette, centred on (0, 0), in the enemies' colours (M3.4). */
-function chessShape(kind: Enemy["kind"]): SVGElement[] {
-  if (kind === "rook") {
-    return [
-      svg("path", {
-        d: "M -15 21 L 15 21 L 15 15 L 11 12 L 11 -6 L 14 -8 L 14 -19 L 9 -19 L 9 -14 L 4 -14 L 4 -19 L -4 -19 L -4 -14 L -9 -14 L -9 -19 L -14 -19 L -14 -8 L -11 -6 L -11 12 L -15 15 Z",
-        class: "enemy-body",
-      }),
-    ];
-  }
-  return [
-    svg("path", {
-      d: "M -14 21 L 14 21 L 14 16 Q 8 14 7 10 Q 13 2 10 -6 Q 6 -14 0 -18 Q -6 -14 -10 -6 Q -13 2 -7 10 Q -8 14 -14 16 Z",
-      class: "enemy-body",
-    }),
-    svg("circle", { cx: 0, cy: -22, r: 3.5, class: "enemy-body" }),
-    svg("path", { d: "M 3 -11 L -3 -3", class: "chess-mark" }),
-  ];
 }
 
 /** The ring that marks where a run was lost, moved onto that square (M3.1). */
@@ -457,17 +465,9 @@ function lostMark(): SVGGElement {
   return group;
 }
 
+/** The goal: the board's one beacon (see sprites). */
 function flag(left: number, top: number): SVGGElement {
-  const group = svg("g", { class: "goal" });
-  group.append(
-    svg("circle", { cx: left + S / 2, cy: top + S / 2, r: S * 0.4, class: "goal-ring" }),
-    svg("rect", { x: left + S * 0.36, y: top + S * 0.2, width: 3.5, height: S * 0.62, class: "goal-pole" }),
-    svg("path", {
-      d: `M ${left + S * 0.36 + 3.5} ${top + S * 0.2} l ${S * 0.34} ${S * 0.12} l ${-S * 0.34} ${S * 0.12} Z`,
-      class: "goal-flag",
-    }),
-  );
-  return group;
+  return svg("g", { class: "goal" }, sprite(left, top, goalSprite()));
 }
 
 /** A square a hidden goal might be on: a dashed ring with ?, or after a run ✓ or ✗ (`passed`). */
@@ -477,20 +477,6 @@ function spot(left: number, top: number, passed?: boolean): SVGGElement {
   const mark = svg("text", { x: left + S / 2, y: top + S / 2 + 9, "text-anchor": "middle", class: "spot-mark" });
   mark.textContent = passed === undefined ? "?" : passed ? "✓" : "✗";
   group.append(title, svg("circle", { cx: left + S / 2, cy: top + S / 2, r: S * 0.36, class: "spot-ring" }), mark);
-  return group;
-}
-
-/** A simple pawn silhouette, centred on (0, 0). */
-function pawnShape(): SVGGElement {
-  const group = svg("g", { class: "pawn" });
-  group.append(
-    svg("ellipse", { cx: 0, cy: 22, rx: 17, ry: 4.5, class: "pawn-shadow" }),
-    svg("path", {
-      d: "M -15 21 Q -15 14 -9 13 L -6 3 Q -11 1 -11 -3 Q -11 -6 -6 -6 L 6 -6 Q 11 -6 11 -3 Q 11 1 6 3 L 9 13 Q 15 14 15 21 Z",
-      class: "pawn-fill",
-    }),
-    svg("circle", { cx: 0, cy: -14, r: 9, class: "pawn-fill" }),
-  );
   return group;
 }
 
@@ -532,10 +518,4 @@ function restartAnimation(element: Element, className: string): void {
   element.classList.remove(className);
   element.getBoundingClientRect();
   element.classList.add(className);
-}
-
-function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>): SVGElementTagNameMap[K] {
-  const element = document.createElementNS(SVG, tag);
-  for (const [name, value] of Object.entries(attrs)) element.setAttribute(name, String(value));
-  return element;
 }

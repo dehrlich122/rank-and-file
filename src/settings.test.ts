@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { applyToDocument, DEFAULTS, sanitize, SettingsStore } from "./settings";
+import { applyToDocument, DEFAULTS, motionReduced, sanitize, SettingsStore } from "./settings";
 import type { StorageLike } from "./storage";
 import { memoryStorage } from "./storage.fake";
 
@@ -62,15 +62,31 @@ describe("SettingsStore", () => {
 
   it("puts the layout, theme and animation choices on the page as data attributes", () => {
     const root = { dataset: {} as Record<string, string>, style: { setProperty: () => {} } };
-    applyToDocument({ ...DEFAULTS, codePanel: "bottom", theme: "dark" }, root as unknown as HTMLElement);
-    expect(root.dataset).toEqual({ codePanel: "bottom", theme: "dark" });
+    applyToDocument({ ...DEFAULTS, codePanel: "bottom", theme: "light" }, root as unknown as HTMLElement);
+    expect(root.dataset).toEqual({ codePanel: "bottom", theme: "light" });
+    applyToDocument({ ...DEFAULTS, theme: "system" }, root as unknown as HTMLElement);
+    expect(root.dataset).toEqual({}); // following the system leaves no attributes behind
     applyToDocument(DEFAULTS, root as unknown as HTMLElement);
-    expect(root.dataset).toEqual({}); // defaults leave no attributes behind
+    expect(root.dataset).toEqual({ theme: "dark" }); // dark is the default theme (M3.7)
   });
 
   it("ignores corrupted or unknown saved values", () => {
     const storage = memoryStorage({ "rank-and-file:settings": '{"speed": 3, "theme": "purple", "motion": "full"' });
     expect(new SettingsStore(storage).get()).toEqual(DEFAULTS); // not valid JSON
     expect(sanitize({ speed: 3, theme: "purple", motion: "full", extra: 1 })).toEqual({ ...DEFAULTS, motion: "full" });
+  });
+});
+
+describe("motionReduced", () => {
+  const os = (reduce: boolean) => vi.stubGlobal("matchMedia", () => ({ matches: reduce }));
+
+  it("follows the Animations setting, and under Match system the OS preference", () => {
+    os(true);
+    expect(motionReduced({ ...DEFAULTS, motion: "system" })).toBe(true);
+    expect(motionReduced({ ...DEFAULTS, motion: "full" })).toBe(false); // Full ignores the OS
+    os(false);
+    expect(motionReduced({ ...DEFAULTS, motion: "system" })).toBe(false);
+    expect(motionReduced({ ...DEFAULTS, motion: "reduced" })).toBe(true); // Reduced always stops motion
+    vi.unstubAllGlobals();
   });
 });

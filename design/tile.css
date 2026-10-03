@@ -1,0 +1,1149 @@
+/* M3.7 step 0 (design prototype): the style tiles' stylesheet.
+   Everything is scoped to .pane (one per theme) so the game's own CSS is untouched.
+   Sections: 1 tokens, 2 the lit-grid board, 3 sprite states and motion, 4 page
+   furniture, 5 the start menu, 6 the Lessons directory, 7 the three tiles. */
+
+/* ---- 1. tokens -------------------------------------------------------------------- */
+
+:root {
+  --font-pixel: "Silkscreen", monospace;
+  --pixel-size: 12px;
+  --pixel-title: 40px;
+}
+
+body {
+  margin: 0;
+  background: #05061a;
+}
+
+#tile {
+  max-width: 1840px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.pane {
+  --font-code: "Cascadia Code", "JetBrains Mono", Consolas, ui-monospace, monospace;
+  --radius: 4px;
+
+  /* structure and text */
+  --bg: light-dark(#e9ebf8, #07081a);
+  --panel: light-dark(#f6f7fd, #0d0f2a);
+  --border: light-dark(#b2b8e0, #2a2f66);
+  --text: light-dark(#14163a, #e6e9ff);
+  --muted: light-dark(#4e5588, #98a0d4);
+  --code-bg: light-dark(#eef0fb, #0a0c24);
+  --frame: light-dark(#0a7f9c, #2fa8c4);
+
+  /* the player and their code: cyan / white */
+  --accent: light-dark(#07708b, #3be0ff);
+  --accent-text: light-dark(#ffffff, #02131a);
+  --pointer: light-dark(#07708b, #3be0ff);
+  --step-line: light-dark(rgb(10 127 156 / 0.2), rgb(59 224 255 / 0.17));
+  --selection: light-dark(rgb(10 127 156 / 0.25), rgb(59 224 255 / 0.3));
+  --active-line: light-dark(rgb(10 127 156 / 0.05), rgb(255 255 255 / 0.04));
+
+  /* hostile only: magenta / red */
+  --bad: light-dark(#c4144f, #ff5c86);
+  --bad-bg: light-dark(#fde6ee, #2a0b1b);
+  --error-line: light-dark(rgb(196 20 79 / 0.14), rgb(255 92 134 / 0.17));
+  --glitch-a: light-dark(#e0207f, #ff2a8a);
+  --glitch-b: light-dark(#6a4cff, #7a5cff);
+  --logo-shadow: #ff2a8a; /* the one chrome exception: the start-menu logo's pixel shadow (to confirm) */
+
+  /* amber: goals, gates, things to act on. green: world text and success */
+  --warn: light-dark(#8a5300, #ffb02e);
+  --warn-bg: light-dark(#fdf0d9, #2e1f06);
+  --good: light-dark(#157a3c, #4cf27a);
+  --good-bg: light-dark(#e1f6e8, #0a2a1a);
+  --goal: light-dark(#935500, #ffb02e);
+  --waypoint: light-dark(#935500, #ffb02e);
+  --star: light-dark(#935500, #ffb02e);
+  --game-message: light-dark(#8a5300, #ffb02e);
+
+  /* syntax: terminal-ish, on the same roles */
+  --syn-keyword: light-dark(#7a3fc4, #c39bff);
+  --syn-string: light-dark(#157a3c, #7dfc9c);
+  --syn-number: light-dark(#0a6f8c, #6fe3ff);
+  --syn-comment: light-dark(#5f6699, #8189bd);
+  --syn-function: light-dark(#1f5fb8, #8fb4ff);
+  --syn-definition: light-dark(#157a3c, #7dfc9c);
+  --syn-class: light-dark(#8a5300, #ffb02e);
+
+  /* the board */
+  --sq-dark: light-dark(#b8bde8, #0e1030);
+  --sq-light: light-dark(#dfe2f5, #272b62);
+  --coords: light-dark(#2f3678, #9fb0ff);
+  --grid-line: light-dark(rgb(24 88 140 / 0.3), rgb(80 220 255 / 0.26));
+  --grid-tick: light-dark(rgb(20 96 150 / 0.8), rgb(110 232 255 / 0.8));
+  --grid-edge: light-dark(rgb(20 96 150 / 0.65), rgb(80 220 255 / 0.6));
+  --hatch-base: light-dark(rgb(196 20 79 / 0.05), rgb(255 60 120 / 0.05));
+  --hatch-line: light-dark(rgb(190 20 80 / 0.4), rgb(255 80 140 / 0.36));
+  --route: light-dark(rgb(196 20 79 / 0.7), rgb(255 92 134 / 0.75));
+  --badge-bg: light-dark(#f6f7fd, #0d0f2a);
+  --badge-border: light-dark(#4e5588, #6b73b8);
+  --badge-text: light-dark(#14163a, #e6e9ff);
+
+  /* sprite tones */
+  --px-line: light-dark(#1b1744, #04041a);
+  --px-void: light-dark(#cfd3f0, #06071b);
+  --hero-1: light-dark(#052c3e, #0b4f6e);
+  --hero-2: light-dark(#083f58, #1596b8);
+  --hero-3: light-dark(#0a4f6c, #38d4f0);
+  --hero-4: light-dark(#2fa0c4, #aef6ff);
+  --hero-v: #ffffff;
+  --hero-w: light-dark(#f2fbff, #e8f4ff);
+  --foe-1: #2a0a24;
+  --foe-2: light-dark(#6a1450, #6a1450);
+  --foe-3: light-dark(#b01a70, #dd2f95);
+  --foe-4: light-dark(#e0388f, #ff4fa8);
+  --foe-eye: #fff0f6;
+  --foe-hot: light-dark(#e01040, #ff2a55);
+  --foe-crack: #0a0414;
+  --str-1: light-dark(#231d5a, #17133a);
+  --str-2: light-dark(#372e80, #3a3088);
+  --str-3: light-dark(#4a3f9e, #6b5ec4);
+  --str-4: light-dark(#7a6fd0, #9a8df0);
+  --amb-1: light-dark(#3d2200, #6b3f0a);
+  --amb-2: light-dark(#7a4600, #b8741a);
+  --amb-3: light-dark(#935500, #ffb02e);
+  --amb-4: light-dark(#d08a10, #ffe08a);
+  --grn-1: light-dark(#063a1c, #0a3a1c);
+  --grn-2: light-dark(#0a5a2a, #1f8a3f);
+  --grn-3: light-dark(#0c6e33, #4cf27a);
+  --grn-4: light-dark(#38b060, #b8ffc8);
+
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 var(--font-ui);
+  padding: 18px;
+  border: 1px solid var(--border);
+  position: relative;
+}
+
+.pane[data-scheme="dark"] {
+  color-scheme: dark;
+}
+
+.pane[data-scheme="light"] {
+  color-scheme: light;
+}
+
+.defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* ---- 2. the lit-grid board ---------------------------------------------------------- */
+
+.board-wrap .board {
+  width: 100%;
+  max-height: none;
+}
+
+.board-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.board-row > .board-wrap {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 700px;
+}
+
+.board-side {
+  flex: none;
+}
+
+.board-min {
+  width: 207px; /* 20px squares: the smallest main board we ship */
+  flex: none !important;
+  margin-top: 8px;
+}
+
+.coords text {
+  fill: var(--coords);
+  font: 700 14px var(--font-code);
+}
+
+.grid-lines {
+  fill: none;
+  stroke: var(--grid-line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.grid-ticks {
+  fill: none;
+  stroke: var(--grid-tick);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.grid-edge {
+  fill: none;
+  stroke: var(--grid-edge);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.pane[data-scheme="dark"] .attacked {
+  fill: url(#hatch-dark);
+}
+
+.pane[data-scheme="light"] .attacked {
+  fill: url(#hatch-light);
+}
+
+.route {
+  stroke-width: 3;
+}
+
+.goal-ring,
+.spot-ring {
+  stroke: var(--goal);
+}
+
+.spot-mark {
+  font-family: var(--font-code);
+}
+
+.badge-text {
+  font-family: var(--font-code);
+}
+
+.piece-pointer {
+  fill: var(--pointer);
+}
+
+/* ---- 3. sprite states and motion ------------------------------------------------------ */
+
+.gate .spr-open,
+.waypoint .spr-done {
+  display: none;
+}
+
+.gate.open .spr-open,
+.waypoint.crossed .spr-done {
+  display: inline;
+}
+
+.gate.open .spr-closed,
+.waypoint.crossed .spr-todo {
+  display: none;
+}
+
+.gate-flash,
+.rune-flash {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.gate-flash {
+  fill: var(--bad);
+}
+
+.rune-flash {
+  fill: var(--accent);
+}
+
+.gate.refusing .gate-flash,
+.rune.reading .rune-flash {
+  animation: pulse 650ms ease-out;
+}
+
+@keyframes pulse {
+  25% {
+    opacity: 0.6;
+  }
+}
+
+/* the hero's 2-frame idle: the head sinks one pixel on the second frame */
+.hero .idle-b {
+  opacity: 0;
+}
+
+:root[data-motion="full"] .hero .idle-a {
+  animation: idle-a 1.4s steps(1) infinite;
+}
+
+:root[data-motion="full"] .hero .idle-b {
+  animation: idle-b 1.4s steps(1) infinite;
+}
+
+@keyframes idle-a {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes idle-b {
+  50% {
+    opacity: 1;
+  }
+}
+
+/* corruption: the static fringe is the reduced-motion look; the burst is the occasional glitch */
+.enemy .burst,
+.sheet-svg .burst {
+  opacity: 0;
+}
+
+.enemy .fringe,
+.sheet-svg .fringe {
+  display: none;
+}
+
+:root[data-motion="reduced"] .enemy .fringe,
+:root[data-motion="reduced"] .sheet-svg .fringe {
+  display: inline;
+  opacity: 0.85;
+}
+
+:root[data-motion="full"] .enemy .burst {
+  animation: burst 6.5s steps(1) infinite;
+  animation-delay: var(--glitch-delay, 0s);
+}
+
+:root[data-motion="full"] .enemy .burst-slice {
+  animation: burst-slice 6.5s steps(1) infinite;
+  animation-delay: var(--glitch-delay, 0s);
+}
+
+:root[data-motion="full"] .enemy .burst-noise {
+  animation: burst-noise 6.5s steps(1) infinite;
+  animation-delay: var(--glitch-delay, 0s);
+}
+
+@keyframes burst {
+  0%, 86% { opacity: 0; }
+  87%, 89% { opacity: 1; }
+  90%, 93% { opacity: 0; }
+  94%, 96% { opacity: 1; }
+  97%, 100% { opacity: 0; }
+}
+
+@keyframes burst-slice {
+  0%, 86% { opacity: 0; }
+  87%, 89% { opacity: 1; }
+  90%, 100% { opacity: 0; }
+}
+
+@keyframes burst-noise {
+  0%, 93% { opacity: 0; }
+  94%, 96% { opacity: 1; }
+  97%, 100% { opacity: 0; }
+}
+
+/* a held burst frame, for screenshots and the sprite sheet's "glitch" cell */
+:root[data-motion] .sheet-svg.freeze .burst,
+:root[data-motion] .sheet-svg.freeze .burst *,
+:root[data-freeze="burst"][data-motion="full"] .enemy .burst,
+:root[data-freeze="burst"][data-motion="full"] .enemy .burst * {
+  animation: none;
+  opacity: 1;
+}
+
+/* threatened squares: a hatch that works without colour, with a slow flicker */
+:root[data-motion="full"] .attacks {
+  animation: threat 3.4s ease-in-out infinite;
+}
+
+@keyframes threat {
+  50% {
+    opacity: 0.72;
+  }
+}
+
+/* the error card: one brief corruption flicker on its frame, never on its text */
+.error-card-demo {
+  animation: frame-flicker 650ms steps(1) 1;
+}
+
+@keyframes frame-flicker {
+  0% { box-shadow: -4px 0 0 var(--glitch-a), 4px 0 0 var(--glitch-b); }
+  18% { box-shadow: none; }
+  32% { box-shadow: 4px 0 0 var(--glitch-a), -4px 0 0 var(--glitch-b); }
+  48% { box-shadow: none; }
+  64% { box-shadow: -3px 0 0 var(--glitch-a), 3px 0 0 var(--glitch-b); }
+  80%, 100% { box-shadow: none; }
+}
+
+:root[data-motion="reduced"] .error-card-demo {
+  animation: none;
+  box-shadow: -2px 0 0 var(--glitch-a), 2px 0 0 var(--glitch-b);
+}
+
+:root[data-motion="reduced"] .error-card-demo.glitch-frame {
+  animation: none;
+}
+
+.error-card-demo.glitch-frame {
+  animation: frame-flicker 650ms steps(1) 1;
+}
+
+/* the original game rules still apply to the bump, the hop and the celebration; stop them with motion off */
+:root[data-motion="reduced"] .piece,
+:root[data-motion="reduced"] .piece-pointer,
+:root[data-motion="reduced"] .enemy {
+  transition: none;
+}
+
+body.greyscale {
+  filter: grayscale(1);
+}
+
+/* optional CRT scanlines: on the board only, never over code or text, off unless switched on */
+body.crt .board-wrap {
+  position: relative;
+}
+
+body.crt .board-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.22) 0 1px, transparent 1px 3px);
+}
+
+/* ---- 4. page furniture ----------------------------------------------------------------- */
+
+.tile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  color: #e6e9ff;
+}
+
+.tile-head h1 {
+  font-family: var(--font-pixel);
+  font-size: 20px;
+  color: #3be0ff;
+}
+
+.tile-head .muted {
+  color: #98a0d4;
+  margin: 4px 0 0;
+  max-width: 70ch;
+}
+
+.tile-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tile-nav a {
+  color: #e6e9ff;
+  border: 1px solid #2a2f66;
+  padding: 3px 10px;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.tile-nav a[aria-current="page"] {
+  border-color: #3be0ff;
+  color: #3be0ff;
+}
+
+.controls {
+  margin: 14px 0;
+  padding: 10px 12px;
+  border: 1px solid #2a2f66;
+  display: grid;
+  gap: 6px;
+  color: #e6e9ff;
+  --border: #2a2f66;
+  --panel: #0d0f2a;
+  --text: #e6e9ff;
+  --accent: #3be0ff;
+  color-scheme: dark;
+}
+
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.controls-row > strong {
+  width: 52px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.pane-name {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: var(--pixel-size);
+  color: var(--accent);
+}
+
+.pane-h {
+  margin: 22px 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+.sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px 10px;
+}
+
+.sheet-item {
+  margin: 0;
+}
+
+.sheet-big svg,
+.sheet-small svg {
+  display: block;
+}
+
+.sheet-small {
+  margin-top: 4px;
+}
+
+.sheet-item figcaption {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.code-slice {
+  display: grid;
+  gap: 8px;
+  max-width: 560px;
+}
+
+.voice {
+  display: grid;
+  gap: 6px;
+}
+
+.voice-line {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: var(--pixel-size);
+}
+
+.voice-line.ok {
+  color: var(--good);
+}
+
+.voice-line.bad {
+  color: var(--bad);
+}
+
+/* ---- 5. the start menu: the arcade title ---------------------------------------------- */
+
+.menu-mock {
+  --sky-top: light-dark(#2a2468, #0a0830);
+  --sky-bottom: light-dark(#6a5cc0, #2a1860);
+  position: relative;
+  min-height: 600px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom) 62%, var(--sky-top));
+  color: #e6e9ff;
+  outline-offset: 3px;
+}
+
+.menu-mock:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.menu-sky {
+  position: absolute;
+  inset: 0;
+}
+
+.menu-sun {
+  position: absolute;
+  left: 50%;
+  bottom: 40%;
+  width: 220px;
+  height: 220px;
+  margin-left: -110px;
+  border-radius: 50%;
+  background: linear-gradient(to bottom, var(--amb-4), var(--amb-3) 45%, var(--str-4));
+  -webkit-mask-image: linear-gradient(#000 0 46%, transparent 46% 50%, #000 50% 62%, transparent 62% 68%, #000 68% 77%, transparent 77% 84%, #000 84% 91%, transparent 91% 100%);
+  mask-image: linear-gradient(#000 0 46%, transparent 46% 50%, #000 50% 62%, transparent 62% 68%, #000 68% 77%, transparent 77% 84%, #000 84% 91%, transparent 91% 100%);
+}
+
+.menu-floor {
+  position: absolute;
+  left: -40%;
+  right: -40%;
+  bottom: 0;
+  height: 40%;
+  transform-origin: 50% 0;
+  transform: perspective(260px) rotateX(58deg);
+  background:
+    repeating-linear-gradient(90deg, var(--grid-tick) 0 2px, transparent 2px 56px),
+    repeating-linear-gradient(0deg, var(--grid-tick) 0 2px, transparent 2px 40px),
+    linear-gradient(to bottom, rgb(0 0 0 / 0.2), rgb(110 90 220 / 0.25));
+  background-position: 0 0, 0 0, 0 0;
+  border-top: 2px solid var(--grid-tick);
+}
+
+:root[data-motion="full"] .menu-floor {
+  animation: floor-scroll 1.6s linear infinite;
+}
+
+@keyframes floor-scroll {
+  to {
+    background-position: 0 0, 0 40px, 0 0;
+  }
+}
+
+.menu-body {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 28px 16px 22px;
+}
+
+.logo {
+  margin: 0;
+}
+
+.logo-text {
+  font-family: var(--font-pixel);
+  font-size: var(--pixel-title);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: #3be0ff;
+  text-shadow: 4px 4px 0 var(--logo-shadow); /* a hard pixel offset, not a blur */
+}
+
+.logo-sub {
+  margin: 0 0 18px;
+  font-family: var(--font-code);
+  font-size: 15px;
+  color: #b8c2ff;
+}
+
+.menu-items {
+  list-style: none;
+  margin: 0;
+  padding: 12px 14px;
+  display: grid;
+  gap: 8px;
+  min-width: 340px;
+  margin-top: 176px;
+  /* the menu sits on a plate, so labels never sit on the sun or the grid */
+  background: rgb(5 4 30 / 0.86);
+  border: 1px solid var(--frame);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-pixel);
+  font-size: calc(var(--pixel-size) * 1.4);
+  color: #e6e9ff;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.menu-item.soon {
+  color: #98a0d4;
+}
+
+.menu-item.selected {
+  color: #3be0ff;
+  background: rgb(10 8 48 / 0.7);
+}
+
+.menu-cursor {
+  width: 1.2em;
+  visibility: hidden;
+}
+
+.menu-item.selected .menu-cursor {
+  visibility: visible;
+}
+
+:root[data-motion="full"] .menu-item.selected .menu-cursor {
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    visibility: hidden;
+  }
+}
+
+.menu-tag {
+  margin-left: auto;
+  font-size: 0.6em;
+  color: #98a0d4;
+  border: 1px solid #98a0d4;
+  padding: 1px 6px;
+}
+
+.menu-note {
+  margin: 6px 0 0;
+  padding: 2px 8px;
+  background: rgb(5 4 30 / 0.86);
+  font-size: 13px;
+  color: #b8c2ff;
+  min-height: 1.5em;
+}
+
+/* ---- 6. the Lessons directory ------------------------------------------------------------- */
+
+.lessons-title {
+  font-family: var(--font-pixel);
+  font-size: calc(var(--pixel-size) * 1.5);
+  color: var(--accent);
+  margin: 0 0 4px;
+}
+
+.lcrumbs {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.lcrumbs a {
+  color: var(--muted);
+}
+
+.hud-frame {
+  position: relative;
+  padding: 16px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(var(--accent), var(--accent)) top left / 16px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) top left / 2px 16px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) top right / 16px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) top right / 2px 16px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) bottom left / 16px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) bottom left / 2px 16px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) bottom right / 16px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) bottom right / 2px 16px no-repeat,
+    var(--panel);
+}
+
+.tier-head {
+  margin: 14px 0 6px;
+  font-family: var(--font-pixel);
+  font-size: var(--pixel-size);
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.tier-head:first-child {
+  margin-top: 0;
+}
+
+.folder + .folder {
+  margin-top: 4px;
+}
+
+.folder-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: none;
+  border: 1px solid transparent;
+  padding: 7px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.folder-head:hover,
+.folder-head:focus-visible {
+  border-color: var(--border);
+}
+
+.folder-caret {
+  display: inline-block;
+  width: 1em;
+  color: var(--accent);
+  transition: transform 200ms ease-out;
+}
+
+.folder.open .folder-caret {
+  transform: rotate(90deg);
+}
+
+.folder-title {
+  font-family: var(--font-pixel);
+  font-size: var(--pixel-size);
+  color: var(--text);
+}
+
+.victory {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-pixel);
+  font-size: calc(var(--pixel-size) * 0.8);
+  color: var(--goal);
+}
+
+.crown-icon {
+  display: block;
+}
+
+.segments {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.seg {
+  width: 14px;
+  height: 9px;
+  border: 1px solid var(--muted);
+}
+
+.seg.on {
+  background: var(--good);
+  border-color: var(--good);
+}
+
+.seg.mastery {
+  border-style: dashed;
+}
+
+.seg.mastery.on {
+  background: var(--goal);
+  border-color: var(--goal);
+}
+
+.folder-slide {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 260ms ease-out;
+}
+
+.folder.open .folder-slide {
+  grid-template-rows: 1fr;
+}
+
+:root[data-motion="reduced"] :is(.folder-slide, .folder-caret) {
+  transition: none;
+}
+
+.lrows {
+  list-style: none;
+  margin: 0 0 0 16px;
+  padding: 0 0 0 14px;
+  border-left: 1px dashed var(--frame);
+  overflow: hidden;
+  min-height: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.folder:not(.open) .lrows {
+  border-left-color: transparent;
+}
+
+.lrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.lrow:hover {
+  border-color: var(--accent);
+}
+
+.lrow.selected {
+  border-color: var(--accent);
+  background: var(--step-line);
+}
+
+.lrow-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  font-weight: 700;
+}
+
+.lrow.solved .lrow-num {
+  background: var(--good);
+  border-color: var(--good);
+  color: var(--accent-text);
+}
+
+.lrow .mastery-tag {
+  margin-left: 8px;
+}
+
+.lrow-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lrow .card-stars,
+.lrow .card-tag {
+  margin-left: auto;
+  flex: none;
+}
+
+.lrow .card-stars + .card-tag {
+  margin-left: 8px;
+}
+
+.hybrid-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(230px, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.detail {
+  border: 1px solid var(--frame);
+  background: var(--panel);
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.detail h4 {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: calc(var(--pixel-size) * 1.3);
+  color: var(--text);
+}
+
+.detail p {
+  margin: 0;
+}
+
+.detail-kicker {
+  font-family: var(--font-pixel);
+  font-size: calc(var(--pixel-size) * 0.8);
+  color: var(--accent);
+}
+
+.detail-board .board-mini {
+  width: 190px;
+}
+
+.detail-stars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--star);
+}
+
+.detail-stars .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---- 7a. tile 1: SNES-crisp ----------------------------------------------------------------- */
+
+[data-tile="snes"] {
+  --font-pixel: "Silkscreen", monospace;
+  --pixel-size: 12px;
+  --pixel-title: 38px;
+}
+
+[data-tile="snes"] .pane {
+  --radius: 2px;
+}
+
+[data-tile="snes"] .btn,
+[data-tile="snes"] .outcome,
+[data-tile="snes"] .panel {
+  border-radius: 2px;
+}
+
+[data-tile="snes"] .grid-edge {
+  stroke-width: 2;
+}
+
+/* ---- 7b. tile 2: neon vector ----------------------------------------------------------------- */
+
+[data-tile="neon"] {
+  --font-pixel: "Press Start 2P", monospace;
+  --pixel-size: 9px;
+  --pixel-title: 30px;
+}
+
+[data-tile="neon"] .pane {
+  --radius: 0px;
+}
+
+[data-tile="neon"] .btn,
+[data-tile="neon"] .outcome {
+  border-radius: 0;
+}
+
+/* glow goes on edges, sprites and lines only, and only in the dark theme */
+[data-tile="neon"] .pane[data-scheme="dark"] .grid-edge {
+  filter: drop-shadow(0 0 5px rgb(80 220 255 / 0.8));
+}
+
+[data-tile="neon"] .pane[data-scheme="dark"] .grid-lines {
+  filter: drop-shadow(0 0 2px rgb(80 220 255 / 0.5));
+}
+
+[data-tile="neon"] .pane[data-scheme="dark"] .px-neon {
+  filter: drop-shadow(0 0 2.5px var(--hero-3));
+}
+
+[data-tile="neon"] .pane[data-scheme="dark"] .enemy .px-neon {
+  filter: drop-shadow(0 0 2.5px var(--foe-4));
+}
+
+[data-tile="neon"] .pane[data-scheme="dark"] :is(.gate, .waypoint, .gem, .goal) .px-neon {
+  filter: drop-shadow(0 0 2.5px var(--amb-3));
+}
+
+[data-tile="neon"] .pane[data-scheme="dark"] :is(.rune, .signpost) .px-neon {
+  filter: drop-shadow(0 0 2.5px var(--grn-3));
+}
+
+[data-tile="neon"] .pane[data-scheme="dark"] .hud-frame {
+  box-shadow: 0 0 14px rgb(80 220 255 / 0.2), inset 0 0 14px rgb(80 220 255 / 0.07);
+}
+
+[data-tile="neon"] .pane[data-scheme="dark"] .menu-item.selected {
+  box-shadow: 0 0 0 1px #3be0ff, 0 0 12px rgb(80 220 255 / 0.4);
+}
+
+[data-tile="neon"] .lrow-num,
+[data-tile="neon"] .seg {
+  border-radius: 0;
+}
+
+/* ---- 7c. tile 3: terminal ------------------------------------------------------------------------ */
+
+[data-tile="terminal"] {
+  --font-pixel: "VT323", monospace;
+  --pixel-size: 20px;
+  --pixel-title: 64px;
+}
+
+[data-tile="terminal"] .pane {
+  --radius: 0px;
+  --border: light-dark(#8fc0a8, #1f4a3a);
+  --frame: light-dark(#157a3c, #2fb860);
+  --accent: light-dark(#07708b, #3be0ff);
+}
+
+[data-tile="terminal"] .btn,
+[data-tile="terminal"] .outcome {
+  border-radius: 0;
+  font-family: var(--font-code);
+}
+
+[data-tile="terminal"] .tier-head,
+[data-tile="terminal"] .lessons-title,
+[data-tile="terminal"] .folder-title {
+  color: var(--good);
+}
+
+[data-tile="terminal"] .folder-caret {
+  color: var(--good);
+}
+
+[data-tile="terminal"] .lrow-num::before {
+  content: "[";
+  color: var(--muted);
+}
+
+[data-tile="terminal"] .lrow-num::after {
+  content: "]";
+  color: var(--muted);
+}
+
+[data-tile="terminal"] .lrow-num {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  height: auto;
+  border: none;
+  background: none;
+  padding: 0 2px;
+}
+
+[data-tile="terminal"] .lrow.solved .lrow-num {
+  background: none;
+  color: var(--good);
+}
+
+[data-tile="terminal"] .lrow-text strong {
+  font-family: var(--font-code);
+  font-size: 14px;
+}
+
+[data-tile="terminal"] .menu-item {
+  letter-spacing: 0.02em;
+}
+
+[data-tile="terminal"] .menu-cursor::before {
+  content: "";
+}
+
+[data-tile="terminal"] .menu-sun {
+  background: linear-gradient(to bottom, var(--grn-4), var(--grn-3) 45%, var(--grn-2));
+}
+
+[data-tile="terminal"] .menu-mock {
+  --sky-top: light-dark(#10382c, #031208);
+  --sky-bottom: light-dark(#1f6a4c, #0a3a20);
+}
+
+[data-tile="terminal"] .menu-floor {
+  background:
+    repeating-linear-gradient(90deg, rgb(76 242 122 / 0.7) 0 2px, transparent 2px 56px),
+    repeating-linear-gradient(0deg, rgb(76 242 122 / 0.7) 0 2px, transparent 2px 40px),
+    linear-gradient(to bottom, rgb(0 0 0 / 0.2), rgb(30 120 70 / 0.25));
+  border-top-color: rgb(76 242 122 / 0.8);
+}
+
+[data-tile="terminal"] .logo-text {
+  color: #7dfc9c;
+  text-shadow: 4px 4px 0 var(--logo-shadow);
+}
+
+[data-tile="terminal"] .menu-item.selected {
+  color: #7dfc9c;
+}

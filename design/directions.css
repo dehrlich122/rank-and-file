@@ -1,0 +1,460 @@
+/* M3.7 step 0, round 3 (design prototype): four directions. Dark theme only.
+   The board keeps the lit grid and the noir palette (the colours "look good");
+   each direction then has its own tokens for how pieces are built. Colour roles
+   (DESIGN.md §9): cyan the hero, magenta hostile, violet / near-black structure. */
+
+:root {
+  color-scheme: dark;
+
+  /* the board */
+  --bg: #090416;
+  --panel: #110a24;
+  --text: #ecebff;
+  --muted: #a69ed6;
+  --sq-dark: #110a2a;
+  --sq-light: #2e2466;
+  --coords: #a9b4ff;
+  --grid-line: rgb(80 220 255 / 0.22);
+  --grid-tick: rgb(110 232 255 / 0.7);
+  --grid-edge: rgb(80 220 255 / 0.55);
+  --glitch-a: #ff2a8a;
+  --glitch-b: #6a5cff;
+  --hot: #ff2a55;
+
+  /* the threatened square: quiet, a little magenta */
+  --hatch-line: rgb(255 70 150 / 0.26);
+  --hatch-base: rgb(255 60 140 / 0.035);
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 var(--font-ui);
+}
+
+#directions {
+  max-width: 1840px;
+  margin: 0 auto;
+  padding: 18px 20px 28px;
+}
+
+.dir-head h1 {
+  margin: 0;
+  font: 700 20px "Orbitron", var(--font-ui);
+  letter-spacing: 0.06em;
+  color: #3be0ff;
+}
+
+.dir-head p {
+  margin: 4px 0 16px;
+  color: var(--muted);
+}
+
+.dir-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.dir {
+  background: var(--panel);
+  border: 1px solid #33255e;
+  padding: 14px 16px 18px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.dir h2 {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font: 700 16px "Orbitron", var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dir-letter {
+  color: #3be0ff;
+  font-size: 22px;
+}
+
+.dir-blurb {
+  margin: 0;
+  min-height: 4.6em;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.dir-board .board {
+  width: 100%;
+  max-height: none;
+}
+
+/* the facing pointer is a later decision (in 3/4 view the model itself can face) */
+.piece-pointer {
+  display: none;
+}
+
+.coords text {
+  fill: var(--coords);
+  font: 700 13px var(--font-code);
+}
+
+.grid-lines {
+  fill: none;
+  stroke: var(--grid-line);
+  stroke-width: 1;
+}
+
+.grid-ticks {
+  fill: none;
+  stroke: var(--grid-tick);
+  stroke-width: 1.1;
+}
+
+.grid-edge {
+  fill: none;
+  stroke: var(--grid-edge);
+  stroke-width: 1.6;
+  filter: drop-shadow(0 0 4px rgb(80 220 255 / 0.7));
+}
+
+.hatch-line {
+  fill: var(--hatch-line);
+}
+
+.hatch-base {
+  fill: var(--hatch-base);
+}
+
+.hatch-dot {
+  fill: var(--hatch-line);
+}
+
+.dir-large-wrap {
+  display: grid;
+  place-items: center;
+  padding-top: 4px;
+}
+
+.dir-large {
+  width: min(100%, 300px);
+  overflow: visible;
+}
+
+/* ---- A: wireframe ---------------------------------------------------------------------- */
+
+.wire polygon,
+.wire polyline,
+.wire ellipse,
+.wire line {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.wire-hero {
+  --w-main: #7af4ff;
+  --w-dim: rgb(90 230 255 / 0.22);
+  filter: drop-shadow(0 0 1.6px #3be0ff) drop-shadow(0 0 4px rgb(59 224 255 / 0.55));
+}
+
+.wire-foe {
+  --w-main: #e0479a;
+  --w-dim: rgb(224 71 154 / 0.2);
+  filter: drop-shadow(0 0 1.6px #ff3d9a);
+}
+
+.wire-wall {
+  --w-main: #8172e0;
+  --w-dim: rgb(129 114 224 / 0.45);
+  filter: drop-shadow(0 0 1.4px #6b5ec4);
+}
+
+.wire-hot {
+  filter: drop-shadow(0 0 2px var(--hot));
+}
+
+.w-front {
+  stroke: var(--w-main);
+  stroke-width: 0.75;
+}
+
+.w-back {
+  stroke: var(--w-dim);
+  stroke-width: 0.45;
+}
+
+.w-contour {
+  stroke: var(--w-main);
+  stroke-width: 1.5;
+}
+
+.w-visor {
+  stroke: #ffffff;
+  stroke-width: 1.15;
+}
+
+.w-pad {
+  stroke: var(--w-main);
+  stroke-width: 1.1;
+}
+
+.w-ghost-line {
+  stroke: var(--glitch-b);
+  stroke-width: 0.6;
+  opacity: 0.6;
+}
+
+.w-slit {
+  stroke: var(--hot);
+  stroke-width: 1.3;
+}
+
+/* ---- B: low-poly solid ------------------------------------------------------------------ */
+
+.solid {
+  --b-visor: #ffffff;
+}
+
+.solid-hero {
+  --b-hero-hi: #8ff4ff;
+  --b-hero-lo: #03263e;
+}
+
+.solid-foe {
+  --b-foe-hi: #ff6db6;
+  --b-foe-lo: #2c0420;
+}
+
+.solid-wall {
+  --b-wall-hi: #7d70d8;
+  --b-wall-lo: #0e0828;
+}
+
+.s-outline {
+  fill: #04020d;
+  stroke: #04020d;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.b-shadow {
+  fill: rgb(0 0 0 / 0.55);
+}
+
+.b-slit {
+  fill: var(--hot);
+  filter: drop-shadow(0 0 1.5px var(--hot));
+}
+
+.b-dead {
+  fill: #fff0f6;
+}
+
+.b-seam {
+  stroke: #0e0828;
+  stroke-width: 1;
+}
+
+/* ---- C: neon poster --------------------------------------------------------------------- */
+
+.poster {
+  --c-ink: #07031a;
+}
+
+.poster-hero {
+  --p-fill: #3be0ff;
+  --p-shade: #1d5fd6;
+  --p-dot: #0b2a86;
+  --p-print: #3a2bd8;
+}
+
+.poster-foe {
+  --p-fill: #ff3d9a;
+  --p-shade: #a8105e;
+  --p-dot: #4a0430;
+  --p-print: #7a0a2e;
+}
+
+.poster-wall {
+  --p-fill: #4f42a8;
+  --p-top: #8577e0;
+  --p-dot: #22185c;
+  --p-print: #05020f;
+}
+
+.p-print {
+  fill: var(--p-print);
+}
+
+.p-fill {
+  fill: var(--p-fill);
+}
+
+.p-ink {
+  stroke: var(--c-ink);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.p-shade {
+  fill: var(--p-shade);
+}
+
+.p-dot {
+  fill: var(--p-dot);
+}
+
+.p-top {
+  fill: var(--p-top);
+}
+
+.p-hi,
+.p-glint {
+  fill: #ffffff;
+}
+
+.p-visor {
+  fill: var(--c-ink);
+}
+
+.p-visor-lit {
+  fill: #ffffff;
+}
+
+.p-slit {
+  fill: var(--hot);
+}
+
+.p-dead {
+  fill: #fff0f6;
+}
+
+.p-crack {
+  fill: none;
+  stroke: var(--c-ink);
+  stroke-width: 1.4;
+  stroke-linejoin: miter;
+}
+
+.p-seam {
+  fill: none;
+  stroke: var(--c-ink);
+  stroke-width: 1.3;
+}
+
+.p-ink-line {
+  fill: none;
+  stroke: var(--c-ink);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.p-tear {
+  stroke: var(--hot);
+  stroke-width: 1;
+}
+
+/* ---- D: hologram ----------------------------------------------------------------------- */
+
+.holo-hero {
+  --d-main: #5ff2ff;
+  --d-fringe-a: #45ffa8;
+  --d-fringe-b: #4a74ff;
+  filter: drop-shadow(0 0 2px rgb(59 224 255 / 0.9)) drop-shadow(0 0 6px rgb(59 224 255 / 0.4));
+}
+
+.holo-foe {
+  --d-main: #f0479f;
+  --d-fringe-a: #ff2a55;
+  --d-fringe-b: #6a5cff;
+  filter: drop-shadow(0 0 1.6px rgb(255 61 154 / 0.7));
+}
+
+.holo-wall {
+  --d-main: #8a7cf0;
+  --d-fringe-a: transparent;
+  --d-fringe-b: transparent;
+}
+
+.h-face {
+  fill: var(--d-main);
+  stroke: var(--d-main);
+  stroke-opacity: 0.35;
+  stroke-width: 0.35;
+}
+
+.h-back {
+  fill: var(--d-main);
+  fill-opacity: 0.04;
+  stroke: var(--d-main);
+  stroke-opacity: 0.16;
+  stroke-width: 0.3;
+}
+
+.h-visor {
+  fill: #ffffff;
+}
+
+.h-scanline {
+  fill: var(--d-main);
+  opacity: 0.32;
+}
+
+.h-glyphs {
+  fill: var(--d-main);
+  opacity: 0.55;
+  font: 700 3.4px var(--font-code);
+  letter-spacing: 0.35px;
+}
+
+.h-contour,
+.h-fringe-a,
+.h-fringe-b,
+.h-edge {
+  fill: none;
+  stroke-linejoin: round;
+}
+
+.h-contour {
+  stroke: var(--d-main);
+  stroke-width: 1.1;
+}
+
+.h-fringe-a {
+  stroke: var(--d-fringe-a);
+  stroke-width: 0.8;
+  opacity: 0.7;
+}
+
+.h-fringe-b {
+  stroke: var(--d-fringe-b);
+  stroke-width: 0.8;
+  opacity: 0.7;
+}
+
+.h-edge {
+  stroke: var(--d-main);
+  stroke-width: 0.8;
+  stroke-opacity: 0.85;
+}
+
+.h-pad {
+  fill: var(--d-main);
+  fill-opacity: 0.22;
+}
+
+.h-pad-ring {
+  fill: none;
+  stroke: var(--d-main);
+  stroke-width: 1;
+}
+
+.h-slit {
+  fill: var(--hot);
+  opacity: 0.9;
+}

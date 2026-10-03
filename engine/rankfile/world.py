@@ -407,7 +407,7 @@ class World:
         if foe := self._foe_at(self.pos):
             self._lose(f"Your {piece} was caught by the {foe.enemy.kind} on {here}.", self.pos)
         elif foe := self.attacker(self.pos):
-            self._lose(f"The {foe.enemy.kind} on {square_name(foe.pos)} took your {piece} on {here}.", self.pos)
+            self._lose(f"The {foe.enemy.kind} on {square_name(foe.pos)} took your {piece} on {here}.", self.pos, by=self.foes.index(foe))
 
     def _capture_message(self, target: Pos, foe: Foe | None) -> str:
         if not self.board.contains(target):
@@ -428,9 +428,10 @@ class World:
         if self.lost is not None:
             raise Lost(str(self.lost), self.lost.at)
 
-    def _lose(self, message: str, at: Pos) -> None:
+    def _lose(self, message: str, at: Pos, by: int | None = None) -> None:
+        """Lose the run at `at`. `by`: which enemy (its place in the level's list) took the piece, for the board to show."""
         self.lost = Lost(message, at)
-        self._emit("lost", at=list(at), message=message)
+        self._emit("lost", at=list(at), message=message, **({} if by is None else {"by": by}))
         raise self.lost
 
     def _gate_locked_message(self, gate: Pos) -> str:

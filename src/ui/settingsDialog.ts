@@ -3,7 +3,7 @@
 // Every change applies straight away through the settings store; there's no
 // Save button. The browser's <dialog> closes on Esc and keeps keyboard focus
 // inside while it's open; on close, focus goes back to where it was.
-import { CODE_SIZES, SPEEDS, type CodeSize, type Settings, type SettingsStore } from "../settings";
+import { CODE_SIZES, SPEEDS, type CodeSize, type Piece, type Settings, type SettingsStore } from "../settings";
 import { confirmStep, dialogHead, modal } from "./dialog";
 import { h } from "./dom";
 
@@ -22,9 +22,18 @@ const GROUPS: Array<{ key: keyof Settings; title: string; hint?: string; choices
     key: "theme",
     title: "Theme",
     choices: [
+      { value: "dark", label: "Dark (Night shift)" },
+      { value: "light", label: "Light (Daylight terminal)" },
       { value: "system", label: "Match system" },
-      { value: "light", label: "Light" },
-      { value: "dark", label: "Dark" },
+    ],
+  },
+  {
+    key: "piece",
+    title: "Piece",
+    hint: "How your piece looks, on every level. A skin unlocks when you earn its promotion: the knight, by clearing Chapter 6.",
+    choices: [
+      { value: "pawn", label: "Pawn" },
+      { value: "knight", label: "Knight" },
     ],
   },
   {
@@ -76,6 +85,8 @@ export class SettingsDialog {
     private readonly store: SettingsStore,
     /** Settings → Reset progress, once the player has confirmed it. */
     onResetProgress: () => void,
+    /** The pieces whose promotion has been earned (the rest are shown but can't be picked). */
+    private readonly unlocked: () => Piece[] = () => ["pawn"],
   ) {
     const groups = GROUPS.map((group) =>
       h(
@@ -117,6 +128,7 @@ export class SettingsDialog {
 
   open(): void {
     if (this.element.open) return;
+    this.lockPieces();
     this.show();
     for (const listener of this.openListeners) listener();
   }
@@ -125,6 +137,19 @@ export class SettingsDialog {
   onOpen(listener: () => void): () => void {
     this.openListeners.add(listener);
     return () => this.openListeners.delete(listener);
+  }
+
+  /** A piece whose promotion isn't earned yet is greyed out, and says what unlocks it. */
+  private lockPieces(): void {
+    const open = this.unlocked();
+    for (const input of this.inputs.filter((i) => i.dataset.key === "piece")) {
+      const locked = !open.includes(input.value as Piece);
+      input.disabled = locked;
+      const label = input.closest("label");
+      label?.classList.toggle("locked", locked);
+      label?.querySelector(".lock-note")?.remove();
+      if (locked) label?.append(h("small", { class: "lock-note" }, " locked until Chapter 6 is cleared"));
+    }
   }
 
   private sync(settings: Settings): void {

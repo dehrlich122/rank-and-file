@@ -3,7 +3,7 @@
 // on some systems, and ▶| looks too much like Play.) Icons use currentColor,
 // so they follow the button's text colour in both themes.
 
-const SVG = "http://www.w3.org/2000/svg";
+import { svg } from "./svg";
 
 type Shape = { d: string; fill?: boolean };
 
@@ -31,24 +31,9 @@ const ICONS = {
 
 export type IconName = keyof typeof ICONS;
 
+const OUTLINE = { fill: "none", stroke: "currentColor", "stroke-width": 2.2, "stroke-linecap": "round", "stroke-linejoin": "round" };
+
 export function icon(name: IconName): SVGSVGElement {
-  const element = document.createElementNS(SVG, "svg");
-  element.setAttribute("viewBox", "0 0 24 24");
-  element.setAttribute("class", `icon icon-${name}`);
-  element.setAttribute("aria-hidden", "true");
-  for (const shape of ICONS[name] as Shape[]) {
-    const path = document.createElementNS(SVG, "path");
-    path.setAttribute("d", shape.d);
-    if (shape.fill) {
-      path.setAttribute("fill", "currentColor");
-    } else {
-      path.setAttribute("fill", "none");
-      path.setAttribute("stroke", "currentColor");
-      path.setAttribute("stroke-width", "2.2");
-      path.setAttribute("stroke-linecap", "round");
-      path.setAttribute("stroke-linejoin", "round");
-    }
-    element.append(path);
-  }
-  return element;
+  const paths = (ICONS[name] as Shape[]).map((shape) => svg("path", { d: shape.d, ...(shape.fill ? { fill: "currentColor" } : OUTLINE) }));
+  return svg("svg", { viewBox: "0 0 24 24", class: `icon icon-${name}`, "aria-hidden": "true" }, ...paths);
 }

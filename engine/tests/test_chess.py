@@ -2,7 +2,7 @@
 
 import pytest
 
-from conftest import make_level
+from conftest import events, make_level
 from rankfile.levels import LevelError
 from rankfile.runner import run_level
 from rankfile.world import World
@@ -103,6 +103,12 @@ def test_stepping_onto_an_attacked_square_loses_the_run():
     assert result.status == "lost"
     assert result.summary == "The rook on c3 took your pawn on b3."
     assert result.final["pos"] == [1, 2] and result.final["lost"] == [1, 2]
+
+
+def test_the_loss_names_the_enemy_that_took_the_piece():
+    # so the board can show that rook moving in (M3.7)
+    (lost,) = events(run_level(rook_level(), "pawn.move(2)"), "lost")
+    assert lost["at"] == [1, 2] and lost["by"] == 0  # the level's only enemy
 
 
 def test_a_rook_taken_from_the_diagonal_attacks_nothing_more():

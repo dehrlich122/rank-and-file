@@ -19,7 +19,7 @@ date)* marks a decision.
 
 Playable now: Chapters 1 to 5 (the first five of the Pawn tier's six), each with
 five levels and one optional mastery challenge, plus a Testing ground of
-practice levels. Chapter 6, Runes, is being built (M3.6).
+practice levels. Chapter 6, Runes, completes the Pawn tier's six chapters.
 
 Built beyond the first brief:
 - **Feedback:** tiered hints, stars for par, a reveal of the idiomatic solution,
@@ -37,8 +37,10 @@ Built beyond the first brief:
   its naive attempts fail; blind level generators that write solutions without
   anyone reading them; an end-to-end suite that drives the real app.
 
-Next: finish Chapter 6. Then a first design pass (§9), which also builds the
-promotion ceremony and the knight skin (§8), then the level editor and free play (§7).
+Next: the first design pass (§9), which also builds the promotion ceremony and
+the knight skin (§8). Its step 0, the direction, is decided (§9: a wire world
+with one solid hero), and step 1 builds it into the game. Then the level editor and
+free play (§7).
 
 ---
 
@@ -168,7 +170,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 | M2 Feedback depth | tiered hints, AST constraints, several boards, par and stars, idiomatic-solution reveal, progress saving | Done |
 | M3.0–M3.5 | the obstacle toolkit, the Codex, Chapters 2–5 | Done |
 | M3.6 Chapter 6 | Runes | In play-test: engine, levels and lessons built |
-| **M3.7 Look & Feel** | the first major design pass (§9), with the **promotion ceremony** and the knight skin (§8) | Planned, before M4 |
+| **M3.7 Look & Feel** | the first major design pass (§9), with the **promotion ceremony** and the knight skin (§8) | Step 0 (direction) in progress; before M4 |
 | M4 Level editor | author levels without hand-writing YAML; the Pawn tier's set of mastery challenges | Planned |
 | **M4.x Free play** | an open board to experiment on, with a skins gallery | Planned, after M4 |
 | M5+ | the remaining chapters, one tier at a time, each ending in a promotion | Planned |
@@ -183,7 +185,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 
 *(Designer, 2026-10-02)* The end of Chapter 6 celebrates the promotion from pawn to knight, and the knight becomes an unlockable skin. Both are built in the design pass (M3.7), in the new look, not in M3.6.
 
-- **A piece is its rules; a skin is its look.** The pawn walks forward and captures diagonally. From Chapter 7 the player's piece is a knight with L-moves. A knight skin on a Pawn-tier level still moves like a pawn.
+- **A piece is its rules; a skin is its look.** The pawn walks forward and captures diagonally. From Chapter 7 the player's piece is a knight with L-moves. A knight skin on a Pawn-tier level still moves like a pawn. *(Designer, 2026-10-03)* A skin never renames the object in the player's code either: Pawn-tier levels always say `pawn.move()`, whatever skin is worn. The name becomes `knight` when the rules do (Chapter 7), so promotion stays visible in the code itself.
 - **The promotion ceremony** closes each tier. The first is at the end of Chapter 6:
   - It shows once, automatically, when the five core levels are solved. The mastery stays optional. The chapter's heading in the level list can replay it.
   - It is a full-screen moment, not a pop-up. It celebrates, sums up what the player learned (the Codex), shows the new piece, and teases the next tier.
@@ -205,12 +207,93 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 - **Dark-first, light kept.** Glow is designed for dark. The light theme keeps the same shapes and palette family as a "daylight terminal", with softer accents.
 - **A system, not a reskin.** Later tiers add tiles and pieces, so the pass delivers a style that new things slot into.
 
+### Decided for the pass *(Designer, 2026-10-02)*
+
+**Priority order.** When two of these conflict, the higher one wins.
+1. **Readability is the product.** The game teaches Python by showing what code does on the board. If the board or the code panel gets harder to parse, the design has failed, however good it looks. The rules are testable:
+   - Every tile, piece and enemy is told apart by its silhouette alone, in greyscale, at the smallest main-board size we ship (a 12×12 board at its minimum height, about 20px a square). The small side and lesson boards get a simpler sprite tier and only have to keep tiles distinguishable.
+   - Squares stay quiet: art lives on squares, and the squares don't get busy. Quiet isn't invisible. Light and dark squares keep a visible step (about 1.4:1 against each other) while sprites stay well above that against both. The grid reads in greyscale, so squares can be counted at a glance. The threatened-square hatch reads on both square colours. File letters and rank numbers meet normal text contrast. All of these go in the automated contrast check.
+   - Glow, glitch and texture go on edges, sprites and lines, never on code, lesson text, labels or badges.
+   - At most one thing on the board moves "ambiently" in a given square. Everything else is still unless the event log says something happened.
+   - With Animations set to reduced, every meaning still reads with zero motion.
+2. **It's a coding game as much as a chess game.** Draw the world as a running program: terminal greens and phosphor amber, cursor blinks, scanning reads, circuit-trace walls, `>_` on runes, line numbers and coordinates treated as part of the HUD. The player's piece is the program: clean, lit, stable.
+3. **Enemies and threats are corrupted code.** Data gone wrong, in magenta and red on a dark body: cracks, dead pixels and intermittent glitch bursts (RGB split, a horizontal slice offset, a frame of noise) every few seconds, not constant. Squares an enemy threatens get the same language: a diagonal hatch (it works without colour) plus a slow scanline or flicker. **Stable = yours or safe; unstable = hostile.** The player should feel the difference before reading any tooltip. In reduced motion the corruption stays as a static colour fringe plus the hatch.
+4. **80s retro-futurism, cyberpunk.** A near-black blue/violet base with cyan, amber and green used sparingly. Magenta is hostile wherever the board can be seen; the big chrome moments may use the full sunset (see "Step 0 feedback" below). Synthwave and vector-arcade energy belongs in the chrome (titles, the promotion ceremony, level-complete), not the play area. CRT scanlines are optional and off by default. The light theme is a "daylight terminal": the same shapes and semantic colours, softer, with no glow.
+
+**Colour roles** (every later decision hangs on these):
+- cyan / white: the player and their code (piece, pointer, trail, step line)
+- magenta / red: **hostile only** (enemies, threatened squares, enemy routes, lost runs). Magenta is taken out of every non-hostile accent. The one exception is the sunset in the big chrome moments, away from the board (see "Step 0 feedback").
+- amber: goals, gates, things to act on
+- phosphor green: text the world holds (runes, signs), and success
+- violet / near-black: structure (walls, pits, the board itself)
+
+**Heroes** are small armoured figures whose silhouette still reads as their chess piece, so each piece's chess identity lives in its outline. The pawn is a round-helmed knight-errant with a lit visor; the knight skin is a horse-head helm. ~~The style draws on SNES Zelda and the modern pixel games in that lineage (Shovel Knight, Hyper Light Drifter, Dead Cells, Loop Hero): chunky readable shapes, a 1px dark outline, 3–4 tone shading, and personality in a 2-frame idle.~~ *Revisited after step 0 (see below): the old-game lineage is dialled down, and the drawing style (neon pixel or vector) is being compared.* Whichever wins stays crisp, high-contrast and deliberately limited, keeps a 2-frame idle, and carries over to the environment tiles.
+
+**Glitch lives in two places only:** on the board (enemies and threatened squares) and on the error card. When player code throws, the card's frame gets one brief corruption flicker, never its text, so bugs and enemies read as the same kind of thing. Every other panel, the lessons and the level list stay calm.
+
+**The board is the "lit grid"** and every style tile uses it, so the tiles differ in sprites and chrome, not in the board:
+- a clear checker: dark squares near-black navy, light squares a visibly lighter indigo (about 1.4:1 between them)
+- thin cyan grid lines at low strength between every square, with a faint glow on the outer edge only
+- a small cyan tick where grid lines cross, so squares can be counted like on a targeting grid
+- file letters (a–h) along the bottom and rank numbers (1–8) up the left, always both, restyled from today's `labels()`; they're text, so no glow
+
+**The start menu** is a styled title screen with some animation, honouring reduced motion. Its four entries are Lessons, Free Play, Level Editor and Settings. Free Play (M4.x) and Level Editor (M4) show now as "coming soon" and switch on when those milestones land.
+- Direction: ~~the arcade title, with a pixel-font logo~~ *the neon title (revised after step 0, below)*. A big "RANK & FILE" logo with a hard offset shadow (an offset, not a blur, so it isn't glow on text), over a slowly scrolling synthwave perspective grid and a striped sun. **A rank of enemy chess pieces stands in front of the sun, and the player's hero (the pawn, or whatever rank the player has reached) stands under the menu.** A blinking ▶ marks the selected entry. With reduced motion the grid, the blink and the glitches stop.
+- The name stays Rank & File. The code form `rank_and_file()` is a secondary mark (for example the subtitle under the logo), never the logo.
+- Keyboard first: the arrow keys move the selection and Enter opens it.
+
+**Lessons is a directory, not a long page.** `src/ui/lessonsMenu.ts` (it replaced `levelSelect.ts`, which showed every chapter open on one page) is a folder cascade: Lessons / Chapter 1 / its levels, with a breadcrumb showing the path.
+- Direction: the "neon explorer". Collapsible chapter folders grouped under tier headings in the display face, inside a thin cyan HUD frame with corner brackets, with indent guides under an open folder. Each chapter has a segmented progress bar (one block per level) and the victory symbol; each level row has its number or ✓ and its stars, and keeps "Solution seen" and the mastery tag. Folders slide open. One hybrid is mocked up as an alternative: the explorer on the left, and a detail pane for the selected level on the right (what it trains, a mini board, best stars, Run / Replay).
+- **Nothing is locked.** Every chapter and level stays open, as today.
+- **Only what you need is open.** On load, the folder holding the next unsolved level is the only one open, and that level is selected and scrolled into view. Folders the player opens by hand are remembered per browser, like settings. The Testing ground is its own folder.
+- **Clearing a chapter earns a victory symbol** (a pixel crown in the samples). When all five core levels are solved the chapter's folder gets it, with a short flourish the first time and still afterwards. The mastery challenge upgrades it (a second state of the same symbol). It reads by shape and label, not only by colour.
+
+**Words and themes follow the art direction.** Flavour lives in the chrome: titles, chapter and tier headings, the intro, the start menu, folder names, the level-complete and promotion moments, and the theme names in Settings (for example a dark "Night shift" and a light "Daylight terminal"). The voice is terse, 80s-terminal and cyberpunk, with the player as the one writing the program and enemies as corrupted code. **Teaching text stays plain**: lessons, hints, error translations, the Codex and tooltips keep today's clear wording (§2), because a clever line that slows down understanding is a bug. Any label someone clicks still says plainly what it does. The voice guide, with before/after examples, is in `docs/M3/M3.7.md`.
+
+**Sprite system.**
+*(Revised after round 5: the pixel-grid plan was dropped for small 3D meshes.)*
+- Each sprite is a small 3D model (a lathe-turned body plus boxes, or an extruded outline), seen in a 3/4 view and fitted into its 64-unit square (`src/ui/sprites/mesh.ts`, `models.ts`). It is drawn one of three ways (`draw.ts`): clean wire for the world, flat-shaded solid for the hero, broken wire for enemies.
+- Sprites are code, not images, so they scale to any board size and the level editor's palette can reuse them.
+- The registry in `src/ui/sprites/index.ts` says which sprite each tile kind and enemy kind uses; `board.ts` calls it. Pawn and knight are skins (§8). An enemy is broken at rest and glitches now and then, so its rest frame still reads as hostile with reduced motion.
+- Every sprite takes its colours from CSS tokens (no hard-coded hex in TS), so the light theme and the contrast checks still work.
+- Every existing state class (open, crossed, collected, bridged, gone, lost, celebrate, bumping, reading, refusing), the badges and the tooltips stay, restyled, not replaced.
+
+### Step 0 feedback *(Designer, 2026-10-02)*
+
+After the first three style tiles (`docs/M3/M3.7.md`):
+- **Neon is the base**, pushed further toward 80s cyberpunk and retro-futurism. The new inspiration is Hotline Miami (its neon, its type and its title screens, without the violence), *Hackers*, *The Lawnmower Man* and their kin. The old video-game references (SNES Zelda and the pixel games in its lineage) are dialled down.
+- **Pink in the big chrome moments.** The title screen, the promotion ceremony and the level-complete flourish may use the full sunset (pink, orange and violet) in the sky, the sun and the logo. Wherever the board can be seen (the level screen, the lessons, the level list), magenta still means hostile, so the rule players learn on the board stays true.
+- **The title screen** gets a rank of enemy chess pieces lined up in front of the sun, and the player's hero, at the rank they've reached, under the menu.
+- **Drawing style: to be compared.** The fourth tile switches between neon pixel sprites and vector "VR" figures (flat-shaded polygons with a lit edge), on the same board, before one is chosen.
+
+After round 2 *(Designer, 2026-10-02)*: neither style yet, and the noir tile is parked as it is. Four quite different directions come first, each a tiny sample (wireframe, low-poly solid, neon poster, hologram).
+- **Vector beat pixel:** larger models and more distinct silhouettes read as characters, not flat icons.
+- **Pieces must pop off the board**, not sit on it like paper dolls: better shading and a sense of perspective. They stay inside their squares but fill most of them.
+- **The threat hatch was overwhelming.** It can be quite subtle, especially once it has an animated pulse.
+- **Amber worked** when it stayed on objects that aren't a threat. **The goal needs to be more distinctive and eye-catching.**
+- The colours generally look good.
+
+**Direction decided after round 3** *(Designer, 2026-10-02)*:
+- **The world is wireframe** (direction A): glowing line art, no fills.
+- **The hero is the only solid thing in it**, and the only thing with a floor shadow.
+- **Enemies are broken wireframe**: magenta mesh that looks damaged even at rest (missing segments, lines out of register), with an occasional "glitch and break" animation. With reduced motion the resting frame alone still looks broken.
+- **Threatened squares use the poster direction's halftone dots** (C), kept quiet.
+- **Walls are A's wireframe wall:** clean, violet and still.
+- Round 4 compares three ways of making the solid hero distinctive.
+
+**After round 4** *(Designer, 2026-10-02)*:
+- **The hero reads as solid:** flat-shaded cyan faces with no mesh lines inside them, lit from one direction, with a glowing edge along its outline only. Next to the wire enemies it is a different material at a glance, in greyscale too.
+- **HUD brackets frame the hero's square**, for the hero only. They show its facing: the side it faces is brighter and carries a small notch. No floating glyph.
+- **No light pool.** The floor shadow stays.
+
+**Approved after round 5** *(Designer, 2026-10-02)*: round 5 is the style, ready to apply to the full set. One note: **the halftone dots scale with the board**, so a threatened square stays clear on the smaller boards too.
+
 ### The look *(directions to explore, not decisions)*
-- **Colour:** a deep near-black, with cyan, magenta and amber used sparingly, in the spirit of synthwave and 80s arcade vector graphics.
+- **Colour:** a near-black blue/violet base, with cyan, amber and phosphor green as role colours used sparingly (see the roles above), in the spirit of synthwave, 80s computer graphics and cyberpunk film. Magenta is reserved for hostile things and is never a general accent, except in the sunset of the big chrome moments.
 - **Board:** thin lit lines that glow slightly; squares that stay quiet so tiles and pieces read first.
 - **Sprites:** wireframe or pixel-grid pieces, tiles and enemies, with each tile's meaning clear at a glance.
-- **Type:** a clean monospace for code. A pixel-adjacent or geometric display face only for titles and badges.
-- **Texture:** a restrained scanline or grain, off by default.
+- **Type:** a clean monospace for code. A geometric display face (80s computer lettering) only for titles and headings.
+- **Texture:** CRT scanlines, optional and off by default, never over code or text.
 
 ### Motion kit
 A trail behind a move, turns, a bump, a capture (the rook takes the pawn, from QA Session 9), a rune read as a scan, a gate unlocking, a level-complete flourish, the promotion ceremony, and screen transitions.
@@ -237,4 +320,4 @@ Colours are CSS custom properties written as `light-dark()`, there is a tile-to-
 - Before/after screenshots through the end-to-end suite.
 
 ### Open for the pass
-Sound (tiny optional chiptune effects, off by default); how much CRT texture; whether the light theme keeps any glow.
+Sound (tiny optional chiptune effects, off by default). Settled by the brief above: the light theme has no glow. *(Designer, 2026-10-03)* The optional CRT scanlines (off by default) are a good idea but not urgent: saved for a future design pass, and not built in M3.7.

@@ -1,30 +1,41 @@
 // The app shell: top bar, Python status, settings, and switching between screens.
 //
 // Routes (in the URL hash):
-//   #/                 level select
+//   #/                 the start menu
+//   #/lessons[/<n>]    the Lessons directory, with chapter n open
+//   #/promotion/<tier> the promotion ceremony (M3.7)
 //   #/level/<id>       a level
 //   #/harness          the raw Python harness from Milestone 0
+//   #/styleguide       the look at every size, in both themes (M3.7)
 import { chapterName, chapters, findLevel } from "./content";
 import { mountHarness } from "./harness";
+import { unlockedPieces } from "./promotion";
 import { progress } from "./progress";
 import { PyClient, startPythonWorker, type ClientStatus } from "./py/client";
 import { applyToDocument, settings } from "./settings";
 import { h } from "./ui/dom";
 import { icon } from "./ui/icons";
-import { renderLevelSelect } from "./ui/levelSelect";
+import { mountLessons } from "./ui/lessonsMenu";
 import { mountLevel, type LevelContext } from "./ui/levelView";
+import { mountPromotion } from "./ui/promotionScreen";
 import { ReplPanel } from "./ui/repl";
 import { SettingsDialog } from "./ui/settingsDialog";
+import { mountTitle } from "./ui/titleScreen";
+import { mountStyleguide } from "./ui/styleguide";
 
 export function startApp(root: HTMLElement): void {
   applyToDocument(settings.get());
   settings.subscribe(applyToDocument);
 
-  const dialog = new SettingsDialog(settings, () => {
-    progress.reset();
-    context.knownCalls.clear();
-    route(); // redraw the screen from the cleared progress
-  });
+  const dialog = new SettingsDialog(
+    settings,
+    () => {
+      progress.reset();
+      context.knownCalls.clear();
+      route(); // redraw the screen from the cleared progress
+    },
+    () => unlockedPieces(progress),
+  );
   const status = h("span", { class: "status", "data-state": "loading" }, "Loading Python…");
   const settingsButton = h(
     "button",
@@ -63,6 +74,14 @@ export function startApp(root: HTMLElement): void {
   };
   let unmount: () => void = () => {};
 
+  /** Put keyboard and screen-reader focus on the screen's heading, so a new screen starts at its top. */
+  function focusHeading(): void {
+    const heading = main.querySelector<HTMLElement>("h1");
+    if (!heading) return;
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+  }
+
   function route(): void {
     unmount();
     unmount = () => {};
@@ -73,7 +92,9 @@ export function startApp(root: HTMLElement): void {
       const chapter = chapters.find((c) => c.chapter === source.chapter);
       const number = (chapter?.levels.indexOf(source) ?? -1) + 1;
       crumbs.replaceChildren(
-        h("a", { href: "#/" }, chapter ? chapterName(chapter) : "Levels"),
+        h("a", { href: "#/lessons" }, "Lessons"),
+        h("span", { class: "crumb-sep" }, "/"),
+        h("a", { href: chapter ? `#/lessons/${chapter.chapter}` : "#/lessons" }, chapter ? chapterName(chapter) : "Levels"),
         h("span", { class: "crumb-sep" }, "/"),
         h("span", {}, `${number}. ${source.title}`),
       );
@@ -83,11 +104,31 @@ export function startApp(root: HTMLElement): void {
       crumbs.replaceChildren(h("span", {}, "Python harness"));
       unmount = mountHarness(main, client);
       document.title = "Harness · Rank & File";
+    } else if (hash === "#/styleguide") {
+      crumbs.replaceChildren(h("span", {}, "Style guide"));
+      unmount = mountStyleguide(main);
+      focusHeading();
+      document.title = "Style guide · Rank & File";
+    } else if (/^#\/lessons(\/\d+)?$/.test(hash)) {
+      const focus = /\/(\d+)$/.exec(hash)?.[1];
+      crumbs.replaceChildren(h("span", {}, "Lessons"));
+      unmount = mountLessons(main, chapters, progress, client, focus === undefined ? undefined : Number(focus));
+      focusHeading();
+      document.title = "Lessons · Rank & File";
+    } else if (/^#\/promotion\/\w+$/.test(hash)) {
+      crumbs.replaceChildren(h("span", {}, "Promotion"));
+      unmount = mountPromotion(main, hash.slice("#/promotion/".length), progress, settings);
+      focusHeading();
+      document.title = "Promotion · Rank & File";
     } else {
       crumbs.replaceChildren();
-      main.replaceChildren(renderLevelSelect(chapters, progress));
+      unmount = mountTitle(main, { lessons: () => (location.hash = "#/lessons"), settings: () => dialog.open() });
       document.title = "Rank & File";
     }
+    // every screen eases in (the CSS skips it with reduced motion)
+    main.classList.remove("screen-in");
+    void main.offsetWidth;
+    main.classList.add("screen-in");
     window.scrollTo(0, 0);
   }
 

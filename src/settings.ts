@@ -6,6 +6,7 @@ type Theme = "system" | "light" | "dark";
 type Motion = "system" | "full" | "reduced";
 export type CodeSize = "small" | "medium" | "large" | "x-large";
 type CodePanel = "right" | "bottom" | "left";
+export type Piece = "pawn" | "knight"; // which skin the player's piece wears (DESIGN.md §8); a locked one reads as the pawn
 
 export interface Settings {
   speed: number; // playback speed multiplier
@@ -14,16 +15,18 @@ export interface Settings {
   motion: Motion; // animations
   codePanel: CodePanel; // where a level's code column sits (wide screens only)
   wrapLines: boolean; // long lines of code wrap instead of running off the side
+  piece: Piece; // the skin of the player's piece
 }
 
 export const SPEEDS = [0.5, 1, 2, 4] as const;
 export const CODE_SIZES: Record<CodeSize, number> = { small: 13, medium: 15, large: 17, "x-large": 20 };
-export const DEFAULTS: Settings = { speed: 1, theme: "system", codeSize: "medium", motion: "system", codePanel: "right", wrapLines: true };
+export const DEFAULTS: Settings = { speed: 1, theme: "dark", codeSize: "medium", motion: "system", codePanel: "right", wrapLines: true, piece: "pawn" };
 
 const STORAGE_KEY = "rank-and-file:settings";
 const THEMES: readonly Theme[] = ["system", "light", "dark"];
 const MOTIONS: readonly Motion[] = ["system", "full", "reduced"];
 const CODE_PANELS: readonly CodePanel[] = ["right", "bottom", "left"];
+const PIECES: readonly Piece[] = ["pawn", "knight"];
 
 export class SettingsStore {
   private value: Settings;
@@ -75,7 +78,14 @@ export function sanitize(raw: unknown): Settings {
     motion: pick(input.motion, MOTIONS, DEFAULTS.motion),
     codePanel: pick(input.codePanel, CODE_PANELS, DEFAULTS.codePanel),
     wrapLines: pick(input.wrapLines, [true, false], DEFAULTS.wrapLines),
+    piece: pick(input.piece, PIECES, DEFAULTS.piece),
   };
+}
+
+/** Whether motion should be off: Animations is Reduced, or Match system and the OS asks for less. */
+export function motionReduced(value: Settings = settings.get()): boolean {
+  if (value.motion !== "system") return value.motion === "reduced";
+  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 /** The app-wide settings. */
