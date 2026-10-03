@@ -37,9 +37,9 @@ Built beyond the first brief:
   its naive attempts fail; blind level generators that write solutions without
   anyone reading them; an end-to-end suite that drives the real app.
 
-Next: the first design pass (§9), which also builds the promotion ceremony and
-the knight skin (§8). Its step 0, the direction, is decided (§9: a wire world
-with one solid hero), and step 1 builds it into the game. Then the level editor and
+The first design pass (§9) is merged: a wire world with one solid hero, the start
+menu, the Lessons directory, the promotion ceremony and the knight skin (§8), the
+motion kit and an accessibility pass. Next: the level editor and
 free play (§7).
 
 ---
@@ -170,7 +170,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 | M2 Feedback depth | tiered hints, AST constraints, several boards, par and stars, idiomatic-solution reveal, progress saving | Done |
 | M3.0–M3.5 | the obstacle toolkit, the Codex, Chapters 2–5 | Done |
 | M3.6 Chapter 6 | Runes | In play-test: engine, levels and lessons built |
-| **M3.7 Look & Feel** | the first major design pass (§9), with the **promotion ceremony** and the knight skin (§8) | Step 0 (direction) in progress; before M4 |
+| **M3.7 Look & Feel** | the first major design pass (§9), with the **promotion ceremony** and the knight skin (§8) | Merged 2026-10-03 (`docs/M3/M3.7.md`), PR #17 |
 | M4 Level editor | author levels without hand-writing YAML; the Pawn tier's set of mastery challenges | Planned |
 | **M4.x Free play** | an open board to experiment on, with a skins gallery | Planned, after M4 |
 | M5+ | the remaining chapters, one tier at a time, each ending in a promotion | Planned |
