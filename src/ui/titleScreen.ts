@@ -1,6 +1,8 @@
 // The start menu (M3.7): the neon title. A chrome logo over a synthwave sunset, a rank of enemy chess pieces
 // standing against the sun, and the player's piece under the menu. Keyboard first: the arrow keys move the
 // selection and Enter opens it. With reduced motion the sky, the floor, the blink and the glitches stop.
+import { wornPiece } from "../promotion";
+import { settings } from "../settings";
 import { h } from "./dom";
 import { enemy, hero, type EnemyKind, type Skin } from "./sprites";
 import { svg } from "./sprites/svg";
@@ -15,7 +17,7 @@ interface Entry {
 }
 
 /** Mount the title in `main`. Returns what to call to leave it. */
-export function mountTitle(main: HTMLElement, options: { skin: Skin; lessons: () => void; settings: () => void }): () => void {
+export function mountTitle(main: HTMLElement, options: { lessons: () => void; settings: () => void }): () => void {
   const entries: Entry[] = [
     { label: VOICE.menu[0], open: options.lessons },
     { label: VOICE.menu[1] }, // Free Play (M4.x)
@@ -48,7 +50,15 @@ export function mountTitle(main: HTMLElement, options: { skin: Skin; lessons: ()
 
   // the enemy rank on the horizon, in front of the sun: broken wire, each glitching on its own beat
   const rank = svg("svg", { viewBox: `0 0 ${RANK.length * 64} 64`, class: "ts-rank", "aria-hidden": "true" }, ...RANK.map((kind, i) => svg("g", { transform: `translate(${i * 64 + 32} 32)` }, enemy(kind, "live", (i * 1.3) % 5, true))));
-  const heroArt = svg("svg", { viewBox: "-38 -38 76 76", class: "ts-hero", role: "img", "aria-label": `Your piece: the ${options.skin}` }, hero(options.skin, options.skin === "knight" ? "east" : "south"));
+  // the piece under the menu follows Settings → Piece, which can change while the menu is up
+  const heroArt = svg("svg", { viewBox: "-38 -38 76 76", class: "ts-hero", role: "img" });
+  const drawHero = () => {
+    const skin: Skin = wornPiece();
+    heroArt.setAttribute("aria-label", `Your piece: the ${skin}`);
+    heroArt.replaceChildren(hero(skin, skin === "knight" ? "east" : "south"));
+  };
+  drawHero();
+  const stopSettings = settings.subscribe(drawHero);
   const scene = h(
     "section",
     { class: "title-scene", "aria-label": "Start menu" },
@@ -77,5 +87,8 @@ export function mountTitle(main: HTMLElement, options: { skin: Skin; lessons: ()
     paint();
   };
   document.addEventListener("keydown", onKey);
-  return () => document.removeEventListener("keydown", onKey);
+  return () => {
+    document.removeEventListener("keydown", onKey);
+    stopSettings();
+  };
 }

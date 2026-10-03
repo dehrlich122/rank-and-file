@@ -9,7 +9,7 @@
 //   #/styleguide       the look at every size, in both themes (M3.7)
 import { chapterName, chapters, findLevel } from "./content";
 import { mountHarness } from "./harness";
-import { unlockedPieces, wornPiece } from "./promotion";
+import { unlockedPieces } from "./promotion";
 import { progress } from "./progress";
 import { PyClient, startPythonWorker, type ClientStatus } from "./py/client";
 import { applyToDocument, settings } from "./settings";
@@ -111,7 +111,7 @@ export function startApp(root: HTMLElement): void {
       document.title = "Promotion · Rank & File";
     } else {
       crumbs.replaceChildren();
-      unmount = mountTitle(main, { skin: wornPiece(progress), lessons: () => (location.hash = "#/lessons"), settings: () => dialog.open() });
+      unmount = mountTitle(main, { lessons: () => (location.hash = "#/lessons"), settings: () => dialog.open() });
       document.title = "Rank & File";
     }
     // every screen eases in (the CSS skips it with reduced motion)

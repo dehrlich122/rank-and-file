@@ -694,6 +694,24 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     return "pawn pickable, knight locked";
   });
 
+  await check("M3.7 (QA): changing Settings → Piece changes the piece on the start menu straight away", async () => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/` });
+    await b.waitFor(`document.querySelector('.title-scene .ts-hero')`, 30_000, "start menu");
+    // the pawn tier cleared: Chapter 6's five core levels solved
+    const solved = Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`ch06-l0${n}`, { stars: 3, hints: 0, failedAfterHints: 0, helped: false, solutionSeen: false, code: null }]));
+    await b.evaluate(`localStorage.setItem("rank-and-file:progress", ${JSON.stringify(JSON.stringify(solved))}); true`);
+    await b.send("Page.navigate", { url: `${base}?reload=${Date.now()}#/` });
+    await b.waitFor(`document.querySelector('.title-scene .ts-hero')`, 30_000, "start menu again");
+    const art = () => b.evaluate(`document.querySelector('.ts-hero').innerHTML.length + ' ' + document.querySelector('.ts-hero').getAttribute('aria-label')`);
+    const before = await art();
+    await b.evaluate(`document.querySelector('.topbar .settings-button').click()`);
+    await b.evaluate(`document.querySelector('input[name="setting-piece"][value="knight"]').click()`);
+    const after = await art();
+    await b.evaluate(`document.querySelector('input[name="setting-piece"][value="pawn"]').click(); document.querySelector('.settings-dialog').close()`);
+    expect(before.includes("pawn") && after.includes("knight") && before !== after, JSON.stringify({ before, after }));
+    return `${before} → ${after}`;
+  });
+
   await check("settings are reset after the checks", async () => {
     await b.evaluate(`localStorage.clear()`);
   });

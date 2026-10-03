@@ -1637,6 +1637,9 @@ The designer ran step 2 with Animations on Full. Rook glitch: "looks great", don
     The knight unlocks with it, and Lessons shows "watch again" on Chapter 6. The ceremony plays after the
     next solved run (any level) if it hasn't been shown yet, so a player who has already cleared Chapter 6
     can open it from Lessons now.
+- **QA-041 · Changing the piece in Settings didn't change the start menu's piece** *(Designer, 2026-10-03)*
+  - **Cause:** the start menu drew its piece once, when it opened.
+  - **Fixed:** it follows Settings → Piece while it is open (the same way the boards do). An e2e check covers it.
 
 ---
 
