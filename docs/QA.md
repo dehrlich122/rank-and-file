@@ -1588,6 +1588,26 @@ The designer played Chapter 6: "mostly excellent", with one note.
     since `len` is in the Codex, instead of Python's. The e2e check for Python's
     own help now uses `abs`.
 
+## Session 12 — 2026-10-03 · M3.7 step 2 (motion) play-test (`m3-7-look-and-feel`)
+
+The designer ran step 2 with Animations on Full. Rook glitch: "looks great", don't touch.
+
+- **QA-036 · Step 2's motion mostly didn't show** *(Designer, 2026-10-03)*
+  - No cyan streak behind the hero or magenta one behind enemies; the rook jumped
+    instead of sliding; no green ring or glowing goal on completion; the gate
+    went from closed to open at once. The rune's green flash did show.
+  - **Cause, two things.** (1) The dev server hadn't picked up the CSS edit, so the
+    page had the new board code but the old styles; that is why the check I ran
+    first looked fine (it only counted streak elements). (2) The rook's slide was
+    cancelled by my own code: moving its element in the document (to draw it over
+    the pawn) resets its transition.
+  - **Fixed:** the rook is reordered first and the browser sees it there before it
+    slides. Checked in headless Chrome with Animations on Full: the streak fades
+    in and out, the rook's position moves through in-between values, the goal and
+    a green ring animate on a solved run, and the gate has running transitions.
+    If the page still looks unchanged, restart the dev server (`npx vite --force`)
+    and hard-refresh.
+
 ---
 
 ## Queued work

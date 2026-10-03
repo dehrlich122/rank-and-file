@@ -222,8 +222,11 @@ export class BoardView {
     const index = this.last?.enemies?.findIndex((pos) => pos && pos[0] === by[0] && pos[1] === by[1]) ?? -1;
     const enemy = this.enemies[index];
     if (!enemy) return;
+    // it takes the square, so it is drawn over the piece (and under the lost ring). Moving a node in the
+    // document cancels its transitions, so reorder it first and let the browser see it there before it slides.
+    this.lostMark.before(enemy);
+    this.element.getBoundingClientRect();
     enemy.style.transform = centre(at, this.level.height);
-    this.lostMark.before(enemy); // it takes the square, so it is drawn over the piece (and under the lost ring)
   }
 
   private bump(from: Pos, at: Pos): void {
