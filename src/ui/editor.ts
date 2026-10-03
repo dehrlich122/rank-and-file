@@ -35,19 +35,19 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { settings } from "../settings";
+import { motionReduced, settings } from "../settings";
 
 /**
  * CodeMirror's usual "basic setup", minus its autocompletion: the game offers
  * only calls the player has typed (see completion.ts), and never on Enter.
  */
-const editorSetup: Extension[] = [
+const editorSetup = (): Extension[] => [  // a function, so each new editor reads the Animations setting for its caret
   lineNumbers(),
   highlightActiveLineGutter(),
   highlightSpecialChars(),
   history(),
   foldGutter(),
-  drawSelection(),
+  drawSelection({ cursorBlinkRate: motionReduced() ? 0 : 1200 }), // no blinking caret without motion
   dropCursor(),
   EditorState.allowMultipleSelections.of(true),
   indentOnInput(),
@@ -77,7 +77,7 @@ export interface EditorOptions {
 
 export function createEditor(options: EditorOptions): EditorView {
   const extensions: Extension[] = [
-    editorSetup,
+    editorSetup(),
     python(),
     indentUnit.of("    "),
     keymap.of([indentWithTab]),

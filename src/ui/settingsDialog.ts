@@ -145,8 +145,10 @@ export class SettingsDialog {
     for (const input of this.inputs.filter((i) => i.dataset.key === "piece")) {
       const locked = !open.includes(input.value as Piece);
       input.disabled = locked;
-      input.closest("label")?.classList.toggle("locked", locked);
-      input.closest("label")?.setAttribute("title", locked ? "Locked: finish Chapter 6 to promote your pawn." : "");
+      const label = input.closest("label");
+      label?.classList.toggle("locked", locked);
+      label?.querySelector(".lock-note")?.remove();
+      if (locked) label?.append(h("small", { class: "lock-note" }, " locked until Chapter 6 is cleared"));
     }
   }
 

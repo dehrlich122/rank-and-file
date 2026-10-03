@@ -242,7 +242,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 - The name stays Rank & File. The code form `rank_and_file()` is a secondary mark (for example the subtitle under the logo), never the logo.
 - Keyboard first: the arrow keys move the selection and Enter opens it.
 
-**Lessons is a directory, not a long page.** `src/ui/levelSelect.ts` today shows every chapter open on one page. It becomes a folder cascade: Lessons / Chapter 1 / its levels, with a breadcrumb showing the path.
+**Lessons is a directory, not a long page.** `src/ui/lessonsMenu.ts` (it replaced `levelSelect.ts`, which showed every chapter open on one page) is a folder cascade: Lessons / Chapter 1 / its levels, with a breadcrumb showing the path.
 - Direction: the "neon explorer". Collapsible chapter folders grouped under tier headings in the display face, inside a thin cyan HUD frame with corner brackets, with indent guides under an open folder. Each chapter has a segmented progress bar (one block per level) and the victory symbol; each level row has its number or ✓ and its stars, and keeps "Solution seen" and the mastery tag. Folders slide open. One hybrid is mocked up as an alternative: the explorer on the left, and a detail pane for the selected level on the right (what it trains, a mini board, best stars, Run / Replay).
 - **Nothing is locked.** Every chapter and level stays open, as today.
 - **Only what you need is open.** On load, the folder holding the next unsolved level is the only one open, and that level is selected and scrolled into view. Folders the player opens by hand are remembered per browser, like settings. The Testing ground is its own folder.
@@ -320,4 +320,4 @@ Colours are CSS custom properties written as `light-dark()`, there is a tile-to-
 - Before/after screenshots through the end-to-end suite.
 
 ### Open for the pass
-Sound (tiny optional chiptune effects, off by default). Settled by the brief above: CRT scanlines are optional and off by default, and the light theme has no glow.
+Sound (tiny optional chiptune effects, off by default). Settled by the brief above: the light theme has no glow. *(Designer, 2026-10-03)* The optional CRT scanlines (off by default) are a good idea but not urgent: saved for a future design pass, and not built in M3.7.

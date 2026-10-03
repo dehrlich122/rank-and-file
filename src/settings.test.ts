@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { applyToDocument, DEFAULTS, sanitize, SettingsStore } from "./settings";
+import { applyToDocument, DEFAULTS, motionReduced, sanitize, SettingsStore } from "./settings";
 import type { StorageLike } from "./storage";
 import { memoryStorage } from "./storage.fake";
 
@@ -74,5 +74,19 @@ describe("SettingsStore", () => {
     const storage = memoryStorage({ "rank-and-file:settings": '{"speed": 3, "theme": "purple", "motion": "full"' });
     expect(new SettingsStore(storage).get()).toEqual(DEFAULTS); // not valid JSON
     expect(sanitize({ speed: 3, theme: "purple", motion: "full", extra: 1 })).toEqual({ ...DEFAULTS, motion: "full" });
+  });
+});
+
+describe("motionReduced", () => {
+  const os = (reduce: boolean) => vi.stubGlobal("matchMedia", () => ({ matches: reduce }));
+
+  it("follows the Animations setting, and under Match system the OS preference", () => {
+    os(true);
+    expect(motionReduced({ ...DEFAULTS, motion: "system" })).toBe(true);
+    expect(motionReduced({ ...DEFAULTS, motion: "full" })).toBe(false); // Full ignores the OS
+    os(false);
+    expect(motionReduced({ ...DEFAULTS, motion: "system" })).toBe(false);
+    expect(motionReduced({ ...DEFAULTS, motion: "reduced" })).toBe(true); // Reduced always stops motion
+    vi.unstubAllGlobals();
   });
 });

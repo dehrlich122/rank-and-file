@@ -41,6 +41,40 @@ function cell(art: () => SVGElement, px: number): SVGElement {
   );
 }
 
+// The colour tokens worth checking by eye, with their contrast against the panel and both squares (WCAG ratios).
+const SWATCHES = ["text", "muted", "accent", "bad", "good", "warn", "wire-wall", "wire-amber", "wire-green", "wire-foe", "beacon", "solid-edge"];
+
+/** A computed "rgb(r, g, b)" as [r, g, b]. */
+const channels = (css: string): number[] => (css.match(/[d.]+/g) ?? []).slice(0, 3).map(Number);
+const luminance = (rgb: number[]): number => {
+  const [r, g, b] = rgb.map((v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+};
+const contrast = (a: number[], b: number[]): number => (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
+
+/** Fill each pane's swatch strip once it is on the page, because a token's colour depends on its pane's theme. */
+function fillSwatches(root: HTMLElement): void {
+  for (const strip of root.querySelectorAll<HTMLElement>(".sg-swatches")) {
+    const probe = h("span", { class: "sg-probe", "aria-hidden": "true" });
+    strip.append(probe);
+    const colour = (token: string, property: "color" | "backgroundColor") => {
+      probe.style[property] = `var(--${token})`;
+      const value = channels(getComputedStyle(probe)[property]);
+      probe.style[property] = "";
+      return value;
+    };
+    const against = ["panel", "sq-dark", "sq-light"].map((token) => colour(token, "backgroundColor"));
+    for (const token of SWATCHES) {
+      const mine = colour(token, "color");
+      const ratios = against.map((other) => contrast(mine, other).toFixed(1));
+      strip.append(
+        h("div", { class: "sg-swatch" }, h("span", { class: "sg-chip", style: `background: var(--${token})` }), h("span", { class: "sg-token" }, token), h("span", { class: "sg-ratios", title: "contrast against the panel, the dark square and the light square" }, ratios.join(" · "))),
+      );
+    }
+    probe.remove();
+  }
+}
+
 /** A figure holding one sprite at 64px and again at 20px. */
 const figure = (label: string, art: () => SVGElement) => h("figure", {}, cell(art, 64), cell(art, 20), h("figcaption", {}, label));
 
@@ -63,6 +97,8 @@ export function mountStyleguide(main: HTMLElement): () => void {
       h("h2", { class: "sg-name" }, scheme === "dark" ? "Night shift (dark)" : "Daylight terminal (light)"),
       h("h3", {}, "The board: every sprite, the threats"),
       h("div", { class: "sg-board-row" }, board(false), h("div", { class: "sg-board-side" }, h("p", {}, "The smallest main board: 20px squares. The halftone switches to bigger dots."), board(true))),
+      h("h3", {}, "Colours: contrast against the panel · dark square · light square"),
+      h("div", { class: "sg-swatches" }),
       h("h3", {}, "The hero, facing each way"),
       h("div", { class: "sg-sheet" }, ...FACINGS.map((face) => figure(`pawn, ${face}`, () => hero("pawn", face))), ...FACINGS.map((face) => figure(`knight, ${face}`, () => hero("knight", face)))),
       h("h3", {}, "Enemies at rest, mid-break and snapping back"),
@@ -122,5 +158,6 @@ export function mountStyleguide(main: HTMLElement): () => void {
     panes,
   );
   main.replaceChildren(page);
+  fillSwatches(page);
   return () => boards.forEach((view) => view.dispose());
 }

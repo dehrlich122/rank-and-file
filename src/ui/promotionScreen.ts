@@ -40,7 +40,7 @@ export function mountPromotion(main: HTMLElement, tier: string, progress: Progre
         "div",
         { class: "ts-body pr-body" },
         h("p", { class: "pr-kicker" }, "Tier cleared"),
-        h("h1", { class: "ts-logo", "aria-label": promotion.headline }, h("span", { class: "ts-logo-text pr-title", "data-text": "PROMOTION" }, "PROMOTION")),
+        h("h1", { class: "ts-logo" }, h("span", { class: "ts-logo-text pr-title", "data-text": "PROMOTION" }, "PROMOTION")),
         h("div", { class: "pr-stage", role: "img", "aria-label": `Your ${promotion.from} becomes a ${promotion.to}` }, figure(promotion.from, "pr-from"), h("span", { class: "pr-arrow", "aria-hidden": "true" }, "▶"), figure(promotion.to, "pr-to")),
         h("p", { class: "pr-headline" }, promotion.headline),
         h(

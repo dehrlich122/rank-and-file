@@ -74,6 +74,14 @@ export function startApp(root: HTMLElement): void {
   };
   let unmount: () => void = () => {};
 
+  /** Put keyboard and screen-reader focus on the screen's heading, so a new screen starts at its top. */
+  function focusHeading(): void {
+    const heading = main.querySelector<HTMLElement>("h1");
+    if (!heading) return;
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+  }
+
   function route(): void {
     unmount();
     unmount = () => {};
@@ -99,15 +107,18 @@ export function startApp(root: HTMLElement): void {
     } else if (hash === "#/styleguide") {
       crumbs.replaceChildren(h("span", {}, "Style guide"));
       unmount = mountStyleguide(main);
+      focusHeading();
       document.title = "Style guide · Rank & File";
     } else if (/^#\/lessons(\/\d+)?$/.test(hash)) {
       const focus = /\/(\d+)$/.exec(hash)?.[1];
       crumbs.replaceChildren(h("span", {}, "Lessons"));
       unmount = mountLessons(main, chapters, progress, client, focus === undefined ? undefined : Number(focus));
+      focusHeading();
       document.title = "Lessons · Rank & File";
     } else if (/^#\/promotion\/\w+$/.test(hash)) {
       crumbs.replaceChildren(h("span", {}, "Promotion"));
       unmount = mountPromotion(main, hash.slice("#/promotion/".length), progress, settings);
+      focusHeading();
       document.title = "Promotion · Rank & File";
     } else {
       crumbs.replaceChildren();

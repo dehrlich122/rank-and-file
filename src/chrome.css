@@ -270,6 +270,10 @@
   border: 1px solid var(--plate-accent);
 }
 
+.ts-menu:focus-visible {
+  outline-offset: 4px;
+}
+
 .ts-menu {
   list-style: none;
   margin: 268px 0 0;
@@ -586,8 +590,7 @@
   text-align: left;
 }
 
-.folder-head:hover,
-.folder-head:focus-visible {
+.folder-head:hover {
   border-color: var(--border);
 }
 
@@ -703,6 +706,13 @@
   border: 1px solid var(--border);
   background: var(--panel);
   cursor: pointer;
+}
+
+/* rows sit inside an overflow-hidden folder, so their focus ring is drawn inside them */
+.lrow:focus-visible,
+.folder-head:focus-visible,
+.promo-link:focus-visible {
+  outline-offset: -2px;
 }
 
 .lrow:hover {

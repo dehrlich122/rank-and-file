@@ -82,5 +82,11 @@ export function sanitize(raw: unknown): Settings {
   };
 }
 
+/** Whether motion should be off: Animations is Reduced, or Match system and the OS asks for less. */
+export function motionReduced(value: Settings = settings.get()): boolean {
+  if (value.motion !== "system") return value.motion === "reduced";
+  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 /** The app-wide settings. */
 export const settings = new SettingsStore();

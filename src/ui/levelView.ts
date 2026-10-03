@@ -19,7 +19,7 @@ import type { ReplPanel } from "./repl";
 import type { SettingsDialog } from "./settingsDialog";
 import { progress } from "../progress";
 import { tierCleared } from "../promotion";
-import { SPEEDS, settings } from "../settings";
+import { SPEEDS, motionReduced, settings } from "../settings";
 
 export interface LevelContext {
   client: PyClient;
@@ -114,7 +114,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
 
   // -- middle: board, playback controls, outcome -----------------------------------
   const boardHost = h("div", { class: "board-host" }, h("p", { class: "muted" }, "Setting up the board…"));
-  const outcomeHost = h("div", { class: "outcome-host" });
+  // a live region that exists before any card is put in it, so a run's result is announced
+  const outcomeHost = h("div", { class: "outcome-host", role: "status" });
   const slider = h("input", { type: "range", min: 0, max: 0, value: 0, class: "scrubber", "aria-label": "Playback position" });
   const stepLabel = h("span", { class: "step-label muted small" }, "");
   const speed = h(
@@ -394,8 +395,13 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       // clearing a tier's last core level earns its promotion: the ceremony follows the celebration, once
       const tier = chapters.find((c) => c.chapter === source.chapter)?.tier;
       if (tier && !source.mastery && tierCleared(tier) && !progress.hasSeen("promotion", tier)) {
-        window.clearTimeout(promotionTimer);
-        promotionTimer = window.setTimeout(() => (location.hash = `#/promotion/${tier}`), afterMs + 2600);
+        if (motionReduced()) {
+          // no automatic jump without motion: offer it instead
+          actions.push(h("a", { class: "btn btn-small", href: `#/promotion/${tier}` }, "Promotion earned: watch it"));
+        } else {
+          window.clearTimeout(promotionTimer);
+          promotionTimer = window.setTimeout(() => (location.hash = `#/promotion/${tier}`), afterMs + 2600);
+        }
       }
     }
     outcomeHost.replaceChildren(outcomeCard(run, result, actions));

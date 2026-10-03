@@ -122,7 +122,7 @@ export function outcomeCard(run: LevelResult, shown: LevelResult, actions: HTMLE
   // a run that goes wrong flickers the card's frame once (never its text); a solved one gets a sunset banner above it
   const card = h(
     "div",
-    { class: `outcome outcome-${tone}${tone === "bad" ? " glitch-frame" : ""}`, role: "status" },
+    { class: `outcome outcome-${tone}${tone === "bad" ? " glitch-frame" : ""}` },
     h("div", { class: "outcome-head" }, h("strong", {}, HEADLINE[run.status]), ...actions),
     ...body,
   );
@@ -141,5 +141,5 @@ function starList(stars: Star[]): HTMLElement {
 
 /** A simple card for problems that aren't a run result (e.g. Python restarting). */
 export function noticeCard(tone: "good" | "warn" | "bad", title: string, text: string): HTMLElement {
-  return h("div", { class: `outcome outcome-${tone}`, role: "status" }, h("div", { class: "outcome-head" }, h("strong", {}, title)), h("p", {}, text));
+  return h("div", { class: `outcome outcome-${tone}` }, h("div", { class: "outcome-head" }, h("strong", {}, title)), h("p", {}, text));
 }

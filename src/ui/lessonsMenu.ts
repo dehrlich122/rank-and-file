@@ -49,8 +49,10 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
   const boards = new Map<string, Promise<LevelInfo | null>>();
   let board: BoardView | undefined;
 
-  const crumbs = h("nav", { class: "lcrumbs", "aria-label": "Where you are" });
-  const detail = h("aside", { class: "detail", "aria-live": "polite" });
+  const crumbs = h("nav", { class: "lcrumbs", "aria-label": "Lessons path" });
+  const detail = h("aside", { class: "detail", "aria-label": "Selected level" });
+  // what a screen reader hears when the selection changes: the level's name, not the whole pane again
+  const announce = h("p", { class: "sr-only", role: "status" });
   const rowOf = new Map<string, HTMLElement>();
 
   const chapterOf = (level: Level) => chapters.find((c) => c.chapter === level.chapter)!;
@@ -92,7 +94,7 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
       h("h2", {}, level.title, level.mastery ? masteryTag() : null),
       h("p", { class: "muted" }, level.trains),
       boardHost,
-      h("div", { class: "detail-stars" }, best > 0 ? h("span", { class: "detail-best" }, "Best: ") : null, ...(best > 0 ? stars(best) : []), helped && best === 0 ? h("span", { class: "muted small" }, "Solution seen") : null),
+      h("div", { class: "detail-stars" }, best > 0 ? h("span", { class: "detail-best", "aria-hidden": "true" }, "Best: ") : null, ...(best > 0 ? [...stars(best), h("span", { class: "sr-only" }, `Best: ${best} of 3 stars`)] : []), helped && best === 0 ? h("span", { class: "muted small" }, "Solution seen") : null),
       h("div", { class: "detail-actions" }, h("a", { class: "btn btn-primary", href: `#/level/${level.id}` }, icon("play"), best > 0 ? "Replay this level" : "Run this level")),
     );
     void boardFor(level).then((info) => {
@@ -104,7 +106,12 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
 
   function select(level: Level): void {
     selected = level;
-    for (const [id, row] of rowOf) row.classList.toggle("selected", id === level.id);
+    for (const [id, row] of rowOf) {
+      row.classList.toggle("selected", id === level.id);
+      if (id === level.id) row.setAttribute("aria-current", "true");
+      else row.removeAttribute("aria-current");
+    }
+    announce.textContent = `${level.title}${level.mastery ? ", optional mastery challenge" : ""}`;
     showCrumbs();
     showDetail();
   }
@@ -114,12 +121,13 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
     const solved = best > 0;
     const element = h(
       "li",
-      { class: `lrow${solved ? " solved" : ""}${selected === level ? " selected" : ""}`, tabindex: "0", "data-level-id": level.id },
+      { class: `lrow${solved ? " solved" : ""}${selected === level ? " selected" : ""}`, tabindex: "0", "data-level-id": level.id, "aria-current": selected === level ? "true" : undefined },
       h("span", { class: "lrow-num" }, solved ? "✓" : String(index + 1)),
       h("span", { class: "lrow-text" }, h("strong", {}, level.title, level.mastery ? masteryTag() : null), h("span", { class: "muted small" }, level.trains)),
-      solved ? h("span", { class: "card-stars", title: `${best} of 3 stars`, "aria-label": `${best} of 3 stars` }, ...stars(best)) : helped ? h("span", { class: "card-tag muted small" }, "Solution seen") : null,
+      solved ? h("span", { class: "card-stars", title: `${best} of 3 stars` }, ...stars(best), h("span", { class: "sr-only" }, `${best} of 3 stars`)) : helped ? h("span", { class: "card-tag muted small" }, "Solution seen") : null,
     );
     element.addEventListener("click", () => select(level));
+    element.addEventListener("focus", () => selected !== level && select(level)); // arriving by keyboard selects too
     element.addEventListener("dblclick", () => (location.hash = `#/level/${level.id}`));
     element.addEventListener("keydown", (event) => {
       if (event.key === "Enter") location.hash = `#/level/${level.id}`;
@@ -151,18 +159,12 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
       cleared ? h("span", { class: `victory${fresh ? " fresh" : ""}`, title: mastered ? "Chapter cleared, mastery done" : "Chapter cleared" }, crownIcon(mastered), h("span", {}, mastered ? "mastered" : "cleared")) : null,
       h("span", { class: "segments", role: "img", "aria-label": `${done} of ${core.length} levels solved` }, ...chapter.levels.map((l) => h("span", { class: `seg${progress.solved(l.id) ? " on" : ""}${l.mastery ? " mastery" : ""}` }))),
     );
-    const element = h(
-      "div",
-      { class: `folder${open ? " open" : ""}${cleared ? " cleared" : ""}`, "data-chapter": String(chapter.chapter) },
-      head,
-      h(
-        "div",
-        { class: "folder-slide" },
-        h("div", { class: "folder-inner" }, promotion ? h("a", { class: "promo-link", href: `#/promotion/${promotion.tier}` }, `★ ${promotion.headline}: watch again`) : null, h("ol", { class: "lrows" }, ...chapter.levels.map((l, i) => row(l, i)))),
-      ),
-    );
+    const inner = h("div", { class: "folder-inner" }, promotion ? h("a", { class: "promo-link", href: `#/promotion/${promotion.tier}` }, `★ ${promotion.headline}: watch again`) : null, h("ol", { class: "lrows" }, ...chapter.levels.map((l, i) => row(l, i))));
+    inner.inert = !open; // a closed folder's rows can't be tabbed to
+    const element = h("div", { class: `folder${open ? " open" : ""}${cleared ? " cleared" : ""}`, "data-chapter": String(chapter.chapter) }, head, h("div", { class: "folder-slide" }, inner));
     head.addEventListener("click", () => {
       const nowOpen = element.classList.toggle("open");
+      inner.inert = !nowOpen;
       head.setAttribute("aria-expanded", String(nowOpen));
       if (nowOpen) remembered.add(chapter.chapter);
       else remembered.delete(chapter.chapter);
@@ -178,9 +180,32 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
   const explorer = h(
     "div",
     { class: "hud-frame" },
-    ...tiers.flatMap((tier, i) => [h("p", { class: "tier-head" }, tierName(tier, i + 1)), ...chapters.filter((c) => c.curriculum && c.tier === tier).map(folder)]),
-    ...(outside.length ? [h("p", { class: "tier-head" }, VOICE.outside), ...outside.map(folder)] : []),
+    ...tiers.flatMap((tier, i) => [h("h2", { class: "tier-head" }, tierName(tier, i + 1)), ...chapters.filter((c) => c.curriculum && c.tier === tier).map(folder)]),
+    ...(outside.length ? [h("h2", { class: "tier-head" }, VOICE.outside), ...outside.map(folder)] : []),
   );
+  // arrow keys move through the folder heads and the rows of open folders; Right and Left open and close a folder
+  explorer.addEventListener("keydown", (event) => {
+    const target = event.target as HTMLElement;
+    if (!target.matches(".folder-head, .lrow")) return;
+    const list = [...explorer.querySelectorAll<HTMLElement>(".folder-head, .folder.open .promo-link, .folder.open .lrow")];
+    const at = list.indexOf(target);
+    const isHead = target.matches(".folder-head");
+    const isOpen = target.closest(".folder")?.classList.contains("open") ?? false;
+    let next: HTMLElement | undefined;
+    if (event.key === "ArrowDown") next = list[at + 1];
+    else if (event.key === "ArrowUp") next = list[at - 1];
+    else if (event.key === "Home") next = list[0];
+    else if (event.key === "End") next = list.at(-1);
+    else if (event.key === "ArrowRight" && isHead) {
+      if (!isOpen) target.click();
+      else next = list[at + 1];
+    } else if (event.key === "ArrowLeft") {
+      if (isHead && isOpen) target.click();
+      else if (!isHead) next = target.closest(".folder")?.querySelector<HTMLElement>(".folder-head") ?? undefined;
+    } else return;
+    event.preventDefault();
+    next?.focus();
+  });
   showCrumbs();
   showDetail();
   const foot = h(
@@ -198,6 +223,7 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
       h("h1", { class: "lessons-title" }, VOICE.lessons),
       h("p", { class: "muted" }, "Every level teaches one idea with a short lesson you can run, then gives you a puzzle that needs it."),
       crumbs,
+      announce,
       h("div", { class: "lessons-cols" }, explorer, detail),
       foot,
     ),

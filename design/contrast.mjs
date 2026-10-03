@@ -5,7 +5,8 @@
 //   node design/contrast.mjs          a table to the console
 //   node design/contrast.mjs --md     the same as a Markdown table, for docs/M3/M3.7.md
 //
-// The step-1 version reads src/styles.css instead and joins `npm run check`.
+// This checks the old style tiles only. The real check, on src/styles.css, is scripts/check-contrast.mjs
+// and runs in `npm run check`.
 import { readFileSync } from "node:fs";
 
 const css = ["./tile.css", "./noir.css"].map((file) => readFileSync(new URL(file, import.meta.url), "utf8")).join("\n");

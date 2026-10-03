@@ -712,6 +712,50 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     return `${before} → ${after}`;
   });
 
+  // -- M3.7 step 4: keyboard, focus and reduced motion ----------------------------------------------
+  await check("M3.7 step 4: Enter on the top bar's Settings button isn't taken by the start menu; the focus ring shows", async () => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/` });
+    await b.waitFor(`document.querySelector('.title-scene .ts-menu')`, 30_000, "start menu");
+    await b.evaluate(`document.querySelector('.topbar .settings-button').focus()`);
+    await b.key("Enter");
+    const state = await b.evaluate(`({ hash: location.hash })`); // before the fix, this Enter opened Lessons
+    // the ring: a keyboard user's focus is drawn in the accent colour (computed on the brand link, the first Tab stop)
+    await b.evaluate(`document.querySelector('.brand').focus()`);
+    await b.key("Tab");
+    const ring = await b.evaluate(`(() => { const s = getComputedStyle(document.activeElement); return { style: s.outlineStyle, width: s.outlineWidth }; })()`);
+    expect(state.hash === "#/" && ring.style === "solid" && ring.width === "2px", JSON.stringify({ state, ring }));
+    return `hash stays ${state.hash}; ring ${ring.style} ${ring.width}`;
+  });
+
+  await check("M3.7 step 4: Lessons: closed folders' rows aren't tab stops, and the arrow keys move through the rows and folders", async () => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/lessons` });
+    await b.waitFor(`document.querySelector('.lessons .folder')`, 30_000, "Lessons");
+    const closedInert = await b.evaluate(`[...document.querySelectorAll('.folder:not(.open) .folder-inner')].every((e) => e.inert) && !document.querySelector('.folder.open .folder-inner').inert`);
+    await b.evaluate(`document.querySelector('.folder[data-chapter="1"] .folder-head').focus()`);
+    await b.key("ArrowDown");
+    const onRow = await b.evaluate(`document.activeElement.dataset.levelId`);
+    await b.key("ArrowLeft");
+    const backOnHead = await b.evaluate(`document.activeElement.classList.contains('folder-head')`);
+    await b.key("ArrowRight");
+    const current = await b.evaluate(`document.querySelector('.lrow[aria-current="true"]')?.dataset.levelId`);
+    expect(closedInert && onRow === "ch01-l01" && backOnHead && current === "ch01-l01", JSON.stringify({ closedInert, onRow, backOnHead, current }));
+    return `first row ${onRow}, selected ${current}`;
+  });
+
+  await check("M3.7 step 4: with Animations reduced a move leaves no trail", async () => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/level/ch01-l01` });
+    await b.waitFor(`document.querySelector('.level .board .piece')`, 30_000, "level");
+    await b.evaluate(`localStorage.setItem("rank-and-file:settings", JSON.stringify({ motion: "reduced" })); true`);
+    await openLevel("ch01-l01", { reload: true });
+    await setCode("pawn.move()\n");
+    await b.evaluate(`window.__trails = 0; setInterval(() => { window.__trails = Math.max(window.__trails, document.querySelectorAll('.board .trail-hero').length); }, 20); document.querySelector('.level-right .btn-primary').click()`);
+    await sleep(1500);
+    const trails = await b.evaluate(`window.__trails`);
+    await b.evaluate(`localStorage.setItem("rank-and-file:settings", JSON.stringify({ motion: "system" })); true`);
+    expect(trails === 0, `${trails} trail elements`);
+    return "no trail elements";
+  });
+
   await check("settings are reset after the checks", async () => {
     await b.evaluate(`localStorage.clear()`);
   });

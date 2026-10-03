@@ -146,6 +146,31 @@ a {
   color: var(--accent);
 }
 
+/* one focus ring for everything a keyboard can reach: the accent colour, which the contrast check tests on every surface */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* the code editor's own ring is a dotted near-black line, invisible on the dark panel */
+.cm-editor.cm-focused {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: -2px;
+}
+
+/* text for screen readers only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 h1,
 h2,
 h3 {
@@ -1952,6 +1977,18 @@ pre {
   }
 }
 
+/* Glow is for the dark theme: its tokens are transparent in the light one, so a drop-shadow there draws nothing.
+   Say so to the browser too, so a busy board (a level with 60 walls) doesn't pay for filters that show nothing. */
+:root[data-theme="light"] :is(.w-wall, .w-amber, .w-green, .beacon .w-amber, .bw, .s-glow, .br :is(.br-facing, .br-notch), .grid-edge, .trail-hero) {
+  filter: none;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) :is(.w-wall, .w-amber, .w-green, .beacon .w-amber, .bw, .s-glow, .br :is(.br-facing, .br-notch), .grid-edge, .trail-hero) {
+    filter: none;
+  }
+}
+
 /* ---- style guide (#/styleguide, src/ui/styleguide.ts) ---- */
 
 .styleguide {
@@ -2056,6 +2093,31 @@ pre {
 .sg-board-min {
   width: 207px; /* 20px squares: the smallest main board we ship */
   flex: none;
+}
+
+.sg-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 6px 10px;
+}
+
+.sg-swatch {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 0 8px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.sg-chip {
+  grid-row: span 2;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+}
+
+.sg-ratios {
+  color: var(--muted);
 }
 
 .sg-sheet {
@@ -2458,6 +2520,15 @@ pre {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-text);
+}
+
+.choice.locked {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.choice.locked .lock-note {
+  color: var(--muted);
 }
 
 .choice input:focus-visible + span {

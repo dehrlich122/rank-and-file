@@ -29,7 +29,7 @@ export function mountTitle(main: HTMLElement, options: { lessons: () => void; se
   const rows = entries.map((entry, i) => {
     const row = h(
       "li",
-      { class: `ts-item${entry.open ? "" : " soon"}`, role: "menuitem", "aria-disabled": entry.open ? undefined : "true" },
+      { class: `ts-item${entry.open ? "" : " soon"}`, id: `ts-item-${i}`, role: "option", "aria-selected": "false", "aria-disabled": entry.open ? undefined : "true" },
       h("span", { class: "ts-cursor", "aria-hidden": "true" }, "▶"),
       h("span", {}, entry.label),
       entry.open ? null : h("span", { class: "ts-tag" }, VOICE.comingSoon),
@@ -41,7 +41,13 @@ export function mountTitle(main: HTMLElement, options: { lessons: () => void; se
     });
     return row;
   });
-  const paint = () => rows.forEach((row, i) => row.classList.toggle("selected", i === selected));
+  const paint = () => {
+    rows.forEach((row, i) => {
+      row.classList.toggle("selected", i === selected);
+      row.setAttribute("aria-selected", String(i === selected));
+    });
+    menu.setAttribute("aria-activedescendant", `ts-item-${selected}`);
+  };
   const choose = () => {
     const entry = entries[selected]!;
     if (entry.open) entry.open();
@@ -59,6 +65,7 @@ export function mountTitle(main: HTMLElement, options: { lessons: () => void; se
   };
   drawHero();
   const stopSettings = settings.subscribe(drawHero);
+  const menu = h("ul", { class: "ts-menu", role: "listbox", "aria-label": "Start menu", tabindex: "0" }, ...rows);
   const scene = h(
     "section",
     { class: "title-scene", "aria-label": "Start menu" },
@@ -68,7 +75,7 @@ export function mountTitle(main: HTMLElement, options: { lessons: () => void; se
       { class: "ts-body" },
       h("h1", { class: "ts-logo", "aria-label": "Rank and File" }, h("span", { class: "ts-logo-text", "data-text": "RANK & FILE" }, "RANK & FILE")),
       h("p", { class: "ts-sub" }, VOICE.subtitle),
-      h("ul", { class: "ts-menu", role: "menu" }, ...rows),
+      menu,
       note,
       h("div", { class: "ts-hero-slot" }, heroArt),
     ),
@@ -79,6 +86,9 @@ export function mountTitle(main: HTMLElement, options: { lessons: () => void; se
   // The keys work as soon as the screen is up, so listen on the page. A dialog or the editor takes them first.
   const onKey = (event: KeyboardEvent) => {
     if (event.defaultPrevented || document.querySelector("dialog[open]")) return;
+    // only when focus is on the page or in the menu: Enter on the Settings button or the logo link is theirs
+    const target = event.target as Node;
+    if (target !== document.body && !scene.contains(target)) return;
     if (event.key === "ArrowDown") selected = (selected + 1) % entries.length;
     else if (event.key === "ArrowUp") selected = (selected + entries.length - 1) % entries.length;
     else if (event.key === "Enter") choose();
@@ -87,6 +97,7 @@ export function mountTitle(main: HTMLElement, options: { lessons: () => void; se
     paint();
   };
   document.addEventListener("keydown", onKey);
+  menu.focus({ preventScroll: true });
   return () => {
     document.removeEventListener("keydown", onKey);
     stopSettings();

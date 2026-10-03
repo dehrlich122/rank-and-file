@@ -378,7 +378,7 @@ src/app.ts         shell and routes (#/, #/level/<id>, #/harness)
 src/content.ts     bundles level YAML and lesson Markdown; loads solutions lazily
 src/settings.ts src/progress.ts src/storage.ts   saved settings and progress (localStorage)
 src/py/            worker, client and protocol
-src/ui/            board, editor, playback, panels, lesson, repl, levelView, levelSelect, codex,
+src/ui/            board, editor, playback, panels, lesson, repl, levelView, lessonsMenu, titleScreen, promotionScreen, codex,
                    help (hints, giving up, the comparison), compare, dialog, settingsDialog
 scripts/           copy-pyodide.mjs (runs after npm install), venv.mjs, check-bundle.mjs, e2e/,
                    solve.py gen_solutions.py gen_loops.py gen_conditions.py levelgen.py (search levels, write solutions blind)

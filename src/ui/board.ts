@@ -11,7 +11,7 @@
 // the hero look like is in ./sprites (the registry there maps a kind to its drawing).
 import type { Clock, Enemy, Facing, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
 import { wornPiece } from "../promotion";
-import { settings } from "../settings";
+import { motionReduced, settings } from "../settings";
 import { playableEvents } from "./motion";
 import { halftone, litGrid, M, S } from "./sprites/floor";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite, type Skin, type TileName } from "./sprites";
@@ -161,6 +161,7 @@ export class BoardView {
   private place(state: WorldState, animate = false): void {
     const before = this.last;
     this.last = state;
+    this.element.setAttribute("aria-label", this.describe(state));
     this.piece.style.transform = centre(state.pos, this.level.height);
     if (state.facing !== this.facing) {
       const turned = this.facing !== undefined;
@@ -218,11 +219,21 @@ export class BoardView {
     for (const [key, art] of tiles) art.classList.toggle(className, on.has(key));
   }
 
+  /** What the board says to a screen reader: its size, where the piece and the goal are, and a lost run. */
+  private describe(state: WorldState): string {
+    const { width, height, goal, piece } = this.level;
+    const parts = [`${width} by ${height} board`, `Your ${piece} is on ${squareName(state.pos)}, facing ${state.facing}`];
+    if (goal) parts.push(`The goal is on ${squareName(goal)}`);
+    if (state.lost) parts.push(`The run was lost on ${squareName(state.lost)}`);
+    return `${parts.join(". ")}.`;
+  }
+
   /**
    * A comet tail behind a moving piece: it is drawn out from the square the piece left at the pace the
    * piece slides, so its head is always the piece, then it fades (it lasts a little longer than the step).
    */
   private trail(from: Pos, to: Pos, className: string): void {
+    if (motionReduced()) return; // nothing would show, so don't build it
     const [a, b] = [from, to].map((pos) => corner(pos, this.level.height).map((n) => n + S / 2));
     const id = `trail-${++trails}`;
     const [x1, y1, x2, y2] = [a![0]!, a![1]!, b![0]!, b![1]!];

@@ -83,6 +83,19 @@ for (const theme of ["dark", "light"]) {
     atLeast(`code: ${syntax} on the editor`, ratio(colour(`syn-${syntax}`), colour("code-bg")), 4.5);
   }
 
+  // the same text on the panels (the Learn panel, cards, dialogs, Lessons), and the Lessons row you have selected
+  const panel = colour("panel");
+  atLeast("body text on a panel", ratio(colour("text"), panel), 4.5);
+  atLeast("muted text on a panel", ratio(colour("muted"), panel), 4.5);
+  atLeast("accent (links, headings) on a panel", ratio(colour("accent"), panel), 4.5);
+  atLeast("body text on the selected Lessons row", ratio(colour("text"), over(colour("step-line"), panel)), 4.5);
+  atLeast("stars on a panel", ratio(colour("star"), panel), 3);
+
+  // the focus ring is the accent colour, on whatever surface the focused thing sits on
+  for (const [surface, under] of [["page", bg], ["panel", panel], ["editor", colour("code-bg")]]) {
+    atLeast(`focus ring on the ${surface}`, ratio(colour("accent"), under), 3);
+  }
+
   // sprites stay well above the square step against both squares
   // (a wall is told apart by its area and its bricks, so it gets a lower bar than the small sprites)
   const sprites = [

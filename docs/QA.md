@@ -1712,6 +1712,9 @@ Planned tasks that aren't QA findings, in the order they should happen.
 
 ## Revisit later
 
+- **CRT scanlines option** (design pass). Faint scanlines over the board only, off by default, never over code or text. A good idea, but not
+  urgent: saved for a future design pass. *(Designer, 2026-10-03)*
+
 Deferred on purpose. Not bugs, but don't lose them.
 
 - **Game-wide visual design pass, after the vertical slice.** This covers
