@@ -1680,15 +1680,15 @@ pre {
 .trail-foe {
   opacity: 0;
   pointer-events: none;
-  animation: trail-fade calc(var(--step-ms, 350ms) * 2.6);
+  animation: trail-fade calc(var(--step-ms, 350ms) * 2.4) ease-out;
 }
 
 .trail-hero line,
 .trail-foe line {
   fill: none;
   stroke-linecap: round;
-  stroke-dasharray: 1 2; /* one dash a path long: the offset slides it on, then off */
-  animation: trail-run calc(var(--step-ms, 350ms) * 2.6) both;
+  stroke-dasharray: 1;
+  animation: trail-draw var(--step-ms, 350ms) ease-in-out both;
 }
 
 .trail-hero line {
@@ -1717,28 +1717,18 @@ pre {
   stop-opacity: 1;
 }
 
-/* drawn out behind the piece at the pace it slides (the first step-ms), held a moment, then rubbed out from the
-   tail forward to the piece */
-@keyframes trail-run {
-  0% {
+@keyframes trail-draw {
+  from {
     stroke-dashoffset: 1;
-    animation-timing-function: ease-in-out;
   }
-  38% {
+  to {
     stroke-dashoffset: 0;
-  }
-  46% {
-    stroke-dashoffset: 0;
-    animation-timing-function: ease-in;
-  }
-  100% {
-    stroke-dashoffset: -1;
   }
 }
 
 @keyframes trail-fade {
   0%,
-  96% {
+  42% {
     opacity: 1;
   }
 }

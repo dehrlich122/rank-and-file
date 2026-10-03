@@ -1622,11 +1622,6 @@ The designer ran step 2 with Animations on Full. Rook glitch: "looks great", don
     where it ends (`playableEvents` in `src/ui/motion.ts`, with tests); the pawn is unchanged.
     No level uses another piece yet, so it can't be seen in play until one does. The trail is
     wider (8 and 4.5, from 5 and 3) and more opaque (a faint tail from the start, a solid head).
-- **QA-039 · The trail's fade** *(Designer, 2026-10-03)*
-  - The trail looks better, but it could fade less suddenly, back to front.
-  - **Done:** after the piece arrives the trail is held a moment, then rubbed out from its tail
-    forward to the piece (about one and a half steps long), instead of fading all at once. It
-    works for the hero's and the enemies'. Checked in frames of the walk on `#/styleguide`.
 
 ---
 
