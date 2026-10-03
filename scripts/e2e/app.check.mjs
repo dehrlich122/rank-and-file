@@ -55,21 +55,21 @@ export default async function appChecks({ browser: b, base, root, check }) {
     });
   }
 
-  await check("level select marks solved levels", async () => {
-    await b.send("Page.navigate", { url: `${base}#/` });
-    const solved = await b.waitFor(`document.querySelectorAll('.level-card.solved').length`, 5000, "level cards");
-    const stars = await b.evaluate(`document.querySelectorAll('.level-card .card-stars .icon-star').length`);
+  await check("Lessons marks solved levels", async () => {
+    await b.send("Page.navigate", { url: `${base}#/lessons` });
+    const solved = await b.waitFor(`document.querySelectorAll('.lrow.solved').length`, 5000, "level cards");
+    const stars = await b.evaluate(`document.querySelectorAll('.lrow .card-stars .icon-star').length`);
     expect(solved === LEVELS.length, `${solved} solved`);
-    expect(stars === LEVELS.length * 3, `${stars} stars on the level cards`);
+    expect(stars === LEVELS.length * 3, `${stars} stars on the level rows`);
     return `${solved} solved, ${stars} stars`;
   });
 
   // -- M2: saved progress ------------------------------------------------------------------
   // Compares the editor with the solution file in Node and reports only yes or no.
   const levelCards = async () => {
-    await b.send("Page.navigate", { url: `${base}#/` });
-    await b.waitFor(`document.querySelector('.level-card')`, 5000, "level cards");
-    return b.evaluate(`document.querySelectorAll('.level-card.solved').length`);
+    await b.send("Page.navigate", { url: `${base}#/lessons` });
+    await b.waitFor(`document.querySelector('.lrow')`, 5000, "level rows");
+    return b.evaluate(`document.querySelectorAll('.lrow.solved').length`);
   };
 
   await check("M2: solved levels and your code survive a reload; a fresh start has neither", async () => {
@@ -259,7 +259,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(idiomatic && tag, `solution shown: ${idiomatic}; Solution section: ${tag}`);
     await levelCards();
     const cards = await b.evaluate(`(() => {
-      const card = document.querySelector('a[href="#/level/ch01-l01"]');
+      const card = document.querySelector('[data-level-id="ch01-l01"]');
       return { tag: card.querySelector('.card-tag')?.textContent ?? null, solved: card.classList.contains('solved') };
     })()`);
     expect(cards.tag === "Solution seen" && !cards.solved, `level card: ${JSON.stringify(cards)}`);
@@ -270,7 +270,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await setCode(solution("ch01-l01"));
     const r = await run();
     const card = await levelCards().then(() =>
-      b.evaluate(`(() => { const card = document.querySelector('a[href="#/level/ch01-l01"]'); return { tag: !!card.querySelector('.card-tag'), stars: card.querySelectorAll('.icon-star').length }; })()`),
+      b.evaluate(`(() => { const card = document.querySelector('[data-level-id="ch01-l01"]'); return { tag: !!card.querySelector('.card-tag'), stars: card.querySelectorAll('.icon-star').length }; })()`),
     );
     expect(r.head === "Solved!" && r.stars === 2, `${r.stars} stars: ${brief(r)}`);
     expect(!card.tag && card.stars === 2, `level card: ${JSON.stringify(card)}`);
@@ -283,7 +283,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   await check("QA-016: the practice level shows ? where the goal might be, and says the code runs once for each", async () => {
     await levelCards();
-    const heading = await b.evaluate(`[...document.querySelectorAll('.chapter h2')].map((e) => e.textContent).find((t) => t.includes('Testing ground'))`);
+    const heading = await b.evaluate(`[...document.querySelectorAll('.folder-title')].map((e) => e.textContent).find((t) => t.includes('Testing ground'))`);
     await openLevel("practice-01", { fresh: true });
     await challengeTab();
     const goals = await b.evaluate(`document.querySelector('.objectives').innerText`);
@@ -388,7 +388,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await setCode(withoutExpectLine(solution("practice-02", ".naive")));
     const r = await run();
     const board = await drawn();
-    expect(r.head === "Lost" && r.tone.includes("outcome-bad") && /fell into the pit on [a-d][1-4]\./.test(r.text), brief(r));
+    expect(r.head === "Run lost" && r.tone.includes("outcome-bad") && /fell into the pit on [a-d][1-4]\./.test(r.text), brief(r));
     expect(board.lost && r.errorLine && r.stars === 0, `board lost: ${board.lost}, error line: ${r.errorLine}`);
     return brief(r);
   });
@@ -399,7 +399,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
       await openLevel(id, { fresh: true });
       await setCode(withoutExpectLine(solution(id, ".naive")));
       const r = await run();
-      expect(r.head === "Lost" && /was caught by the (patrol|chaser) on [a-g][1-6]\./.test(r.text), `${id}: ${brief(r)}`);
+      expect(r.head === "Run lost" && /was caught by the (patrol|chaser) on [a-g][1-6]\./.test(r.text), `${id}: ${brief(r)}`);
       results.push(`${id}: ${r.head}`);
     }
     return results.join(", ");
@@ -504,7 +504,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await setCode("pawn.move(2)\n"); // into the first gate on its last open tick
     const r = await run();
     const lesson = [await runSnippet(0), await runSnippet(1), await runSnippet(2)].map((s) => s.status);
-    expect(r.head === "Lost" && r.text.includes("Your pawn was crushed by the gate on c1."), brief(r));
+    expect(r.head === "Run lost" && r.text.includes("Your pawn was crushed by the gate on c1."), brief(r));
     expect(/stopped/.test(lesson[0]) && lesson[1].includes("Lost") && lesson[2].includes("Finished"), JSON.stringify(lesson));
     return lesson.join(" / ");
   });
@@ -565,7 +565,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   await check("QA-023: The Toll says it's a demo with nothing new to learn", async () => {
     await levelCards();
-    const card = await b.evaluate(`document.querySelector('a[href="#/level/practice-08"]').innerText`);
+    const card = await b.evaluate(`document.querySelector('[data-level-id="practice-08"]').innerText`);
     expect(card.includes("A demo of gems and a guard who asks a question"), card);
   });
 
@@ -982,7 +982,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   await check("M3.2: The Gauntlet is tagged as the chapter's optional mastery challenge", async () => {
     await levelCards();
-    const card = await b.evaluate(`document.querySelector('a[href="#/level/ch02-l06"] .mastery-tag')?.textContent ?? null`);
+    const card = await b.evaluate(`document.querySelector('[data-level-id="ch02-l06"] .mastery-tag')?.textContent ?? null`);
     await openLevel("ch02-l06", { fresh: true });
     await challengeTab();
     const panel = await b.evaluate(`document.querySelector('.mastery-note .mastery-tag')?.textContent ?? null`);
@@ -995,12 +995,12 @@ export default async function appChecks({ browser: b, base, root, check }) {
   await check("M3.3: Chapter 3 is listed after Chapter 2, and The Clocktower is its optional mastery challenge", async () => {
     await levelCards();
     const list = await b.evaluate(`({
-      chapters: [...document.querySelectorAll('.chapter h2')].map((e) => e.textContent),
-      cards: ${JSON.stringify(CH03)}.map((id) => !!document.querySelector('a[href="#/level/' + id + '"]')),
-      mastery: document.querySelector('a[href="#/level/ch03-l06"] .mastery-tag')?.textContent ?? null,
+      chapters: [...document.querySelectorAll('.folder-title')].map((e) => e.textContent),
+      cards: ${JSON.stringify(CH03)}.map((id) => !!document.querySelector('[data-level-id="' + id + '"]')),
+      mastery: document.querySelector('[data-level-id="ch03-l06"] .mastery-tag')?.textContent ?? null,
     })`);
-    const third = list.chapters.indexOf("Chapter 3 · Marching Orders");
-    expect(third > list.chapters.indexOf("Chapter 2 · Counting Steps") && list.cards.every(Boolean), JSON.stringify(list));
+    const third = list.chapters.indexOf("03 · Marching Orders");
+    expect(third > list.chapters.indexOf("02 · Counting Steps") && list.cards.every(Boolean), JSON.stringify(list));
     expect(list.mastery === "Mastery · optional", JSON.stringify(list));
   });
 
@@ -1037,7 +1037,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     const board = await drawn();
     await setCode("pawn.turn_right()\npawn.turn_right()\npawn.move()\n"); // test code: straight off the edge of the walkway
     const r = await run();
-    expect(board.pits > 0 && r.head === "Lost" && r.text.includes("fell into the pit on a6."), `${board.pits} pits | ${brief(r)}`);
+    expect(board.pits > 0 && r.head === "Run lost" && r.text.includes("fell into the pit on a6."), `${board.pits} pits | ${brief(r)}`);
   });
 
   await check("M3.3: The Clockwork Sentry's gear counts only new lines, and the moves copied out get caught", async () => {
@@ -1052,7 +1052,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await setCode(withoutExpectLine(solution("ch03-l04", ".naive")));
     const copied = await run();
     expect(before === "0" && solved.head === "Solved!" && after === String(lines), JSON.stringify({ before, after }));
-    expect(copied.head === "Lost" && /was caught by the patrol on [a-i][1-7]\./.test(copied.text), brief(copied));
+    expect(copied.head === "Run lost" && /was caught by the patrol on [a-i][1-7]\./.test(copied.text), brief(copied));
     return `gear ${before} → ${after} | copied out: ${copied.head}`;
   });
 
@@ -1073,12 +1073,12 @@ export default async function appChecks({ browser: b, base, root, check }) {
   await check("M3.4: Chapter 4 is listed after Chapter 3, and Pawn Storm is its optional mastery challenge", async () => {
     await levelCards();
     const list = await b.evaluate(`({
-      chapters: [...document.querySelectorAll('.chapter h2')].map((e) => e.textContent),
-      cards: ${JSON.stringify(CH04)}.map((id) => !!document.querySelector('a[href="#/level/' + id + '"]')),
-      mastery: document.querySelector('a[href="#/level/ch04-l06"] .mastery-tag')?.textContent ?? null,
+      chapters: [...document.querySelectorAll('.folder-title')].map((e) => e.textContent),
+      cards: ${JSON.stringify(CH04)}.map((id) => !!document.querySelector('[data-level-id="' + id + '"]')),
+      mastery: document.querySelector('[data-level-id="ch04-l06"] .mastery-tag')?.textContent ?? null,
     })`);
-    const fourth = list.chapters.indexOf("Chapter 4 · Eyes Open");
-    expect(fourth > list.chapters.indexOf("Chapter 3 · Marching Orders") && list.cards.every(Boolean), JSON.stringify(list));
+    const fourth = list.chapters.indexOf("04 · Eyes Open");
+    expect(fourth > list.chapters.indexOf("03 · Marching Orders") && list.cards.every(Boolean), JSON.stringify(list));
     expect(list.mastery === "Mastery · optional", JSON.stringify(list));
   });
 
@@ -1093,7 +1093,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     const board = await drawn();
     await setCode("while not pawn.at_goal():\n    pawn.move()\n"); // test code: walks straight, ignoring the rooks
     const r = await run();
-    expect(board.rooks > 0 && board.attacked > 0 && r.head === "Lost", `${board.rooks} rooks, ${board.attacked} shaded | ${brief(r)}`);
+    expect(board.rooks > 0 && board.attacked > 0 && r.head === "Run lost", `${board.rooks} rooks, ${board.attacked} shaded | ${brief(r)}`);
   });
 
   await check("QA-034: the guards in True or False name their gate and say the hall is the stretch before the turn", async () => {
@@ -1109,12 +1109,12 @@ export default async function appChecks({ browser: b, base, root, check }) {
   await check("M3.5: Chapter 5 is listed after Chapter 4, and The Tally is its optional mastery challenge", async () => {
     await levelCards();
     const list = await b.evaluate(`({
-      chapters: [...document.querySelectorAll('.chapter h2')].map((e) => e.textContent),
-      cards: ${JSON.stringify(CH05)}.map((id) => !!document.querySelector('a[href="#/level/' + id + '"]')),
-      mastery: document.querySelector('a[href="#/level/ch05-l06"] .mastery-tag')?.textContent ?? null,
+      chapters: [...document.querySelectorAll('.folder-title')].map((e) => e.textContent),
+      cards: ${JSON.stringify(CH05)}.map((id) => !!document.querySelector('[data-level-id="' + id + '"]')),
+      mastery: document.querySelector('[data-level-id="ch05-l06"] .mastery-tag')?.textContent ?? null,
     })`);
-    const fifth = list.chapters.indexOf("Chapter 5 · Keep Going");
-    expect(fifth > list.chapters.indexOf("Chapter 4 · Eyes Open") && list.cards.every(Boolean), JSON.stringify(list));
+    const fifth = list.chapters.indexOf("05 · Keep Going");
+    expect(fifth > list.chapters.indexOf("04 · Eyes Open") && list.cards.every(Boolean), JSON.stringify(list));
     expect(list.mastery === "Mastery · optional", JSON.stringify(list));
   });
 
@@ -1152,7 +1152,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await setCode("pawn.move()\n"); // test code: straight into a rook's line
     const r = await run();
     expect(boards["ch05-l04"].rooks === 5 && boards["ch05-l05"].rooks > 0 && boards["ch05-l05"].attacked > 0, JSON.stringify(boards));
-    expect(r.head === "Lost", brief(r));
+    expect(r.head === "Run lost", brief(r));
   });
 
   await check("M3.5: The Tally's guard asks for a count, and its limit is 8 lines", async () => {
@@ -1168,11 +1168,11 @@ export default async function appChecks({ browser: b, base, root, check }) {
   await check("M3.6: Chapter 6 is listed after Chapter 5, and The Written Route is its optional mastery challenge", async () => {
     await levelCards();
     const list = await b.evaluate(`({
-      chapters: [...document.querySelectorAll('.chapter h2')].map((e) => e.textContent),
-      cards: ${JSON.stringify(CH06)}.map((id) => !!document.querySelector('a[href="#/level/' + id + '"]')),
-      mastery: document.querySelector('a[href="#/level/ch06-l06"] .mastery-tag')?.textContent ?? null,
+      chapters: [...document.querySelectorAll('.folder-title')].map((e) => e.textContent),
+      cards: ${JSON.stringify(CH06)}.map((id) => !!document.querySelector('[data-level-id="' + id + '"]')),
+      mastery: document.querySelector('[data-level-id="ch06-l06"] .mastery-tag')?.textContent ?? null,
     })`);
-    expect(list.chapters.indexOf("Chapter 6 · Runes") > list.chapters.indexOf("Chapter 5 · Keep Going") && list.cards.every(Boolean), JSON.stringify(list));
+    expect(list.chapters.indexOf("06 · Runes") > list.chapters.indexOf("05 · Keep Going") && list.cards.every(Boolean), JSON.stringify(list));
     expect(list.mastery === "Mastery · optional", JSON.stringify(list));
   });
 

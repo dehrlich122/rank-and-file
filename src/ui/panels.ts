@@ -1,5 +1,6 @@
 // The small read-only panels around the board: variables, console output,
 // and the outcome of a run.
+import { VOICE } from "./voice";
 import type { ErrorInfo, LevelResult, Star, Var } from "../py/protocol";
 import { h } from "./dom";
 import { icon } from "./icons";
@@ -90,7 +91,7 @@ const HEADLINE: Record<LevelResult["status"], string> = {
   finished: "Finished",
   incomplete: "Not there yet",
   constraint: "Check the rules",
-  lost: "Lost",
+  lost: VOICE.lost,
   error: "Python stopped",
   timeout: "Endless loop",
 };
@@ -117,12 +118,15 @@ export function outcomeCard(run: LevelResult, shown: LevelResult, actions: HTMLE
   if (result.truncated) {
     body.push(h("p", { class: "muted small" }, "This run was very long, so only its beginning was recorded for playback."));
   }
-  return h(
+  const tone = TONE[run.status];
+  // a run that goes wrong flickers the card's frame once (never its text); a solved one gets a sunset banner above it
+  const card = h(
     "div",
-    { class: `outcome outcome-${TONE[run.status]}`, role: "status" },
+    { class: `outcome outcome-${tone}${tone === "bad" ? " glitch-frame" : ""}`, role: "status" },
     h("div", { class: "outcome-head" }, h("strong", {}, HEADLINE[run.status]), ...actions),
     ...body,
   );
+  return run.status === "solved" ? h("div", { class: "complete-mock" }, h("div", { class: "complete-banner play", "aria-hidden": "true" }, h("span", { class: "complete-text", "data-text": VOICE.complete }, VOICE.complete)), card) : card;
 }
 
 /** A solved run's stars, each with what it's for (M2). */

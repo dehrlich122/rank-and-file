@@ -654,6 +654,46 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     expect(before.length === 0 && after.length === 1 && after[0].startsWith("print()") && reset.length === 0, JSON.stringify({ before, after, reset, log }));
   });
 
+  // -- M3.7: the start menu, Lessons and the Piece setting (last, because each fresh page load starts Python and a
+  // renderer that has loaded it many times in a row has died; see QA.md)
+  await check("M3.7: the start menu has four entries; Free Play says coming soon; Enter on Lessons opens it", async () => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/` });
+    await b.waitFor(`document.querySelector('.title-scene .ts-menu')`, 30_000, "start menu");
+    const labels = await b.evaluate(`[...document.querySelectorAll('.ts-item')].map((e) => e.textContent.replace('▶', '').trim())`);
+    await b.key("ArrowDown");
+    await b.key("Enter");
+    const note = await b.evaluate(`document.querySelector('.ts-note').textContent`);
+    await b.key("ArrowUp");
+    await b.key("Enter");
+    await b.waitFor(`location.hash === '#/lessons'`, 5000, "Lessons");
+    expect(labels.length === 4 && labels[1].startsWith("Free Play") && note.includes("coming soon"), JSON.stringify({ labels, note }));
+    return `${labels.length} entries · ${note}`;
+  });
+
+  await check("M3.7: on a fresh start Lessons opens only Chapter 1 and selects its first level; folders opened by hand are remembered", async () => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/lessons` });
+    await b.waitFor(`document.querySelector('.lessons .folder')`, 30_000, "Lessons");
+    const open = () => b.evaluate(`[...document.querySelectorAll('.folder.open')].map((e) => e.dataset.chapter)`);
+    const first = await open();
+    const selected = await b.evaluate(`document.querySelector('.lrow.selected')?.dataset.levelId`);
+    await b.evaluate(`document.querySelector('.folder[data-chapter="2"] .folder-head').click()`);
+    await b.send("Page.navigate", { url: `${base}#/lessons` });
+    await b.waitFor(`document.querySelector('.lessons .folder')`, 30_000, "Lessons again");
+    const second = await open();
+    expect(first.join() === "1" && selected === "ch01-l01" && second.join() === "1,2", JSON.stringify({ first, selected, second }));
+    return `opened ${first} then ${second}`;
+  });
+
+  await check("M3.7: Settings → Piece offers the knight, locked until the pawn tier is cleared", async () => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/lessons` });
+    await b.waitFor(`document.querySelector('.topbar .settings-button')`, 30_000, "settings button");
+    await b.evaluate(`document.querySelector('.topbar .settings-button').click()`);
+    const piece = await b.evaluate(`(() => { const knight = document.querySelector('input[name="setting-piece"][value="knight"]'); return { pawn: !document.querySelector('input[name="setting-piece"][value="pawn"]').disabled, knightLocked: knight.disabled }; })()`);
+    await b.evaluate(`document.querySelector('.settings-dialog').close()`);
+    expect(piece.pawn && piece.knightLocked, JSON.stringify(piece));
+    return "pawn pickable, knight locked";
+  });
+
   await check("settings are reset after the checks", async () => {
     await b.evaluate(`localStorage.clear()`);
   });

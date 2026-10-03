@@ -108,6 +108,15 @@ for (const theme of ["dark", "light"]) {
   }
   atLeast("grid tick on the dark square", ratio(over(colour("grid-tick"), squares.dark), squares.dark), 1.5);
 
+  // the title screen's plates are see-through, so test them over the brightest sky and the floor
+  for (const [where, under] of [["sky", colour("sky-4")], ["floor", colour("floor-bg")]]) {
+    const plate = over(colour("plate-bg"), under);
+    atLeast(`title menu text on its plate (over the ${where})`, ratio(colour("plate-text"), plate), 4.5);
+    atLeast(`title menu, coming-soon text (over the ${where})`, ratio(colour("plate-muted"), plate), 4.5);
+    atLeast(`title menu frame (over the ${where})`, ratio(colour("plate-accent"), plate), 3);
+  }
+  atLeast("HUD frame on its panel", ratio(colour("frame"), colour("panel")), 3);
+
   // glow belongs to the dark theme: the light theme's glow tokens must draw nothing
   for (const glow of ["wall", "amber", "green", "foe", "hero"]) {
     const alpha = colour(`glow-${glow}`)[3];

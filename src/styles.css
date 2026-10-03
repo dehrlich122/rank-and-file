@@ -5,9 +5,10 @@
 :root {
   color-scheme: light dark;
   --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Orbitron", var(--font-ui); /* 80s computer lettering: titles and headings only */
   --font-code: "Cascadia Code", "JetBrains Mono", Consolas, ui-monospace, monospace;
   --code-size: 15px; /* the Code text size setting */
-  --radius: 8px;
+  --radius: 2px;
 
   /* structure and text */
   --bg: light-dark(#ecebf8, #090416);
@@ -93,6 +94,28 @@
   --glow-hero: light-dark(transparent, #3be0ff);
   --glow-hero-soft: light-dark(transparent, rgb(59 224 255 / 0.5));
   --glow-grid: light-dark(transparent, rgb(80 220 255 / 0.7));
+  --glow-frame: light-dark(transparent, rgb(80 220 255 / 0.16));
+
+  /* chrome: the HUD frame, and the title screen, where the sunset is the one place pink is allowed */
+  --frame: light-dark(#0a6f8a, #2fb6d4);
+  --sky-0: light-dark(#cfe6ff, #05021a);
+  --sky-1: light-dark(#e2dbff, #1c0742);
+  --sky-2: light-dark(#ffd3ea, #561366);
+  --sky-3: light-dark(#ffadcb, #c1267b);
+  --sky-4: light-dark(#ffc496, #ff7843);
+  --floor-bg: light-dark(#e9e3ff, #0a0420);
+  --floor-line: light-dark(rgb(30 80 150 / 0.55), rgb(110 232 255 / 0.7));
+  --sun-a: light-dark(#fff2ad, #fff27a);
+  --sun-b: light-dark(#ffc278, #ffb347);
+  --sun-c: light-dark(#ff8fb6, #ff4f8b);
+  --plate-bg: light-dark(rgb(250 248 255 / 0.93), rgb(8 3 24 / 0.9));
+  --plate-text: light-dark(#1a1240, #ecebff);
+  --plate-muted: light-dark(#51497f, #a69ed6);
+  --plate-accent: light-dark(#07708b, #3be0ff);
+  --logo-shadow-1: light-dark(#e0207f, #ff2a8a);
+  --logo-shadow-2: light-dark(#4b2390, #3b0f7a);
+  --scanline: light-dark(rgb(40 20 90 / 0.05), rgb(0 0 0 / 0.16));
+  --title-silhouette: light-dark(rgb(42 18 64 / 0.85), rgb(18 3 32 / 0.85));
 }
 
 :root[data-theme="light"] {
@@ -317,84 +340,6 @@ pre {
 
 /* ---- level select ---- */
 
-.home {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 32px 16px 48px;
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-}
-
-.intro p {
-  color: var(--muted);
-  font-size: 16px;
-  margin: 8px 0 0;
-}
-
-.chapter header {
-  margin-bottom: 12px;
-}
-
-.chapter header p {
-  margin: 4px 0 0;
-}
-
-.tier {
-  display: inline-block;
-  font-size: 12px;
-  font-weight: 650;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent);
-  margin-bottom: 2px;
-}
-
-.level-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 8px;
-}
-
-.level-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 14px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  text-decoration: none;
-}
-
-.level-card:hover {
-  border-color: var(--accent);
-}
-
-.level-number {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--code-bg);
-  font-weight: 650;
-}
-
-.level-card.solved .level-number {
-  background: var(--accent);
-  color: var(--accent-text);
-}
-
-.level-text {
-  display: flex;
-  flex-direction: column;
-}
-
 /* a solved level's best stars (M2), or a note that its solution was seen */
 .card-stars,
 .card-tag {
@@ -441,10 +386,6 @@ pre {
 
 .stars li.earned .icon {
   color: var(--star);
-}
-
-.home footer {
-  text-align: center;
 }
 
 /* ---- level screen ---- */
@@ -747,10 +688,6 @@ pre {
   border: 1px solid var(--warn);
   padding-block: 0;
   vertical-align: 1px;
-}
-
-.level-card .mastery-tag {
-  margin-left: 8px;
 }
 
 .challenge-title {

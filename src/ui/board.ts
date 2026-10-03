@@ -10,6 +10,8 @@
 // redesign can reskin tiles without touching the logic. What each tile, enemy and
 // the hero look like is in ./sprites (the registry there maps a kind to its drawing).
 import type { Clock, Enemy, Facing, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
+import { wornPiece } from "../promotion";
+import { settings } from "../settings";
 import { playableEvents } from "./motion";
 import { halftone, litGrid, M, S } from "./sprites/floor";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite, type Skin, type TileName } from "./sprites";
@@ -38,6 +40,7 @@ export class BoardView {
   private readonly heroes = new Map<Facing, SVGElement>(); // the hero drawn facing each way, made when first needed
   private facing: Facing | undefined;
   private skin: Skin;
+  private readonly stopSettings: () => void;
   private readonly stopHalftone: () => void;
   private timers: number[] = [];
 
@@ -49,7 +52,9 @@ export class BoardView {
     private readonly level: LevelInfo,
     private readonly options: { mini?: boolean; spots?: ReadonlyMap<string, boolean>; skin?: Skin } = {},
   ) {
-    this.skin = options.skin ?? "pawn";
+    // without a skin of its own, a board wears the piece chosen in Settings, and follows that choice
+    this.skin = options.skin ?? wornPiece();
+    this.stopSettings = options.skin ? () => {} : settings.subscribe(() => this.setSkin(wornPiece()));
     const { width, height } = level;
     this.element = svg("svg", {
       class: this.options.mini ? "board board-mini" : "board",
@@ -264,6 +269,7 @@ export class BoardView {
   dispose(): void {
     this.cancel();
     this.stopHalftone();
+    this.stopSettings();
   }
 
   /** Draw the hero as another skin (Settings → Piece, step 3 of M3.7). */

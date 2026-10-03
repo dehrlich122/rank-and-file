@@ -1,7 +1,7 @@
 // A level: the lesson and challenge on the left, the board in the middle, the
 // code editor and what the program is doing on the right.
 import type { EditorView } from "@codemirror/view";
-import { codexChapters, nextLevel, type LevelSource } from "../content";
+import { chapters, codexChapters, nextLevel, type LevelSource } from "../content";
 import { PythonHungError, StoppedError, type PyClient } from "../py/client";
 import type { LevelInfo, LevelResult } from "../py/protocol";
 import { BoardView, squareName } from "./board";
@@ -9,7 +9,7 @@ import { ChipTooltip, codexHover, renderCodex, type CodexLookup, type CodexView 
 import { h } from "./dom";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
-import { masteryTag } from "./levelSelect";
+import { masteryTag } from "./lessonsMenu";
 import { Console, Inspector, noticeCard, outcomeCard } from "./panels";
 import { callCompletion, KnownCalls } from "./completion";
 import { HelpPanel } from "./help";
@@ -18,6 +18,7 @@ import { Player, buildFrames, consoleAt, controlStates } from "./playback";
 import type { ReplPanel } from "./repl";
 import type { SettingsDialog } from "./settingsDialog";
 import { progress } from "../progress";
+import { tierCleared } from "../promotion";
 import { SPEEDS, settings } from "../settings";
 
 export interface LevelContext {
@@ -369,6 +370,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     else player.seek(last);
   }
 
+  let promotionTimer: number | undefined;
+
   function finish(result: LevelResult, afterMs: number): void {
     if (result.error) {
       setActiveLine(editor, null);
@@ -385,9 +388,15 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       actions.push(
         next
           ? h("a", { class: "btn btn-primary btn-small", href: `#/level/${next.id}` }, "Next level →")
-          : h("a", { class: "btn btn-primary btn-small", href: "#/" }, "Back to the levels"),
+          : h("a", { class: "btn btn-primary btn-small", href: "#/lessons" }, "Back to Lessons"),
       );
       window.setTimeout(() => shownBoard()?.setCelebrating(true), afterMs);
+      // clearing a tier's last core level earns its promotion: the ceremony follows the celebration, once
+      const tier = chapters.find((c) => c.chapter === source.chapter)?.tier;
+      if (tier && !source.mastery && tierCleared(tier) && !progress.hasSeen("promotion", tier)) {
+        window.clearTimeout(promotionTimer);
+        promotionTimer = window.setTimeout(() => (location.hash = `#/promotion/${tier}`), afterMs + 2600);
+      }
     }
     outcomeHost.replaceChildren(outcomeCard(run, result, actions));
   }
@@ -509,6 +518,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   }
 
   return () => {
+    window.clearTimeout(promotionTimer);
     stopFollowingSettings();
     wideScreen.removeEventListener("change", placePlayback);
     stopPausingOnSettings();
