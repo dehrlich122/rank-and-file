@@ -185,7 +185,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 
 *(Designer, 2026-10-02)* The end of Chapter 6 celebrates the promotion from pawn to knight, and the knight becomes an unlockable skin. Both are built in the design pass (M3.7), in the new look, not in M3.6.
 
-- **A piece is its rules; a skin is its look.** The pawn walks forward and captures diagonally. From Chapter 7 the player's piece is a knight with L-moves. A knight skin on a Pawn-tier level still moves like a pawn.
+- **A piece is its rules; a skin is its look.** The pawn walks forward and captures diagonally. From Chapter 7 the player's piece is a knight with L-moves. A knight skin on a Pawn-tier level still moves like a pawn. *(Designer, 2026-10-03)* A skin never renames the object in the player's code either: Pawn-tier levels always say `pawn.move()`, whatever skin is worn. The name becomes `knight` when the rules do (Chapter 7), so promotion stays visible in the code itself.
 - **The promotion ceremony** closes each tier. The first is at the end of Chapter 6:
   - It shows once, automatically, when the five core levels are solved. The mastery stays optional. The chapter's heading in the level list can replay it.
   - It is a full-screen moment, not a pop-up. It celebrates, sums up what the player learned (the Codex), shows the new piece, and teases the next tier.
