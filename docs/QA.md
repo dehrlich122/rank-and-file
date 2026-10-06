@@ -1242,9 +1242,10 @@ Item 6 (hidden boards) became QA-016.
 The designer's answer to PR #8's question: are the Testing-ground hints good
 enough, or should they be rewritten?
 
-### QA-025 · Stepping Stones: hint 2 gives too much away · Fixed
+### QA-025 · Stepping Stones: hint 2 gives too much away · Verified
 
-- **Fixed** in `05221bc` (2026-09-29); awaiting the designer's retest.
+- **Verified** *(Designer, 2026-10-07)*: retested thoroughly and approved.
+- **Fixed** in `05221bc` (2026-09-29).
   - Hint 2 only explains the plank: walk over it to pick it up, and lay it
     over a pit as a bridge you can walk on. It has no code.
   - Hint 3 shows the code for bridging (`pawn.bridge()`, then
@@ -1260,10 +1261,10 @@ enough, or should they be rewritten?
   bridge could then come in hint 3.
 
 
-### QA-026 · The Sentry's Round turns, in the level that brings in `wait()` · Fixed
+### QA-026 · The Sentry's Round turns, in the level that brings in `wait()` · Verified
 
-- **Fixed** in `03c75c5` (2026-09-29), with a level test in `b9f4034`;
-  awaiting the designer's retest.
+- **Verified** *(Designer, 2026-10-07)*: retested thoroughly and approved.
+- **Fixed** in `03c75c5` (2026-09-29), with a level test in `b9f4034`.
   - `scripts/solve.py` now weighs a solution by lines, then turns. Among
     the shortest programs it takes the one that turns least, so idle ticks
     go to `wait()`.
@@ -1291,9 +1292,10 @@ enough, or should they be rewritten?
     and back.
 
 
-### QA-027 · Pursuit: hint 3 turns on the spot · Fixed
+### QA-027 · Pursuit: hint 3 turns on the spot · Verified
 
-- **Fixed** in `c522931` (2026-09-29); awaiting the designer's retest.
+- **Verified** *(Designer, 2026-10-07)*: retested thoroughly and approved.
+- **Fixed** in `c522931` (2026-09-29).
   - `wait()` is unlocked. The reference takes the same route as before, but
     waits one tick where it spun for two, so par goes from 5 to 4.
   - Hint 3 is regenerated, and it waits. Hints 1 and 2 are unchanged.
@@ -1316,9 +1318,10 @@ enough, or should they be rewritten?
   turning away and back is the only way it can pass time.
 
 
-### QA-028 · Portcullis: hint 3 starts oddly, and the gates' cycle could be a hint · Fixed
+### QA-028 · Portcullis: hint 3 starts oddly, and the gates' cycle could be a hint · Verified
 
-- **Fixed** in `9721bc1` (2026-09-29); awaiting the designer's retest.
+- **Verified** *(Designer, 2026-10-07)*: retested thoroughly and approved.
+- **Fixed** in `9721bc1` (2026-09-29).
   - Hint 2 ends with the designer's reminder: "Don't forget: the gates keep
     cycling on every tick, so time your loops carefully!" ("run for every
     tick" became "keep cycling on every tick".)
@@ -1656,6 +1659,22 @@ The designer ran step 2 with Animations on Full. Rook glitch: "looks great", don
     ratio NaN), fixed. Full e2e: 205/205.
   - What a player may notice: enemies are now drawn over the piece (only visible when they share a square); the record of what has been shown once
     changed shape, so a browser that has already seen the promotion or a crown will see each once more.
+
+## Session 14 — 2026-10-07 · before M4 (`m4-0-plan`)
+
+The designer retested the Testing-ground hint fixes and answered the questions left open before M4. M4's plan is `docs/M4/M4.md`.
+
+- **QA-025 to QA-028** *(Designer, 2026-10-07)*: retested thoroughly and approved. All four are Verified.
+- **The tick counter** (PR #8's question) *(Designer, 2026-10-07)*: the timed gate's badge ("2 of 4 · tick N") is fine for now. No
+  separate counter on the board.
+- **QA-042 · "Show me a solution" after three tries, hints or not** *(Designer, 2026-10-07)* · Open
+  - **Observed:** the offer only comes once every hint is open and three more runs have failed (M2).
+  - **Wanted:** the solution is available after three tries, whether or not hints have been opened.
+  - **Planned** in M4.0 (`docs/M4/M4.md`): the third failed run of a level offers "Show me a solution…", with or without hints.
+    A failed run is any run that doesn't solve the level, and replays don't count, as today. Hints, the third star and "solved
+    with help" don't change, and a count already saved carries over.
+- **Sound comes in M4** *(Designer, 2026-10-07)*: a soundtrack (credited "Music by Karl Casey @ White Bat Audio") and sound
+  effects, on and quiet by default, with a mute button (M4.1). The CRT scanlines stay under "Revisit later".
 
 ---
 

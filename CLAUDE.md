@@ -295,3 +295,6 @@ names.
   path.
 - Work on one branch per milestone (e.g. `m1-vertical-slice`) and open a PR for
   the designer to merge after manual testing.
+- Once a milestone's PR is merged, delete its branch, locally and on GitHub
+  *(Designer, 2026-10-07)*. Merged commits stay reachable from `main`, and the
+  PR page keeps its history.
