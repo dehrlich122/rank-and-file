@@ -102,7 +102,7 @@ The engine composes levels from reusable, extensible elements. Levels name tile 
 
 ## 4. Curriculum map *(Updated 2026-10-07)*
 
-Chapter 4 was split in two, so every later chapter moved up by one. Each chapter has **5 levels plus 1 optional mastery challenge** (Chapter 1 has no mastery challenge yet). Each tier ends with a promotion (§8) and a set of optional mastery challenges that cover the whole tier; the Pawn tier's comes in M4. *(Proposed, 2026-10-07, for the designer to confirm: the set lives in Free Play, not Lessons, and has no lesson phase; `docs/M4/M4.md`.)*
+Chapter 4 was split in two, so every later chapter moved up by one. Each chapter has **5 levels plus 1 optional mastery challenge**, except Chapter 1, a prologue of the basics of the basics, which needs none *(Designer, 2026-10-07)*. Each tier ends with a promotion (§8) and a set of optional mastery challenges that cover the whole tier; the Pawn tier's comes in M4. *(Designer, 2026-10-07)* The sets live in Free Play, not Lessons, with no lesson phase, and are free play's default levels for now; each is tagged with its tier and a difficulty (`docs/M4/M4.md`).
 
 | # | Tier | Chapter | Python concepts | Board mechanic | Status |
 |---|------|---------|-----------------|----------------|--------|
@@ -176,7 +176,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 
 *(Designer, 2026-10-02)* The design pass comes **before** the editor. By then the Pawn tier holds every tile, enemy and ability the editor's palette must show, and an editor built on the old look would be restyled straight away.
 
-*(Designer, 2026-10-07)* Sound comes into M4, music and effects together. The editor is for players as well as the designer, and its levels can be exported and shared. *(Proposed, 2026-10-07)* Free play, planned as M4.x, comes into M4 too, because it holds the editor's levels, shared levels and the Pawn tier's set.
+*(Designer, 2026-10-07)* Sound comes into M4, music and effects together. The editor is for players as well as the designer, and its levels can be exported and shared, carrying their author's solution. Free play, planned as M4.x, comes into M4 too, because it holds the editor's levels, shared levels and the Pawn tier's set. Every free-play level is tagged with its tier and a difficulty: `pass`, `try`, `raise`, `assert` or `while True:`, colour-coded green, yellow, orange, red and a flashing warning.
 
 **Out of scope for now:** accounts, multiplayer, mobile layout, and a server (so shared levels travel as links, codes and files).
 
@@ -194,6 +194,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 - **Using a skin:**
   - From M3.7, once a skin is unlocked it is **selectable in the menu**: Settings has a **Piece** choice (pawn or knight) that works on every level.
   - Free play (M4.4) gets a gallery of unlocked skins.
+- **Rewards for mastery sets:** none yet. The designer has ideas for skins and trophies, for a later design and experience pass *(Designer, 2026-10-07)*.
 
 ---
 
