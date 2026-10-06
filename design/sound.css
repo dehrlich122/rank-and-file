@@ -1,0 +1,13 @@
+/* M4.1 step 0 (design prototype, dev-only): the sound sheet. */
+body { margin: 0; background: var(--bg); color: var(--text); }
+.sound-sheet { max-width: 900px; margin: 0 auto; padding: 24px 20px 80px; display: grid; gap: 14px; }
+.sound-sheet h1 { margin: 0; }
+.sound-sheet h2 { margin: 18px 0 0; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.sound-sheet .sound-row { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: center; border-top: 1px solid var(--border); padding-top: 8px; }
+.sound-sheet .sound-row > code { color: var(--muted); }
+.sound-sheet .takes { display: flex; flex-wrap: wrap; gap: 8px; }
+.sound-sheet .take { display: inline-flex; align-items: center; gap: 6px; }
+.sound-sheet .controls { display: grid; gap: 8px; position: sticky; top: 0; background: var(--bg); padding: 10px 0; border-bottom: 1px solid var(--border); z-index: 1; }
+.sound-sheet .controls label { display: grid; grid-template-columns: 110px 1fr 50px; gap: 10px; align-items: center; }
+.sound-sheet textarea { width: 100%; min-height: 150px; background: var(--code-bg); color: var(--text); border: 1px solid var(--border); font: 13px/1.5 var(--mono, monospace); }
+@media (max-width: 640px) { .sound-sheet .sound-row { grid-template-columns: 1fr; } }
