@@ -2,8 +2,8 @@
 
 For each level (levels/<folder>/<id>.yaml: a chapter, chNN, or practice) it checks that:
 - the level file is valid and its id matches its file name;
-- the reference solution (solutions/chNN/<id>.py) solves it, and where
-  `wait()` is unlocked it passes time with it, never by turning on the spot;
+- the reference solution (solutions/chNN/<id>.py) solves it, and passes time
+  with `wait()`, never by turning on the spot;
 - every naive solution (solutions/chNN/<id>.naive*.py) fails the way its
   first line says it should (`# expect: <status>`, optionally followed by the
   error type, e.g. `# expect: error GateLockedError`);
@@ -92,23 +92,28 @@ def test_reference_solution_solves_it(level_file):
 
 def test_reference_solution_waits_rather_than_spinning(level_file):
     """A turn spends a tick just like `wait()`, so a solution can pass time by
-    turning away and back. Where `wait()` is unlocked, the reference never
-    turns more than it needs to between one step and the next (QA-026)."""
+    turning away and back. On every level (designer, 2026-10-07; QA-026 began
+    it where `wait()` is unlocked), the reference never turns more than it
+    needs to between one step and the next, and doesn't turn after its last
+    step, except to finish a loop's last lap: a turn by a line that already ran."""
     level = load(level_file)
-    if "wait" not in level.api:
-        pytest.skip("wait() isn't unlocked on this level")
     result = run_reference(level, level_file)
     # A level with several cases records each one separately, and the run itself has no steps.
     for steps in [case["steps"] for case in result.cases] or [result.steps]:
         stepped = facing = level.facing  # the facing at the last step, and now
         turns = 0  # since the last step
-        for event in (event for step in steps for event in step["events"]):
-            if event["kind"] == "turn":
-                facing, turns = Direction(event["state"]["facing"]), turns + 1
-            elif event["kind"] in FACING_ACTIONS:
-                assert turns == quarter_turns(stepped, facing), f"{level.id}: the reference turns more than it needs to"
-                stepped, turns = facing, 0
-        assert turns == 0, f"{level.id}: the reference turns after its last step"
+        added = False  # since the last step, a turn by a line running for the first time
+        ran: set[int] = set()  # the lines that have run
+        for step in steps:
+            for event in step["events"]:
+                if event["kind"] == "turn":
+                    facing, turns = Direction(event["state"]["facing"]), turns + 1
+                    added = added or step["line"] not in ran
+                elif event["kind"] in FACING_ACTIONS:
+                    assert turns == quarter_turns(stepped, facing), f"{level.id}: the reference turns more than it needs to"
+                    stepped, turns, added = facing, 0, False
+            ran.add(step["line"])
+        assert not added, f"{level.id}: the reference turns after its last step"
 
 
 def quarter_turns(start: Direction, end: Direction) -> int:

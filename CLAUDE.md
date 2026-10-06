@@ -26,7 +26,8 @@ The designer is also the target learner.
   lines, ticks). Its `fewest_lines`/`write_code` write reference solutions
   blind. Among the shortest programs it takes the one with the fewest turns,
   so references pass time with `wait()`, not by spinning (QA-026). A level
-  test enforces this wherever `wait()` is unlocked. Chapter 3's levels and
+  test enforces this on every level (M4.0); a loop's last lap may end on its
+  own turn. Chapter 3's levels and
   solutions come from `scripts/gen_loops.py`, which replays solve.py's route
   with the fewest lines of `for` loops (M3.3). Chapter 4's come from
   `scripts/gen_conditions.py`, which lines up each board's route and
@@ -294,7 +295,5 @@ names.
   `MSYS_NO_PATHCONV=1`, or Git Bash rewrites `/rank-and-file/` into a Windows
   path.
 - Work on one branch per milestone (e.g. `m1-vertical-slice`) and open a PR for
-  the designer to merge after manual testing.
-- Once a milestone's PR is merged, delete its branch, locally and on GitHub
-  *(Designer, 2026-10-07)*. Merged commits stay reachable from `main`, and the
-  PR page keeps its history.
+  the designer to merge after manual testing. Merged branches are kept
+  *(Designer, 2026-10-07)*.
