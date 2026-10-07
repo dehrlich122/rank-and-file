@@ -90,3 +90,16 @@ describe("motionReduced", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("sound settings (M4.1)", () => {
+  it("start on, at 25% music and 35% effects, not muted", () => {
+    expect(sanitize({})).toMatchObject({ music: 25, effects: 35, muted: false });
+  });
+
+  it("keep volumes as whole numbers from 0 to 100, and fall back otherwise", () => {
+    expect(sanitize({ music: 0, effects: 100 })).toMatchObject({ music: 0, effects: 100 });
+    expect(sanitize({ music: 140, effects: -5 })).toMatchObject({ music: 100, effects: 0 });
+    expect(sanitize({ music: 12.6 }).music).toBe(13);
+    expect(sanitize({ music: "loud", effects: NaN, muted: "yes" })).toMatchObject({ music: 25, effects: 35, muted: false });
+  });
+});

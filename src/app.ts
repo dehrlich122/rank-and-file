@@ -13,6 +13,7 @@ import { unlockedPieces } from "./promotion";
 import { progress } from "./progress";
 import { PyClient, startPythonWorker, type ClientStatus } from "./py/client";
 import { applyToDocument, settings } from "./settings";
+import { sound } from "./sound";
 import { h } from "./ui/dom";
 import { icon } from "./ui/icons";
 import { mountLessons } from "./ui/lessonsMenu";
@@ -36,6 +37,18 @@ export function startApp(root: HTMLElement): void {
     },
     () => unlockedPieces(progress),
   );
+  sound.start(); // music and effects begin at the first click or key press
+  const muteButton = h("button", { class: "btn btn-small mute-button", "aria-pressed": "false", onClick: () => settings.set({ muted: !settings.get().muted }) });
+  const paintMute = () => {
+    const { muted } = settings.get();
+    const label = muted ? "Sound is off. Turn it on" : "Sound is on. Mute it";
+    muteButton.setAttribute("aria-pressed", String(muted));
+    muteButton.setAttribute("aria-label", label);
+    muteButton.title = label;
+    muteButton.replaceChildren(icon(muted ? "soundMuted" : "sound"));
+  };
+  paintMute();
+  settings.subscribe(paintMute);
   const status = h("span", { class: "status", "data-state": "loading" }, "Loading Python…");
   const settingsButton = h(
     "button",
@@ -49,7 +62,7 @@ export function startApp(root: HTMLElement): void {
     h(
       "div",
       { class: "app" },
-      h("header", { class: "topbar" }, h("a", { class: "brand", href: "#/" }, "♟ Rank & File"), crumbs, status, settingsButton),
+      h("header", { class: "topbar" }, h("a", { class: "brand", href: "#/" }, "♟ Rank & File"), crumbs, status, muteButton, settingsButton),
       main,
     ),
     dialog.element,

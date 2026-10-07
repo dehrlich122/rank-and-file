@@ -25,6 +25,9 @@ const ICONS = {
   // a solved level's stars: earned (filled) and not yet earned (outlined)
   star: [{ d: STAR, fill: true }],
   starOutline: [{ d: STAR }],
+  // sound (M4.1): a speaker with waves, and the same crossed out when muted
+  sound: [{ d: "M4 10v4h3.5L12 18V6L7.5 10z" }, { d: "M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10" }],
+  soundMuted: [{ d: "M4 10v4h3.5L12 18V6L7.5 10z" }, { d: "M16 9.5l5 5M21 9.5l-5 5" }],
   // settings: three sliders
   settings: [{ d: "M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1" }, { d: "M15 5v4M9 10v4M17 15v4" }],
 } satisfies Record<string, Shape[]>;

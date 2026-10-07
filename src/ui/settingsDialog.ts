@@ -4,6 +4,7 @@
 // Save button. The browser's <dialog> closes on Esc and keeps keyboard focus
 // inside while it's open; on close, focus goes back to where it was.
 import { CODE_SIZES, SPEEDS, type CodeSize, type Piece, type Settings, type SettingsStore } from "../settings";
+import { TRACKS } from "../sound";
 import { confirmStep, dialogHead, modal } from "./dialog";
 import { h } from "./dom";
 
@@ -75,9 +76,38 @@ const GROUPS: Array<{ key: keyof Settings; title: string; hint?: string; choices
   },
 ];
 
+/** Settings → Sound (M4.1): a slider for the music and one for the effects, and the credit the soundtrack asks for. */
+function soundGroup(store: SettingsStore): { element: HTMLElement; sync: (settings: Settings) => void } {
+  const sliders = ([["music", "Music"], ["effects", "Effects"]] as const).map(([key, label]) => {
+    const input = h("input", { type: "range", min: 0, max: 100, step: 1, "aria-label": `${label} volume` });
+    const value = h("span", { class: "slider-value small" });
+    input.addEventListener("input", () => store.set({ [key]: Number(input.value) }));
+    return { key, input, value, row: h("label", { class: "slider" }, h("span", {}, label), input, value) };
+  });
+  const track = TRACKS[0]!;
+  const element = h(
+    "fieldset",
+    {},
+    h("legend", {}, "Sound"),
+    h("p", { class: "muted small" }, "0 turns one off. The speaker button in the top bar mutes both."),
+    ...sliders.map((s) => s.row),
+    h("p", { class: "muted small" }, `Now playing: ${track.title} · ${track.credit}`),
+  );
+  return {
+    element,
+    sync: (settings) => {
+      for (const { key, input, value } of sliders) {
+        input.value = String(settings[key]);
+        value.textContent = `${settings[key]}%`;
+      }
+    },
+  };
+}
+
 export class SettingsDialog {
   readonly element: HTMLDialogElement;
   private readonly inputs: HTMLInputElement[] = [];
+  private readonly soundSync: (settings: Settings) => void;
   private readonly openListeners = new Set<() => void>();
   private readonly show: () => void;
 
@@ -113,11 +143,14 @@ export class SettingsDialog {
         ),
       ),
     );
+    const soundSettings = soundGroup(store);
+    this.soundSync = soundSettings.sync;
     this.element = h(
       "dialog",
       { class: "settings-dialog", "aria-labelledby": "settings-title" },
       dialogHead("settings-title", "Settings", "Done", () => this.element.close()),
       ...groups,
+      soundSettings.element,
       resetProgress(onResetProgress),
       h("p", { class: "muted small" }, "Esc opens and closes this menu. In the code editor, Ctrl+M then Tab moves focus out of the editor."),
     );
@@ -157,6 +190,7 @@ export class SettingsDialog {
       const key = input.dataset.key as keyof Settings;
       input.checked = String(settings[key]) === input.value;
     }
+    this.soundSync(settings);
   }
 }
 

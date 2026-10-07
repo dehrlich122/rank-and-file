@@ -53,6 +53,8 @@ blurred so no level solution is shown.
 
 ## License
 
+The soundtrack, **Music by Karl Casey @ White Bat Audio**, is used under [its own terms](public/audio/CREDITS.md) and is not covered by the licences below.
+
 The code is under the [MIT License](LICENSE). The level content in `levels/`,
 `lessons/` and `solutions/` is under [CC BY-NC-SA 4.0](LICENSE-CONTENT): free
 to share and adapt for non-commercial use, with credit, under the same license.

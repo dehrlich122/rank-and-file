@@ -10,6 +10,7 @@ import { asRecord, browserStorage, readJson, writeJson } from "../storage";
 import { BoardView } from "./board";
 import { h } from "./dom";
 import { icon } from "./icons";
+import { sound } from "../sound";
 import { crown } from "./sprites";
 import { svg } from "./svg";
 import { folderName, tierName, VOICE } from "./voice";
@@ -149,6 +150,7 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
     // the crown gets a short flourish the first time it is shown, and is still afterwards
     const fresh = cleared && !progress.hasSeen("crown", chapter.chapter);
     if (cleared) progress.markSeen("crown", chapter.chapter);
+    if (fresh) sound.play("crown", 0.3);
     const promotion = lastChapterOf(chapter.tier) === chapter ? PROMOTIONS.find((p) => p.tier === chapter.tier && tierCleared(p.tier, progress)) : undefined;
     const head = h(
       "button",

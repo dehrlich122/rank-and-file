@@ -31,6 +31,7 @@ export async function launch({ width = 1400, height = 860 } = {}) {
     findChrome(),
     [
       "--headless=new",
+      "--mute-audio",
       "--remote-debugging-port=0",
       `--user-data-dir=${profile}`,
       "--no-first-run",

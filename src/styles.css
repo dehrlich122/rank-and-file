@@ -2418,6 +2418,23 @@ pre {
   gap: 6px;
 }
 
+.mute-button[aria-pressed="true"] {
+  color: var(--muted);
+}
+
+/* Settings → Sound: a slider and its value */
+.settings-dialog .slider {
+  display: grid;
+  grid-template-columns: 64px 1fr 44px;
+  gap: 10px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.settings-dialog .slider-value {
+  text-align: right;
+}
+
 .settings-dialog,
 .compare-dialog {
   width: min(460px, 92vw);

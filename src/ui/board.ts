@@ -12,6 +12,8 @@
 import type { Clock, Enemy, Facing, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
 import { wornPiece } from "../promotion";
 import { motionReduced, settings } from "../settings";
+import { sound } from "../sound";
+import { soundsForStep } from "../sound/events";
 import { playableEvents } from "./motion";
 import { halftone, litGrid, M, S } from "./sprites/floor";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite, type Skin, type TileName } from "./sprites";
@@ -134,8 +136,14 @@ export class BoardView {
     if (events.length === 0) return;
     const each = totalMs / events.length;
     this.element.style.setProperty("--step-ms", `${Math.round(each * 0.9)}ms`);
+    const sounds = soundsForStep(events, this.last ?? null, settings.get().speed); // only played events sound: jumps and scrubs never come here
     events.forEach((event, i) => {
-      this.timers.push(window.setTimeout(() => this.apply(event), i * each));
+      this.timers.push(
+        window.setTimeout(() => {
+          this.apply(event);
+          for (const name of sounds[i]!) sound.play(name);
+        }, i * each),
+      );
     });
   }
 

@@ -3,6 +3,7 @@
 // selection and Enter opens it. With reduced motion the sky, the floor, the blink and the glitches stop.
 import { wornPiece } from "../promotion";
 import { settings } from "../settings";
+import { sound, TRACKS } from "../sound";
 import { h } from "./dom";
 import { enemy, hero, type EnemyKind, type Skin } from "./sprites";
 import { svg } from "./svg";
@@ -50,6 +51,7 @@ export function mountTitle(main: HTMLElement, options: { lessons: () => void; se
   };
   const choose = () => {
     const entry = entries[selected]!;
+    sound.play("menu_choose");
     if (entry.open) entry.open();
     else note.textContent = `${entry.label}: ${VOICE.comingSoon}`;
   };
@@ -78,6 +80,7 @@ export function mountTitle(main: HTMLElement, options: { lessons: () => void; se
       menu,
       note,
       h("div", { class: "ts-hero-slot" }, heroArt),
+      h("p", { class: "ts-credit" }, `♪ ${TRACKS[0]!.title} · ${TRACKS[0]!.credit}`),
     ),
   );
   paint();
@@ -94,6 +97,7 @@ export function mountTitle(main: HTMLElement, options: { lessons: () => void; se
     else if (event.key === "Enter") choose();
     else return;
     event.preventDefault();
+    if (event.key !== "Enter") sound.play("menu_move");
     paint();
   };
   document.addEventListener("keydown", onKey);
