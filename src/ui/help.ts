@@ -13,6 +13,7 @@
 // It keeps the level's progress up to date: `recordRun` once per run.
 import { GIVE_UP_AFTER, progress } from "../progress";
 import type { LevelResult } from "../py/protocol";
+import { sound } from "../sound";
 import { openComparison } from "./compare";
 import { confirmStep } from "./dialog";
 import { h, withCode } from "./dom";
@@ -76,6 +77,7 @@ export class HelpPanel {
   private openNextHint(): void {
     if (this.allOpen) return;
     progress.update(this.levelId, { hints: progress.level(this.levelId).hints + 1 });
+    sound.play("hint");
     this.render();
     this.hintsSection.querySelector<HTMLElement>(".hint-list li:last-child")?.focus();
   }

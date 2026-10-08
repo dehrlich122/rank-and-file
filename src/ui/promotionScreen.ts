@@ -5,6 +5,7 @@ import { chapters } from "../content";
 import type { ProgressStore } from "../progress";
 import { PROMOTIONS, tierCleared } from "../promotion";
 import type { SettingsStore } from "../settings";
+import { sound } from "../sound";
 import { h } from "./dom";
 import { hero } from "./sprites";
 import { svg } from "./svg";
@@ -17,6 +18,7 @@ export function mountPromotion(main: HTMLElement, tier: string, progress: Progre
     return () => {};
   }
   progress.markSeen("promotion", tier);
+  sound.play("promotion", 0.4);
 
   const learned = chapters.filter((c) => c.curriculum && c.tier === tier);
   const figure = (piece: typeof promotion.from, className: string) => svg("svg", { viewBox: "-38 -38 76 76", class: `pr-piece ${className}`, "aria-hidden": "true" }, hero(piece, piece === "knight" ? "east" : "south"));

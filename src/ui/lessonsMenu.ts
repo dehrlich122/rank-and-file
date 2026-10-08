@@ -6,6 +6,7 @@ import type { PyClient } from "../py/client";
 import type { LevelInfo } from "../py/protocol";
 import type { ProgressStore } from "../progress";
 import { lastChapterOf, PROMOTIONS, tierCleared } from "../promotion";
+import { sound } from "../sound";
 import { asRecord, browserStorage, readJson, writeJson } from "../storage";
 import { BoardView } from "./board";
 import { h } from "./dom";
@@ -116,6 +117,12 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
     showDetail();
   }
 
+  /** Open the level itself. */
+  function open(level: Level): void {
+    sound.play("menu_choose");
+    location.hash = `#/level/${level.id}`;
+  }
+
   function row(level: Level, index: number): HTMLElement {
     const { stars: best, helped } = progress.level(level.id);
     const solved = best > 0;
@@ -126,11 +133,12 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
       h("span", { class: "lrow-text" }, h("strong", {}, level.title, level.mastery ? masteryTag() : null), h("span", { class: "muted small" }, level.trains)),
       solved ? h("span", { class: "card-stars", title: `${best} of 3 stars` }, ...stars(best), h("span", { class: "sr-only" }, `${best} of 3 stars`)) : helped ? h("span", { class: "card-tag muted small" }, "Solution seen") : null,
     );
+    element.addEventListener("mousedown", () => selected !== level && sound.play("menu_move")); // before the click's focus selects it
     element.addEventListener("click", () => select(level));
     element.addEventListener("focus", () => selected !== level && select(level)); // arriving by keyboard selects too
-    element.addEventListener("dblclick", () => (location.hash = `#/level/${level.id}`));
+    element.addEventListener("dblclick", () => open(level));
     element.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") location.hash = `#/level/${level.id}`;
+      if (event.key === "Enter") open(level);
       else if (event.key === " ") {
         event.preventDefault();
         select(level);
@@ -149,6 +157,7 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
     // the crown gets a short flourish the first time it is shown, and is still afterwards
     const fresh = cleared && !progress.hasSeen("crown", chapter.chapter);
     if (cleared) progress.markSeen("crown", chapter.chapter);
+    if (fresh) sound.play("crown", 0.3);
     const promotion = lastChapterOf(chapter.tier) === chapter ? PROMOTIONS.find((p) => p.tier === chapter.tier && tierCleared(p.tier, progress)) : undefined;
     const head = h(
       "button",
@@ -162,6 +171,7 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
     inner.inert = !open; // a closed folder's rows can't be tabbed to
     const element = h("div", { class: `folder${open ? " open" : ""}${cleared ? " cleared" : ""}`, "data-chapter": String(chapter.chapter) }, head, h("div", { class: "folder-slide" }, inner));
     head.addEventListener("click", () => {
+      sound.play("menu_choose");
       const nowOpen = element.classList.toggle("open");
       inner.inert = !nowOpen;
       head.setAttribute("aria-expanded", String(nowOpen));
@@ -203,6 +213,7 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
       else if (!isHead) next = target.closest(".folder")?.querySelector<HTMLElement>(".folder-head") ?? undefined;
     } else return;
     event.preventDefault();
+    if (next) sound.play("menu_move");
     next?.focus();
   });
   showCrumbs();

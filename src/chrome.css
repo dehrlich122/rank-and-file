@@ -335,6 +335,14 @@
   background: var(--plate-bg);
 }
 
+.ts-credit {
+  margin: 8px 0 0;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--plate-muted);
+  background: var(--plate-bg);
+}
+
 .ts-hero-slot {
   margin-top: 6px;
 }

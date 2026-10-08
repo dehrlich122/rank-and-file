@@ -20,6 +20,8 @@ import type { SettingsDialog } from "./settingsDialog";
 import { progress } from "../progress";
 import { tierCleared } from "../promotion";
 import { SPEEDS, motionReduced, settings } from "../settings";
+import { sound } from "../sound";
+import { outcomeSounds } from "../sound/events";
 
 export interface LevelContext {
   client: PyClient;
@@ -381,6 +383,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     // The verdict and what's on offer follow the run as a whole; the details
     // come from the recording on show (the run, or one of its cases).
     const run = runResult ?? result;
+    // the outcome sounds once playback has played its way here: not on a jump to the end (afterMs is 0)
+    if (afterMs > 0) for (const { sound: name, after } of outcomeSounds(run)) sound.play(name, afterMs / 1000 + after);
     const actions: HTMLElement[] = [];
     if (help) actions.push(...help.outcomeActions(run, recordedCode ?? "", showHelp));
     if (run.status === "solved") {
