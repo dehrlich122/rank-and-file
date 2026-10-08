@@ -5,6 +5,7 @@
 import { Checker, type Verdict } from "../editor/checker";
 import { draftToLevelInfo, squareName, type Draft } from "../editor/draft";
 import { drafts } from "../editor/drafts";
+import { addBoard, boardCount, boardName, commitBoard, removeBoard, viewOf, type BoardEdit } from "../editor/boards";
 import { clearBoard, enemyAt, erase, extendRoute, fill, moveEnemy, occupantOf, paint, placeEnemy, placeGoal, placeStart, resize, rotateStart, toggleSpot, type Edit } from "../editor/edit";
 import { History } from "../editor/history";
 import { draftToYaml } from "../editor/levelData";
@@ -121,7 +122,14 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   let painting: { button: number; last: string } | null = null;
   let dragging: { what: "start" | "goal" | "enemy"; index: number } | null = null;
   let fromPanel = false; // the change came from a field in the properties panel: leave that panel alone
-  const draft = () => history.current;
+  let boardIndex = 0; // the board being edited, from 0 (M4.3): the draft's own board, or one of its `boards`
+  const whole = () => history.current; // the level, every board: what is saved, checked and exported
+  let view: { of: Draft; index: number; draft: Draft } | null = null;
+  /** The level as the board being edited is: every editing function works on this, and `commit` puts the result back. */
+  const draft = (): Draft => {
+    if (!view || view.of !== whole() || view.index !== boardIndex) view = { of: whole(), index: boardIndex, draft: viewOf(whole(), boardIndex) };
+    return view.draft;
+  };
 
   const host = h("div", { class: "ed-board", tabindex: "0", role: "group", "aria-label": "Level board", "aria-describedby": "ed-status" });
   const status = h("p", { class: "ed-status", id: "ed-status", "aria-live": "polite" });
@@ -132,7 +140,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   const undoButton = h("button", { class: "btn btn-small", onClick: () => undo() }, "Undo");
   const redoButton = h("button", { class: "btn btn-small", onClick: () => redo() }, "Redo");
   const clearButton = h("button", { class: "btn btn-small", onClick: () => askToClear() }, "Clear board");
-  const exportButton = h("button", { class: "btn btn-small", onClick: () => download(`${fileName(draft().title)}.yaml`, draftToYaml(draft())) }, "Export");
+  const exportButton = h("button", { class: "btn btn-small", onClick: () => download(`${fileName(whole().title)}.yaml`, draftToYaml(whole())) }, "Export");
   const testButton = h("button", { class: "btn btn-small btn-primary", onClick: () => (location.hash = `#/editor/${id}/play`) }, "Test-play");
   const widthInput = h("input", { type: "number", min: "2", "aria-label": "Width in squares" });
   const heightInput = h("input", { type: "number", min: "2", "aria-label": "Height in squares" });
@@ -152,7 +160,8 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     exportButton,
     testButton,
   );
-  const middle = h("div", { class: "ed-middle" }, host, status, keysHelp);
+  const boardRow = h("div", { class: "board-row", role: "group", "aria-label": "Boards" });
+  const middle = h("div", { class: "ed-middle" }, boardRow, host, status, keysHelp);
   root.replaceChildren(h("div", { class: "level-editor" }, toolbar, confirmHost, h("div", { class: "ed ed-a" }, paletteHost, middle, propsHost)));
   host.replaceChildren(h("p", { class: "muted" }, "Setting up the editor…"));
 
@@ -161,6 +170,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     if (drawnFromEngine !== (!!verdict.level && verdict.revision === revision)) renderBoard();
     else renderMarks(); // only the problem rings can have changed
     renderToolbar();
+    renderBoardRow();
     renderProblemsOnly(); // not the whole panel: a field being typed in keeps its focus
   });
 
@@ -172,21 +182,74 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   }
 
   function commit(next: Draft, note?: string, burst?: string): void {
-    history.set(next, burst);
+    history.set(commitBoard(whole(), boardIndex, next), burst);
     changed(note);
+  }
+
+  /** A change to the level as a whole (a board added or removed), and the board to be on afterwards. */
+  function commitBoards(edit: BoardEdit): void {
+    if ("refused" in edit) return say(edit.refused);
+    boardIndex = edit.index;
+    selection = null;
+    anchor = null;
+    history.set(edit.draft);
+    changed(edit.note);
+    drawProps();
+  }
+
+  function switchBoard(index: number): void {
+    if (index === boardIndex || index >= boardCount(whole())) return;
+    boardIndex = index;
+    selection = null;
+    anchor = null;
+    keepInside();
+    message = `Editing ${boardName(index)}.`;
+    renderBoard();
+    renderStatus();
+    renderToolbar();
+    renderBoardRow();
+    drawProps();
+    host.focus();
+  }
+
+  function renderBoardRow(): void {
+    const total = boardCount(whole());
+    const problemOn = verdict?.problem && verdict.revision === revision ? verdict.problem.board : 0;
+    boardRow.replaceChildren(
+      h("span", { class: "field-label" }, "Boards"),
+      ...Array.from({ length: total }, (_, i) =>
+        h(
+          "button",
+          { class: "board-tab", "aria-pressed": String(i === boardIndex), onClick: () => switchBoard(i) },
+          boardName(i),
+          problemOn === i + 1 ? h("span", { class: "problem-badge", "aria-hidden": "true" }, "!") : null,
+          problemOn === i + 1 ? h("span", { class: "sr-only" }, " has a problem") : null,
+        ),
+      ),
+      h("button", { class: "btn btn-small", onClick: () => commitBoards(addBoard(whole(), boardIndex, options?.max_boards ?? 6)) }, "+ Add a board"),
+      h("span", { class: "grow" }),
+      h("button", { class: "btn btn-small btn-danger", disabled: total < 2, onClick: askToRemove }, "Remove this board"),
+    );
+  }
+
+  function askToRemove(): void {
+    const index = boardIndex;
+    ask(`Remove ${boardName(index)}? You can undo it.`, "Yes, remove it", "Keep it", () => commitBoards(removeBoard(whole(), index)));
   }
 
   /** The draft is different now (a change, an undo or a redo): save it, ask the engine, redraw. */
   function changed(note?: string): void {
     revision++;
-    drafts.save(draft());
-    onTitle(draft().title);
-    checker.ask(draft(), revision);
+    drafts.save(whole());
+    onTitle(whole().title);
+    checker.ask(whole(), revision);
     if (note !== undefined) message = note;
+    boardIndex = Math.min(boardIndex, boardCount(whole()) - 1); // an undo can take a board away
     keepInside();
     renderBoard();
     renderStatus();
     renderToolbar();
+    renderBoardRow();
     if (fromPanel) renderProblemsOnly();
     else drawProps();
   }
@@ -248,7 +311,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
       case "goal":
         return placeGoal(d, pos);
       case "spot":
-        return toggleSpot(d, pos);
+        return boardIndex > 0 ? { refused: "Hidden-goal squares (?) are only on Board 1." } : toggleSpot(d, pos);
       case "enemy":
         return placeEnemy(d, pos, action.enemy);
       case "route":
@@ -308,7 +371,8 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
 
   /** What the board shows: the engine's own description when it has accepted this very draft (it knows what attacks what), else the draft's. */
   function levelToDraw(): LevelInfo {
-    return verdict?.level && verdict.revision === revision ? verdict.level : draftToLevelInfo(draft());
+    const accepted = verdict?.level && verdict.revision === revision ? verdict.level : null;
+    return (boardIndex > 0 ? accepted?.boards[boardIndex] : accepted) ?? draftToLevelInfo(draft());
   }
 
   let marksLayer: SVGGElement | null = null;
@@ -360,7 +424,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     }
     layer.append(box(cursor, d.height, "ed-cursor"));
     const problem = verdict?.problem;
-    if (problem) {
+    if (problem && problem.board === boardIndex + 1) {
       const rung = [...problem.squares, ...(problem.enemy !== null && d.enemies[problem.enemy] ? [d.enemies[problem.enemy]!.start] : [])];
       for (const pos of rung) {
         const [x, y] = square(pos, d.height);
@@ -410,7 +474,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   }
 
   function renderStatus(): void {
-    const where = `${squareName(cursor)} · ${describeSquare(cursor)}`;
+    const where = `${boardCount(whole()) > 1 ? `${boardName(boardIndex)} · ` : ""}${squareName(cursor)} · ${describeSquare(cursor)}`;
     const doing = anchor ? ` · rectangle to ${squareName(anchor)}: Enter fills it` : tool ? ` · Enter: ${tool.label.toLowerCase()}` : "";
     status.replaceChildren(h("strong", {}, where), doing, ...(message ? [h("span", { class: "ed-note" }, ` — ${message}`)] : []));
   }
@@ -448,6 +512,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
       drawProps();
     },
     goTo: (problem: Problem) => {
+      if (problem.board - 1 !== boardIndex && problem.board <= boardCount(whole())) switchBoard(problem.board - 1);
       const pos = problem.squares[0] ?? (problem.enemy !== null ? draft().enemies[problem.enemy]?.start : undefined);
       if (problem.field === "goal" && !pos) {
         const goal = tools.find((t) => t.id === "goal");
@@ -620,7 +685,8 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
       renderBoard();
       renderStatus();
       drawProps();
-      checker.ask(draft(), revision);
+      renderBoardRow();
+      checker.ask(whole(), revision);
     } catch (error) {
       host.replaceChildren(h("p", { class: "muted" }, `Python couldn't start: ${String(error)}`));
     }
@@ -631,6 +697,6 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     checker.stop();
     document.removeEventListener("keydown", onKey);
     board?.dispose();
-    if (revision > 0) drafts.save(draft()); // only a level that was changed counts as edited
+    if (revision > 0) drafts.save(whole()); // only a level that was changed counts as edited
   };
 }

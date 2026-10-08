@@ -8,10 +8,11 @@ export interface Problem {
   squares: Pos[]; // squares to mark
   enemy: number | null; // an enemy to mark: its place in the draft's list, from 0
   field: string | null; // a field of the level: "title", "goal", "start", "api", "size", ...
+  board: number; // the board it is on, from 1 (M4.3): squares and enemies belong to it
 }
 
 export function placeProblem(message: string, at: ProblemAt | null | undefined): Problem {
   const names = [...(at?.square ? [at.square] : []), ...(at?.squares ?? [])];
   const squares = names.map(parseSquare).filter((pos): pos is Pos => pos !== null);
-  return { message, squares, enemy: at?.enemy !== undefined ? at.enemy - 1 : null, field: at?.field ?? null };
+  return { message, squares, enemy: at?.enemy !== undefined ? at.enemy - 1 : null, field: at?.field ?? null, board: at?.board ?? 1 };
 }

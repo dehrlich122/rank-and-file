@@ -217,7 +217,7 @@ def test_a_problem_on_another_board_names_the_board_and_the_place():
     variant = {"map": "G . .\n. . .\nP . .\n", "enemies": [{"kind": "rook", "start": "a1"}]}
     error = problem(variants=[variant])
     assert error.at["board"] == 2 and error.at["enemy"] == 1
-    assert str(error).startswith("variant 1: ")
+    assert str(error).startswith("board 2: ")
     assert problem(variants=[{"map": "P . .\n. . .\n. . ."}]).at == {"field": "goal", "board": 2}
 
 

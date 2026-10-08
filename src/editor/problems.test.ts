@@ -3,11 +3,11 @@ import { placeProblem } from "./problems";
 
 describe("placeProblem", () => {
   it("marks the square the engine names", () => {
-    expect(placeProblem("m", { square: "c4" })).toEqual({ message: "m", squares: [[2, 3]], enemy: null, field: null });
+    expect(placeProblem("m", { square: "c4" })).toEqual({ message: "m", squares: [[2, 3]], enemy: null, field: null, board: 1 });
   });
 
   it("turns an enemy's number (from 1) into its place in the list (from 0), with its square", () => {
-    expect(placeProblem("m", { enemy: 2, square: "b3" })).toEqual({ message: "m", squares: [[1, 2]], enemy: 1, field: null });
+    expect(placeProblem("m", { enemy: 2, square: "b3" })).toEqual({ message: "m", squares: [[1, 2]], enemy: 1, field: null, board: 1 });
   });
 
   it("marks every square the engine names, when it names several", () => {
@@ -20,6 +20,11 @@ describe("placeProblem", () => {
 
   it("names a field, and copes with a problem with no place", () => {
     expect(placeProblem("m", { field: "goal" })).toMatchObject({ field: "goal", squares: [], enemy: null });
-    expect(placeProblem("m", null)).toEqual({ message: "m", squares: [], enemy: null, field: null });
+    expect(placeProblem("m", null)).toEqual({ message: "m", squares: [], enemy: null, field: null, board: 1 });
+  });
+
+  it("says which board a problem is on, the first when it says nothing", () => {
+    expect(placeProblem("m", { board: 3, enemy: 1 }).board).toBe(3);
+    expect(placeProblem("m", { square: "a1" }).board).toBe(1);
   });
 });

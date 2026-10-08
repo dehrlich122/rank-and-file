@@ -96,6 +96,7 @@ export interface ProblemAt {
   enemy?: number; // its number from 1, as in the message
   field?: string; // a key of the level: "title", "goal", "start", "api", "size", ...
   squares?: string[]; // several squares, e.g. every square using a legend entry that is wrong
+  board?: number; // a problem on one of a level's other boards: its number from 1 (absent: the first)
 }
 
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string; at: ProblemAt | null };

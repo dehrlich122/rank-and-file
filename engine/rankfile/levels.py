@@ -706,7 +706,7 @@ def _on_board(number: int):
     try:
         yield
     except LevelError as exc:
-        raise LevelError(f"variant {number}: {exc}", at={"field": "variants", **(exc.at or {}), "board": number + 1}) from None
+        raise LevelError(f"board {number + 1}: {exc}", at={"field": "variants", **(exc.at or {}), "board": number + 1}) from None
 
 
 def _parse_variants(items, legend: dict, level: Level) -> list[Level]:
@@ -719,13 +719,13 @@ def _parse_variants(items, legend: dict, level: Level) -> list[Level]:
     for number, item in enumerate(items, start=1):
         with _locate(field="variants", board=number + 1):
             if not isinstance(item, dict) or "map" not in item or set(item) - {"map", "legend", "enemies"}:
-                raise LevelError(f"variant {number} must have a map, and optionally a legend and enemies, and nothing else")
+                raise LevelError(f"board {number + 1} must have a map, and optionally a legend and enemies, and nothing else")
             if not isinstance(item.get("legend", {}), dict):
-                raise LevelError(f"variant {number}: legend must be a mapping of symbols to tiles")
+                raise LevelError(f"board {number + 1}: legend must be a mapping of symbols to tiles")
             with _on_board(number):
                 board, start, goal, spots = _parse_board(item["map"], {**legend, **item.get("legend", {})}, level.objectives)
             if spots:
-                raise LevelError(f"variant {number}: ? squares are only for the level's own map")
+                raise LevelError(f"board {number + 1}: ? squares are only for the level's own map")
             with _on_board(number):
                 enemies = _parse_enemies(item["enemies"]) if "enemies" in item else level.enemies
                 variant = replace(level, board=board, start=start, goal=goal, variants=[], enemies=enemies)

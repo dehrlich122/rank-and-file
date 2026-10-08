@@ -73,9 +73,9 @@ def test_describe_is_ready_for_the_ui():
         ({"par": {"lines": "3"}}, "par lines"),
         ({"par": 3}, "par must be a mapping"),
         ({"variants": {"map": "P G\n"}}, "variants must be a list"),
-        ({"variants": [{"map": "P G\n", "goal": 1}]}, "variant 1 must have a map"),
-        ({"variants": [{"map": "P G\n"}, {"map": "G .\n"}]}, "variant 2: the map needs a start"),
-        ({"variants": [{"map": "P .\n"}]}, "variant 1: objective reach_goal needs a goal"),
+        ({"variants": [{"map": "P G\n", "goal": 1}]}, "board 2 must have a map"),
+        ({"variants": [{"map": "P G\n"}, {"map": "G .\n"}]}, "board 3: the map needs a start"),
+        ({"variants": [{"map": "P .\n"}]}, "board 2: objective reach_goal needs a goal"),
     ],
 )
 def test_bad_levels_fail_loudly(overrides, message):
