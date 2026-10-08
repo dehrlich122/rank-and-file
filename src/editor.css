@@ -371,3 +371,248 @@
 .my-level-open:hover strong {
   color: var(--accent);
 }
+
+/* -- M4.3: the rules, other boards, the solvability check and sharing ------------------------------------ */
+
+.ed-right .tab {
+  padding: 10px 9px 7px;
+}
+
+.rules-section {
+  display: grid;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.rules-section + .rules-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.rules-section h3 {
+  margin: 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+
+.choice-row input[type="number"] {
+  width: 5em;
+}
+
+.phrase {
+  display: flex;
+  gap: 6px;
+}
+
+.construct-list {
+  columns: 2;
+  column-gap: 14px;
+}
+
+.construct-list .check {
+  display: flex;
+  break-inside: avoid;
+  padding: 1px 0;
+}
+
+.rules-section details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.read-aloud {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.read-aloud li + li {
+  margin-top: 3px;
+}
+
+.counter {
+  text-align: right;
+}
+
+.counter.over {
+  color: var(--bad);
+  font-weight: 600;
+}
+
+/* the board switcher above the board */
+.board-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.board-row .board-tab {
+  font: inherit;
+  font-weight: 600;
+  padding: 3px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.board-row .board-tab[aria-pressed="true"] {
+  color: var(--text);
+  border-color: var(--accent);
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+
+.board-tab .problem-badge {
+  margin-left: 6px;
+}
+
+/* the solvability check, under the Problems list */
+.solve-box {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+}
+
+.solve-box h3 {
+  margin: 0;
+}
+
+.solve-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.solve-results li {
+  display: grid;
+  grid-template-columns: 1.4em 1fr;
+  gap: 6px;
+}
+
+.solve-mark {
+  font-weight: 700;
+  text-align: center;
+}
+
+.solve-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.solve-bar > span {
+  display: block;
+  height: 100%;
+  width: 40%;
+  background: var(--accent);
+}
+
+.solve-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* the Share dialog */
+.share-dialog {
+  width: min(520px, 94vw);
+  padding: 18px 22px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
+}
+
+.share-dialog::backdrop {
+  background: rgb(0 0 0 / 0.35);
+}
+
+.share-checks {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.share-checks li {
+  display: grid;
+  grid-template-columns: 1.4em 1fr auto;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.share-out {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.share-out.blocked {
+  opacity: 0.55;
+}
+
+.share-copy {
+  display: flex;
+  gap: 6px;
+}
+
+.share-copy input,
+.share-copy textarea {
+  flex: 1;
+  min-width: 0;
+  font: 13px var(--font-code, monospace);
+}
+
+.keep-solution {
+  margin-top: 8px;
+}
+
+/* the person the level came from is not named: a shared level says only that it is shared */
+.shared-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 8px 14px;
+}
+
+.my-levels-title {
+  margin: 22px 0 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.ed-right .field-row {
+  align-items: start;
+}
+
+.choice-row .field-label {
+  flex-basis: 100%;
+}
+
+.rules-section > .btn,
+.rules-section > details {
+  justify-self: start;
+}
+
+.rules-section > details {
+  justify-self: stretch;
+}
