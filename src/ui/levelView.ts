@@ -12,7 +12,7 @@ import { renderLesson, type Lesson } from "./lesson";
 import { masteryTag } from "./lessonsMenu";
 import { Console, Inspector, noticeCard, outcomeCard } from "./panels";
 import { callCompletion, KnownCalls } from "./completion";
-import { HelpPanel } from "./help";
+import { HelpPanel, type HelpFocus } from "./help";
 import { icon, type IconName } from "./icons";
 import { Player, buildFrames, consoleAt, controlStates } from "./playback";
 import type { ReplPanel } from "./repl";
@@ -382,8 +382,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     // come from the recording on show (the run, or one of its cases).
     const run = runResult ?? result;
     const actions: HTMLElement[] = [];
-    const offer = help?.outcomeAction(run, recordedCode ?? "", showHelp);
-    if (offer) actions.push(offer);
+    if (help) actions.push(...help.outcomeActions(run, recordedCode ?? "", showHelp));
     if (run.status === "solved") {
       const next = nextLevel(source.id);
       actions.push(
@@ -475,11 +474,11 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     if (level) board?.show(level.start);
   }
 
-  /** Opens the Challenge panel at the help (expanding a collapsed panel). */
-  function showHelp(): void {
+  /** Opens the Challenge panel at the help (expanding a collapsed panel), focused on the next hint or the solution. */
+  function showHelp(focus?: HelpFocus): void {
     if (layout.classList.contains("learn-collapsed")) setCollapsed(false);
     showTab("challenge");
-    help?.focus();
+    help?.focus(focus);
   }
 
   function updateControls(): void {

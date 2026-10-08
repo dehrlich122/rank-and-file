@@ -1242,9 +1242,10 @@ Item 6 (hidden boards) became QA-016.
 The designer's answer to PR #8's question: are the Testing-ground hints good
 enough, or should they be rewritten?
 
-### QA-025 · Stepping Stones: hint 2 gives too much away · Fixed
+### QA-025 · Stepping Stones: hint 2 gives too much away · Verified
 
-- **Fixed** in `05221bc` (2026-09-29); awaiting the designer's retest.
+- **Verified** *(Designer, 2026-10-07)*: retested thoroughly and approved.
+- **Fixed** in `05221bc` (2026-09-29).
   - Hint 2 only explains the plank: walk over it to pick it up, and lay it
     over a pit as a bridge you can walk on. It has no code.
   - Hint 3 shows the code for bridging (`pawn.bridge()`, then
@@ -1260,10 +1261,10 @@ enough, or should they be rewritten?
   bridge could then come in hint 3.
 
 
-### QA-026 · The Sentry's Round turns, in the level that brings in `wait()` · Fixed
+### QA-026 · The Sentry's Round turns, in the level that brings in `wait()` · Verified
 
-- **Fixed** in `03c75c5` (2026-09-29), with a level test in `b9f4034`;
-  awaiting the designer's retest.
+- **Verified** *(Designer, 2026-10-07)*: retested thoroughly and approved.
+- **Fixed** in `03c75c5` (2026-09-29), with a level test in `b9f4034`.
   - `scripts/solve.py` now weighs a solution by lines, then turns. Among
     the shortest programs it takes the one that turns least, so idle ticks
     go to `wait()`.
@@ -1291,9 +1292,10 @@ enough, or should they be rewritten?
     and back.
 
 
-### QA-027 · Pursuit: hint 3 turns on the spot · Fixed
+### QA-027 · Pursuit: hint 3 turns on the spot · Verified
 
-- **Fixed** in `c522931` (2026-09-29); awaiting the designer's retest.
+- **Verified** *(Designer, 2026-10-07)*: retested thoroughly and approved.
+- **Fixed** in `c522931` (2026-09-29).
   - `wait()` is unlocked. The reference takes the same route as before, but
     waits one tick where it spun for two, so par goes from 5 to 4.
   - Hint 3 is regenerated, and it waits. Hints 1 and 2 are unchanged.
@@ -1316,9 +1318,10 @@ enough, or should they be rewritten?
   turning away and back is the only way it can pass time.
 
 
-### QA-028 · Portcullis: hint 3 starts oddly, and the gates' cycle could be a hint · Fixed
+### QA-028 · Portcullis: hint 3 starts oddly, and the gates' cycle could be a hint · Verified
 
-- **Fixed** in `9721bc1` (2026-09-29); awaiting the designer's retest.
+- **Verified** *(Designer, 2026-10-07)*: retested thoroughly and approved.
+- **Fixed** in `9721bc1` (2026-09-29).
   - Hint 2 ends with the designer's reminder: "Don't forget: the gates keep
     cycling on every tick, so time your loops carefully!" ("run for every
     tick" became "keep cycling on every tick".)
@@ -1657,6 +1660,42 @@ The designer ran step 2 with Animations on Full. Rook glitch: "looks great", don
   - What a player may notice: enemies are now drawn over the piece (only visible when they share a square); the record of what has been shown once
     changed shape, so a browser that has already seen the promotion or a crown will see each once more.
 
+## Session 14 — 2026-10-07 · before M4 (`m4-0-plan`)
+
+The designer retested the Testing-ground hint fixes and answered the questions left open before M4. M4's plan is `docs/M4/M4.md`.
+
+- **QA-025 to QA-028** *(Designer, 2026-10-07)*: retested thoroughly and approved. All four are Verified.
+- **The tick counter** (PR #8's question) *(Designer, 2026-10-07)*: the timed gate's badge ("2 of 4 · tick N") is fine for now. No
+  separate counter on the board.
+- **QA-042 · "Show me a solution" after three tries, hints or not** *(Designer, 2026-10-07)* · Fixed
+  - **Observed:** the offer only comes once every hint is open and three more runs have failed (M2).
+  - **Wanted:** the solution is available after three tries, whether or not hints have been opened.
+  - **Fixed** in `71353eb` (M4.0; `docs/M4/M4.md` has the details):
+    - The third failed run of a level offers "Show me a solution…", with or without hints. A failed run is any run that
+      doesn't solve the level, and replays don't count, as before.
+    - The offer sits in the Challenge panel's Solution section, so a level with no hints gets it too. After the first failed
+      run, a line there counts the runs left.
+    - A failed run's outcome card offers "Need a hint?" while hints remain, and "Show me a solution…" once it's on offer, side
+      by side.
+    - Hints, the third star and "solved with help" don't change. A count saved under the old rule carries over.
+    - vitest covers the rule. The M2 e2e checks for giving up now follow it.
+  - **Retest:**
+    1. Pick a level you haven't played (or Settings → Reset progress), and fail it twice without opening a hint. Nothing is
+       offered yet. After the first failure, the Challenge panel's Solution section counts the runs left.
+    2. Fail it a third time. The outcome card shows "Need a hint?" and "Show me a solution…". Each opens the Challenge panel
+       on its own button.
+    3. "Not yet" cancels. "Show it" opens the comparison, and in Lessons the level reads "Solution seen", with no stars.
+    4. Solve it afterwards: it counts, with two stars at most.
+    5. Replay a failed run (back to the start, then to the end): it doesn't count again.
+- **Sound comes in M4** *(Designer, 2026-10-07)*: a soundtrack (credited "Music by Karl Casey @ White Bat Audio") and sound
+  effects, on and quiet by default, with a mute button (M4.1). The CRT scanlines stay under "Revisit later".
+- **"References wait rather than spin" on every level** *(Designer, 2026-10-07)*. The level test from QA-026 skipped levels
+  without `wait()`; now it runs on all of them.
+  - A loop's last lap may end on the loop's own turn. Only one reference needed that: a Testing-ground loop whose lap ends
+    turning, on a level whose only clock counts new lines.
+  - All 45 levels pass, and no level or solution changed (`fd69616`).
+- **Merged branches stay** *(Designer, 2026-10-07)*: unless there's a reason to delete them, keeping them does little harm.
+
 ---
 
 ## Queued work
@@ -1730,6 +1769,8 @@ Planned tasks that aren't QA findings, in the order they should happen.
 
 - **CRT scanlines option** (design pass). Faint scanlines over the board only, off by default, never over code or text. A good idea, but not
   urgent: saved for a future design pass. *(Designer, 2026-10-03)*
+- **Rewards for mastery sets** (a later design and experience pass). Clearing a tier's mastery set earns nothing yet. The designer has
+  ideas for skins and trophies. *(Designer, 2026-10-07)*
 
 Deferred on purpose. Not bugs, but don't lose them.
 

@@ -15,11 +15,11 @@ date)* marks a decision.
 
 ---
 
-## 0. Where the project stands *(Updated 2026-10-02)*
+## 0. Where the project stands *(Updated 2026-10-07)*
 
-Playable now: Chapters 1 to 5 (the first five of the Pawn tier's six), each with
-five levels and one optional mastery challenge, plus a Testing ground of
-practice levels. Chapter 6, Runes, completes the Pawn tier's six chapters.
+Playable now: the Pawn tier's six chapters, each with five levels and (from
+Chapter 2) one optional mastery challenge, plus a Testing ground of practice
+levels.
 
 Built beyond the first brief:
 - **Feedback:** tiered hints, stars for par, a reveal of the idiomatic solution,
@@ -39,8 +39,8 @@ Built beyond the first brief:
 
 The first design pass (§9) is merged: a wire world with one solid hero, the start
 menu, the Lessons directory, the promotion ceremony and the knight skin (§8), the
-motion kit and an accessibility pass. Next: the level editor and
-free play (§7).
+motion kit and an accessibility pass. Next is M4 (§7, `docs/M4/M4.md`): sound,
+the level editor with sharing, free play, and the Pawn tier's mastery set.
 
 ---
 
@@ -68,7 +68,7 @@ I'm the designer **and** the target learner. I know some core Python but learn b
 2. **Learn phase is short and runnable.** Max ~150 words of explanation per concept, plus 1–3 editable snippets the player can run in place. Show, don't tell. Include a scratch REPL on every level.
 3. **Feedback in under a second.** Visualize execution step by step: highlight the executing line as the piece moves, show live variable values in an inspector panel, allow step / pause / rewind.
 4. **Errors are teaching moments.** Translate tracebacks into plain language pointing at the exact line (e.g. `AttributeError` on `knight.mvoe()` → "The knight doesn't know `mvoe` — did you mean `move`?"), but keep the real traceback visible and expandable. Learning to read real tracebacks is part of the curriculum.
-5. **Tiered hints:** nudge → concept reminder → partial example. Never the full solution unless explicitly requested after several failed attempts.
+5. **Tiered hints:** nudge → concept reminder → partial example. Never the full solution unless explicitly requested after several failed attempts. *(Updated, Designer 2026-10-07: a solution can be asked for after three failed runs, whether or not any hint was opened. QA-042, built in M4.0.)*
 6. **Levels must force the target concept.** A loop level must be unsolvable by pasting `move()` ten times. Tools for this:
    - **Several boards:** a solution is validated against more than one board, shown up front, so hard-coding fails and the player must generalize. *(Updated: in play-testing, boards that changed after a solve felt like a bait-and-switch, so every board is visible before the run. QA-016.)*
    - **Constraints:** line/character limits, step budgets, required or banned constructs — checked via `ast` inspection, never string matching.
@@ -100,9 +100,9 @@ The engine composes levels from reusable, extensible elements. Levels name tile 
 
 ---
 
-## 4. Curriculum map *(Updated 2026-10-02)*
+## 4. Curriculum map *(Updated 2026-10-07)*
 
-Chapter 4 was split in two, so every later chapter moved up by one. Each chapter has **5 levels plus 1 optional mastery challenge**. Each tier ends with a promotion (§8) and, in M4, a set of optional mastery challenges that cover the whole tier.
+Chapter 4 was split in two, so every later chapter moved up by one. Each chapter has **5 levels plus 1 optional mastery challenge**, except Chapter 1, a prologue of the basics of the basics, which needs none *(Designer, 2026-10-07)*. Each tier ends with a promotion (§8) and a set of optional mastery challenges that cover the whole tier; the Pawn tier's comes in M4. *(Designer, 2026-10-07)* The sets live in Free Play, not Lessons, with no lesson phase, and are free play's default levels for now; each is tagged with its tier and a difficulty (`docs/M4/M4.md`).
 
 | # | Tier | Chapter | Python concepts | Board mechanic | Status |
 |---|------|---------|-----------------|----------------|--------|
@@ -111,7 +111,7 @@ Chapter 4 was split in two, so every later chapter moved up by one. Each chapter
 | 3 | Pawn | Marching Orders | `for`, `range()`, nested loops | long corridors, waypoints, clockwork obstacles | Playable |
 | 4 | Pawn | Eyes Open | booleans, comparisons, `if/elif/else`, `None` | pits, enemy rooks and bishops, `look()` | Playable |
 | 5 | Pawn | Keep Going | `while`, `break`, `continue`, counters | goals hidden on several squares, winding roads | Playable |
-| 6 | Pawn | Runes | strings: indexing, slicing, methods, `in`, `int()`, `split()` | read rune tiles to decode guards, roads and destinations | In progress (M3.6) |
+| 6 | Pawn | Runes | strings: indexing, slicing, methods, `in`, `int()`, `split()` | read rune tiles to decode guards, roads and destinations | Playable |
 | 7 | Knight | Spellbook | `def`, parameters, `return`, scope | reusable maneuvers; knight L-moves | Planned |
 | 8 | Knight | The Satchel | lists, tuples (coordinates), iteration, sorting | collect keys in the right order | Planned |
 | 9 | Bishop | The Map Legend | dicts, sets | key→door pairs, tracking visited squares | Planned |
@@ -161,7 +161,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 
 ---
 
-## 7. Milestones *(Updated 2026-10-02)*
+## 7. Milestones *(Updated 2026-10-07)*
 
 | Milestone | What | Status |
 |---|---|---|
@@ -169,15 +169,16 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 | M1 Vertical slice | board, editor, Run, animated event log, line highlighting, variables, error translation, Learn phase, Chapter 1 | Done |
 | M2 Feedback depth | tiered hints, AST constraints, several boards, par and stars, idiomatic-solution reveal, progress saving | Done |
 | M3.0–M3.5 | the obstacle toolkit, the Codex, Chapters 2–5 | Done |
-| M3.6 Chapter 6 | Runes | In play-test: engine, levels and lessons built |
+| M3.6 Chapter 6 | Runes | Merged 2026-10-02 (`docs/M3/M3.6.md`), PR #16 |
 | **M3.7 Look & Feel** | the first major design pass (§9), with the **promotion ceremony** and the knight skin (§8) | Merged 2026-10-03 (`docs/M3/M3.7.md`), PR #17 |
-| M4 Level editor | author levels without hand-writing YAML; the Pawn tier's set of mastery challenges | Planned |
-| **M4.x Free play** | an open board to experiment on, with a skins gallery | Planned, after M4 |
+| **M4 Sound, editor and free play** | **sound** (a soundtrack and effects); author levels without hand-writing YAML, and **share** them; **free play** (challenges, your own and shared levels, a sandbox, the skins gallery); the Pawn tier's set of mastery challenges | Planning (`docs/M4/M4.md`) |
 | M5+ | the remaining chapters, one tier at a time, each ending in a promotion | Planned |
 
 *(Designer, 2026-10-02)* The design pass comes **before** the editor. By then the Pawn tier holds every tile, enemy and ability the editor's palette must show, and an editor built on the old look would be restyled straight away.
 
-**Out of scope for now:** accounts, multiplayer, mobile layout. Sound is out of scope too, but is worth revisiting in the design pass (§9).
+*(Designer, 2026-10-07)* Sound comes into M4, music and effects together. The editor is for players as well as the designer, and its levels can be exported and shared, carrying their author's solution. Free play, planned as M4.x, comes into M4 too, because it holds the editor's levels, shared levels and the Pawn tier's set. Every free-play level is tagged with its tier and a difficulty: `pass`, `try`, `raise`, `assert` or `while True:`, colour-coded green, yellow, orange, red and a flashing warning.
+
+**Out of scope for now:** accounts, multiplayer, mobile layout, and a server (so shared levels travel as links, codes and files).
 
 ---
 
@@ -192,7 +193,8 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 - **Unlocking:** a skin unlocks when its promotion is earned. The rule is worked out from the saved progress, so Reset progress locks it again. The bishop, rook and queen would unlock the same way *(proposed; confirm when those tiers are built)*.
 - **Using a skin:**
   - From M3.7, once a skin is unlocked it is **selectable in the menu**: Settings has a **Piece** choice (pawn or knight) that works on every level.
-  - After M4, free play gets a gallery of unlocked skins.
+  - Free play (M4.4) gets a gallery of unlocked skins.
+- **Rewards for mastery sets:** none yet. The designer has ideas for skins and trophies, for a later design and experience pass *(Designer, 2026-10-07)*.
 
 ---
 
@@ -237,7 +239,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 - a small cyan tick where grid lines cross, so squares can be counted like on a targeting grid
 - file letters (a–h) along the bottom and rank numbers (1–8) up the left, always both, restyled from today's `labels()`; they're text, so no glow
 
-**The start menu** is a styled title screen with some animation, honouring reduced motion. Its four entries are Lessons, Free Play, Level Editor and Settings. Free Play (M4.x) and Level Editor (M4) show now as "coming soon" and switch on when those milestones land.
+**The start menu** is a styled title screen with some animation, honouring reduced motion. Its four entries are Lessons, Free Play, Level Editor and Settings. Free Play (M4.4) and Level Editor (M4.2) show now as "coming soon" and switch on when those milestones land.
 - Direction: ~~the arcade title, with a pixel-font logo~~ *the neon title (revised after step 0, below)*. A big "RANK & FILE" logo with a hard offset shadow (an offset, not a blur, so it isn't glow on text), over a slowly scrolling synthwave perspective grid and a striped sun. **A rank of enemy chess pieces stands in front of the sun, and the player's hero (the pawn, or whatever rank the player has reached) stands under the menu.** A blinking ▶ marks the selected entry. With reduced motion the grid, the blink and the glitches stop.
 - The name stays Rank & File. The code form `rank_and_file()` is a secondary mark (for example the subtitle under the logo), never the logo.
 - Keyboard first: the arrow keys move the selection and Enter opens it.
@@ -320,4 +322,4 @@ Colours are CSS custom properties written as `light-dark()`, there is a tile-to-
 - Before/after screenshots through the end-to-end suite.
 
 ### Open for the pass
-Sound (tiny optional chiptune effects, off by default). Settled by the brief above: the light theme has no glow. *(Designer, 2026-10-03)* The optional CRT scanlines (off by default) are a good idea but not urgent: saved for a future design pass, and not built in M3.7.
+Sound moved to M4.1 *(Designer, 2026-10-07)*: a soundtrack and sound effects, on and quiet by default, with a mute button (`docs/M4/M4.md`). Settled by the brief above: the light theme has no glow. *(Designer, 2026-10-03)* The optional CRT scanlines (off by default) are a good idea but not urgent: saved for a future design pass, and not built in M3.7.

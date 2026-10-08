@@ -216,21 +216,19 @@ export default async function appChecks({ browser: b, base, root, check }) {
   await check("M2: replaying a failed run doesn't count it again towards 'Show me a solution'", async () => {
     await openLevel("ch01-l02", { fresh: true });
     await challengeTab();
-    for (let i = 0; i < 3; i++) await b.evaluate(`document.querySelector('.hints .hint-button').click()`);
     await setCode("pawn.fly()\n");
     await run();
     for (let i = 0; i < 3; i++) {
       await b.evaluate(`${button(0)}.click()`); // back to the start
       await b.evaluate(`${button(4)}.click()`); // and to the outcome again
     }
-    const note = await b.evaluate(`document.querySelector('.hints p')?.textContent ?? ''`);
+    const note = await b.evaluate(`document.querySelector('.solution-section .give-up-note')?.textContent ?? ''`);
     expect(note.includes("after 2 more runs"), `after one failed run, replayed 3 times: "${note}"`);
   });
 
-  await check("M2: with every hint open, the third failed run offers 'Show me a solution'", async () => {
+  await check("QA-042: the third failed run offers 'Show me a solution', with no hint open", async () => {
     await openLevel("ch01-l01", { fresh: true });
     await challengeTab();
-    for (let i = 0; i < 3; i++) await b.evaluate(`document.querySelector('.hints .hint-button').click()`);
     await setCode("pawn.fly()\n");
     const offered = [];
     for (let i = 0; i < 3; i++) {
@@ -238,19 +236,20 @@ export default async function appChecks({ browser: b, base, root, check }) {
       offered.push(await offersSolution());
     }
     const needHint = await hasButton("Need a hint?", ".outcome-host");
+    const hintsOpen = await b.evaluate(`document.querySelectorAll('.hints .hint-list li').length`);
     expect(JSON.stringify(offered) === "[false,false,true]", `offered after runs 1-3: ${JSON.stringify(offered)}`);
-    expect(!needHint, "'Need a hint?' is still offered with every hint open");
+    expect(needHint && hintsOpen === 0, `'Need a hint?' beside it: ${needHint}; hints open: ${hintsOpen}`);
   });
 
   await check("M2: 'Show me a solution' asks first; 'Show it' opens the comparison and marks the level", async () => {
     await clickButton("Show me a solution…", ".outcome-host");
     const focused = await b.evaluate(`document.activeElement?.classList.contains('give-up-button') ?? false`);
     await b.evaluate(`document.querySelector('.give-up-button').click()`);
-    const asked = await b.evaluate(`!!document.querySelector('.hints .confirm-step')`);
-    await clickButton("Not yet", ".hints .confirm-step");
-    const cancelled = await b.evaluate(`!document.querySelector('.hints .confirm-step') && !!document.querySelector('.give-up-button') && !document.querySelector('.compare-dialog')`);
+    const asked = await b.evaluate(`!!document.querySelector('.solution-section .confirm-step')`);
+    await clickButton("Not yet", ".solution-section .confirm-step");
+    const cancelled = await b.evaluate(`!document.querySelector('.solution-section .confirm-step') && !!document.querySelector('.give-up-button') && !document.querySelector('.compare-dialog')`);
     await b.evaluate(`document.querySelector('.give-up-button').click()`);
-    await clickButton("Show it", ".hints .confirm-step");
+    await clickButton("Show it", ".solution-section .confirm-step");
     await b.waitFor(`!!document.querySelector('.compare-dialog .compare-idiomatic .cm-line')`, 10_000, "the comparison");
     const idiomatic = (await paneText("compare-idiomatic")) === solution("ch01-l01").trimEnd();
     await b.key("Escape");
@@ -265,7 +264,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(cards.tag === "Solution seen" && !cards.solved, `level card: ${JSON.stringify(cards)}`);
   });
 
-  await check("M2: solving it yourself afterwards counts, with two stars (the hints were open)", async () => {
+  await check("M2: solving it yourself afterwards counts, with two stars (the solution was seen)", async () => {
     await openLevel("ch01-l01");
     await setCode(solution("ch01-l01"));
     const r = await run();

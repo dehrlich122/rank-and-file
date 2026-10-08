@@ -698,7 +698,7 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/` });
     await b.waitFor(`document.querySelector('.title-scene .ts-hero')`, 30_000, "start menu");
     // the pawn tier cleared: Chapter 6's five core levels solved
-    const solved = Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`ch06-l0${n}`, { stars: 3, hints: 0, failedAfterHints: 0, helped: false, solutionSeen: false, code: null }]));
+    const solved = Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`ch06-l0${n}`, { stars: 3, hints: 0, failedRuns: 0, helped: false, solutionSeen: false, code: null }]));
     await b.evaluate(`localStorage.setItem("rank-and-file:progress", ${JSON.stringify(JSON.stringify(solved))}); true`);
     await b.send("Page.navigate", { url: `${base}?reload=${Date.now()}#/` });
     await b.waitFor(`document.querySelector('.title-scene .ts-hero')`, 30_000, "start menu again");
@@ -757,7 +757,7 @@ export default async function uiChecks({ browser: b, base, root, check }) {
   });
 
   // -- M3.7 pre-merge: the look, the chrome and the motion, end to end -----------------------------------
-  const solvedChapter6 = Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`ch06-l0${n}`, { stars: 3, hints: 0, failedAfterHints: 0, helped: false, solutionSeen: false, code: null }]));
+  const solvedChapter6 = Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`ch06-l0${n}`, { stars: 3, hints: 0, failedRuns: 0, helped: false, solutionSeen: false, code: null }]));
   const setStorage = (key, value) => b.evaluate(`localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(JSON.stringify(value))}); true`);
 
   await check("M3.7: the style guide shows the board, the sprites and a colour strip in both themes", async () => {

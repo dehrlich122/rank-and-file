@@ -895,7 +895,8 @@ pre {
   margin-top: 8px;
 }
 
-.hints p {
+.hints p,
+.solution-section .give-up-note {
   margin: 6px 0 0;
 }
 
