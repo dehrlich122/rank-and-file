@@ -8,7 +8,8 @@ import { drafts } from "../editor/drafts";
 import { addBoard, boardCount, boardName, commitBoard, removeBoard, viewOf, type BoardEdit } from "../editor/boards";
 import { clearBoard, enemyAt, erase, extendRoute, fill, moveEnemy, occupantOf, paint, placeEnemy, placeGoal, placeStart, resize, rotateStart, toggleSpot, type Edit } from "../editor/edit";
 import { History } from "../editor/history";
-import { draftToYaml } from "../editor/levelData";
+import { startSolve, type SolveRun } from "../editor/solve";
+import { draftToLevelData, draftToYaml } from "../editor/levelData";
 import { editorOptions } from "../editor/options";
 import type { Problem } from "../editor/problems";
 import type { PyClient } from "../py/client";
@@ -20,6 +21,7 @@ import { download, fileName } from "./download";
 import { h } from "./dom";
 import { renderProblems, renderProps, type Selection, type Tab } from "./editorProps";
 import { readAloud } from "./editorRules";
+import { renderSolve, type SolveState } from "./editorSolve";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite } from "./sprites";
 import { M, S } from "./sprites/floor";
 import { svg } from "./svg";
@@ -122,6 +124,8 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   let painting: { button: number; last: string } | null = null;
   let dragging: { what: "start" | "goal" | "enemy"; index: number } | null = null;
   let fromPanel = false; // the change came from a field in the properties panel: leave that panel alone
+  let solveState: SolveState = { kind: "idle" }; // the solvability check (M4.3)
+  let solveRun: SolveRun | null = null;
   let boardIndex = 0; // the board being edited, from 0 (M4.3): the draft's own board, or one of its `boards`
   const whole = () => history.current; // the level, every board: what is saved, checked and exported
   let view: { of: Draft; index: number; draft: Draft } | null = null;
@@ -171,6 +175,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     else renderMarks(); // only the problem rings can have changed
     renderToolbar();
     renderBoardRow();
+    refreshSolve();
     renderProblemsOnly(); // not the whole panel: a field being typed in keeps its focus
   });
 
@@ -232,6 +237,41 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     );
   }
 
+  // -- the solvability check ---------------------------------------------------------------------------------------
+
+  const refreshSolve = () => propsHost.querySelector(".solve-box")?.replaceWith(propsContext().solve());
+
+  function startCheck(): void {
+    if (!verdict?.level || verdict.revision !== revision) return;
+    solveRun?.cancel();
+    const about = revision;
+    solveState = { kind: "searching", progress: null };
+    refreshSolve();
+    solveRun = startSolve(client, draftToLevelData(whole()), {
+      progress: (progress) => {
+        solveState = { kind: "searching", progress };
+        refreshSolve();
+      },
+      done: (progress) => {
+        solveRun = null;
+        solveState = { kind: "done", revision: about, progress };
+        refreshSolve();
+      },
+      failed: (message) => {
+        solveRun = null;
+        solveState = { kind: "failed", message };
+        refreshSolve();
+      },
+    });
+  }
+
+  function cancelCheck(note?: string): void {
+    solveRun?.cancel();
+    solveRun = null;
+    solveState = { kind: "idle", note };
+    refreshSolve();
+  }
+
   function askToRemove(): void {
     const index = boardIndex;
     ask(`Remove ${boardName(index)}? You can undo it.`, "Yes, remove it", "Keep it", () => commitBoards(removeBoard(whole(), index)));
@@ -252,6 +292,8 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     renderBoardRow();
     if (fromPanel) renderProblemsOnly();
     else drawProps();
+    if (solveState.kind === "searching") cancelCheck("The level changed, so the search stopped.");
+    else refreshSolve(); // an answer for an older level says so
   }
 
   /** After a change (a smaller board, an undo) the cursor, rectangle and selection must still be on the board. */
@@ -505,6 +547,15 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
       fromPanel = false;
     },
     current: draft,
+    solve: () =>
+      renderSolve({
+        state: solveState,
+        revision,
+        canCheck: !!verdict?.level && verdict.revision === revision,
+        whyNot: verdict?.problem ? `Fix the problem first: ${verdict.problem.message}` : "Checking the level…",
+        start: startCheck,
+        cancel: () => cancelCheck(),
+      }),
     select,
     say,
     setTab: (next: Tab) => {
@@ -694,6 +745,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
 
   return () => {
     live = false;
+    solveRun?.cancel();
     checker.stop();
     document.removeEventListener("keydown", onKey);
     board?.dispose();

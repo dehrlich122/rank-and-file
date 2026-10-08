@@ -616,3 +616,7 @@
 .rules-section > details {
   justify-self: stretch;
 }
+
+.solve-results.stale {
+  opacity: 0.55;
+}

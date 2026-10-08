@@ -59,7 +59,7 @@ class RouteSearch:
     @property
     def positions(self) -> int:
         """How many positions it has reached so far."""
-        return len(self._best) if self.status != CLOCKS else 0
+        return min(len(self._best), self.max_states) if self.status != CLOCKS else 0
 
     def run(self, seconds: float | None = None) -> bool:
         """Search for up to `seconds` (no limit if None). True once it has an answer."""
@@ -100,6 +100,7 @@ class Search:
 
     def __init__(self, level: Level, max_states: int = MAX_STATES):
         self.cases: list[Case] = level.cases()
+        self._unit = "place" if level.goal_spots else "board"  # what a case is, for the words around the answer
         self._searches = [RouteSearch(case.level, max_states) for case in self.cases]
         self._current = 0
 
@@ -119,6 +120,7 @@ class Search:
             "done": self.done,
             "case": shown + 1,
             "cases": len(self.cases),
+            "unit": self._unit,
             "positions": self._searches[shown].positions,
             "results": [self._result(i) for i in range(self._current)],
         }

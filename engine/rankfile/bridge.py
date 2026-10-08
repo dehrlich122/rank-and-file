@@ -51,7 +51,7 @@ def solve_start(level_json: str) -> str:
 def solve_step(seconds: float = 0.15) -> str:
     """Work on the check for about `seconds`, then report how far it got (counts and words, never the route)."""
     if _search is None:
-        return json.dumps({"done": True, "case": 0, "cases": 0, "positions": 0, "results": []})
+        return json.dumps({"done": True, "case": 0, "cases": 0, "unit": "board", "positions": 0, "results": []})
     return json.dumps(_search.step(float(seconds)))
 
 

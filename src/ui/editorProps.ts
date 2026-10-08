@@ -25,6 +25,7 @@ export interface PropsContext {
   // field is one undo step (`burst`); `redraw` rebuilds the panel after a change that alters its fields.
   change(next: Draft | ((current: Draft) => Draft), burst?: string, redraw?: boolean): void;
   current(): Draft;
+  solve(): HTMLElement; // the solvability check's box (editorSolve.ts), kept up to date by the screen
   select(selection: Selection): void;
   say(text: string): void;
   setTab(tab: Tab): void;
@@ -48,7 +49,7 @@ export function renderProps(ctx: PropsContext): HTMLElement {
     ),
   );
   const body = { level: levelFields, rules: rulesFields, hints: hintsFields, square: squareFields, enemy: enemyFields }[ctx.tab](ctx);
-  return h("div", { class: "props" }, tabs, h("div", { class: "props-scroll", role: "tabpanel" }, body, renderProblems(ctx)));
+  return h("div", { class: "props" }, tabs, h("div", { class: "props-scroll", role: "tabpanel" }, body, renderProblems(ctx), ctx.solve()));
 }
 
 // -- the Level tab ----------------------------------------------------------------------------------------------

@@ -119,10 +119,11 @@ export interface EditorOptions {
 type SolveStatus = "route" | "no_route" | "gave_up" | "clocks";
 
 /** Where the check has got to. Counts and words only: the route is never sent (engine/rankfile/search.py). */
-interface SolveProgress {
+export interface SolveProgress {
   done: boolean;
   case: number; // the board (or hidden-goal place) it is on, from 1
   cases: number;
+  unit: "board" | "place"; // what a case is: another board, or another square the hidden goal might be on
   positions: number; // positions reached on that board so far
   results: Array<{ label: string; where: string; status: SolveStatus; lines: number | null; positions: number }>; // the boards finished
 }

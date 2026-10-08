@@ -46,6 +46,7 @@ def test_a_small_cap_gives_up_on_a_board_that_has_a_route():
     search = RouteSearch(made(), max_states=3)
     search.run()
     assert search.status == GAVE_UP and search.actions == []
+    assert search.positions == 3  # it never says it looked at more than its limit
 
 
 def test_obstacles_that_tick_with_the_code_cannot_be_judged():
@@ -71,7 +72,7 @@ def test_each_hidden_goal_square_and_each_board_is_its_own_case():
 
 def test_what_a_step_reports_is_counts_and_words_never_a_route():
     result = finish(Search(made(map="? . ?\n. . .\nP . .\n")))
-    assert result["cases"] == 2 and len(result["results"]) == 2
+    assert result["cases"] == 2 and result["unit"] == "place" and len(result["results"]) == 2
     assert set(result["results"][0]) == {"label", "where", "status", "lines", "positions"}
     assert "actions" not in json.dumps(result) and "move" not in json.dumps(result)
 
