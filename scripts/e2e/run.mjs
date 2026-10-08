@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import appChecks from "./app.check.mjs";
 import { launch } from "./cdp.mjs";
+import editorChecks from "./editor.check.mjs";
 import harnessChecks from "./harness.check.mjs";
 import uiChecks from "./ui.check.mjs";
 import { createSuite } from "./suite.mjs";
@@ -21,7 +22,7 @@ const base = (args.find((arg) => /^https?:\/\//.test(arg)) ?? "http://localhost:
 const only = args.find((arg) => arg.startsWith("--only="))?.slice("--only=".length);
 const outDir = join(root, "e2e-results");
 
-const suites = { harness: harnessChecks, app: appChecks, ui: uiChecks };
+const suites = { harness: harnessChecks, app: appChecks, ui: uiChecks, editor: editorChecks };
 
 try {
   await fetch(base);

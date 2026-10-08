@@ -30,7 +30,7 @@ export interface Chapter {
 
 // YAML 1.1 matches PyYAML, which the level checker uses, so both sides read
 // every level file the same way.
-const parseYaml = (text: string): unknown => parse(text, { version: "1.1" });
+export const parseYaml = (text: string): unknown => parse(text, { version: "1.1" });
 
 function loadLevels(): LevelSource[] {
   return Object.entries(levelFiles)

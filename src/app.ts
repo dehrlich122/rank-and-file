@@ -5,9 +5,14 @@
 //   #/lessons[/<n>]    the Lessons directory, with chapter n open
 //   #/promotion/<tier> the promotion ceremony (M3.7)
 //   #/level/<id>       a level
+//   #/editor           My levels: the levels made in the editor (M4.2)
+//   #/editor/<id>      the level editor
+//   #/editor/<id>/play test-play: the level opened in the real level screen
 //   #/harness          the raw Python harness from Milestone 0
 //   #/styleguide       the look at every size, in both themes (M3.7)
 import { chapterName, chapters, findLevel } from "./content";
+import { drafts } from "./editor/drafts";
+import { testPlaySource } from "./editor/starts";
 import { mountHarness } from "./harness";
 import { unlockedPieces } from "./promotion";
 import { progress } from "./progress";
@@ -16,6 +21,8 @@ import { applyToDocument, settings } from "./settings";
 import { sound } from "./sound";
 import { h } from "./ui/dom";
 import { icon } from "./ui/icons";
+import { mountEditor } from "./ui/editorScreen";
+import { mountEditorList } from "./ui/editorList";
 import { mountLessons } from "./ui/lessonsMenu";
 import { mountLevel, type LevelContext } from "./ui/levelView";
 import { mountPromotion } from "./ui/promotionScreen";
@@ -116,6 +123,25 @@ export function startApp(root: HTMLElement): void {
       );
       unmount = mountLevel(main, context, source);
       document.title = `${source.title} · Rank & File`;
+    } else if (hash === "#/editor") {
+      crumbs.replaceChildren(h("span", {}, "My levels"));
+      unmount = mountEditorList(main, client);
+      focusHeading();
+      document.title = "My levels · Rank & File";
+    } else if (/^#\/editor\/[\w-]+\/play$/.test(hash)) {
+      const id = hash.split("/")[2]!;
+      const draft = drafts.load(id);
+      if (!draft) return void (location.hash = "#/editor");
+      crumbs.replaceChildren(h("a", { href: "#/editor" }, "My levels"), h("span", { class: "crumb-sep" }, "/"), h("a", { href: `#/editor/${id}` }, draft.title), h("span", { class: "crumb-sep" }, "/"), h("span", {}, "Test-play"));
+      unmount = mountLevel(main, context, testPlaySource(draft), { testPlay: { back: `#/editor/${id}` } });
+      document.title = `${draft.title} · Test-play · Rank & File`;
+    } else if (/^#\/editor\/[\w-]+$/.test(hash)) {
+      const name = h("span", {}, "Editing");
+      crumbs.replaceChildren(h("a", { href: "#/editor" }, "My levels"), h("span", { class: "crumb-sep" }, "/"), name);
+      unmount = mountEditor(main, client, hash.slice("#/editor/".length), (title) => {
+        name.textContent = title;
+        document.title = `${title} · Editor · Rank & File`;
+      });
     } else if (hash === "#/harness") {
       crumbs.replaceChildren(h("span", {}, "Python harness"));
       unmount = mountHarness(main, client);
@@ -138,7 +164,7 @@ export function startApp(root: HTMLElement): void {
       document.title = "Promotion · Rank & File";
     } else {
       crumbs.replaceChildren();
-      unmount = mountTitle(main, { lessons: () => (location.hash = "#/lessons"), settings: () => dialog.open() });
+      unmount = mountTitle(main, { lessons: () => (location.hash = "#/lessons"), editor: () => (location.hash = "#/editor"), settings: () => dialog.open() });
       document.title = "Rank & File";
     }
     // every screen eases in (the CSS skips it with reduced motion)

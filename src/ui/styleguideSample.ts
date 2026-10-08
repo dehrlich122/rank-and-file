@@ -1,6 +1,7 @@
 // The sample level of the style guide (#/styleguide, src/ui/styleguide.ts): one board that holds
 // every Pawn-tier tile, every enemy kind, a patrol's route, and the squares a rook and a bishop attack.
 // It is a hand-built LevelInfo, so the real BoardView draws it.
+import { NO_RULES } from "../editor/draft";
 import type { Enemy, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
 
 // Top rank first. . floor  # wall  s sign  g guarded gate  t timed gate  o pit
@@ -107,18 +108,8 @@ export const LEVEL = {
   ],
   case_title: "",
   start: START,
-  objectives: { reach_goal: true, say: [], waypoints: false, collect: null, capture: null },
   api: [],
-  constraints: { max_lines: null, min_comments: 0, require_nodes: [], ban_nodes: [], max_numbers: null },
-  par: { lines: null },
-  starter: "",
-  goals: [],
-  rules: [],
-  obstacles: [],
-  stars: [],
-  hints: [],
-  mastery: false,
-  boards: [],
+  ...NO_RULES,
 } satisfies LevelInfo;
 
 /** The states the buttons jump to. Each starts from START. */

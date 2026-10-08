@@ -3,6 +3,7 @@ import "@fontsource/orbitron/700.css";
 import "@fontsource/orbitron/900.css";
 import "./styles.css";
 import "./chrome.css";
+import "./editor.css";
 import { startApp } from "./app";
 
 startApp(document.querySelector<HTMLElement>("#app")!);

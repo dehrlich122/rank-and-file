@@ -11,6 +11,7 @@ import json
 from . import runner
 from .codex import entries as codex_entries
 from .levels import LevelError, parse_level, sandbox_level
+from .levels import editor_options as level_editor_options
 from .repl import Repl
 
 _repl = Repl()
@@ -25,8 +26,13 @@ def load_level(level_json: str) -> str:
     try:
         level = parse_level(json.loads(level_json))
     except LevelError as exc:
-        return json.dumps({"ok": False, "error": str(exc)})
+        return json.dumps({"ok": False, "error": str(exc), "at": exc.at})
     return json.dumps({"ok": True, "level": level.describe()})
+
+
+def editor_options() -> str:
+    """What the level editor offers (levels.editor_options)."""
+    return json.dumps(level_editor_options())
 
 
 def run_level(level_json: str, code: str, hints_used: int = 0, solution_seen: bool = False) -> str:
