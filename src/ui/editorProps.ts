@@ -4,11 +4,13 @@
 import { copyKeys, DETAIL_KEYS, PLAIN_ENEMY_KEYS, squareName, words, type Cell, type Draft, type DraftEnemy } from "../editor/draft";
 import { removeCorner, removeEnemy, withCell, withEnemy, type Edit } from "../editor/edit";
 import type { Problem } from "../editor/problems";
-import type { Clock, EditorOptions, Pos } from "../py/protocol";
+import type { Clock, EditorOptions, LevelInfo, Pos } from "../py/protocol";
 import { h } from "./dom";
+import { hintsFields, rulesFields } from "./editorRules";
+import { check, field, numberInput, select, textArea, textInput } from "./editorFields";
 
 export type Selection = { kind: "square"; pos: Pos } | { kind: "enemy"; index: number } | null;
-export type Tab = "level" | "square" | "enemy";
+export type Tab = "level" | "rules" | "hints" | "square" | "enemy";
 
 export interface PropsContext {
   draft: Draft;
@@ -17,7 +19,12 @@ export interface PropsContext {
   tab: Tab;
   problem: Problem | null;
   checking: boolean; // the problem shown is for an older draft
-  change(next: Draft, burst?: string): void; // a change made in the panel: typing in a field is one undo step
+  info: LevelInfo | null; // the engine's description of this very draft, when it accepts it: what the player will read
+  // A change made in the panel, as the draft it makes or an update of the draft *as it is now* (a field's closure holds
+  // the draft the panel was drawn from, which an earlier change in another field has already moved on from). Typing in a
+  // field is one undo step (`burst`); `redraw` rebuilds the panel after a change that alters its fields.
+  change(next: Draft | ((current: Draft) => Draft), burst?: string, redraw?: boolean): void;
+  current(): Draft;
   select(selection: Selection): void;
   say(text: string): void;
   setTab(tab: Tab): void;
@@ -26,6 +33,8 @@ export interface PropsContext {
 
 const TABS: Array<[Tab, string]> = [
   ["level", "Level"],
+  ["rules", "Rules"],
+  ["hints", "Hints"],
   ["square", "Square"],
   ["enemy", "Enemy"],
 ];
@@ -38,43 +47,8 @@ export function renderProps(ctx: PropsContext): HTMLElement {
       h("button", { class: `tab${ctx.tab === id ? " active" : ""}`, role: "tab", "aria-selected": String(ctx.tab === id), onClick: () => ctx.setTab(id) }, label),
     ),
   );
-  const body = ctx.tab === "level" ? levelFields(ctx) : ctx.tab === "square" ? squareFields(ctx) : enemyFields(ctx);
+  const body = { level: levelFields, rules: rulesFields, hints: hintsFields, square: squareFields, enemy: enemyFields }[ctx.tab](ctx);
   return h("div", { class: "props" }, tabs, h("div", { class: "props-scroll", role: "tabpanel" }, body, renderProblems(ctx)));
-}
-
-// -- fields -------------------------------------------------------------------------------------------------
-
-const field = (label: string, control: HTMLElement, note?: string, name?: string) =>
-  h("label", { class: "field", "data-field": name }, h("span", { class: "field-label" }, label), control, note ? h("span", { class: "muted small" }, note) : null);
-
-function textInput(value: string, on: (value: string) => void, attrs: Record<string, string> = {}): HTMLInputElement {
-  const input = h("input", { type: "text", value, ...attrs });
-  input.addEventListener("input", () => on(input.value));
-  return input;
-}
-
-function textArea(value: string, rows: number, on: (value: string) => void): HTMLTextAreaElement {
-  const area = h("textarea", { rows: String(rows) }, value);
-  area.addEventListener("input", () => on(area.value));
-  return area;
-}
-
-function numberInput(value: number | undefined, min: number, on: (value: number | undefined) => void): HTMLInputElement {
-  const input = h("input", { type: "number", min: String(min), value: value === undefined ? "" : String(value) });
-  input.addEventListener("input", () => on(input.value === "" ? undefined : Number(input.value)));
-  return input;
-}
-
-function select(value: string, choices: string[], on: (value: string) => void): HTMLSelectElement {
-  const box = h("select", {}, ...choices.map((choice) => h("option", { value: choice, selected: choice === value }, choice)));
-  box.addEventListener("change", () => on(box.value));
-  return box;
-}
-
-function check(label: Node | string, on: boolean, change: (on: boolean) => void): HTMLElement {
-  const input = h("input", { type: "checkbox", checked: on });
-  input.addEventListener("change", () => change(input.checked));
-  return h("label", { class: "check" }, input, label);
 }
 
 // -- the Level tab ----------------------------------------------------------------------------------------------
@@ -85,9 +59,9 @@ function levelFields(ctx: PropsContext): HTMLElement {
   return h(
     "div",
     { class: "props-body" },
-    field("Title", textInput(draft.title, (title) => ctx.change({ ...draft, title }, "title")), undefined, "title"),
-    field("Brief", textArea(draft.brief, 3, (brief) => ctx.change({ ...draft, brief }, "brief")), "What the player is asked to do.", "brief"),
-    field("What it trains", textInput(draft.trains, (trains) => ctx.change({ ...draft, trains }, "trains")), "A few words, shown above the challenge.", "trains"),
+    field("Title", textInput(draft.title, (title) => ctx.change((d) => ({ ...d, title }), "title")), undefined, "title"),
+    field("Brief", textArea(draft.brief, 3, (brief) => ctx.change((d) => ({ ...d, brief }), "brief")), "What the player is asked to do.", "brief"),
+    field("What it trains", textInput(draft.trains, (trains) => ctx.change((d) => ({ ...d, trains }), "trains")), "A few words, shown above the challenge.", "trains"),
     h(
       "fieldset",
       { class: "field", "data-field": "api" },
@@ -96,15 +70,15 @@ function levelFields(ctx: PropsContext): HTMLElement {
         "div",
         { class: "checks" },
         ...abilities.map((name) =>
-          check(h("code", {}, name), draft.api.includes(name), (on) => ctx.change({ ...draft, api: abilities.filter((a) => (a === name ? on : draft.api.includes(a))) })),
+          check(h("code", {}, name), draft.api.includes(name), (on) => ctx.change((d) => ({ ...d, api: abilities.filter((a) => (a === name ? on : d.api.includes(a))) }))),
         ),
       ),
     ),
     h(
       "div",
       { class: "field-row" },
-      field("Starts facing", select(draft.facing, options.facings, (facing) => ctx.change({ ...draft, facing: facing as Draft["facing"] })), undefined, "start"),
-      field("Planks to start with", numberInput(draft.planks, 0, (planks) => ctx.change({ ...draft, planks: planks ?? 0 }, "planks"))),
+      field("Starts facing", select(draft.facing, options.facings, (facing) => ctx.change((d) => ({ ...d, facing: facing as Draft["facing"] }))), undefined, "start"),
+      field("Planks to start with", numberInput(draft.planks, 0, (planks) => ctx.change((d) => ({ ...d, planks: planks ?? 0 }), "planks"))),
     ),
   );
 }
@@ -132,10 +106,13 @@ function squareFields(ctx: PropsContext): HTMLElement {
   const rule = options.tiles[cell.tile] ?? { needs: [], may: [] };
   const keys = [...rule.needs, ...rule.may].sort((a, b) => DETAIL_KEYS.indexOf(a as (typeof DETAIL_KEYS)[number]) - DETAIL_KEYS.indexOf(b as (typeof DETAIL_KEYS)[number]));
   const set = (key: keyof Cell, value: string | number | undefined, burst?: string) => {
-    const next: Cell = { ...cell };
-    if (value === undefined || (value === "" && rule.may.includes(key))) delete next[key];
-    else (next as unknown as Record<string, unknown>)[key] = value;
-    ctx.change(withCell(draft, selection.pos, next), burst ?? `square:${squareName(selection.pos)}:${key}`);
+    const edited = (old: Cell): Cell => {
+      const next: Cell = { ...old };
+      if (value === undefined || (value === "" && rule.may.includes(key))) delete next[key];
+      else (next as unknown as Record<string, unknown>)[key] = value;
+      return next;
+    };
+    ctx.change((d) => withCell(d, selection.pos, edited(d.cells[y]?.[x] ?? cell)), burst ?? `square:${squareName(selection.pos)}:${key}`);
   };
   const controls = keys.map((key) => {
     const label = DETAIL_LABELS[cell.tile]?.[key] ?? key;
@@ -162,8 +139,9 @@ function enemyFields(ctx: PropsContext): HTMLElement {
   const enemy = draft.enemies[index];
   if (!enemy) return h("div", { class: "props-body" }, h("p", { class: "muted" }, "Choose the Select tool and click an enemy to change it, or pick an enemy from the palette and click a square to add one."));
   const keys = options.enemies[enemy.kind] ?? [];
-  const update = (next: DraftEnemy, burst?: string) => ctx.change(withEnemy(draft, index, next), burst);
-  const flag = (key: "loop" | "armoured", label: string) => (keys.includes(key) ? check(label, enemy[key] === true, (on) => update(withoutKey(enemy, key, on ? true : undefined))) : null);
+  const update = (change: (enemy: DraftEnemy) => DraftEnemy, burst?: string, redraw?: boolean) =>
+    ctx.change((d) => (d.enemies[index] ? withEnemy(d, index, change(d.enemies[index]!)) : d), burst, redraw);
+  const flag = (key: "loop" | "armoured", label: string) => (keys.includes(key) ? check(label, enemy[key] === true, (on) => update((e) => withoutKey(e, key, on ? true : undefined))) : null);
   const route = enemy.route ?? [];
   return h(
     "div",
@@ -172,8 +150,8 @@ function enemyFields(ctx: PropsContext): HTMLElement {
     h(
       "div",
       { class: "field-row" },
-      field("Kind", select(enemy.kind, Object.keys(options.enemies), (kind) => update(changeKind(enemy, kind as DraftEnemy["kind"], options)))),
-      keys.includes("clock") ? field("Ticks with", select(enemy.clock ?? "action", options.clocks, (clock) => update({ ...enemy, clock: clock as Clock }))) : null,
+      field("Kind", select(enemy.kind, Object.keys(options.enemies), (kind) => update((e) => changeKind(e, kind as DraftEnemy["kind"], options), undefined, true))),
+      keys.includes("clock") ? field("Ticks with", select(enemy.clock ?? "action", options.clocks, (clock) => update((e) => ({ ...e, clock: clock as Clock })))) : null,
     ),
     h("div", { class: "checks" }, flag("loop", "Loops round"), flag("armoured", "Armoured (can't be captured)")),
     keys.includes("route")
@@ -190,7 +168,7 @@ function enemyFields(ctx: PropsContext): HTMLElement {
                     "li",
                     {},
                     h("code", {}, squareName(corner)),
-                    i === 0 ? " start" : h("button", { class: "btn btn-small", "aria-label": `Remove the corner on ${squareName(corner)}`, onClick: () => applyEdit(ctx, removeCorner(draft, index, i)) }, "×"),
+                    i === 0 ? " start" : h("button", { class: "btn btn-small", "aria-label": `Remove the corner on ${squareName(corner)}`, onClick: () => applyEdit(ctx, (d) => removeCorner(d, index, i)) }, "×"),
                   ),
                 ),
               )
@@ -198,13 +176,14 @@ function enemyFields(ctx: PropsContext): HTMLElement {
           h("p", { class: "muted small" }, "Pick the Route tool and click squares to add corners. A route runs straight along a rank or file."),
         )
       : null,
-    h("button", { class: "btn btn-small btn-danger", onClick: () => applyEdit(ctx, removeEnemy(draft, index), { kind: "square", pos: enemy.start }) }, "Remove this enemy"),
+    h("button", { class: "btn btn-small btn-danger", onClick: () => applyEdit(ctx, (d) => removeEnemy(d, index), { kind: "square", pos: enemy.start }) }, "Remove this enemy"),
   );
 }
 
-function applyEdit(ctx: PropsContext, edit: Edit, then?: Selection): void {
+function applyEdit(ctx: PropsContext, make: (current: Draft) => Edit, then?: Selection): void {
+  const edit = make(ctx.current());
   if ("refused" in edit) return ctx.say(edit.refused);
-  ctx.change(edit.draft);
+  ctx.change(edit.draft, undefined, true);
   ctx.say(edit.note);
   if (then) ctx.select(then);
 }

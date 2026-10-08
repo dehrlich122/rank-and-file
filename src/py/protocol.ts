@@ -109,6 +109,9 @@ export interface EditorOptions {
   clocks: Clock[];
   facings: Facing[];
   timed_gate: { open: number; clock: Clock }; // a timed gate's defaults
+  constructs: Array<{ node: string; label: string }>; // what a level may require or ban: an `ast` node's name and how to say it (M4.3)
+  limits: Record<string, number>; // how long each text may be, and how many hints and enemies (LIMITS)
+  max_boards: number; // a level and its other boards
 }
 
 /** How the solvability check (M4.3) got on with one board: a route of plain calls, none, a cap reached, or clockwork it can't judge. */

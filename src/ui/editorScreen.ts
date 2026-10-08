@@ -18,10 +18,14 @@ import { confirmStep } from "./dialog";
 import { download, fileName } from "./download";
 import { h } from "./dom";
 import { renderProblems, renderProps, type Selection, type Tab } from "./editorProps";
+import { readAloud } from "./editorRules";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite } from "./sprites";
 import { M, S } from "./sprites/floor";
 import { svg } from "./svg";
 import { wornPiece } from "../promotion";
+
+/** The tab a problem with a field of the level belongs on: the rules and the hints have tabs of their own. */
+const TAB_OF_FIELD: Record<string, Tab> = { objectives: "rules", constraints: "rules", par: "rules", starter: "rules", hints: "hints" };
 
 // -- tools ----------------------------------------------------------------------------------------------------------
 
@@ -430,11 +434,13 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     tab,
     problem: verdict?.problem ?? null,
     checking: !!verdict && verdict.revision !== revision,
-    change: (next: Draft, burst?: string) => {
-      fromPanel = true;
-      commit(next, undefined, burst);
+    info: verdict?.level && verdict.revision === revision ? verdict.level : null,
+    change: (next: Draft | ((current: Draft) => Draft), burst?: string, redraw = false) => {
+      fromPanel = !redraw;
+      commit(typeof next === "function" ? next(draft()) : next, undefined, burst);
       fromPanel = false;
     },
+    current: draft,
     select,
     say,
     setTab: (next: Tab) => {
@@ -452,7 +458,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
         select(problem.enemy !== null && draft().enemies[problem.enemy] ? { kind: "enemy", index: problem.enemy } : { kind: "square", pos });
         host.focus();
       } else {
-        tab = "level";
+        tab = TAB_OF_FIELD[problem.field ?? ""] ?? "level";
         drawProps();
         propsHost.querySelector<HTMLElement>(`[data-field="${problem.field ?? ""}"] :is(input, textarea, select)`)?.focus();
       }
@@ -463,9 +469,11 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     if (options) propsHost.replaceChildren(renderProps(propsContext()));
   }
 
-  /** Only the problems list: what a verdict or a change made in a field can alter, so the field keeps its focus. */
+  /** Only the problems list and what the player will read: what a verdict or a change made in a field can alter, so the field keeps its focus. */
   function renderProblemsOnly(): void {
-    if (options) propsHost.querySelector(".ed-problems")?.replaceWith(renderProblems(propsContext()));
+    if (!options) return;
+    propsHost.querySelector(".ed-problems")?.replaceWith(renderProblems(propsContext()));
+    propsHost.querySelector(".rules-read")?.replaceWith(readAloud(propsContext()));
   }
 
   // -- the mouse ---------------------------------------------------------------------------------------------------

@@ -1699,6 +1699,26 @@ The designer retested the Testing-ground hint fixes and answered the questions l
 
 ---
 
+## Session 15 — 2026-10-08 · M4.3 (`m4-3-editor-rules`)
+
+Found while building the Rules and Hints tabs, not by the designer.
+
+- **QA-043 · Editing a second field in the editor's properties dropped the first field's change** *(found 2026-10-08, M4.2's code)* · Fixed
+  - **Observed:** in the Level tab, type a title, then click into Brief and type: the saved level has the brief and the old
+    title. The same for planks, facing and abilities, a square's details (a sign's words, then a gate's question) and an
+    enemy's settings. Reproduced on `main` before the fix.
+  - **Cause:** a field changed the draft through the draft the panel was drawn from. The panel isn't redrawn while you type
+    (so the cursor stays put), so a second field still held the draft from before the first change.
+  - **Fixed** in M4.3 step 2: `ctx.change` takes an update of the draft *as it is now*, and every field uses it. The buttons
+    that change which fields exist (remove a corner, remove an enemy, change an enemy's kind) rebuild the panel, which
+    they didn't before, so a removed route corner is gone from its list at once.
+  - **Retest:**
+    1. Level tab: type a title, then a brief, then "what it trains". Leave and reopen the level: all three are there.
+    2. Place a gate: type a passphrase, then a question; both are kept. Same with a patrol's clock, then "Loops round".
+    3. Remove a route corner with its × button: it leaves the list immediately.
+
+---
+
 ## Queued work
 
 Planned tasks that aren't QA findings, in the order they should happen.

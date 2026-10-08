@@ -7,6 +7,7 @@ import type { LevelInfo, LevelResult } from "../py/protocol";
 import { BoardView, squareName } from "./board";
 import { ChipTooltip, codexHover, renderCodex, type CodexLookup, type CodexView } from "./codex";
 import { h } from "./dom";
+import type { SolutionSource } from "./compare";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
 import { masteryTag } from "./lessonsMenu";
@@ -17,7 +18,7 @@ import { icon, type IconName } from "./icons";
 import { Player, buildFrames, consoleAt, controlStates } from "./playback";
 import type { ReplPanel } from "./repl";
 import type { SettingsDialog } from "./settingsDialog";
-import { progress } from "../progress";
+import { progress as curriculumProgress, ProgressStore } from "../progress";
 import { tierCleared } from "../promotion";
 import { SPEEDS, motionReduced, settings } from "../settings";
 import { sound } from "../sound";
@@ -35,9 +36,16 @@ const AUTOPLAY_LIMIT = 150; // longer runs open at the end instead of playing
 /** ✓ or ✗: how one case of a run ended. */
 const verdict = (c: LevelResult) => (c.status === "solved" ? "✓" : "✗");
 
-/** How a level is opened. Test-play (M4.2) is a level from the editor: no lesson, hints or solution, no progress, and a way back. */
+/**
+ * How a level is opened. Test-play (M4.2) is a level from the editor: no lesson, nothing saved, and a way back. It plays
+ * as a player would see the level (its hints, its stars, the offer of a solution once one is kept), with a progress
+ * store of its own that is gone when the screen is. `progress` and `solution` say where another kind of level (M4.3's
+ * shared levels) keeps its progress and finds its solution; left out, they are the curriculum's.
+ */
 export interface LevelOptions {
   testPlay?: { back: string };
+  progress?: ProgressStore;
+  solution?: SolutionSource | null;
 }
 
 const testCodes = new Map<string, string>(); // the code typed in a test-play, kept for the session only
@@ -45,6 +53,7 @@ const testCodes = new Map<string, string>(); // the code typed in a test-play, k
 export function mountLevel(root: HTMLElement, context: LevelContext, source: LevelSource, options: LevelOptions = {}): () => void {
   const { client } = context;
   const testPlay = options.testPlay;
+  const store = options.progress ?? (testPlay ? new ProgressStore(null) : curriculumProgress);
   let level: LevelInfo | null = null;
   let board: BoardView | null = null;
   let caseBoard: BoardView | null = null; // the board of the case being replayed (M2), shown instead
@@ -264,11 +273,11 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const editor: EditorView = createEditor({
     parent: editorHost,
     extensions: [...callCompletion({ known, piece: () => level?.piece ?? null, api: () => level?.api ?? [] }), codexHover(() => codex)],
-    code: (testPlay ? testCodes.get(source.id) : progress.level(source.id).code) ?? String(source.data.starter ?? ""),
+    code: (testPlay ? testCodes.get(source.id) : store.level(source.id).code) ?? String(source.data.starter ?? ""),
     onRun: () => void run(),
     onChange: (code) => {
       if (testPlay) testCodes.set(source.id, code);
-      else progress.update(source.id, { code });
+      else store.update(source.id, { code });
       if (player && code !== recordedCode) dropRecording();
     },
     placeholder: `Write your code here, then press Run.\nYour pawn is called ${String(source.data.piece ?? "pawn")}.`,
@@ -289,8 +298,9 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       board = new BoardView(level);
       if (level.boards.length) showBoards(0, null); // with its other boards beside it (QA-032)
       else boardHost.replaceChildren(board.element);
-      if (!testPlay) help = new HelpPanel(source.id, level.hints, () => getCode(editor));
-      challengePanel.replaceChildren(...describeChallenge(level, openCodexEntry, chipTooltip, () => codex, !testPlay), ...(help ? [help.element] : []));
+      // a level from the editor offers a solution only once its author has kept one
+      help = new HelpPanel(source.id, level.hints, () => getCode(editor), { store, solution: testPlay ? (options.solution ?? null) : options.solution });
+      challengePanel.replaceChildren(...describeChallenge(level, openCodexEntry, chipTooltip, () => codex), help.element);
       updateControls();
       // Scratch Python gets a stand-in for this level's piece, and its tooltips follow this level's Codex.
       context.repl.setLevel({ piece: level.piece, api: level.api, codex: () => codex });
@@ -328,7 +338,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     running = true;
     updateControls();
     try {
-      const { hints: hintsUsed, solutionSeen } = testPlay ? { hints: 0, solutionSeen: false } : progress.level(source.id);
+      const { hints: hintsUsed, solutionSeen } = store.level(source.id);
       const result = await client.call("runLevel", { level: source.data, code: recordedCode, hintsUsed, solutionSeen });
       runResult = result;
       help?.recordRun(result); // once per run, here rather than in playback, which can reach the end many times
@@ -406,7 +416,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     // The verdict and what's on offer follow the run as a whole; the details
     // come from the recording on show (the run, or one of its cases).
     const whole = runResult ?? result;
-    const run = testPlay ? { ...whole, stars: [] } : whole; // a level from the editor has no stars to earn
+    const run = whole;
     // the outcome sounds once playback has played its way here: not on a jump to the end (afterMs is 0)
     if (afterMs > 0) for (const { sound: name, after } of outcomeSounds(run)) sound.play(name, afterMs / 1000 + after);
     const actions: HTMLElement[] = [];
@@ -423,7 +433,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       window.setTimeout(() => shownBoard()?.setCelebrating(true), afterMs);
       // clearing a tier's last core level earns its promotion: the ceremony follows the celebration, once
       const tier = chapters.find((c) => c.chapter === source.chapter)?.tier;
-      if (tier && !source.mastery && tierCleared(tier) && !progress.hasSeen("promotion", tier)) {
+      if (!testPlay && tier && !source.mastery && tierCleared(tier) && !curriculumProgress.hasSeen("promotion", tier)) {
         if (motionReduced()) {
           // no automatic jump without motion: offer it instead
           actions.push(h("a", { class: "btn btn-small", href: `#/promotion/${tier}` }, "Promotion earned: watch it"));
@@ -567,10 +577,10 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   };
 }
 
-function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, tooltip: ChipTooltip, codex: () => CodexLookup | null, withStars: boolean): HTMLElement[] {
+function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, tooltip: ChipTooltip, codex: () => CodexLookup | null): HTMLElement[] {
   const parts: HTMLElement[] = [
     h("h2", { class: "challenge-title" }, level.title),
-    h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), level.trains),
+    ...(level.trains ? [h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), level.trains)] : []), // a level from the editor may not say
   ];
   if (level.mastery) {
     parts.push(
@@ -590,7 +600,7 @@ function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, 
   }
   if (level.obstacles.length) parts.push(h("h3", {}, "Obstacles"), list("obstacles", level.obstacles));
   if (level.rules.length) parts.push(h("h3", {}, "Rules"), list("rules", level.rules));
-  if (withStars) parts.push(h("h3", {}, "Stars"), list("star-goals", level.stars));
+  parts.push(h("h3", {}, "Stars"), list("star-goals", level.stars));
 
   // Each ability is a way into the Codex: hover for its entry, click to open it there.
   const chip = (name: string) => {
