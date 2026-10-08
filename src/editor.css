@@ -1,0 +1,369 @@
+/* The level editor (M4.2): the screen, the palette, the marks over the board, the properties and My levels.
+   Layout: docs/M4/M4.2.md, "Take A" (design/editor.html). Every colour is a token from styles.css. */
+
+.level-editor,
+.editor-list,
+.editor-missing {
+  --side-col: clamp(340px, 29vw, 440px); /* the same columns as a level, so the board sits where it does there */
+  padding: 12px;
+}
+
+.level-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.editor-list,
+.editor-missing {
+  max-width: 760px;
+  margin: 0 auto;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.grow {
+  flex: 1;
+}
+
+.ed-toolbar .ed-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+}
+
+.ed-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ed-size input {
+  width: 4.5em;
+}
+
+.ed-confirm:empty {
+  display: none;
+}
+
+.ed {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+}
+
+.ed-a {
+  grid-template-columns: var(--side-col) minmax(0, 1fr) var(--side-col);
+}
+
+@media (max-width: 1100px) {
+  .ed-a {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ed-left,
+.ed-right {
+  padding: 12px;
+}
+
+.ed-middle {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* -- palette ------------------------------------------------------------------------------------------ */
+
+.pal-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.pal-group + .pal-group {
+  margin-top: 12px;
+}
+
+.pal-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.tool {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  font: inherit;
+  color: var(--text);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+}
+
+.tool:hover {
+  border-color: var(--accent);
+}
+
+.tool.active {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.tool kbd {
+  font: 12px var(--font-code);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  padding: 0 5px;
+}
+
+.pal-art {
+  display: block;
+  width: 36px;
+  height: 36px;
+}
+
+.pal-sprite {
+  width: 36px;
+  height: 36px;
+  overflow: visible;
+}
+
+.pal-glyph {
+  font: 700 38px var(--font-code);
+  fill: var(--accent);
+}
+
+/* -- the board and what the editor draws over it ----------------------------------------------------------- */
+
+.ed-board {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  min-height: 200px;
+  outline-offset: 3px;
+}
+
+.ed-board .board {
+  width: 100%;
+  height: auto;
+  max-height: var(--board-max-height, 62vh);
+  touch-action: none;
+}
+
+.ed-cursor {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+}
+
+.ed-selected {
+  fill: var(--selection);
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.ed-brackets {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 5;
+}
+
+.ed-rectangle {
+  fill: var(--selection);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 8 4;
+}
+
+.ed-problem {
+  fill: none;
+  stroke: var(--hot);
+  stroke-width: 3;
+}
+
+.ed-badge {
+  fill: var(--hot);
+}
+
+.ed-badge-mark {
+  fill: #fff;
+  font: 700 14px var(--font-ui);
+}
+
+.ed-status {
+  margin: 0;
+  font: 14px var(--font-code);
+  min-height: 2.8em;
+}
+
+.ed-note {
+  color: var(--muted);
+  font-family: var(--font-ui);
+}
+
+.ed-keys {
+  margin: 0;
+}
+
+/* -- properties --------------------------------------------------------------------------------------- */
+
+.ed-right {
+  padding: 0;
+}
+
+.props-scroll {
+  padding: 8px 14px 14px;
+}
+
+.props-body {
+  display: grid;
+  gap: 10px;
+  padding: 10px 0 4px;
+}
+
+.props-what {
+  margin: 0;
+}
+
+.field {
+  display: grid;
+  gap: 3px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.field-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  padding: 0;
+}
+
+.level-editor input[type="text"],
+.level-editor input[type="number"],
+.level-editor textarea,
+.level-editor select {
+  font: inherit;
+  color: var(--text);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px 8px;
+  box-sizing: border-box;
+}
+
+.field input[type="text"],
+.field textarea,
+.field select {
+  width: 100%;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ed-route {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.ed-route li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ed-problems {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.ed-problems ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.problem-link {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: var(--bad-bg);
+  border: 1px solid var(--bad);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.problem-badge {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--hot);
+  color: #fff;
+  font: 700 12px var(--font-ui);
+}
+
+/* -- My levels ---------------------------------------------------------------------------------------- */
+
+.my-levels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.my-level {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.my-level-open {
+  color: inherit;
+  text-decoration: none;
+  flex: 1;
+}
+
+.my-level-open:hover strong {
+  color: var(--accent);
+}

@@ -91,7 +91,7 @@ export interface Enemy {
 }
 
 /** Where a level problem belongs, for the editor (levels.LevelError.at): any of these. */
-interface ProblemAt {
+export interface ProblemAt {
   square?: string; // "c4"
   enemy?: number; // its number from 1, as in the message
   field?: string; // a key of the level: "title", "goal", "start", "api", "size", ...
@@ -101,7 +101,7 @@ interface ProblemAt {
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string; at: ProblemAt | null };
 
 /** What the level editor offers, read from the checker's own tables (levels.editor_options). */
-interface EditorOptions {
+export interface EditorOptions {
   max_side: number;
   pieces: Record<string, string[]>; // a piece's abilities
   tiles: Record<string, { needs: string[]; may: string[] }>; // the details each tile kind takes
