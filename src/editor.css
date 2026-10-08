@@ -61,6 +61,10 @@
   .ed-a {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .ed-middle {
+    order: -1; /* the board comes first when the columns stack */
+  }
 }
 
 .ed-left,

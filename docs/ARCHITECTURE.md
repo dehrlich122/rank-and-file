@@ -382,7 +382,7 @@ engine/rankfile/   the Python game engine (no third-party dependencies)
   bridge.py                   JSON functions the worker calls
 engine/tests/      pytest suite, including the level checker (test_levels.py)
 levels/ lessons/ solutions/   level content (chNN/ folders, plus practice/)
-src/app.ts         shell and routes (#/, #/level/<id>, #/harness)
+src/app.ts         shell and routes (#/, #/lessons, #/level/<id>, #/editor[/<id>[/play]], #/harness)
 src/content.ts     bundles level YAML and lesson Markdown; loads solutions lazily
 src/settings.ts src/progress.ts src/storage.ts   saved settings and progress (localStorage)
 src/py/            worker, client and protocol

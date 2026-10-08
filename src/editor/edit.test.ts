@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Pos } from "../py/protocol";
 import { blankDraft, type Draft } from "./draft";
-import { erase, extendRoute, fill, moveEnemy, newCell, paint, placeEnemy, placeGoal, placeStart, rectangle, removeCorner, removeEnemy, resize, rotateStart, toggleSpot, type Edit } from "./edit";
+import { clearBoard, erase, extendRoute, fill, moveEnemy, newCell, paint, placeEnemy, placeGoal, placeStart, rectangle, removeCorner, removeEnemy, resize, rotateStart, toggleSpot, type Edit } from "./edit";
 
 const ok = (edit: Edit): Draft => {
   if ("refused" in edit) throw new Error(`refused: ${edit.refused}`);
@@ -213,5 +213,17 @@ describe("resizing", () => {
     const { draft: smaller, lost } = resize(moved, 3, 3);
     expect(smaller.start).toEqual([2, 0]);
     expect(lost).toContain("the start moves to c1");
+  });
+});
+
+describe("clearing the board", () => {
+  it("takes away tiles, enemies and ? squares, and keeps the start and the goal", () => {
+    let d = ok(paint(draft(), [2, 2], "wall", []));
+    d = ok(placeEnemy(d, [3, 3], "rook"));
+    const cleared = clearBoard(d);
+    expect(cleared.cells.flat().every((cell) => cell.tile === "floor")).toBe(true);
+    expect([cleared.enemies, cleared.spots, cleared.start, cleared.goal]).toEqual([[], [], [0, 0], [5, 4]]);
+    const spotted = ok(toggleSpot(draft(), [2, 2]));
+    expect(clearBoard(spotted).spots).toEqual([]);
   });
 });

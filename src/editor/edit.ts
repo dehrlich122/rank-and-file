@@ -183,6 +183,11 @@ export function fill(draft: Draft, a: Pos, b: Pos, apply: (draft: Draft, pos: Po
   return done(next, `Changed ${changed} ${changed === 1 ? "square" : "squares"}.`);
 }
 
+/** Every tile, enemy and ? square gone; the start and the goal stay where they are. */
+export function clearBoard(draft: Draft): Draft {
+  return { ...draft, cells: draft.cells.map((row) => row.map(floorCell)), enemies: [], spots: [] };
+}
+
 // -- size ---------------------------------------------------------------------------------------------------
 
 /** The board at a new size, from the bottom left: squares are added to the right and the top, and lost from them. `lost` says what a smaller board drops. */

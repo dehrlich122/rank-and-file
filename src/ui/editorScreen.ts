@@ -5,7 +5,7 @@
 import { Checker, type Verdict } from "../editor/checker";
 import { draftToLevelInfo, squareName, type Draft } from "../editor/draft";
 import { drafts } from "../editor/drafts";
-import { enemyAt, erase, extendRoute, fill, moveEnemy, occupantOf, paint, placeEnemy, placeGoal, placeStart, resize, rotateStart, toggleSpot, type Edit } from "../editor/edit";
+import { clearBoard, enemyAt, erase, extendRoute, fill, moveEnemy, occupantOf, paint, placeEnemy, placeGoal, placeStart, resize, rotateStart, toggleSpot, type Edit } from "../editor/edit";
 import { History } from "../editor/history";
 import { draftToYaml } from "../editor/levelData";
 import { editorOptions } from "../editor/options";
@@ -127,6 +127,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   const confirmHost = h("div", { class: "ed-confirm" });
   const undoButton = h("button", { class: "btn btn-small", onClick: () => undo() }, "Undo");
   const redoButton = h("button", { class: "btn btn-small", onClick: () => redo() }, "Redo");
+  const clearButton = h("button", { class: "btn btn-small", onClick: () => askToClear() }, "Clear board");
   const exportButton = h("button", { class: "btn btn-small", onClick: () => download(`${fileName(draft().title)}.yaml`, draftToYaml(draft())) }, "Export");
   const testButton = h("button", { class: "btn btn-small btn-primary", onClick: () => (location.hash = `#/editor/${id}/play`) }, "Test-play");
   const widthInput = h("input", { type: "number", min: "2", "aria-label": "Width in squares" });
@@ -141,6 +142,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     redoButton,
     h("span", { class: "ed-sep" }),
     h("span", { class: "ed-size" }, "Size ", widthInput, " × ", heightInput),
+    clearButton,
     h("span", { class: "grow" }),
     h("span", { class: "muted small" }, "Saved in this browser"),
     exportButton,
@@ -206,6 +208,16 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
       confirmHost.replaceChildren();
       changed("Redone.");
     }
+  }
+
+  function askToClear(): void {
+    confirmHost.replaceChildren(
+      confirmStep("Clear every tile, enemy and ? square? The start and the goal stay. You can undo it.", "Yes, clear the board", "Keep it", (yes) => {
+        confirmHost.replaceChildren();
+        if (yes) commit(clearBoard(draft()), "Cleared the board.");
+        host.focus();
+      }),
+    );
   }
 
   function resizeTo(width: number, height: number): void {
