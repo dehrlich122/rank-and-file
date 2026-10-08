@@ -13,8 +13,10 @@ from .codex import entries as codex_entries
 from .levels import LevelError, parse_level, sandbox_level
 from .levels import editor_options as level_editor_options
 from .repl import Repl
+from .search import Search
 
 _repl = Repl()
+_search: Search | None = None  # the solvability check in progress (M4.3); starting another replaces it
 
 
 def run_snippet(code: str) -> str:
@@ -33,6 +35,24 @@ def load_level(level_json: str) -> str:
 def editor_options() -> str:
     """What the level editor offers (levels.editor_options)."""
     return json.dumps(level_editor_options())
+
+
+def solve_start(level_json: str) -> str:
+    """Begin the solvability check of a level (search.py). Returns {"ok": true, "cases": n} or {"ok": false, "error": ...}."""
+    global _search
+    try:
+        _search = Search(parse_level(json.loads(level_json)))
+    except LevelError as exc:
+        _search = None
+        return json.dumps({"ok": False, "error": str(exc)})
+    return json.dumps({"ok": True, "cases": len(_search.cases)})
+
+
+def solve_step(seconds: float = 0.15) -> str:
+    """Work on the check for about `seconds`, then report how far it got (counts and words, never the route)."""
+    if _search is None:
+        return json.dumps({"done": True, "case": 0, "cases": 0, "positions": 0, "results": []})
+    return json.dumps(_search.step(float(seconds)))
 
 
 def run_level(level_json: str, code: str, hints_used: int = 0, solution_seen: bool = False) -> str:

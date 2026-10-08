@@ -11,6 +11,8 @@ bridge.load_level
 bridge.load_sandbox
 bridge.repl_push
 bridge.repl_reset
+bridge.solve_start
+bridge.solve_step
 
 # Called by the player's code, which vulture never sees.
 pieces.Pawn.move
@@ -22,6 +24,7 @@ pieces.Pawn.look
 # Level fields read by the level checker (engine/tests/test_levels.py), which
 # vulture doesn't scan.
 levels.Level.lesson
+levels.Level.solution  # read by the tests; the editor keeps it in the level file's data
 
 # Dataclass fields that are serialised to JSON (asdict) for the UI.
 codex.Entry.new

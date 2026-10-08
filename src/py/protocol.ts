@@ -111,6 +111,18 @@ export interface EditorOptions {
   timed_gate: { open: number; clock: Clock }; // a timed gate's defaults
 }
 
+/** How the solvability check (M4.3) got on with one board: a route of plain calls, none, a cap reached, or clockwork it can't judge. */
+type SolveStatus = "route" | "no_route" | "gave_up" | "clocks";
+
+/** Where the check has got to. Counts and words only: the route is never sent (engine/rankfile/search.py). */
+interface SolveProgress {
+  done: boolean;
+  case: number; // the board (or hidden-goal place) it is on, from 1
+  cases: number;
+  positions: number; // positions reached on that board so far
+  results: Array<{ label: string; where: string; status: SolveStatus; lines: number | null; positions: number }>; // the boards finished
+}
+
 export interface GameEvent {
   kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "capture" | "tick" | "lost" | "pick_up" | "bridge" | "fall" | "crush" | "read";
   state: WorldState; // the whole world's state after the event
@@ -209,6 +221,9 @@ export interface Requests {
   runSnippet: { args: { code: string }; result: SnippetResult };
   loadLevel: { args: { level: unknown }; result: LoadLevelResult };
   editorOptions: { args: Record<string, never>; result: EditorOptions };
+  // The solvability check, in slices (M4.3): start it, then ask again until `done`; not asking again cancels it.
+  solveStart: { args: { level: unknown }; result: { ok: true; cases: number } | { ok: false; error: string } };
+  solveStep: { args: { seconds?: number }; result: SolveProgress };
   loadSandbox: { args: { api: string[]; board?: unknown }; result: LevelInfo }; // board: a level's lesson_board (QA-019)
   runLevel: { args: { level: unknown; code: string; hintsUsed: number; solutionSeen: boolean }; result: LevelResult };
   runSandbox: { args: { code: string; api: string[]; board?: unknown }; result: LevelResult };

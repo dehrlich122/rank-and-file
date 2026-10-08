@@ -129,7 +129,7 @@ def test_a_start_square_under_attack_names_the_square_and_the_attacker():
 
 def test_a_problem_in_another_board_is_a_problem_with_the_variants():
     error = problem(variants=[{"map": "G .\n. .\n"}])
-    assert error.at == {"field": "variants"}
+    assert error.at == {"field": "start", "board": 2}
 
 
 def test_a_problem_in_a_constraint_is_a_problem_with_the_constraints():
@@ -199,3 +199,83 @@ def test_the_bridge_sends_the_options_as_json():
     import json
 
     assert json.loads(bridge.editor_options()) == json.loads(json.dumps(editor_options()))
+
+
+# -- the rules the editor adds (M4.3) -----------------------------------------------------------------
+
+
+def test_the_constructs_a_level_may_require_or_ban_are_real_ast_nodes():
+    import ast
+
+    constructs = editor_options()["constructs"]
+    assert constructs and all(isinstance(getattr(ast, item["node"], None), type) and item["label"] for item in constructs)
+    nodes = [item["node"] for item in constructs]
+    assert parse_level(made(constraints={"require_nodes": nodes[:2], "ban_nodes": nodes[2:4]})).constraints.require_nodes == nodes[:2]
+
+
+def test_a_problem_on_another_board_names_the_board_and_the_place():
+    variant = {"map": "G . .\n. . .\nP . .\n", "enemies": [{"kind": "rook", "start": "a1"}]}
+    error = problem(variants=[variant])
+    assert error.at["board"] == 2 and error.at["enemy"] == 1
+    assert str(error).startswith("variant 1: ")
+    assert problem(variants=[{"map": "P . .\n. . .\n. . ."}]).at == {"field": "goal", "board": 2}
+
+
+def test_a_level_may_have_a_limited_number_of_boards():
+    from rankfile.levels import MAX_BOARDS
+
+    other = {"map": MAP}
+    assert len(parse_level(made(variants=[other] * (MAX_BOARDS - 1))).variants) == MAX_BOARDS - 1
+    assert problem(variants=[other] * MAX_BOARDS).at == {"field": "variants"}
+
+
+def test_a_level_made_in_the_editor_may_carry_a_solution_that_describe_never_sends():
+    level = parse_level(made(solution="pawn.move()\n"))
+    assert level.solution == "pawn.move()\n"
+    assert "solution" not in level.describe() and "pawn.move()" not in str(level.describe())
+    assert problem(solution="").at == {"field": "solution"}
+    assert problem(solution=4).at == {"field": "solution"}
+
+
+def test_no_level_in_the_repo_carries_its_solution():
+    for path in LEVEL_FILES:
+        assert "solution" not in yaml.safe_load(path.read_text(encoding="utf-8")), path.name
+
+
+@pytest.mark.parametrize(
+    "changes, field",
+    [
+        ({"title": "t" * 61}, "title"),
+        ({"brief": "b" * 601}, "brief"),
+        ({"trains": "t" * 201}, "trains"),
+        ({"starter": "s" * 2001}, "starter"),
+        ({"solution": "s" * 2001}, "solution"),
+        ({"hints": ["h"] * 6}, "hints"),
+        ({"hints": ["h" * 601]}, "hints"),
+        ({"objectives": ["reach_goal", {"say": "x" * 301}]}, "objectives"),
+        ({"enemies": [{"kind": "patrol", "start": "b2"}] * 13}, "enemies"),
+    ],
+)
+def test_a_text_or_a_list_over_its_limit_is_a_problem_with_that_field(changes, field):
+    assert problem(**changes).at == {"field": field}
+
+
+def test_a_sign_over_its_limit_names_its_squares():
+    error = problem(map="S . G\n. . .\nP . .\n", legend={"S": {"tile": "sign", "text": "x" * 301}})
+    assert error.at == {"squares": ["a3"]}
+
+
+def test_every_level_in_the_repo_fits_the_text_limits():
+    from rankfile.levels import LIMITS
+
+    for path in LEVEL_FILES:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        parse_level(data)  # the limits are checked in the parser; a level over one would raise
+        assert len(data.get("hints", [])) <= LIMITS["hints"], path.name
+
+
+def test_the_options_report_the_limits():
+    from rankfile.levels import LIMITS, MAX_BOARDS
+
+    options = editor_options()
+    assert options["limits"] == LIMITS and options["max_boards"] == MAX_BOARDS
