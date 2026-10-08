@@ -24,8 +24,8 @@ class LevelError(ValueError):
     `at` says where, for the level editor (M4.2), which marks the square, enemy or
     field a problem belongs to. It's a dict with any of: `square` ("c4"), `enemy` (its
     number from 1, as in the message), `field` (a key of the level: "title", "goal",
-    "start", "api", "size", ...), `symbol` (a legend symbol, whose squares the editor
-    knows). The message is the same with or without it."""
+    "start", "api", "size", ...), or `squares` (several, e.g. every square using a legend
+    entry that's wrong). The message is the same with or without it."""
 
     def __init__(self, message: str, at: dict | None = None):
         super().__init__(message)
@@ -34,7 +34,8 @@ class LevelError(ValueError):
 
 @contextmanager
 def _locate(**at):
-    """Whatever LevelError is raised inside gets `at`, unless it already knows better."""
+    """Whatever LevelError is raised inside gets `at`, unless it already knows better.
+    Works as a `with` block, and as a decorator for a whole parser."""
     try:
         yield
     except LevelError as exc:
@@ -71,10 +72,8 @@ def editor_options() -> dict:
         "max_side": MAX_SIDE,
         "pieces": {name: list(piece.ABILITIES) for name, piece in PIECES.items()},
         "tiles": {tile.value: {"needs": sorted(TILE_DETAILS.get(tile, (set(), set()))[0]), "may": sorted(TILE_DETAILS.get(tile, (set(), set()))[1])} for tile in Tile},
-        "open_ground": [tile.value for tile in OPEN_GROUND],
         "enemies": {kind: sorted(keys - {"kind"}) for kind, keys in ENEMY_KEYS.items()},
         "clocks": list(CLOCKS),
-        "strategies": list(CHASERS),
         "facings": [direction.value for direction in Direction],
         "timed_gate": {"open": Timer.open, "clock": Timer.clock},
     }
@@ -443,11 +442,12 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
         if symbol in BUILTIN_SYMBOLS:
             raise LevelError(f"legend can't redefine the built-in symbol {symbol!r}")
         meaning = meaning if isinstance(meaning, dict) else {"tile": meaning}
-        try:
-            tile = symbols[symbol] = Tile(meaning.get("tile"))
-        except ValueError:
-            raise LevelError(f"legend {symbol!r}: unknown tile {meaning.get('tile')!r}", at={"symbol": symbol}) from None
-        with _locate(symbol=symbol):
+        used = [square_name((x, height - 1 - i)) for i, row in enumerate(rows) for x, cell in enumerate(row) if cell == symbol]
+        with _locate(squares=used):
+            try:
+                tile = symbols[symbol] = Tile(meaning.get("tile"))
+            except ValueError:
+                raise LevelError(f"legend {symbol!r}: unknown tile {meaning.get('tile')!r}") from None
             details[symbol] = _parse_details(symbol, tile, meaning)
 
     board = Board(width, height)
@@ -778,12 +778,8 @@ def _check_enemies(level: Level) -> None:
         )
 
 
+@_locate(field="par")
 def _parse_par(data: dict) -> Par:
-    with _locate(field="par"):
-        return _parse_par_in(data)
-
-
-def _parse_par_in(data: dict) -> Par:
     if not isinstance(data, dict):
         raise LevelError("par must be a mapping, e.g. {lines: 3}")
     unknown = set(data) - {"lines"}
@@ -795,12 +791,8 @@ def _parse_par_in(data: dict) -> Par:
     return Par(lines=lines)
 
 
+@_locate(field="constraints")
 def _parse_constraints(data: dict) -> Constraints:
-    with _locate(field="constraints"):
-        return _parse_constraints_in(data)
-
-
-def _parse_constraints_in(data: dict) -> Constraints:
     allowed = {"max_lines", "min_comments", "require_nodes", "ban_nodes", "max_numbers"}
     unknown = set(data) - allowed
     if unknown:

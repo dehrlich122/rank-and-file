@@ -56,14 +56,17 @@ export class DraftStore {
   }
 
   save(draft: Draft): void {
-    this.saved = { ...this.saved, [draft.id]: { data: draftToLevelData(draft).data, edited: this.now() } };
-    writeJson(this.storage, STORAGE_KEY, { levels: this.saved });
+    this.keep({ ...this.saved, [draft.id]: { data: draftToLevelData(draft), edited: this.now() } });
   }
 
   remove(id: string): void {
     const { [id]: _gone, ...rest } = this.saved;
-    this.saved = rest;
-    writeJson(this.storage, STORAGE_KEY, { levels: this.saved });
+    this.keep(rest);
+  }
+
+  private keep(next: Record<string, Saved>): void {
+    this.saved = next;
+    writeJson(this.storage, STORAGE_KEY, { levels: next });
   }
 }
 

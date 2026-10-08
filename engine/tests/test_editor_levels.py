@@ -8,9 +8,9 @@ import yaml
 
 from rankfile import bridge
 from rankfile.board import Tile
-from rankfile.levels import ENEMY_KEYS, MAX_SIDE, OPEN_GROUND, TILE_DETAILS, LevelError, editor_options, parse_level
+from rankfile.levels import ENEMY_KEYS, MAX_SIDE, TILE_DETAILS, LevelError, editor_options, parse_level
 from rankfile.pieces import PIECES
-from rankfile.world import CHASERS, CLOCKS
+from rankfile.world import CLOCKS
 
 ROOT = Path(__file__).resolve().parents[2]
 LEVEL_FILES = sorted((ROOT / "levels").glob("*/*.yaml"))
@@ -81,22 +81,22 @@ def test_a_bad_start_is_a_problem_with_the_start():
     assert problem(start={"facing": "up"}).at == {"field": "start"}
 
 
-def test_a_sign_with_no_text_names_its_legend_symbol():
+def test_a_sign_with_no_text_names_the_squares_that_use_it():
     error = problem(legend={"S": {"tile": "sign", "text": ""}}, map="""
 . S G
-. . .
+. . S
 P . .
 """)
-    assert error.at == {"symbol": "S"}
+    assert error.at == {"squares": ["b3", "c2"]}
 
 
-def test_a_timed_gate_that_never_shuts_names_its_legend_symbol():
+def test_a_timed_gate_that_never_shuts_names_its_squares():
     error = problem(legend={"T": {"tile": "timed_gate", "every": 2, "open": 2}}, map="""
 . T G
 . . .
 P . .
 """)
-    assert error.at == {"symbol": "T"}
+    assert error.at == {"squares": ["b3"]}
 
 
 def test_an_enemy_on_a_wall_names_the_enemy_and_the_square():
@@ -183,9 +183,8 @@ def test_the_options_come_from_the_checkers_own_tables():
     assert options["max_side"] == MAX_SIDE
     assert options["pieces"] == {name: list(piece.ABILITIES) for name, piece in PIECES.items()}
     assert set(options["tiles"]) == {tile.value for tile in Tile}
-    assert options["open_ground"] == [tile.value for tile in OPEN_GROUND]
     assert set(options["enemies"]) == set(ENEMY_KEYS)
-    assert options["clocks"] == list(CLOCKS) and options["strategies"] == list(CHASERS)
+    assert options["clocks"] == list(CLOCKS)
     assert options["facings"] == ["north", "east", "south", "west"]
 
 

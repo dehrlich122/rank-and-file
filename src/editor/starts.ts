@@ -17,5 +17,5 @@ export function copyOfLevel(data: unknown, id = newId()): Draft {
 
 /** A draft as a level the level screen can open: it belongs to no chapter and has no lesson. */
 export function testPlaySource(draft: Draft): LevelSource {
-  return { id: draft.id, chapter: 0, title: draft.title, trains: draft.trains, mastery: false, lesson: "", data: draftToLevelData(draft).data };
+  return { id: draft.id, chapter: 0, title: draft.title, trains: draft.trains, mastery: false, lesson: "", data: draftToLevelData(draft) };
 }

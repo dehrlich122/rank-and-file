@@ -49,6 +49,23 @@ export interface Draft {
 }
 
 export const DETAIL_KEYS = ["text", "passphrase", "question", "every", "open", "clock"] as const;
+export const FACINGS: Facing[] = ["north", "east", "south", "west"];
+export const ENEMY_KINDS: Array<Enemy["kind"]> = ["patrol", "chaser", "rook", "bishop"];
+/** The enemy keys that are copied as they are (a route is squares, so it has its own handling). */
+export const PLAIN_ENEMY_KEYS = ["loop", "clock", "armoured", "strategy"] as const;
+
+/** Copy the listed keys that `from` has, and nothing else. */
+export function copyKeys(from: object, to: object, keys: readonly string[]): void {
+  for (const key of keys) {
+    const value = (from as Record<string, unknown>)[key];
+    if (value !== undefined) (to as Record<string, unknown>)[key] = value;
+  }
+}
+
+/** A kind's name in words: "timed_gate" is "timed gate". */
+export const words = (name: string): string => name.replace(/_/g, " ");
+
+export const capitalise = (text: string): string => text.replace(/^./, (c) => c.toUpperCase());
 
 export const floorCell = (): Cell => ({ tile: "floor" });
 

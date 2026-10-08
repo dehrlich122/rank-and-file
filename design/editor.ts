@@ -13,6 +13,7 @@ import "./editor.css";
 import type { Pos } from "../src/py/protocol";
 import { BoardView } from "../src/ui/board";
 import { h } from "../src/ui/dom";
+import { squareName as name } from "../src/editor/draft";
 import { LEVEL } from "../src/ui/styleguideSample";
 import { enemy, goal, hero, tile, type EnemyKind, type TileName } from "../src/ui/sprites";
 import { M, S } from "../src/ui/sprites/floor";
@@ -31,7 +32,6 @@ const SIGN: Pos = level.signs[0]!.pos; // the selected square in the Square tab
 const TIMED: Pos = level.timed_gates[0]!.pos; // the square with a problem
 const CHASER: Pos = level.enemies[2]!.route[0]!;
 
-const name = ([x, y]: Pos) => `${String.fromCharCode(97 + x)}${y + 1}`;
 const corner = ([x, y]: Pos): [number, number] => [M + x * S, (level.height - 1 - y) * S];
 const VIEW_W = M + level.width * S;
 const VIEW_H = level.height * S + M;

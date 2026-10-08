@@ -332,8 +332,8 @@ What a level must have *(M4.2)*: `id`, `title`, `map` and `api`. A level made in
 `chapter` (0), `lesson` or `trains`, so the engine doesn't insist on them; `test_levels.py` still does for every
 level in the repo. A board is at most 12 squares along a side (`MAX_SIDE`; the repo's levels all fit).
 Every `LevelError` carries `at`, saying where, for the editor: any of `square` ("c4"), `enemy` (its number from
-1, as in the message), `field` (a key of the level) or `symbol` (a legend symbol, whose squares the editor
-knows). The message is the same either way.
+1, as in the message), `field` (a key of the level) or `squares` (several, e.g. every square that uses
+a wrong legend entry). The message is the same either way.
 `max_lines` counts lines containing code (blank and comment-only lines don't
 count), as if every statement had its own line *(M3.3)*: a second statement
 after `;`, a loop's body on the loop's own line, or `else:` with its body

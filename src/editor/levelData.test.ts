@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { blankDraft, draftToLevelInfo, parseSquare, squareName, type Draft } from "./draft";
-import { draftToLevelData, draftToYaml, ImportError, levelDataToDraft, parseLevelYaml, yamlToDraft } from "./levelData";
+import { parseYaml } from "../content";
+import { draftToLevelData, draftToYaml, ImportError, levelDataToDraft, yamlToDraft } from "./levelData";
 
 const FILE = `
 id: ch99-l01
@@ -114,7 +115,7 @@ describe("writing a level file", () => {
     const d = blankDraft(3, 2, "my-x");
     d.spots = [[1, 1]];
     d.goal = null;
-    const { data } = draftToLevelData(d);
+    const data = draftToLevelData(d);
     expect(data.map).toBe(". ? .\nP . .\n");
     expect(data).toMatchObject({ id: "my-x", piece: "pawn", start: { facing: "north" }, api: ["move", "turn_left", "turn_right"] });
     expect(data).not.toHaveProperty("legend");
@@ -129,12 +130,11 @@ describe("writing a level file", () => {
     d.cells[0]![1] = { tile: "sign", text: "one" };
     d.cells[0]![2] = { tile: "sign", text: "two" };
     d.cells[0]![3] = { tile: "sign", text: "one" };
-    const { data, squares } = draftToLevelData(d);
+    const data = draftToLevelData(d);
     const symbols = String(data.map).trim().split(" ");
     expect(symbols[1]).toBe(symbols[3]);
     expect(symbols[2]).not.toBe(symbols[1]);
-    expect(squares[symbols[1]!]).toEqual(["b1", "d1"]);
-    expect(squares[symbols[2]!]).toEqual(["c1"]);
+    expect(Object.keys(data.legend as object)).toHaveLength(2);
   });
 
   it("writes a detail-less tile as its bare name, and a tile with details as a mapping", () => {
@@ -142,7 +142,7 @@ describe("writing a level file", () => {
     d.goal = null;
     d.cells[0]![1] = { tile: "pit" };
     d.cells[0]![2] = { tile: "gate", passphrase: "open", question: "Well?" };
-    expect(draftToLevelData(d).data.legend).toEqual({ O: "pit", X: { tile: "gate", passphrase: "open", question: "Well?" } });
+    expect(draftToLevelData(d).legend).toEqual({ O: "pit", X: { tile: "gate", passphrase: "open", question: "Well?" } });
   });
 
   it("writes only the enemy keys it has, and a patrol's start only when it isn't its first corner", () => {
@@ -152,7 +152,7 @@ describe("writing a level file", () => {
       { kind: "patrol", start: [4, 1], route: [[1, 1], [4, 1]] },
       { kind: "rook", start: [5, 5] },
     ];
-    expect(draftToLevelData(d).data.enemies).toEqual([
+    expect(draftToLevelData(d).enemies).toEqual([
       { kind: "patrol", route: ["b2", "e2"], loop: true },
       { kind: "patrol", start: "e2", route: ["b2", "e2"] },
       { kind: "rook", start: "f6" },
@@ -161,16 +161,16 @@ describe("writing a level file", () => {
 
   it("writes the start's planks only when there are some", () => {
     const d = blankDraft();
-    expect(draftToLevelData(d).data.start).toEqual({ facing: "north" });
+    expect(draftToLevelData(d).start).toEqual({ facing: "north" });
     d.planks = 2;
-    expect(draftToLevelData(d).data.start).toEqual({ facing: "north", planks: 2 });
+    expect(draftToLevelData(d).start).toEqual({ facing: "north", planks: 2 });
   });
 
   it("keeps the symbols the other boards use meaning what they meant", () => {
     const d = draft();
     // the editor adds a different gate where the file's `Z` gate isn't on the main map
     d.cells[0]![3] = { tile: "gate", passphrase: "new" };
-    const { data } = draftToLevelData(d);
+    const data = draftToLevelData(d);
     const legend = data.legend as Record<string, unknown>;
     expect(legend.Z).toEqual({ tile: "gate", passphrase: "4" }); // still what the variant means
     const newSymbol = String(data.map).trim().split("\n")[3]!.split(" ")[3]!;
@@ -180,12 +180,12 @@ describe("writing a level file", () => {
   });
 
   it("keeps a square's old symbol when it still means the same", () => {
-    const rewritten = draftToLevelData(draft()).data;
+    const rewritten = draftToLevelData(draft());
     expect(rewritten.legend).toMatchObject({ S: { tile: "sign" }, X: { tile: "gate" }, R: { tile: "rune" }, O: "pit", T: { tile: "timed_gate", every: 3 }, $: "gem" });
   });
 
   it("writes the keys it doesn't edit after its own", () => {
-    const data = draftToLevelData(draft()).data;
+    const data = draftToLevelData(draft());
     expect(data).toMatchObject({ chapter: 99, par: { lines: 3 }, hints: ["a", "b"], lesson: "ch99/ch99-l01.md" });
     expect(Object.keys(data).indexOf("api")).toBeLessThan(Object.keys(data).indexOf("par"));
   });
@@ -195,7 +195,7 @@ describe("YAML", () => {
   it("round-trips a level through its own text", () => {
     const first = draft();
     const again = yamlToDraft(draftToYaml(first));
-    expect(draftToLevelData(again).data).toEqual(draftToLevelData(first).data);
+    expect(draftToLevelData(again)).toEqual(draftToLevelData(first));
     expect(draftToLevelInfo(again)).toEqual(draftToLevelInfo(first));
   });
 
@@ -215,7 +215,7 @@ describe("YAML", () => {
     const back = yamlToDraft(draftToYaml(d));
     expect(back.cells[0]![1]!.passphrase).toBe("yes");
     expect(back.cells[0]![2]!.passphrase).toBe("4");
-    expect(parseLevelYaml("a: yes\nb: 'yes'")).toEqual({ a: true, b: "yes" }); // why it matters
+    expect(parseYaml("a: yes\nb: 'yes'")).toEqual({ a: true, b: "yes" }); // why it matters
   });
 
   it("round-trips text with colons, quotes and leading symbols", () => {
@@ -264,6 +264,6 @@ describe("squares", () => {
 
 describe("importing parsed data directly", () => {
   it("accepts the parsed object, as the app's level content has it", () => {
-    expect(levelDataToDraft(parseLevelYaml(FILE)).title).toBe("The Test");
+    expect(levelDataToDraft(parseYaml(FILE)).title).toBe("The Test");
   });
 });

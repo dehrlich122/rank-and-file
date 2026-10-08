@@ -10,6 +10,7 @@
 // maps a kind to its drawing). Every colour comes from the CSS custom properties in
 // styles.css, so a visual redesign can reskin them without touching the logic.
 import type { Clock, Enemy, Facing, GameEvent, LevelInfo, Pos, TileKind, WorldState } from "../py/protocol";
+import { squareName } from "../editor/draft";
 import { wornPiece } from "../promotion";
 import { motionReduced, settings } from "../settings";
 import { sound } from "../sound";
@@ -21,9 +22,7 @@ import { svg } from "./svg";
 
 let trails = 0; // numbers each trail's gradient
 
-export function squareName([x, y]: Pos): string {
-  return `${String.fromCharCode(97 + x)}${y + 1}`;
-}
+export { squareName };
 
 export class BoardView {
   readonly element: SVGSVGElement;

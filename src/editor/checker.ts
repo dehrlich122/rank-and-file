@@ -11,7 +11,6 @@ export interface Verdict {
   revision: number; // the draft's revision it's about
   level: LevelInfo | null; // the engine's description, when it accepts the draft
   problem: Problem | null; // what's wrong, when it doesn't
-  data: Record<string, unknown>; // what was sent: the draft as a level file
 }
 
 const WAIT_MS = 150;
@@ -34,15 +33,14 @@ export class Checker {
   }
 
   private async run(draft: Draft, revision: number): Promise<void> {
-    const { data, squares } = draftToLevelData(draft);
     try {
       await this.client.ready();
-      const result = await this.client.call("loadLevel", { level: data });
+      const result = await this.client.call("loadLevel", { level: draftToLevelData(draft) });
       if (this.stopped || revision !== this.latest) return;
-      this.onVerdict(result.ok ? { revision, level: result.level, problem: null, data } : { revision, level: null, problem: placeProblem(result.error, result.at, squares), data });
+      this.onVerdict(result.ok ? { revision, level: result.level, problem: null } : { revision, level: null, problem: placeProblem(result.error, result.at) });
     } catch (error) {
       if (this.stopped || revision !== this.latest) return;
-      this.onVerdict({ revision, level: null, problem: placeProblem(`Python couldn't check this level: ${String(error)}`, null, {}), data });
+      this.onVerdict({ revision, level: null, problem: placeProblem(`Python couldn't check this level: ${String(error)}`, null) });
     }
   }
 

@@ -283,8 +283,8 @@ names.
     `draft.extra`), `checker.ts` (asks the engine), `drafts.ts` (My levels, saved under their own key,
     apart from progress), `starts.ts` (copy a lesson level, never its hints; test-play's `LevelSource`).
   - **The engine is the only judge.** The editor never re-implements a rule: it exports the draft and
-    sends it to `loadLevel`. A refusal carries `at` (`LevelError.at`: a square, an enemy's number, a
-    field or a legend symbol), which `problems.ts` turns into marks on the board. What it may offer
+    sends it to `loadLevel`. A refusal carries `at` (`LevelError.at`: a square or several, an enemy's
+    number, or a field), which `problems.ts` turns into marks on the board. What it may offer
     comes from the `editorOptions` request. A new tile or enemy reaches the palette by being added to
     the sprite registry.
   - The board draws from the engine's own description when it accepted the current draft (that has the

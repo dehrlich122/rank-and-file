@@ -5,7 +5,8 @@
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { draftToLevelInfo } from "./draft";
-import { draftToLevelData, draftToYaml, levelDataToDraft, parseLevelYaml, yamlToDraft } from "./levelData";
+import { parseYaml } from "../content";
+import { draftToLevelData, draftToYaml, levelDataToDraft, yamlToDraft } from "./levelData";
 
 const files = import.meta.glob<string>("/levels/*/*.yaml", { query: "?raw", import: "default", eager: true });
 const levels = Object.entries(files).map(([path, source]) => ({ path, data: parse(source, { version: "1.1" }) as Record<string, unknown> }));
@@ -20,11 +21,13 @@ describe("every level in the game", () => {
   });
 
   it("is written again as the same level, by the draft and by its YAML text", () => {
+    // compared as true or false, so a failure never prints a level (its hints are spoilers)
+    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
     for (const { path, data } of levels) {
       const draft = levelDataToDraft(data);
-      expect(draftToLevelData(draft).data, path).toEqual(draftToLevelData(yamlToDraft(draftToYaml(draft))).data);
+      expect(same(draftToLevelData(draft), draftToLevelData(yamlToDraft(draftToYaml(draft)))), `${path}: the draft written, read and written again`).toBe(true);
       // reading the text a draft was written to gives the same level back: the YAML layout never changes the data
-      expect(parseLevelYaml(draftToYaml(draft)), path).toEqual(draftToLevelData(draft).data);
+      expect(same(parseYaml(draftToYaml(draft)), draftToLevelData(draft)), `${path}: the YAML text read back`).toBe(true);
     }
   });
 
@@ -37,7 +40,7 @@ describe("every level in the game", () => {
     const entries: Record<string, unknown> = {};
     for (const { data } of levels) {
       const draft = levelDataToDraft(data);
-      entries[String(data.id)] = { original: data, exported: draftToLevelData(draft).data, info: draftToLevelInfo(draft) };
+      entries[String(data.id)] = { original: data, exported: draftToLevelData(draft), info: draftToLevelInfo(draft) };
     }
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rank-and-file-"));
     try {

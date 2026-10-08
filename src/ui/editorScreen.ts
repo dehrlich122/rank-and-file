@@ -17,7 +17,7 @@ import { BoardView } from "./board";
 import { confirmStep } from "./dialog";
 import { download, fileName } from "./download";
 import { h } from "./dom";
-import { renderProps, type Selection, type Tab } from "./editorProps";
+import { renderProblems, renderProps, type Selection, type Tab } from "./editorProps";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite } from "./sprites";
 import { M, S } from "./sprites/floor";
 import { svg } from "./svg";
@@ -154,9 +154,10 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
 
   const checker = new Checker(client, (next) => {
     verdict = next;
-    renderBoard();
+    if (drawnFromEngine !== (!!verdict.level && verdict.revision === revision)) renderBoard();
+    else renderMarks(); // only the problem rings can have changed
     renderToolbar();
-    renderProps_();
+    renderProblemsOnly(); // not the whole panel: a field being typed in keeps its focus
   });
 
   // -- changing the draft ------------------------------------------------------------------------------------------
@@ -183,7 +184,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     renderStatus();
     renderToolbar();
     if (fromPanel) renderProblemsOnly();
-    else renderProps_();
+    else drawProps();
   }
 
   /** After a change (a smaller board, an undo) the cursor, rectangle and selection must still be on the board. */
@@ -196,29 +197,28 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     if (selection?.kind === "square" && (selection.pos[0] >= width || selection.pos[1] >= height)) selection = null;
   }
 
-  function undo(): void {
-    if (history.undo()) {
-      confirmHost.replaceChildren();
-      changed("Undone.");
-    }
+  /** Undo or redo one step (a question waiting to be answered is dropped: it was about the draft before). */
+  function step(go: () => Draft | null, note: string): void {
+    if (!go()) return;
+    confirmHost.replaceChildren();
+    changed(note);
   }
+  const undo = () => step(() => history.undo(), "Undone.");
+  const redo = () => step(() => history.redo(), "Redone.");
 
-  function redo(): void {
-    if (history.redo()) {
-      confirmHost.replaceChildren();
-      changed("Redone.");
-    }
-  }
-
-  function askToClear(): void {
+  /** A question in the page with a yes and a no; the board gets the focus back once it's answered. */
+  function ask(question: string, yes: string, no: string, onYes: () => void, onNo?: () => void): void {
     confirmHost.replaceChildren(
-      confirmStep("Clear every tile, enemy and ? square? The start and the goal stay. You can undo it.", "Yes, clear the board", "Keep it", (yes) => {
+      confirmStep(question, yes, no, (confirmed) => {
         confirmHost.replaceChildren();
-        if (yes) commit(clearBoard(draft()), "Cleared the board.");
+        if (confirmed) onYes();
+        else onNo?.();
         host.focus();
       }),
     );
   }
+
+  const askToClear = () => ask("Clear every tile, enemy and ? square? The start and the goal stay. You can undo it.", "Yes, clear the board", "Keep it", () => commit(clearBoard(draft()), "Cleared the board."));
 
   function resizeTo(width: number, height: number): void {
     const max = options?.max_side ?? 12;
@@ -226,14 +226,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     if (w === draft().width && h2 === draft().height) return renderToolbar();
     const { draft: next, lost } = resize(draft(), w, h2);
     if (!lost.length) return commit(next, `The board is ${w} × ${h2}.`);
-    confirmHost.replaceChildren(
-      confirmStep(`A ${w} × ${h2} board drops ${lost.join(", ")}. Make it smaller anyway?`, "Yes, make it smaller", "Keep the size", (yes) => {
-        confirmHost.replaceChildren();
-        if (yes) commit(next, `The board is ${w} × ${h2}.`);
-        else renderToolbar();
-        host.focus();
-      }),
-    );
+    ask(`A ${w} × ${h2} board drops ${lost.join(", ")}. Make it smaller anyway?`, "Yes, make it smaller", "Keep the size", () => commit(next, `The board is ${w} × ${h2}.`), renderToolbar);
   }
 
   // -- tools applied -----------------------------------------------------------------------------------------------
@@ -270,13 +263,13 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     if ("refused" in edit) return say(edit.refused);
     commit(edit.draft, edit.note);
     if (action.kind === "enemy") select({ kind: "enemy", index: edit.draft.enemies.length - 1 });
-    else if (action.kind === "tile" && (options?.tiles[action.tile]?.needs.length ?? 0) > 0) select({ kind: "square", pos });
+    else if (action.kind === "tile" && needs(action.tile).length > 0) select({ kind: "square", pos });
   }
 
   /** The tool across the rectangle between the anchor and the cursor (only tiles and erasing make sense over many squares). */
-  function applyRectangle(): void {
-    const action = tool?.action;
-    if (!anchor) return applyAt(cursor);
+  function applyRectangle(override?: Action): void {
+    const action = override ?? tool?.action;
+    if (!anchor) return applyAt(cursor, override);
     if (action?.kind !== "tile" && action?.kind !== "erase") return say("Only a tile or Erase can fill a rectangle.");
     const edit = fill(draft(), anchor, cursor, (d, pos) => editFor(d, pos, action));
     if ("refused" in edit) say(edit.refused);
@@ -295,7 +288,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     if (next?.kind === "enemy") tab = "enemy";
     else if (next?.kind === "square") tab = "square";
     renderMarks();
-    renderProps_();
+    drawProps();
     renderStatus();
   }
 
@@ -324,9 +317,12 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     marksLayer = next;
   }
 
+  let drawnFromEngine = false;
+
   function renderBoard(): void {
     if (!options) return;
     const d = draft();
+    drawnFromEngine = !!verdict?.level && verdict.revision === revision;
     board?.dispose();
     board = new BoardView(levelToDraw());
     marksLayer = marks(d);
@@ -443,7 +439,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     say,
     setTab: (next: Tab) => {
       tab = next;
-      renderProps_();
+      drawProps();
     },
     goTo: (problem: Problem) => {
       const pos = problem.squares[0] ?? (problem.enemy !== null ? draft().enemies[problem.enemy]?.start : undefined);
@@ -457,23 +453,19 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
         host.focus();
       } else {
         tab = "level";
-        renderProps_();
-        propsHost.querySelector<HTMLElement>(`[data-field="${problem.field ?? ""}"] input, [data-field="${problem.field ?? ""}"] textarea, [data-field="${problem.field ?? ""}"] select`)?.focus();
+        drawProps();
+        propsHost.querySelector<HTMLElement>(`[data-field="${problem.field ?? ""}"] :is(input, textarea, select)`)?.focus();
       }
     },
   });
 
-  function renderProps_(): void {
+  function drawProps(): void {
     if (options) propsHost.replaceChildren(renderProps(propsContext()));
   }
 
-  /** A field in the panel changed the draft: update only the problems list, so the field keeps its focus. */
+  /** Only the problems list: what a verdict or a change made in a field can alter, so the field keeps its focus. */
   function renderProblemsOnly(): void {
-    if (!options) return;
-    const fresh = renderProps(propsContext());
-    const old = propsHost.querySelector(".ed-problems");
-    const next = fresh.querySelector(".ed-problems");
-    if (old && next) old.replaceWith(next);
+    if (options) propsHost.querySelector(".ed-problems")?.replaceWith(renderProblems(propsContext()));
   }
 
   // -- the mouse ---------------------------------------------------------------------------------------------------
@@ -571,12 +563,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
       }
     } else if (event.key === "Delete" || event.key === "Backspace") {
       history.begin();
-      if (anchor) {
-        const edit = fill(draft(), anchor, cursor, (d, pos) => erase(d, pos));
-        if ("refused" in edit) say(edit.refused);
-        else commit(edit.draft, edit.note);
-        anchor = null;
-      } else applyAt(cursor, { kind: "erase" });
+      applyRectangle({ kind: "erase" });
       history.end();
     } else if (event.key === "Escape" && anchor) {
       anchor = null;
@@ -624,7 +611,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
       renderToolbar();
       renderBoard();
       renderStatus();
-      renderProps_();
+      drawProps();
       checker.ask(draft(), revision);
     } catch (error) {
       host.replaceChildren(h("p", { class: "muted" }, `Python couldn't start: ${String(error)}`));
@@ -636,6 +623,6 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     checker.stop();
     document.removeEventListener("keydown", onKey);
     board?.dispose();
-    drafts.save(draft());
+    if (revision > 0) drafts.save(draft()); // only a level that was changed counts as edited
   };
 }

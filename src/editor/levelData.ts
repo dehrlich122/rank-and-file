@@ -2,9 +2,11 @@
 // (docs/ARCHITECTURE.md); nothing here is editor-only. Importing never judges a level (the engine does,
 // through `loadLevel`): it only fails when a file can't be held as a draft at all, e.g. a map symbol
 // with no meaning. Keys the editor doesn't edit are kept in `draft.extra` and written back as they were.
-import { Document, isMap, isSeq, parse } from "yaml";
-import type { Clock, Facing, Pos, TileKind } from "../py/protocol";
-import { DETAIL_KEYS, floorCell, newId, parseSquare, squareName, type Cell, type Draft, type DraftEnemy } from "./draft";
+import { Document, isMap, isSeq } from "yaml";
+import { parseYaml } from "../content";
+import type { Facing, Pos, TileKind } from "../py/protocol";
+import { asRecord } from "../storage";
+import { copyKeys, DETAIL_KEYS, ENEMY_KINDS, FACINGS, floorCell, newId, parseSquare, PLAIN_ENEMY_KEYS, squareName, type Cell, type Draft, type DraftEnemy } from "./draft";
 
 type LevelData = Record<string, unknown>;
 
@@ -12,13 +14,13 @@ type LevelData = Record<string, unknown>;
 export class ImportError extends Error {}
 
 const EDITED_KEYS = ["id", "title", "trains", "brief", "piece", "map", "legend", "enemies", "start", "api"];
-const FACINGS: Facing[] = ["north", "east", "south", "west"];
-const ENEMY_KINDS = ["patrol", "chaser", "rook", "bishop"];
-const ENEMY_KEYS = new Set(["kind", "start", "route", "loop", "clock", "armoured", "strategy"]);
+const ENEMY_KEYS = new Set(["kind", "start", "route", ...PLAIN_ENEMY_KEYS]);
 const BUILTIN = new Set([".", "#", "P", "G", "?"]);
 
-const record = (value: unknown): Record<string, unknown> => (value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {});
 const text = (value: unknown, fallback = ""): string => (typeof value === "string" ? value : fallback);
+
+/** A legend entry as a mapping: `pit` is `{tile: pit}`. */
+const normalEntry = (raw: unknown): Record<string, unknown> => (typeof raw === "string" ? { tile: raw } : asRecord(raw));
 
 // -- import -------------------------------------------------------------------------------------------
 
@@ -27,21 +29,17 @@ export function levelDataToDraft(data: unknown, options: { maxSide?: number; id?
   if (!data || typeof data !== "object" || Array.isArray(data)) throw new ImportError("A level is a set of keys and values, like title: and map:.");
   const file = data as LevelData;
   if (typeof file.map !== "string" || !file.map.trim()) throw new ImportError("This level has no map.");
-  const legend = record(file.legend);
+  const legend = asRecord(file.legend);
   const meaning = (symbol: string): Cell => {
     if (symbol === ".") return floorCell();
     if (symbol === "#") return { tile: "wall" };
     if (BUILTIN.has(symbol)) return floorCell(); // the start, the goal and ? are floor
-    const raw = legend[symbol];
-    if (raw === undefined) throw new ImportError(`The map uses ${symbol}, which the legend doesn't explain.`);
-    const entry = typeof raw === "string" ? { tile: raw } : record(raw);
-    const cell: Cell = { tile: entry.tile as TileKind, symbol };
-    if (typeof entry.tile !== "string") throw new ImportError(`The legend entry for ${symbol} has no tile.`);
-    for (const [key, value] of Object.entries(entry)) {
-      if (key === "tile") continue;
-      if (!(DETAIL_KEYS as readonly string[]).includes(key)) throw new ImportError(`The legend entry for ${symbol} has ${key}, which the editor can't keep.`);
-      (cell as unknown as Record<string, unknown>)[key] = value;
-    }
+    if (legend[symbol] === undefined) throw new ImportError(`The map uses ${symbol}, which the legend doesn't explain.`);
+    const { tile, ...details } = normalEntry(legend[symbol]);
+    if (typeof tile !== "string") throw new ImportError(`The legend entry for ${symbol} has no tile.`);
+    for (const key of Object.keys(details)) if (!(DETAIL_KEYS as readonly string[]).includes(key)) throw new ImportError(`The legend entry for ${symbol} has ${key}, which the editor can't keep.`);
+    const cell: Cell = { tile: tile as TileKind, symbol };
+    copyKeys(details, cell, DETAIL_KEYS);
     return cell;
   };
 
@@ -73,7 +71,7 @@ export function levelDataToDraft(data: unknown, options: { maxSide?: number; id?
   });
   if (!start) throw new ImportError("The map needs a start square (P).");
 
-  const begin = record(file.start);
+  const begin = asRecord(file.start);
   const facing = begin.facing ?? "north";
   if (!FACINGS.includes(facing as Facing)) throw new ImportError("The start must face north, east, south or west.");
   const planks = begin.planks ?? 0;
@@ -104,18 +102,15 @@ export function levelDataToDraft(data: unknown, options: { maxSide?: number; id?
 
 function importEnemy(item: unknown, index: number): DraftEnemy {
   const where = `Enemy ${index + 1}`;
-  const enemy = record(item);
-  if (!ENEMY_KINDS.includes(enemy.kind as string)) throw new ImportError(`${where}: its kind must be patrol, chaser, rook or bishop.`);
+  const enemy = asRecord(item);
+  if (!ENEMY_KINDS.includes(enemy.kind as DraftEnemy["kind"])) throw new ImportError(`${where}: its kind must be ${ENEMY_KINDS.slice(0, -1).join(", ")} or ${ENEMY_KINDS.at(-1)}.`);
   for (const key of Object.keys(enemy)) if (!ENEMY_KEYS.has(key)) throw new ImportError(`${where} has ${key}, which the editor can't keep.`);
   const square = (name: unknown): Pos => parseSquare(name) ?? fail(`${where}: ${JSON.stringify(name)} isn't a square; squares are named like b4.`);
   const route = enemy.route === undefined ? undefined : (Array.isArray(enemy.route) ? enemy.route : fail(`${where}: its route must be a list of squares.`)).map(square);
   const start = enemy.start !== undefined ? square(enemy.start) : (route?.[0] ?? fail(`${where}: it needs a start square.`));
   const result: DraftEnemy = { kind: enemy.kind as DraftEnemy["kind"], start };
   if (route) result.route = route;
-  if (enemy.loop !== undefined) result.loop = enemy.loop as boolean;
-  if (enemy.clock !== undefined) result.clock = enemy.clock as Clock;
-  if (enemy.armoured !== undefined) result.armoured = enemy.armoured as boolean;
-  if (enemy.strategy !== undefined) result.strategy = enemy.strategy as string;
+  copyKeys(enemy, result, PLAIN_ENEMY_KEYS);
   return result;
 }
 
@@ -131,30 +126,25 @@ const POOL = "ABCDEFHIJKMNQSTUVXYZabcdefghijklmnopqrstuvwxyz0123456789@%&*+=~";
 
 /** A cell's legend entry: the bare tile name when it has no details, else `{tile, ...details}`. */
 function entryOf(cell: Cell): string | Record<string, unknown> {
-  const details = DETAIL_KEYS.filter((key) => cell[key] !== undefined);
-  return details.length ? { tile: cell.tile, ...Object.fromEntries(details.map((key) => [key, cell[key]])) } : cell.tile;
+  const entry: Record<string, unknown> = { tile: cell.tile };
+  copyKeys(cell, entry, DETAIL_KEYS);
+  return Object.keys(entry).length > 1 ? entry : cell.tile;
 }
 
 const keyOf = (entry: unknown): string => {
-  const normal = typeof entry === "string" ? { tile: entry } : record(entry);
+  const normal = normalEntry(entry);
   return JSON.stringify(Object.keys(normal).sort().map((key) => [key, normal[key]]));
 };
 
 /** Every symbol a map text uses (split on spaces). */
 const symbolsIn = (map: unknown): string[] => (typeof map === "string" ? map.split(/\s+/).filter(Boolean) : []);
 
-export interface ExportedLevel {
-  data: LevelData;
-  /** The squares each legend symbol stands for, by name, so a problem the engine places at a symbol can be put on its squares. */
-  squares: Record<string, string[]>;
-}
-
 /** The draft in the level file's shape, ready for `loadLevel` or for YAML. */
-export function draftToLevelData(draft: Draft): ExportedLevel {
-  const oldLegend = record(draft.extra.legend);
+export function draftToLevelData(draft: Draft): LevelData {
+  const oldLegend = asRecord(draft.extra.legend);
   const { legend: _legend, ...extra } = draft.extra;
   // symbols other boards (variants) use mean what the file said; the editor keeps clear of them
-  const reserved = new Set((Array.isArray(extra.variants) ? extra.variants : []).flatMap((variant) => symbolsIn(record(variant).map)).filter((symbol) => symbol in oldLegend));
+  const reserved = new Set((Array.isArray(extra.variants) ? extra.variants : []).flatMap((variant) => symbolsIn(asRecord(variant).map)).filter((symbol) => symbol in oldLegend));
   const taken = new Set<string>([...BUILTIN, ...reserved]);
   const bound = new Map<string, string>(); // an entry's key -> its symbol
   const legend: Record<string, unknown> = {};
@@ -162,7 +152,6 @@ export function draftToLevelData(draft: Draft): ExportedLevel {
     legend[symbol] = oldLegend[symbol];
     if (!bound.has(keyOf(oldLegend[symbol]))) bound.set(keyOf(oldLegend[symbol]), symbol);
   }
-  const squares: Record<string, string[]> = {};
 
   const symbolFor = (cell: Cell): string => {
     if (cell.tile === "floor") return ".";
@@ -188,9 +177,7 @@ export function draftToLevelData(draft: Draft): ExportedLevel {
         if (same(draft.start, x, y)) return "P";
         if (same(draft.goal, x, y)) return "G";
         if (draft.spots.some((spot) => same(spot, x, y))) return "?";
-        const symbol = symbolFor(cell);
-        if (symbol !== "." && symbol !== "#") (squares[symbol] ??= []).push(squareName([x, y]));
-        return symbol;
+        return symbolFor(cell);
       }).join(" "),
     );
   }
@@ -205,7 +192,7 @@ export function draftToLevelData(draft: Draft): ExportedLevel {
   data.start = draft.planks ? { facing: draft.facing, planks: draft.planks } : { facing: draft.facing };
   data.api = draft.api;
   Object.assign(data, extra);
-  return { data, squares };
+  return data;
 }
 
 function exportEnemy(enemy: DraftEnemy): Record<string, unknown> {
@@ -213,22 +200,15 @@ function exportEnemy(enemy: DraftEnemy): Record<string, unknown> {
   const first = enemy.route?.[0];
   if (!first || first[0] !== enemy.start[0] || first[1] !== enemy.start[1]) out.start = squareName(enemy.start);
   if (enemy.route) out.route = enemy.route.map(squareName);
-  if (enemy.loop !== undefined) out.loop = enemy.loop;
-  if (enemy.clock !== undefined) out.clock = enemy.clock;
-  if (enemy.armoured !== undefined) out.armoured = enemy.armoured;
-  if (enemy.strategy !== undefined) out.strategy = enemy.strategy;
+  copyKeys(enemy, out, PLAIN_ENEMY_KEYS);
   return out;
 }
 
 // -- YAML -----------------------------------------------------------------------------------------------
 
-/** YAML 1.1, the way the engine's checker and `content.ts` read level files, so "yes" and "no" survive. */
-export const parseLevelYaml = (source: string): unknown => parse(source, { version: "1.1" });
-
 /** The draft as a level file's text: the map as a block, and each enemy, legend entry and the start on one line. */
 export function draftToYaml(draft: Draft): string {
-  const { data } = draftToLevelData(draft);
-  const doc = new Document(data, { version: "1.1" });
+  const doc = new Document(draftToLevelData(draft), { version: "1.1" });
   const flow = (node: unknown) => {
     if (isMap(node)) node.flow = true;
   };
@@ -240,11 +220,11 @@ export function draftToYaml(draft: Draft): string {
   return doc.toString({ lineWidth: 0 });
 }
 
-/** A level file's text as a draft (see `levelDataToDraft`). */
+/** A level file's text as a draft (see `levelDataToDraft`). Read as YAML 1.1, like the checker, so "yes" and "no" survive. */
 export function yamlToDraft(source: string, options: { maxSide?: number; id?: string } = {}): Draft {
   let data: unknown;
   try {
-    data = parseLevelYaml(source);
+    data = parseYaml(source);
   } catch (error) {
     throw new ImportError(`This isn't readable YAML: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`);
   }

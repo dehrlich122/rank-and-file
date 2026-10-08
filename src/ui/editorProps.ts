@@ -1,8 +1,8 @@
 // The level editor's properties panel (M4.2): the Level, Square and Enemy tabs, and the Problems list.
 // It builds plain DOM from the draft, and reports every change through `change`; it never judges anything
 // (the engine does, and its problem arrives here already placed).
-import { squareName, type Cell, type Draft, type DraftEnemy } from "../editor/draft";
-import { removeCorner, removeEnemy } from "../editor/edit";
+import { copyKeys, DETAIL_KEYS, PLAIN_ENEMY_KEYS, squareName, words, type Cell, type Draft, type DraftEnemy } from "../editor/draft";
+import { removeCorner, removeEnemy, withCell, withEnemy, type Edit } from "../editor/edit";
 import type { Problem } from "../editor/problems";
 import type { Clock, EditorOptions, Pos } from "../py/protocol";
 import { h } from "./dom";
@@ -39,7 +39,7 @@ export function renderProps(ctx: PropsContext): HTMLElement {
     ),
   );
   const body = ctx.tab === "level" ? levelFields(ctx) : ctx.tab === "square" ? squareFields(ctx) : enemyFields(ctx);
-  return h("div", { class: "props" }, tabs, h("div", { class: "props-scroll", role: "tabpanel" }, body, problems(ctx)));
+  return h("div", { class: "props" }, tabs, h("div", { class: "props-scroll", role: "tabpanel" }, body, renderProblems(ctx)));
 }
 
 // -- fields -------------------------------------------------------------------------------------------------
@@ -117,7 +117,6 @@ const DETAIL_LABELS: Record<string, Record<string, string>> = {
   gate: { passphrase: "The answer that opens it", question: "What the guard asks (optional)" },
   timed_gate: { every: "Opens and shuts every … ticks", open: "Open for … of those ticks", clock: "Ticks with" },
 };
-const DETAIL_ORDER = ["text", "passphrase", "question", "every", "open", "clock"];
 const DETAIL_NOTES: Record<string, string> = {
   text: "Shown before the run, and read by the pawn.",
   passphrase: "Printing exactly this next to the gate opens it. It is never shown to the player.",
@@ -131,12 +130,12 @@ function squareFields(ctx: PropsContext): HTMLElement {
   const cell = draft.cells[y]?.[x];
   if (!cell) return h("div", { class: "props-body" }, h("p", { class: "muted" }, "That square is off the board now."));
   const rule = options.tiles[cell.tile] ?? { needs: [], may: [] };
-  const keys = [...rule.needs, ...rule.may].sort((a, b) => DETAIL_ORDER.indexOf(a) - DETAIL_ORDER.indexOf(b));
+  const keys = [...rule.needs, ...rule.may].sort((a, b) => DETAIL_KEYS.indexOf(a as (typeof DETAIL_KEYS)[number]) - DETAIL_KEYS.indexOf(b as (typeof DETAIL_KEYS)[number]));
   const set = (key: keyof Cell, value: string | number | undefined, burst?: string) => {
     const next: Cell = { ...cell };
     if (value === undefined || (value === "" && rule.may.includes(key))) delete next[key];
     else (next as unknown as Record<string, unknown>)[key] = value;
-    ctx.change({ ...draft, cells: draft.cells.map((row, rowY) => (rowY === y ? row.map((old, colX) => (colX === x ? next : old)) : row)) }, burst ?? `square:${squareName(selection.pos)}:${key}`);
+    ctx.change(withCell(draft, selection.pos, next), burst ?? `square:${squareName(selection.pos)}:${key}`);
   };
   const controls = keys.map((key) => {
     const label = DETAIL_LABELS[cell.tile]?.[key] ?? key;
@@ -150,7 +149,7 @@ function squareFields(ctx: PropsContext): HTMLElement {
   return h(
     "div",
     { class: "props-body" },
-    h("p", { class: "props-what" }, h("strong", {}, squareName(selection.pos)), ` · ${cell.tile.replace("_", " ")}`),
+    h("p", { class: "props-what" }, h("strong", {}, squareName(selection.pos)), ` · ${words(cell.tile)}`),
     ...(controls.length ? controls : [h("p", { class: "muted" }, "Nothing else can be set on this one.")]),
   );
 }
@@ -163,7 +162,7 @@ function enemyFields(ctx: PropsContext): HTMLElement {
   const enemy = draft.enemies[index];
   if (!enemy) return h("div", { class: "props-body" }, h("p", { class: "muted" }, "Choose the Select tool and click an enemy to change it, or pick an enemy from the palette and click a square to add one."));
   const keys = options.enemies[enemy.kind] ?? [];
-  const update = (next: DraftEnemy, burst?: string) => ctx.change({ ...draft, enemies: draft.enemies.map((old, i) => (i === index ? next : old)) }, burst);
+  const update = (next: DraftEnemy, burst?: string) => ctx.change(withEnemy(draft, index, next), burst);
   const flag = (key: "loop" | "armoured", label: string) => (keys.includes(key) ? check(label, enemy[key] === true, (on) => update(withoutKey(enemy, key, on ? true : undefined))) : null);
   const route = enemy.route ?? [];
   return h(
@@ -203,7 +202,7 @@ function enemyFields(ctx: PropsContext): HTMLElement {
   );
 }
 
-function applyEdit(ctx: PropsContext, edit: ReturnType<typeof removeEnemy>, then?: Selection): void {
+function applyEdit(ctx: PropsContext, edit: Edit, then?: Selection): void {
   if ("refused" in edit) return ctx.say(edit.refused);
   ctx.change(edit.draft);
   ctx.say(edit.note);
@@ -222,13 +221,13 @@ function withoutKey(enemy: DraftEnemy, key: "loop" | "armoured", value: true | u
 function changeKind(enemy: DraftEnemy, kind: DraftEnemy["kind"], options: EditorOptions): DraftEnemy {
   const takes = new Set(options.enemies[kind] ?? []);
   const next: DraftEnemy = { kind, start: enemy.start };
-  for (const key of ["route", "loop", "clock", "armoured", "strategy"] as const) if (takes.has(key) && enemy[key] !== undefined) Object.assign(next, { [key]: enemy[key] });
+  copyKeys(enemy, next, ["route", ...PLAIN_ENEMY_KEYS].filter((key) => takes.has(key)));
   return next;
 }
 
 // -- problems -------------------------------------------------------------------------------------------------------
 
-function problems(ctx: PropsContext): HTMLElement {
+export function renderProblems(ctx: PropsContext): HTMLElement {
   const { problem } = ctx;
   return h(
     "section",

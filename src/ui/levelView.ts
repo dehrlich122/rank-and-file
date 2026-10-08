@@ -412,7 +412,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     const actions: HTMLElement[] = [];
     if (help) actions.push(...help.outcomeActions(run, recordedCode ?? "", showHelp));
     if (run.status === "solved") {
-      const next = testPlay ? undefined : nextLevel(source.id);
+      const next = nextLevel(source.id); // none for a level from the editor: it's in no chapter
       actions.push(
         testPlay
           ? h("a", { class: "btn btn-primary btn-small", href: testPlay.back }, "← Back to the editor")
@@ -423,7 +423,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       window.setTimeout(() => shownBoard()?.setCelebrating(true), afterMs);
       // clearing a tier's last core level earns its promotion: the ceremony follows the celebration, once
       const tier = chapters.find((c) => c.chapter === source.chapter)?.tier;
-      if (!testPlay && tier && !source.mastery && tierCleared(tier) && !progress.hasSeen("promotion", tier)) {
+      if (tier && !source.mastery && tierCleared(tier) && !progress.hasSeen("promotion", tier)) {
         if (motionReduced()) {
           // no automatic jump without motion: offer it instead
           actions.push(h("a", { class: "btn btn-small", href: `#/promotion/${tier}` }, "Promotion earned: watch it"));

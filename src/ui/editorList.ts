@@ -1,7 +1,7 @@
 // My levels (M4.2): `#/editor`. The levels made in the editor, saved in this browser, newest edit first. From here a
 // new level starts blank, from a lesson level's board, or from a .yaml file; and each can be duplicated, exported
 // or deleted.
-import { chapterName, chapters } from "../content";
+import { chapterName, chapters, findLevel } from "../content";
 import { blankDraft, newId, type Draft } from "../editor/draft";
 import { drafts } from "../editor/drafts";
 import { draftToYaml, ImportError, yamlToDraft } from "../editor/levelData";
@@ -94,7 +94,7 @@ export function mountEditorList(root: HTMLElement, client: PyClient): () => void
   );
   const picker = h("select", { "aria-label": "A lesson level to copy" }, ...lessonLevels);
   const copy = () => {
-    const level = chapters.flatMap((chapter) => chapter.levels).find((candidate) => candidate.id === picker.value);
+    const level = findLevel(picker.value);
     if (level) open(copyOfLevel(level.data));
   };
 

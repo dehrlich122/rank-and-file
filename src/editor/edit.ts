@@ -1,12 +1,10 @@
 // The editor's changes to a draft (M4.2): paint, erase, place, move, resize. Each is a pure function that gives
 // back a new draft, or says why it won't (`refused`), in words the status line can show. None of them judges the
 // level: a wall under an enemy is allowed, and the engine's problem list says so (docs/M4/M4.2.md).
-import type { Facing, Pos, TileKind } from "../py/protocol";
-import { floorCell, squareName, type Cell, type Draft, type DraftEnemy } from "./draft";
+import type { Pos, TileKind } from "../py/protocol";
+import { capitalise, FACINGS, floorCell, squareName, words, type Cell, type Draft, type DraftEnemy } from "./draft";
 
 export type Edit = { draft: Draft; note: string } | { refused: string };
-
-const FACINGS: Facing[] = ["north", "east", "south", "west"];
 
 /** What a new tile starts with, by detail name, so a sign or gate is complete when it's placed. */
 const STARTS_WITH: Record<string, string | number> = { text: "Edit me", passphrase: "open sesame", every: 4 };
@@ -29,13 +27,18 @@ export function occupantOf(draft: Draft, pos: Pos): Occupant | null {
 }
 
 /** A square made to hold `cell`; the rest of the board is shared with the old draft. */
-function withCell(draft: Draft, [x, y]: Pos, cell: Cell): Draft {
+export function withCell(draft: Draft, [x, y]: Pos, cell: Cell): Draft {
   return { ...draft, cells: draft.cells.map((row, rowY) => (rowY === y ? row.map((old, colX) => (colX === x ? cell : old)) : row)) };
 }
 
 const done = (draft: Draft, note: string): Edit => ({ draft, note });
 const refuse = (refused: string): Edit => ({ refused });
-const label = (tile: TileKind): string => tile.replace("_", " ");
+const label = (tile: TileKind): string => words(tile);
+
+/** The draft with enemy `index` replaced. */
+export function withEnemy(draft: Draft, index: number, enemy: DraftEnemy): Draft {
+  return { ...draft, enemies: draft.enemies.map((old, i) => (i === index ? enemy : old)) };
+}
 
 /** A new tile of this kind with the details it needs (`needs`: the engine's list, from `editorOptions`). */
 export function newCell(tile: TileKind, needs: string[]): Cell {
@@ -53,7 +56,7 @@ export function paint(draft: Draft, pos: Pos, tile: TileKind, needs: string[]): 
   const here = occupantOf(draft, pos);
   if (here === "start" || here === "goal" || here === "spot") return refuse(`The ${here === "spot" ? "hidden goal" : here} is on ${squareName(pos)}: move it first.`);
   if (old.tile === tile) return refuse(`${squareName(pos)} is already a ${label(tile)}.`);
-  return done(withCell(draft, pos, newCell(tile, needs)), `${label(tile)} on ${squareName(pos)}.`.replace(/^./, (c) => c.toUpperCase()));
+  return done(withCell(draft, pos, newCell(tile, needs)), capitalise(`${label(tile)} on ${squareName(pos)}.`));
 }
 
 /** Take away what's on a square: an enemy first, then a goal or hidden-goal mark, then the tile. */
@@ -111,7 +114,7 @@ export function rotateStart(draft: Draft): Edit {
 export function placeEnemy(draft: Draft, pos: Pos, kind: DraftEnemy["kind"]): Edit {
   if (!inside(draft, pos)) return refuse("That's off the board.");
   if (enemyAt(draft, pos) >= 0) return refuse(`There's already an enemy on ${squareName(pos)}.`);
-  return done({ ...draft, enemies: [...draft.enemies, { kind, start: pos }] }, `${kind} on ${squareName(pos)}.`.replace(/^./, (c) => c.toUpperCase()));
+  return done({ ...draft, enemies: [...draft.enemies, { kind, start: pos }] }, capitalise(`${kind} on ${squareName(pos)}.`));
 }
 
 export function removeEnemy(draft: Draft, index: number): Edit {
@@ -132,7 +135,7 @@ export function moveEnemy(draft: Draft, index: number, to: Pos): Edit {
   const route = enemy.route?.map(shift);
   if (route?.some((corner) => !inside(draft, corner))) return refuse("Its route would leave the board.");
   const moved: DraftEnemy = { ...enemy, start: to, ...(route ? { route } : {}) };
-  return done({ ...draft, enemies: draft.enemies.map((old, i) => (i === index ? moved : old)) }, `Moved the ${enemy.kind} to ${squareName(to)}.`);
+  return done(withEnemy(draft, index, moved), `Moved the ${enemy.kind} to ${squareName(to)}.`);
 }
 
 /** Add a corner to a patrol's route, in a straight line along a rank or file from the last one. */
@@ -145,7 +148,7 @@ export function extendRoute(draft: Draft, index: number, pos: Pos): Edit {
   const last = route[route.length - 1]!;
   if (samePos(last, pos)) return refuse("The route is already there.");
   if (last[0] !== pos[0] && last[1] !== pos[1]) return refuse("A route runs straight along a rank or file.");
-  return done({ ...draft, enemies: draft.enemies.map((old, i) => (i === index ? { ...enemy, route: [...route, pos] } : old)) }, `Route corner on ${squareName(pos)}.`);
+  return done(withEnemy(draft, index, { ...enemy, route: [...route, pos] }), `Route corner on ${squareName(pos)}.`);
 }
 
 /** Drop a corner from a patrol's route (the first corner is where the patrol starts: drop the route to change that). */
@@ -157,7 +160,7 @@ export function removeCorner(draft: Draft, index: number, corner: number): Edit 
   const next: DraftEnemy = { ...enemy };
   if (rest.length > 1) next.route = rest;
   else delete next.route; // a patrol with no corner to walk to stands guard
-  return done({ ...draft, enemies: draft.enemies.map((old, i) => (i === index ? next : old)) }, `Took a corner off the route.`);
+  return done(withEnemy(draft, index, next), "Took a corner off the route.");
 }
 
 // -- many squares -------------------------------------------------------------------------------------------
