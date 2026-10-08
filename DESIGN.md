@@ -171,7 +171,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 | M3.0–M3.5 | the obstacle toolkit, the Codex, Chapters 2–5 | Done |
 | M3.6 Chapter 6 | Runes | Merged 2026-10-02 (`docs/M3/M3.6.md`), PR #16 |
 | **M3.7 Look & Feel** | the first major design pass (§9), with the **promotion ceremony** and the knight skin (§8) | Merged 2026-10-03 (`docs/M3/M3.7.md`), PR #17 |
-| **M4 Sound, editor and free play** | **sound** (a soundtrack and effects); author levels without hand-writing YAML, and **share** them; **free play** (challenges, your own and shared levels, a sandbox, the skins gallery); the Pawn tier's set of mastery challenges | In progress: M4.0 and M4.1 (sound) merged 2026-10-08; the editor is next (`docs/M4/M4.md`) |
+| **M4 Sound, editor and free play** | **sound** (a soundtrack and effects); author levels without hand-writing YAML, and **share** them; **free play** (challenges, your own and shared levels, a sandbox, the skins gallery); the Pawn tier's set of mastery challenges | In progress: M4.0, M4.1 (sound) and M4.2 (the editor's board) merged 2026-10-08; rules, a solvability check and sharing are next (M4.3, `docs/M4/M4.md`) |
 | M5+ | the remaining chapters, one tier at a time, each ending in a promotion | Planned |
 
 *(Designer, 2026-10-02)* The design pass comes **before** the editor. By then the Pawn tier holds every tile, enemy and ability the editor's palette must show, and an editor built on the old look would be restyled straight away.
@@ -239,7 +239,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 - a small cyan tick where grid lines cross, so squares can be counted like on a targeting grid
 - file letters (a–h) along the bottom and rank numbers (1–8) up the left, always both, restyled from today's `labels()`; they're text, so no glow
 
-**The start menu** is a styled title screen with some animation, honouring reduced motion. Its four entries are Lessons, Free Play, Level Editor and Settings. Free Play (M4.4) and Level Editor (M4.2) show now as "coming soon" and switch on when those milestones land.
+**The start menu** is a styled title screen with some animation, honouring reduced motion. Its four entries are Lessons, Free Play, Level Editor and Settings. The Level Editor is on (M4.2); Free Play (M4.4) shows as "coming soon" until that milestone lands.
 - Direction: ~~the arcade title, with a pixel-font logo~~ *the neon title (revised after step 0, below)*. A big "RANK & FILE" logo with a hard offset shadow (an offset, not a blur, so it isn't glow on text), over a slowly scrolling synthwave perspective grid and a striped sun. **A rank of enemy chess pieces stands in front of the sun, and the player's hero (the pawn, or whatever rank the player has reached) stands under the menu.** A blinking ▶ marks the selected entry. With reduced motion the grid, the blink and the glitches stop.
 - The name stays Rank & File. The code form `rank_and_file()` is a secondary mark (for example the subtitle under the logo), never the logo.
 - Keyboard first: the arrow keys move the selection and Enter opens it.
