@@ -23,7 +23,7 @@ export interface Settings {
 
 export const SPEEDS = [0.5, 1, 2, 4] as const;
 export const CODE_SIZES: Record<CodeSize, number> = { small: 13, medium: 15, large: 17, "x-large": 20 };
-export const DEFAULTS: Settings = { speed: 1, theme: "dark", codeSize: "medium", motion: "system", codePanel: "right", wrapLines: true, piece: "pawn", music: 25, effects: 35, muted: false };
+export const DEFAULTS: Settings = { speed: 1, theme: "dark", codeSize: "medium", motion: "system", codePanel: "right", wrapLines: true, piece: "pawn", music: 60, effects: 50, muted: false };
 
 const STORAGE_KEY = "rank-and-file:settings";
 const THEMES: readonly Theme[] = ["system", "light", "dark"];

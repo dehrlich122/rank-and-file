@@ -4,7 +4,7 @@
 // Save button. The browser's <dialog> closes on Esc and keeps keyboard focus
 // inside while it's open; on close, focus goes back to where it was.
 import { CODE_SIZES, SPEEDS, type CodeSize, type Piece, type Settings, type SettingsStore } from "../settings";
-import { TRACKS } from "../sound";
+import { sound, TRACKS } from "../sound";
 import { confirmStep, dialogHead, modal } from "./dialog";
 import { h } from "./dom";
 
@@ -135,7 +135,9 @@ export class SettingsDialog {
               "data-key": group.key,
             });
             input.addEventListener("change", () => {
-              if (input.checked) this.store.set({ [group.key]: choice.value });
+              if (!input.checked) return;
+              sound.play("menu_choose");
+              this.store.set({ [group.key]: choice.value });
             });
             this.inputs.push(input);
             return h("label", { class: "choice" }, input, h("span", {}, choice.label));

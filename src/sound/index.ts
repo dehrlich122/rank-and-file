@@ -39,11 +39,13 @@ class Sound {
     };
     window.addEventListener("pointerdown", unlock, true);
     window.addEventListener("keydown", unlock, true);
-    settings.subscribe((next) => this.applyEffectsVolume(next));
+    settings.subscribe((next) => {
+      this.applyEffectsVolume(next);
+      if (next.muted) this.silenceMusic(); // muting is instant; only coming back fades in
+    });
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) return;
-      this.fade = 0; // a hidden tab's timers are throttled, so stop at once instead of fading
-      this.audio?.pause();
+      this.silenceMusic(); // a hidden tab's timers are throttled, so stop at once instead of fading
     });
   }
 
@@ -60,6 +62,13 @@ class Sound {
     if (ctx.state === "suspended") void ctx.resume();
     EFFECTS[name](ctx, this.master, ctx.currentTime + after + 0.01);
     if (DUCKS.includes(name)) this.duckUntil = performance.now() + (after + lengthOf(name) + 0.4) * 1000;
+  }
+
+  private silenceMusic(): void {
+    this.fade = 0;
+    if (!this.audio) return;
+    this.audio.volume = 0;
+    this.audio.pause();
   }
 
   private context(): AudioContext | null {
