@@ -171,7 +171,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 | M3.0–M3.5 | the obstacle toolkit, the Codex, Chapters 2–5 | Done |
 | M3.6 Chapter 6 | Runes | Merged 2026-10-02 (`docs/M3/M3.6.md`), PR #16 |
 | **M3.7 Look & Feel** | the first major design pass (§9), with the **promotion ceremony** and the knight skin (§8) | Merged 2026-10-03 (`docs/M3/M3.7.md`), PR #17 |
-| **M4 Sound, editor and free play** | **sound** (a soundtrack and effects); author levels without hand-writing YAML, and **share** them; **free play** (challenges, your own and shared levels, a sandbox, the skins gallery); the Pawn tier's set of mastery challenges | Planning (`docs/M4/M4.md`) |
+| **M4 Sound, editor and free play** | **sound** (a soundtrack and effects); author levels without hand-writing YAML, and **share** them; **free play** (challenges, your own and shared levels, a sandbox, the skins gallery); the Pawn tier's set of mastery challenges | In progress: M4.0 and M4.1 (sound) merged 2026-10-08; the editor is next (`docs/M4/M4.md`) |
 | M5+ | the remaining chapters, one tier at a time, each ending in a promotion | Planned |
 
 *(Designer, 2026-10-02)* The design pass comes **before** the editor. By then the Pawn tier holds every tile, enemy and ability the editor's palette must show, and an editor built on the old look would be restyled straight away.

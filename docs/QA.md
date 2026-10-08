@@ -1667,7 +1667,7 @@ The designer retested the Testing-ground hint fixes and answered the questions l
 - **QA-025 to QA-028** *(Designer, 2026-10-07)*: retested thoroughly and approved. All four are Verified.
 - **The tick counter** (PR #8's question) *(Designer, 2026-10-07)*: the timed gate's badge ("2 of 4 · tick N") is fine for now. No
   separate counter on the board.
-- **QA-042 · "Show me a solution" after three tries, hints or not** *(Designer, 2026-10-07)* · Fixed
+- **QA-042 · "Show me a solution" after three tries, hints or not** *(Designer, 2026-10-07)* · Verified
   - **Observed:** the offer only comes once every hint is open and three more runs have failed (M2).
   - **Wanted:** the solution is available after three tries, whether or not hints have been opened.
   - **Fixed** in `71353eb` (M4.0; `docs/M4/M4.md` has the details):
@@ -1679,6 +1679,7 @@ The designer retested the Testing-ground hint fixes and answered the questions l
       by side.
     - Hints, the third star and "solved with help" don't change. A count saved under the old rule carries over.
     - vitest covers the rule. The M2 e2e checks for giving up now follow it.
+  - **Verified** *(Designer, 2026-10-08)*: merged as PR #18 after the retest.
   - **Retest:**
     1. Pick a level you haven't played (or Settings → Reset progress), and fail it twice without opening a hint. Nothing is
        offered yet. After the first failure, the Challenge panel's Solution section counts the runs left.
