@@ -26,7 +26,9 @@ class Sound {
   private fade = 0; // 0 to 1: the music's fade in or out
   private duck = 1;
   private duckUntil = 0; // performance.now() time
-  private readonly voices = new Voices(4);
+  private readonly voices = new Voices();
+  private timer: number | undefined; // the music's 50 ms tick: running only while there is something to fade
+  private lastTry = 0; // when the music last asked the browser to play
 
   /** Wait for the first click or key press, then let the music and effects work. Call once, at startup. */
   start(): void {
@@ -35,23 +37,19 @@ class Sound {
       window.removeEventListener("keydown", unlock, true);
       this.unlocked = true;
       this.context();
-      window.setInterval(() => this.tick(), TICK_MS);
+      this.wake();
     };
     window.addEventListener("pointerdown", unlock, true);
     window.addEventListener("keydown", unlock, true);
     settings.subscribe((next) => {
       this.applyEffectsVolume(next);
       if (next.muted) this.silenceMusic(); // muting is instant; only coming back fades in
+      this.wake();
     });
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) return;
-      this.silenceMusic(); // a hidden tab's timers are throttled, so stop at once instead of fading
+      if (document.hidden) this.silenceMusic(); // a hidden tab's timers are throttled, so stop at once instead of fading
+      else this.wake();
     });
-  }
-
-  /** The track now on (or next to play), for Settings → Sound. */
-  nowPlaying(): (typeof TRACKS)[number] {
-    return TRACKS[this.track]!;
   }
 
   /** Play an effect, `after` seconds from now. Silent before the first click or key, when muted, or at 0%. */
@@ -61,7 +59,10 @@ class Sound {
     if (!ctx || !this.master || muted || effects === 0 || !this.voices.start(ctx.currentTime + after, lengthOf(name))) return;
     if (ctx.state === "suspended") void ctx.resume();
     EFFECTS[name](ctx, this.master, ctx.currentTime + after + 0.01);
-    if (DUCKS.includes(name)) this.duckUntil = performance.now() + (after + lengthOf(name) + 0.4) * 1000;
+    if (DUCKS.includes(name)) {
+      this.duckUntil = performance.now() + (after + lengthOf(name) + 0.4) * 1000;
+      this.wake();
+    }
   }
 
   private silenceMusic(): void {
@@ -86,27 +87,48 @@ class Sound {
     if (this.master) this.master.gain.value = muted ? 0 : effects / 100;
   }
 
-  /** Every 50 ms: fade the music towards what's wanted, fetch and play it when it is, and set its volume. */
+  private wake(): void {
+    if (this.unlocked && this.timer === undefined) this.timer = window.setInterval(() => this.tick(), TICK_MS);
+  }
+
+  /** Every 50 ms while there is something to do: fade the music towards what's wanted, fetch and play it when it is, and set its volume. */
   private tick(): void {
     const { music, muted } = settings.get();
     const wanted = !muted && music > 0 && !document.hidden;
     this.fade = Math.min(1, Math.max(0, this.fade + (wanted ? TICK_MS : -TICK_MS) / FADE_MS));
     if (wanted && !this.audio) this.audio = this.createAudio();
     const audio = this.audio;
-    if (!audio) return;
-    if (wanted && audio.paused) audio.play().catch(() => {}); // refused: the next tick tries again
-    if (!wanted && this.fade === 0 && !audio.paused) audio.pause();
     this.duck += ((performance.now() < this.duckUntil ? DUCKED : 1) - this.duck) * 0.2;
+    if (!audio) return this.rest(wanted);
+    if (wanted && audio.paused && performance.now() - this.lastTry > 1000) {
+      this.lastTry = performance.now();
+      audio.play().catch(() => {}); // refused (before a click, say): tried again in a second
+    }
+    if (!wanted && this.fade === 0 && !audio.paused) audio.pause();
     const edge = Number.isFinite(audio.duration) ? Math.min(1, audio.currentTime / EDGE_S, (audio.duration - audio.currentTime) / EDGE_S) : 1;
-    audio.volume = Math.min(1, Math.max(0, (music / 100) * this.fade * this.duck * Math.max(0, edge)));
+    const volume = Math.min(1, Math.max(0, (music / 100) * this.fade * this.duck * Math.max(0, edge)));
+    if (Math.abs(audio.volume - volume) > 0.002) audio.volume = volume;
+    this.rest(wanted);
+  }
+
+  /** Stop ticking when nothing is playing, fading or ducked: the next setting change, duck or return to the tab starts it again. */
+  private rest(wanted: boolean): void {
+    const quiet = !wanted && this.fade === 0 && (this.audio?.paused ?? true) && Math.abs(this.duck - 1) < 0.01;
+    if (!quiet || this.timer === undefined) return;
+    window.clearInterval(this.timer);
+    this.timer = undefined;
+  }
+
+  private url(): string {
+    return `${import.meta.env.BASE_URL}audio/${TRACKS[this.track]!.file}`;
   }
 
   private createAudio(): HTMLAudioElement {
-    const audio = new Audio(`${import.meta.env.BASE_URL}audio/${TRACKS[this.track]!.file}`);
+    const audio = new Audio(this.url());
     audio.loop = TRACKS.length === 1;
     audio.addEventListener("ended", () => {
       this.track = (this.track + 1) % TRACKS.length; // with more than one track, the next
-      audio.src = `${import.meta.env.BASE_URL}audio/${TRACKS[this.track]!.file}`;
+      audio.src = this.url();
       audio.play().catch(() => {});
     });
     return audio;

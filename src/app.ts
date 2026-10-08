@@ -38,11 +38,14 @@ export function startApp(root: HTMLElement): void {
     () => unlockedPieces(progress),
   );
   sound.start(); // music and effects begin at the first click or key press
-  const muteButton = h("button", { class: "btn btn-small mute-button", "aria-pressed": "false", onClick: () => settings.set({ muted: !settings.get().muted }) });
+  const muteButton = h("button", { class: "btn btn-small mute-button", onClick: () => settings.set({ muted: !settings.get().muted }) });
+  let painted: boolean | undefined; // volume changes reach this too, and the icon only changes with muting
   const paintMute = () => {
     const { muted } = settings.get();
+    if (muted === painted) return;
+    painted = muted;
     const label = muted ? "Sound is off. Turn it on" : "Sound is on. Mute it";
-    muteButton.setAttribute("aria-pressed", String(muted));
+    muteButton.classList.toggle("muted", muted);
     muteButton.setAttribute("aria-label", label);
     muteButton.title = label;
     muteButton.replaceChildren(icon(muted ? "soundMuted" : "sound"));

@@ -6,11 +6,11 @@ import type { PyClient } from "../py/client";
 import type { LevelInfo } from "../py/protocol";
 import type { ProgressStore } from "../progress";
 import { lastChapterOf, PROMOTIONS, tierCleared } from "../promotion";
+import { sound } from "../sound";
 import { asRecord, browserStorage, readJson, writeJson } from "../storage";
 import { BoardView } from "./board";
 import { h } from "./dom";
 import { icon } from "./icons";
-import { sound } from "../sound";
 import { crown } from "./sprites";
 import { svg } from "./svg";
 import { folderName, tierName, VOICE } from "./voice";
@@ -133,10 +133,8 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
       h("span", { class: "lrow-text" }, h("strong", {}, level.title, level.mastery ? masteryTag() : null), h("span", { class: "muted small" }, level.trains)),
       solved ? h("span", { class: "card-stars", title: `${best} of 3 stars` }, ...stars(best), h("span", { class: "sr-only" }, `${best} of 3 stars`)) : helped ? h("span", { class: "card-tag muted small" }, "Solution seen") : null,
     );
-    element.addEventListener("click", () => {
-      if (selected !== level) sound.play("menu_move");
-      select(level);
-    });
+    element.addEventListener("mousedown", () => selected !== level && sound.play("menu_move")); // before the click's focus selects it
+    element.addEventListener("click", () => select(level));
     element.addEventListener("focus", () => selected !== level && select(level)); // arriving by keyboard selects too
     element.addEventListener("dblclick", () => open(level));
     element.addEventListener("keydown", (event) => {

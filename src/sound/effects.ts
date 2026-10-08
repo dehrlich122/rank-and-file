@@ -1,12 +1,6 @@
 // The sound effects (M4.1): chiptune, synthesised with Web Audio, so there are no sound files and nothing to license.
 // Each is the take the designer picked from the sound sheet (docs/M4/M4.1.md); the others are in git history.
 
-export type SoundName =
-  | "move" | "turn_left" | "turn_right" | "bump" | "gate_open" | "guard" | "pick_up" | "bridge" | "capture"
-  | "read" | "lost" | "fall" | "crush" | "waypoint"
-  | "complete" | "star" | "run_lost" | "error"
-  | "menu_move" | "menu_choose" | "hint" | "crown" | "promotion";
-
 /** Schedules a sound on `out`, starting at time `t` of `ctx`. */
 export type Play = (ctx: AudioContext, out: AudioNode, t: number) => void;
 
@@ -39,13 +33,22 @@ function voice(ctx: AudioContext, out: AudioNode, t: number, v: Voice): void {
 }
 
 /** A burst of filtered noise: the crunch, thud and scan of the effects. */
+const noise = new WeakMap<AudioContext, AudioBuffer>(); // one second of white noise per context, shared by every burst
+
+function noiseBuffer(ctx: AudioContext): AudioBuffer {
+  let buffer = noise.get(ctx);
+  if (!buffer) {
+    buffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    noise.set(ctx, buffer);
+  }
+  return buffer;
+}
+
 function burst(ctx: AudioContext, out: AudioNode, t: number, at: number, dur: number, cutoff: number, gain = 0.5): void {
-  const length = Math.max(1, Math.floor(ctx.sampleRate * dur));
-  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
   const source = ctx.createBufferSource();
-  source.buffer = buffer;
+  source.buffer = noiseBuffer(ctx);
   const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
   filter.frequency.value = cutoff;
@@ -53,7 +56,7 @@ function burst(ctx: AudioContext, out: AudioNode, t: number, at: number, dur: nu
   amp.gain.setValueAtTime(gain, t + at);
   amp.gain.exponentialRampToValueAtTime(0.0001, t + at + dur);
   source.connect(filter).connect(amp).connect(out);
-  source.start(t + at);
+  source.start(t + at, 0, dur);
 }
 
 /** Notes (semitones from A4) one after another, `step` seconds apart. */
@@ -67,7 +70,7 @@ const blip = (semi: number, dur: number, type: OscillatorType = "square", gain =
 const glide = (from: number, to: number, dur: number, type: OscillatorType = "square", gain = 0.4): Play => (ctx, out, t) =>
   voice(ctx, out, t, { freq: hz(from), to: hz(to), dur, type, gain });
 
-export const EFFECTS: Record<SoundName, Play> = {
+export const EFFECTS = {
   // -- on the board ----------------------------------------------------------------------------------------
   move: blip(7, 0.04, "square", 0.25),
   turn_left: run([7, 0], 0.045, "square", 0.06, 0.3),
@@ -96,4 +99,6 @@ export const EFFECTS: Record<SoundName, Play> = {
   hint: glide(5, 17, 0.14, "sine", 0.45),
   crown: run([12, 16, 19, 24], 0.12, "triangle", 0.45, 0.4),
   promotion: run([0, 4, 7, 12, 16, 19, 24], 0.12, "square", 0.3, 0.3),
-};
+} satisfies Record<string, Play>;
+
+export type SoundName = keyof typeof EFFECTS;

@@ -828,6 +828,126 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     return `beacon ${beacon}, trail elements ${trails}, gate transitions ${gate}, rook slides`;
   });
 
+  // -- M4.1: sound ---------------------------------------------------------------------------------------
+  const gesture = async () => {
+    await b.send("Input.dispatchMouseEvent", { type: "mousePressed", x: 650, y: 30, button: "left", clickCount: 1 });
+    await b.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: 650, y: 30, button: "left", clickCount: 1 });
+  };
+  /** Count the oscillators the page creates from now on: one per note of an effect (Chrome runs with --mute-audio). */
+  const countNotes = () =>
+    b.evaluate(`window.__notes = 0; (() => { const make = AudioContext.prototype.createOscillator; AudioContext.prototype.createOscillator = function () { window.__notes++; return make.call(this); }; })(); 0`);
+  const notes = () => b.evaluate(`window.__notes`);
+
+  await check("M4.1: the speaker button mutes at once, says so, and remembers it after a reload", async () => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/` });
+    await b.waitFor(`document.querySelector('.topbar .mute-button')`, 30_000, "mute button");
+    await b.evaluate(`localStorage.clear()`);
+    const label = () => b.evaluate(`document.querySelector('.mute-button').getAttribute('aria-label')`);
+    const on = await label();
+    await b.evaluate(`document.querySelector('.mute-button').click()`);
+    const off = await label();
+    const saved = await b.evaluate(`JSON.parse(localStorage.getItem('rank-and-file:settings')).muted`);
+    const marked = await b.evaluate(`document.querySelector('.mute-button').classList.contains('muted')`);
+    await b.send("Page.navigate", { url: `${base}?v=${Date.now()}#/` });
+    await b.waitFor(`document.querySelector('.topbar .mute-button')`, 30_000, "mute button after reload");
+    const after = await label();
+    await b.evaluate(`document.querySelector('.mute-button').click()`);
+    expect(on.startsWith("Sound is on") && off.startsWith("Sound is off") && saved === true && marked && after === off, JSON.stringify({ on, off, saved, marked, after }));
+    return `${on} -> ${off}, remembered`;
+  });
+
+  await check("M4.1: Settings → Sound has a slider each for music (60%) and effects (50%), and remembers a change", async () => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/` });
+    await b.waitFor(`document.querySelector('.topbar .settings-button')`, 30_000, "settings button");
+    await b.evaluate(`localStorage.clear()`);
+    await b.send("Page.navigate", { url: `${base}?v=${Date.now()}#/` });
+    await b.waitFor(`document.querySelector('.topbar .settings-button')`, 30_000, "settings button");
+    await b.evaluate(`document.querySelector('.settings-button').click()`);
+    const sliders = () => b.evaluate(`[...document.querySelectorAll('.settings-dialog .slider input')].map((i) => i.value + '/' + i.getAttribute('aria-label'))`);
+    const start = await sliders();
+    await b.evaluate(`(() => { const i = document.querySelector('.settings-dialog .slider input'); i.value = 10; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    const shown = await b.evaluate(`document.querySelector('.settings-dialog .slider-value').textContent`);
+    const credit = await b.evaluate(`[...document.querySelectorAll('.settings-dialog p')].some((p) => p.textContent.includes('Music by Karl Casey @ White Bat Audio'))`);
+    await b.send("Page.navigate", { url: `${base}?v=${Date.now()}#/` });
+    await b.waitFor(`document.querySelector('.topbar .settings-button')`, 30_000, "settings button");
+    await b.evaluate(`document.querySelector('.settings-button').click()`);
+    const after = await sliders();
+    expect(JSON.stringify(start) === JSON.stringify(["60/Music volume", "50/Effects volume"]), JSON.stringify(start));
+    expect(shown === "10%" && credit && after[0] === "10/Music volume", JSON.stringify({ shown, credit, after }));
+    return `${start.join(", ")}; music set to 10 and kept`;
+  });
+
+  await check("M4.1: the music is fetched only after the first click, and never with Music at 0", async () => {
+    const asked = [];
+    const listener = (m) => m.method === "Network.requestWillBeSent" && m.params.request.url.includes("elysium") && asked.push(m.params.request.url);
+    b.listeners.push(listener);
+    await b.send("Network.enable");
+    const visit = async (settings) => {
+      asked.length = 0;
+      await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/` });
+      await b.waitFor(`document.querySelector('.topbar .settings-button')`, 30_000, "settings button");
+      await b.evaluate(`localStorage.setItem('rank-and-file:settings', ${JSON.stringify(JSON.stringify(settings))})`);
+      await b.send("Page.navigate", { url: `${base}?v=${Date.now()}#/` });
+      await b.waitFor(`document.querySelector('.ts-menu')`, 30_000, "start menu");
+      await sleep(600);
+      const before = asked.length;
+      await gesture();
+      await sleep(1500);
+      return [before, asked.length];
+    };
+    const [beforeClick, afterClick] = await visit({});
+    const [, silent] = await visit({ music: 0 });
+    const [, muted] = await visit({ muted: true });
+    b.listeners.splice(b.listeners.indexOf(listener), 1);
+    await b.evaluate(`localStorage.removeItem('rank-and-file:settings')`); // not muted, music on, for the checks after this
+    expect(beforeClick === 0 && afterClick === 1, `before the click ${beforeClick}, after ${afterClick}`);
+    expect(silent === 0 && muted === 0, `music at 0: ${silent}, muted: ${muted}`);
+    return `0 before the click, ${afterClick} after; none at 0% or muted`;
+  });
+
+  await check("M4.1: Lessons ticks on the arrow keys and clicks; a Settings choice confirms", async () => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/lessons` });
+    await b.waitFor(`document.querySelector('.lrow')`, 30_000, "Lessons");
+    await b.evaluate(`localStorage.clear()`);
+    await countNotes();
+    await gesture();
+    await sleep(300);
+    await b.evaluate(`document.querySelector('.lrow').focus()`);
+    const start = await notes();
+    await b.key("ArrowDown");
+    await sleep(150);
+    const arrow = (await notes()) - start;
+    await b.evaluate(`document.querySelector('.settings-button').click()`);
+    await sleep(300);
+    const before = await notes();
+    await b.evaluate(`document.querySelector('.settings-dialog input[type=radio]:not(:checked)').click()`);
+    await sleep(150);
+    const choice = (await notes()) - before;
+    expect(arrow > 0 && choice > 0, `arrow key ${arrow} notes, Settings choice ${choice}`);
+    return `arrow key ${arrow} note(s), Settings choice ${choice}`;
+  });
+
+  await check("M4.1: a played run makes sounds; stepping back and jumping to the end make none", async () => {
+    await openLevel("ch01-l01", { fresh: true });
+    await countNotes();
+    await gesture();
+    await sleep(300);
+    await setCode(solution("ch01-l01"));
+    const begin = await notes();
+    await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
+    await b.waitFor(`document.querySelector('.outcome')`, 30_000, "the run's result");
+    await sleep(1800); // the fanfare and stars come after the last frame
+    const played = (await notes()) - begin;
+    const mark = await notes();
+    await b.evaluate(`document.querySelectorAll('${BUTTONS}')[1].click()`); // step back
+    await b.evaluate(`document.querySelectorAll('${BUTTONS}')[0].click()`); // back to the start
+    await b.evaluate(`document.querySelectorAll('${BUTTONS}')[4].click()`); // jump to the outcome
+    await sleep(1500);
+    const silent = (await notes()) - mark;
+    expect(played > 3 && silent === 0, `played ${played} notes; stepping back and jumping made ${silent}`);
+    return `${played} notes while playing, ${silent} on step back and jump`;
+  });
+
   await check("settings are reset after the checks", async () => {
     await b.evaluate(`localStorage.clear()`);
   });
