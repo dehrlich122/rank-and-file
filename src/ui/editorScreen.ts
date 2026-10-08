@@ -7,20 +7,21 @@ import { draftToLevelInfo, squareName, type Draft } from "../editor/draft";
 import { drafts } from "../editor/drafts";
 import { enemyAt, erase, extendRoute, fill, moveEnemy, occupantOf, paint, placeEnemy, placeGoal, placeStart, resize, rotateStart, toggleSpot, type Edit } from "../editor/edit";
 import { History } from "../editor/history";
+import { draftToYaml } from "../editor/levelData";
+import { editorOptions } from "../editor/options";
 import type { Problem } from "../editor/problems";
 import type { PyClient } from "../py/client";
 import type { EditorOptions, Enemy, LevelInfo, Pos, TileKind } from "../py/protocol";
 import { sound } from "../sound";
 import { BoardView } from "./board";
 import { confirmStep } from "./dialog";
+import { download, fileName } from "./download";
 import { h } from "./dom";
 import { renderProps, type Selection, type Tab } from "./editorProps";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite } from "./sprites";
 import { M, S } from "./sprites/floor";
 import { svg } from "./svg";
 import { wornPiece } from "../promotion";
-
-let cachedOptions: EditorOptions | null = null;
 
 // -- tools ----------------------------------------------------------------------------------------------------------
 
@@ -126,6 +127,8 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   const confirmHost = h("div", { class: "ed-confirm" });
   const undoButton = h("button", { class: "btn btn-small", onClick: () => undo() }, "Undo");
   const redoButton = h("button", { class: "btn btn-small", onClick: () => redo() }, "Redo");
+  const exportButton = h("button", { class: "btn btn-small", onClick: () => download(`${fileName(draft().title)}.yaml`, draftToYaml(draft())) }, "Export");
+  const testButton = h("button", { class: "btn btn-small btn-primary", onClick: () => (location.hash = `#/editor/${id}/play`) }, "Test-play");
   const widthInput = h("input", { type: "number", min: "2", "aria-label": "Width in squares" });
   const heightInput = h("input", { type: "number", min: "2", "aria-label": "Height in squares" });
   widthInput.addEventListener("change", () => resizeTo(Number(widthInput.value), draft().height));
@@ -140,6 +143,8 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     h("span", { class: "ed-size" }, "Size ", widthInput, " × ", heightInput),
     h("span", { class: "grow" }),
     h("span", { class: "muted small" }, "Saved in this browser"),
+    exportButton,
+    testButton,
   );
   const middle = h("div", { class: "ed-middle" }, host, status, keysHelp);
   root.replaceChildren(h("div", { class: "level-editor" }, toolbar, confirmHost, h("div", { class: "ed ed-a" }, paletteHost, middle, propsHost)));
@@ -148,6 +153,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   const checker = new Checker(client, (next) => {
     verdict = next;
     renderBoard();
+    renderToolbar();
     renderProps_();
   });
 
@@ -403,6 +409,10 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     widthInput.max = heightInput.max = String(options?.max_side ?? 12);
     widthInput.value = String(draft().width);
     heightInput.value = String(draft().height);
+    // test-play opens the level the engine has accepted, so it waits for the engine's answer to this very draft
+    const checked = verdict && verdict.revision === revision;
+    testButton.disabled = !checked || !verdict?.level;
+    testButton.title = !verdict || !checked ? "Checking the level…" : verdict.problem ? `Fix the problem first: ${verdict.problem.message}` : "Play this level, with the real level screen";
   }
 
   const propsContext = () => ({
@@ -593,9 +603,9 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   void (async () => {
     try {
       await client.ready();
-      cachedOptions ??= await client.call("editorOptions", {});
+      const loaded = await editorOptions(client);
       if (!live) return;
-      options = cachedOptions;
+      options = loaded;
       tools = buildTools(options);
       tool = tools.find((t) => t.id === "select") ?? tools[0] ?? null;
       renderPalette();
