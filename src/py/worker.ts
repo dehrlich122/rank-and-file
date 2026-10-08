@@ -24,6 +24,7 @@ const scope = self as unknown as WorkerScope;
 interface Bridge {
   run_snippet(code: string): string;
   load_level(levelJson: string): string;
+  editor_options(): string;
   load_sandbox(apiJson: string, boardJson: string): string;
   run_level(levelJson: string, code: string, hintsUsed: number, solutionSeen: boolean): string;
   run_sandbox(code: string, apiJson: string, boardJson: string): string;
@@ -63,6 +64,7 @@ booting.then(
 const handlers: { [K in RequestKind]: (bridge: Bridge, args: Requests[K]["args"]) => Requests[K]["result"] } = {
   runSnippet: (bridge, { code }) => JSON.parse(bridge.run_snippet(code)),
   loadLevel: (bridge, { level }) => JSON.parse(bridge.load_level(JSON.stringify(level))),
+  editorOptions: (bridge) => JSON.parse(bridge.editor_options()),
   loadSandbox: (bridge, { api, board }) => JSON.parse(bridge.load_sandbox(JSON.stringify(api), JSON.stringify(board ?? null))),
   runLevel: (bridge, { level, code, hintsUsed, solutionSeen }) => JSON.parse(bridge.run_level(JSON.stringify(level), code, hintsUsed, solutionSeen)),
   runSandbox: (bridge, { code, api, board }) => JSON.parse(bridge.run_sandbox(code, JSON.stringify(api), JSON.stringify(board ?? null))),

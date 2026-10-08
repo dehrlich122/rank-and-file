@@ -8,6 +8,7 @@ checker instead of confusing a player.
 """
 
 import ast
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, replace
 
 from .board import Board, Direction, Pos, Tile, Timer, sign, square_name
@@ -18,7 +19,28 @@ from .world import CHASERS, CHESS_LINES, CLOCKS, World
 
 
 class LevelError(ValueError):
-    """A level file is malformed."""
+    """A level file is malformed.
+
+    `at` says where, for the level editor (M4.2), which marks the square, enemy or
+    field a problem belongs to. It's a dict with any of: `square` ("c4"), `enemy` (its
+    number from 1, as in the message), `field` (a key of the level: "title", "goal",
+    "start", "api", "size", ...), `symbol` (a legend symbol, whose squares the editor
+    knows). The message is the same with or without it."""
+
+    def __init__(self, message: str, at: dict | None = None):
+        super().__init__(message)
+        self.at = at
+
+
+@contextmanager
+def _locate(**at):
+    """Whatever LevelError is raised inside gets `at`, unless it already knows better."""
+    try:
+        yield
+    except LevelError as exc:
+        if exc.at is None:
+            exc.at = at
+        raise
 
 
 # Map symbols every level understands. A level's `legend` can add more.
@@ -43,6 +65,21 @@ ENEMY_KEYS = {
 }
 OPEN_GROUND = (Tile.FLOOR, Tile.WAYPOINT, Tile.GEM, Tile.PLANK, Tile.RUNE)
 
+def editor_options() -> dict:
+    """What the level editor (M4.2) offers, read from the checker's own tables, so the editor keeps no rules of its own."""
+    return {
+        "max_side": MAX_SIDE,
+        "pieces": {name: list(piece.ABILITIES) for name, piece in PIECES.items()},
+        "tiles": {tile.value: {"needs": sorted(TILE_DETAILS.get(tile, (set(), set()))[0]), "may": sorted(TILE_DETAILS.get(tile, (set(), set()))[1])} for tile in Tile},
+        "open_ground": [tile.value for tile in OPEN_GROUND],
+        "enemies": {kind: sorted(keys - {"kind"}) for kind, keys in ENEMY_KEYS.items()},
+        "clocks": list(CLOCKS),
+        "strategies": list(CHASERS),
+        "facings": [direction.value for direction in Direction],
+        "timed_gate": {"open": Timer.open, "clock": Timer.clock},
+    }
+
+
 # What a code clock does while the code only repeats lines that have already run (QA-021).
 CLOCK_STILL = {"new_line": " While your code only repeats lines that have already run, it {still}."}
 
@@ -63,7 +100,10 @@ ALLOWED_KEYS = {
     "objectives", "api", "constraints", "par", "hints", "lesson", "starter", "variants",
     "enemies", "lesson_board", "mastery",
 }  # fmt: skip
-REQUIRED_KEYS = {"id", "chapter", "title", "trains", "map", "api", "lesson"}
+# A level made in the editor (M4.2) has no chapter, lesson or "trains" line, so only these are required here;
+# the level checker (engine/tests/test_levels.py) still asks the repo's levels for all of them.
+REQUIRED_KEYS = {"id", "title", "map", "api"}
+MAX_SIDE = 12  # squares along a board's edge (M4.2): the editor's limit, and a shared level's
 
 
 @dataclass
@@ -330,18 +370,20 @@ def parse_level(data: dict) -> Level:
 
     piece = data.get("piece", "pawn")
     if piece not in PIECES:
-        raise LevelError(f"unknown piece {piece!r}; expected one of {sorted(PIECES)}")
+        raise LevelError(f"unknown piece {piece!r}; expected one of {sorted(PIECES)}", at={"field": "piece"})
 
     legend = data.get("legend") or {}
-    objectives = _parse_objectives(data.get("objectives", ["reach_goal"]))
+    with _locate(field="objectives"):
+        objectives = _parse_objectives(data.get("objectives", ["reach_goal"]))
     board, start, goal, spots = _parse_board(data["map"], legend, objectives)
-    facing, planks = _parse_start(data.get("start") or {})
+    with _locate(field="start"):
+        facing, planks = _parse_start(data.get("start") or {})
 
     level = Level(
         id=_text(data, "id"),
-        chapter=_int(data, "chapter"),
+        chapter=_int(data, "chapter") if "chapter" in data else 0,
         title=_text(data, "title"),
-        trains=_text(data, "trains"),
+        trains=str(data.get("trains", "")),
         piece=piece,
         board=board,
         start=start,
@@ -354,29 +396,31 @@ def parse_level(data: dict) -> Level:
         constraints=_parse_constraints(data.get("constraints") or {}),
         par=_parse_par(data.get("par") or {}),
         hints=[str(hint) for hint in data.get("hints") or []],
-        lesson=_text(data, "lesson"),
+        lesson=str(data.get("lesson", "")),
         brief=str(data.get("brief", "")),
         starter=str(data.get("starter", "")),
         mastery=data.get("mastery", False),
     )
     if not isinstance(level.mastery, bool):
-        raise LevelError("mastery is true or false")
+        raise LevelError("mastery is true or false", at={"field": "mastery"})
     if "lesson_board" in data:
         try:
             sandbox_level(level.api, piece, data["lesson_board"])
         except LevelError as exc:
-            raise LevelError(f"lesson_board: {exc}") from None
+            raise LevelError(f"lesson_board: {exc}", at={"field": "lesson_board"}) from None
         level.lesson_board = data["lesson_board"]
     level.enemies = _parse_enemies(data.get("enemies") or [])
     _check_enemies(level)
     capturable = level.capturable
-    if level.objectives.capture and not capturable:
-        raise LevelError("objective capture needs an enemy that isn't armoured")
-    if isinstance(level.objectives.capture, int) and level.objectives.capture > capturable:
-        raise LevelError(f"objective capture asks for {level.objectives.capture}, and only {capturable} can be taken")
-    level.variants = _parse_variants(data.get("variants") or [], legend, level)
-    if level.variants and level.goal_spots:
-        raise LevelError("a level has ? squares for a hidden goal or other maps (variants), not both")
+    with _locate(field="objectives"):
+        if level.objectives.capture and not capturable:
+            raise LevelError("objective capture needs an enemy that isn't armoured")
+        if isinstance(level.objectives.capture, int) and level.objectives.capture > capturable:
+            raise LevelError(f"objective capture asks for {level.objectives.capture}, and only {capturable} can be taken")
+    with _locate(field="variants"):
+        level.variants = _parse_variants(data.get("variants") or [], legend, level)
+        if level.variants and level.goal_spots:
+            raise LevelError("a level has ? squares for a hidden goal or other maps (variants), not both")
     return level
 
 
@@ -389,6 +433,8 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
     width, height = len(rows[0]), len(rows)
     if any(len(row) != width for row in rows):
         raise LevelError("every map row must have the same number of squares")
+    if max(width, height) > MAX_SIDE:
+        raise LevelError(f"a board is at most {MAX_SIDE} squares along each side, not {width} by {height}", at={"field": "size"})
 
     symbols = dict(BUILTIN_SYMBOLS)
     details: dict[str, dict] = {}  # symbol -> its details, e.g. a sign's text or a gate's passphrase
@@ -400,8 +446,9 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
         try:
             tile = symbols[symbol] = Tile(meaning.get("tile"))
         except ValueError:
-            raise LevelError(f"legend {symbol!r}: unknown tile {meaning.get('tile')!r}") from None
-        details[symbol] = _parse_details(symbol, tile, meaning)
+            raise LevelError(f"legend {symbol!r}: unknown tile {meaning.get('tile')!r}", at={"symbol": symbol}) from None
+        with _locate(symbol=symbol):
+            details[symbol] = _parse_details(symbol, tile, meaning)
 
     board = Board(width, height)
     start: Pos | None = None
@@ -436,9 +483,9 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
             if symbol == SPOT:
                 spots.append((x, y))
     if start is None:
-        raise LevelError("the map needs a start square (P)")
+        raise LevelError("the map needs a start square (P)", at={"field": "start"})
     if goal is not None and spots:
-        raise LevelError("a map has a goal (G) or squares a hidden goal might be on (?), not both")
+        raise LevelError("a map has a goal (G) or squares a hidden goal might be on (?), not both", at={"field": "goal"})
     return board, start, goal, sorted(spots)
 
 
@@ -520,14 +567,14 @@ def names(squares: list[Pos]) -> list[str]:
 def _text(data: dict, key: str) -> str:
     value = data.get(key)
     if not isinstance(value, str) or not value.strip():
-        raise LevelError(f"{key} must be non-empty text")
+        raise LevelError(f"{key} must be non-empty text", at={"field": key})
     return value
 
 
 def _int(data: dict, key: str) -> int:
     value = data.get(key)
     if not isinstance(value, int) or isinstance(value, bool):
-        raise LevelError(f"{key} must be a whole number")
+        raise LevelError(f"{key} must be a whole number", at={"field": key})
     return value
 
 
@@ -585,11 +632,11 @@ def _check_clock(where: str, clock) -> None:
 
 def _parse_api(names, piece: str) -> list[str]:
     if not isinstance(names, list):
-        raise LevelError("api must be a list of ability names")
+        raise LevelError("api must be a list of ability names", at={"field": "api"})
     known = PIECES[piece].ABILITIES
     for name in names:
         if name not in known:
-            raise LevelError(f"api: the {piece} has no ability {name!r}; it has {', '.join(known)}")
+            raise LevelError(f"api: the {piece} has no ability {name!r}; it has {', '.join(known)}", at={"field": "api"})
     return list(names)
 
 
@@ -597,15 +644,15 @@ def _parse_board(text: str, legend: dict, objectives: Objectives) -> tuple[Board
     """A map, checked against what the level asks for."""
     board, start, goal, spots = parse_map(text, legend)
     if objectives.reach_goal and goal is None and not spots:
-        raise LevelError("objective reach_goal needs a goal square (G), or ? squares for a hidden goal, on the map")
+        raise LevelError("objective reach_goal needs a goal square (G), or ? squares for a hidden goal, on the map", at={"field": "goal"})
     # Waypoints are always an objective: listing it is optional, but then the map needs some.
     if objectives.waypoints and not board.squares(Tile.WAYPOINT):
-        raise LevelError("objective waypoints needs waypoint squares on the map")
+        raise LevelError("objective waypoints needs waypoint squares on the map", at={"field": "objectives"})
     gems = len(board.squares(Tile.GEM))
     if objectives.collect and not gems:
-        raise LevelError("objective collect needs gem squares on the map")
+        raise LevelError("objective collect needs gem squares on the map", at={"field": "objectives"})
     if isinstance(objectives.collect, int) and objectives.collect > gems:
-        raise LevelError(f"objective collect asks for {objectives.collect} gems, and the map has {gems}")
+        raise LevelError(f"objective collect asks for {objectives.collect} gems, and the map has {gems}", at={"field": "objectives"})
     return board, start, goal, spots
 
 
@@ -642,38 +689,43 @@ def _parse_enemies(items) -> list[Enemy]:
         raise LevelError("enemies must be a list, e.g. [{kind: patrol, route: [b4, e4]}]")
     enemies = []
     for number, item in enumerate(items, start=1):
-        where = f"enemy {number}"
-        if not isinstance(item, dict) or item.get("kind") not in ENEMY_KEYS:
-            raise LevelError(f"{where}: kind must be patrol, chaser, rook or bishop")
-        kind = item["kind"]
-        unknown = set(item) - ENEMY_KEYS[kind]
-        if unknown:
-            raise LevelError(f"{where}: a {kind} doesn't take {', '.join(sorted(unknown))}")
-        route = item.get("route", [])
-        if not isinstance(route, list):
-            raise LevelError(f"{where}: route must be a list of squares, e.g. [b4, e4]")
-        corners = [_square(where, name) for name in route]
-        if "start" in item:
-            start = _square(where, item["start"])
-        elif corners:
-            start = corners[0]
-        else:
-            raise LevelError(f"{where}: needs a start square")
-        loop = item.get("loop", False)
-        clock = item.get("clock", "action")
-        strategy = item.get("strategy", "simple")
-        armoured = item.get("armoured", False)
-        if not isinstance(loop, bool) or not isinstance(armoured, bool):
-            raise LevelError(f"{where}: loop and armoured are true or false")
-        _check_clock(where, clock)
-        if strategy not in CHASERS:
-            raise LevelError(f"{where}: strategy must be one of {', '.join(CHASERS)}, not {strategy!r}")
-        corners = corners or [start]
-        path = _walk(where, corners, loop)
-        if start not in path:
-            raise LevelError(f"{where}: starts on {square_name(start)}, which isn't on its route")
-        enemies.append(Enemy(kind, start, corners, path, loop, clock, strategy, armoured))
+        with _locate(enemy=number):
+            enemies.append(_parse_enemy(number, item))
     return enemies
+
+
+def _parse_enemy(number: int, item) -> Enemy:
+    where = f"enemy {number}"
+    if not isinstance(item, dict) or item.get("kind") not in ENEMY_KEYS:
+        raise LevelError(f"{where}: kind must be patrol, chaser, rook or bishop")
+    kind = item["kind"]
+    unknown = set(item) - ENEMY_KEYS[kind]
+    if unknown:
+        raise LevelError(f"{where}: a {kind} doesn't take {', '.join(sorted(unknown))}")
+    route = item.get("route", [])
+    if not isinstance(route, list):
+        raise LevelError(f"{where}: route must be a list of squares, e.g. [b4, e4]")
+    corners = [_square(where, name) for name in route]
+    if "start" in item:
+        start = _square(where, item["start"])
+    elif corners:
+        start = corners[0]
+    else:
+        raise LevelError(f"{where}: needs a start square")
+    loop = item.get("loop", False)
+    clock = item.get("clock", "action")
+    strategy = item.get("strategy", "simple")
+    armoured = item.get("armoured", False)
+    if not isinstance(loop, bool) or not isinstance(armoured, bool):
+        raise LevelError(f"{where}: loop and armoured are true or false")
+    _check_clock(where, clock)
+    if strategy not in CHASERS:
+        raise LevelError(f"{where}: strategy must be one of {', '.join(CHASERS)}, not {strategy!r}")
+    corners = corners or [start]
+    path = _walk(where, corners, loop)
+    if start not in path:
+        raise LevelError(f"{where}: starts on {square_name(start)}, which isn't on its route")
+    return Enemy(kind, start, corners, path, loop, clock, strategy, armoured)
 
 
 def _square(where: str, name) -> Pos:
@@ -708,19 +760,30 @@ def _check_enemies(level: Level) -> None:
     for number, enemy in enumerate(level.enemies, start=1):
         for pos in enemy.path:
             if not level.board.contains(pos):
-                raise LevelError(f"enemy {number}: {square_name(pos)} isn't on the board")
+                raise LevelError(f"enemy {number}: {square_name(pos)} isn't on the board", at={"enemy": number, "square": square_name(pos)})
             if level.board.tile(pos) not in OPEN_GROUND:
-                raise LevelError(f"enemy {number}: {square_name(pos)} is a {level.board.tile(pos).value}, and enemies walk on open ground")
+                raise LevelError(
+                    f"enemy {number}: {square_name(pos)} is a {level.board.tile(pos).value}, and enemies walk on open ground",
+                    at={"enemy": number, "square": square_name(pos)},
+                )
         if enemy.start == level.start:
-            raise LevelError(f"enemy {number}: starts on the {level.piece}'s square")
+            raise LevelError(f"enemy {number}: starts on the {level.piece}'s square", at={"enemy": number})
         if enemy.start in starts:
-            raise LevelError(f"enemy {number}: starts on the same square as another enemy")
+            raise LevelError(f"enemy {number}: starts on the same square as another enemy", at={"enemy": number})
         starts.add(enemy.start)
     if foe := World(level).attacker(level.start):
-        raise LevelError(f"the {level.piece} starts on {square_name(level.start)}, which the {foe.enemy.kind} on {square_name(foe.pos)} attacks")
+        raise LevelError(
+            f"the {level.piece} starts on {square_name(level.start)}, which the {foe.enemy.kind} on {square_name(foe.pos)} attacks",
+            at={"square": square_name(level.start), "enemy": level.enemies.index(foe.enemy) + 1},
+        )
 
 
 def _parse_par(data: dict) -> Par:
+    with _locate(field="par"):
+        return _parse_par_in(data)
+
+
+def _parse_par_in(data: dict) -> Par:
     if not isinstance(data, dict):
         raise LevelError("par must be a mapping, e.g. {lines: 3}")
     unknown = set(data) - {"lines"}
@@ -733,6 +796,11 @@ def _parse_par(data: dict) -> Par:
 
 
 def _parse_constraints(data: dict) -> Constraints:
+    with _locate(field="constraints"):
+        return _parse_constraints_in(data)
+
+
+def _parse_constraints_in(data: dict) -> Constraints:
     allowed = {"max_lines", "min_comments", "require_nodes", "ban_nodes", "max_numbers"}
     unknown = set(data) - allowed
     if unknown:

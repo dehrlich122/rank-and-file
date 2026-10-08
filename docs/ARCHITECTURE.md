@@ -156,7 +156,8 @@ bridge function takes strings and returns a JSON string.
 
 | Request | Does |
 |---|---|
-| `loadLevel` | Validate a level (the parsed YAML) and describe it for drawing |
+| `loadLevel` | Validate a level (the parsed YAML) and describe it for drawing. A refusal carries `at`: where the problem is (a square, an enemy's number, a field, a legend symbol), for the level editor (M4.2) |
+| `editorOptions` | What the level editor offers (M4.2), read from the checker's own tables: each piece's abilities, the details each tile takes, enemy keys, clocks, facings, the board size limit |
 | `runLevel` | Run code against a level (with the number of hints opened, for scoring); returns the full recording |
 | `loadSandbox` / `runSandbox` | The small open board lesson snippets run on |
 | `codex` | A level's Codex entries: its abilities and the built-ins taught so far ([Codex.md](Codex.md)) |
@@ -326,6 +327,13 @@ Enemies *(M3.1)* move one square per tick of their clock:
 
 Unknown keys, symbols,
 abilities or `ast` node names are errors, so typos fail in the level checker.
+
+What a level must have *(M4.2)*: `id`, `title`, `map` and `api`. A level made in the level editor has no
+`chapter` (0), `lesson` or `trains`, so the engine doesn't insist on them; `test_levels.py` still does for every
+level in the repo. A board is at most 12 squares along a side (`MAX_SIDE`; the repo's levels all fit).
+Every `LevelError` carries `at`, saying where, for the editor: any of `square` ("c4"), `enemy` (its number from
+1, as in the message), `field` (a key of the level) or `symbol` (a legend symbol, whose squares the editor
+knows). The message is the same either way.
 `max_lines` counts lines containing code (blank and comment-only lines don't
 count), as if every statement had its own line *(M3.3)*: a second statement
 after `;`, a loop's body on the loop's own line, or `else:` with its body
@@ -378,6 +386,8 @@ src/app.ts         shell and routes (#/, #/level/<id>, #/harness)
 src/content.ts     bundles level YAML and lesson Markdown; loads solutions lazily
 src/settings.ts src/progress.ts src/storage.ts   saved settings and progress (localStorage)
 src/py/            worker, client and protocol
+src/editor/        the level editor's draft (M4.2): draft.ts (the data, and what the board draws from it),
+                   levelData.ts (draft <-> level file and YAML; keys it doesn't edit are kept as they were)
 src/ui/            board, editor, playback, panels, lesson, repl, levelView, lessonsMenu, titleScreen, promotionScreen, codex,
                    help (hints, giving up, the comparison), compare, dialog, settingsDialog
 scripts/           copy-pyodide.mjs (runs after npm install), venv.mjs, check-bundle.mjs, e2e/,

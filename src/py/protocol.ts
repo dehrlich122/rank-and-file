@@ -90,7 +90,28 @@ export interface Enemy {
   armoured: boolean;
 }
 
-type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string };
+/** Where a level problem belongs, for the editor (levels.LevelError.at): any of these. */
+interface ProblemAt {
+  square?: string; // "c4"
+  enemy?: number; // its number from 1, as in the message
+  field?: string; // a key of the level: "title", "goal", "start", "api", "size", ...
+  symbol?: string; // a legend symbol: the editor knows its squares
+}
+
+type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string; at: ProblemAt | null };
+
+/** What the level editor offers, read from the checker's own tables (levels.editor_options). */
+interface EditorOptions {
+  max_side: number;
+  pieces: Record<string, string[]>; // a piece's abilities
+  tiles: Record<string, { needs: string[]; may: string[] }>; // the details each tile kind takes
+  open_ground: string[]; // where enemies can walk
+  enemies: Record<string, string[]>; // the keys each enemy kind takes
+  clocks: Clock[];
+  strategies: string[];
+  facings: Facing[];
+  timed_gate: { open: number; clock: Clock }; // a timed gate's defaults
+}
 
 export interface GameEvent {
   kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "capture" | "tick" | "lost" | "pick_up" | "bridge" | "fall" | "crush" | "read";
@@ -189,6 +210,7 @@ export interface CodexChapter {
 export interface Requests {
   runSnippet: { args: { code: string }; result: SnippetResult };
   loadLevel: { args: { level: unknown }; result: LoadLevelResult };
+  editorOptions: { args: Record<string, never>; result: EditorOptions };
   loadSandbox: { args: { api: string[]; board?: unknown }; result: LevelInfo }; // board: a level's lesson_board (QA-019)
   runLevel: { args: { level: unknown; code: string; hintsUsed: number; solutionSeen: boolean }; result: LevelResult };
   runSandbox: { args: { code: string; api: string[]; board?: unknown }; result: LevelResult };

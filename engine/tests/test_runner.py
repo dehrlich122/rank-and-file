@@ -180,7 +180,7 @@ def test_bridge_speaks_json():
     assert json.loads(bridge.run_snippet("print(1)"))["output"] == "1\n"
 
     broken = json.loads(bridge.load_level(json.dumps({**level, "map": "G\n"})))
-    assert broken == {"ok": False, "error": "the map needs a start square (P)"}
+    assert broken == {"ok": False, "error": "the map needs a start square (P)", "at": {"field": "start"}}
 
 
 # -- stars (M2) --------------------------------------------------------------------
