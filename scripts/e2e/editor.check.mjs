@@ -45,7 +45,11 @@ export default async function editorChecks({ browser: b, base, check }) {
   const problemsText = () => text(".ed-problems");
   const settled = async () => {
     // the engine's answer to the draft on screen: Test-play enables, or a problem is listed
-    await b.waitFor(`!document.querySelector('.ed-toolbar .btn-primary').disabled || document.querySelector('.problem-link')`, 30_000, "the engine's answer");
+    await b.waitFor(
+      `!document.querySelector('.ed-problems')?.textContent.includes('checking') && (!document.querySelector('.ed-toolbar .btn-primary').disabled || document.querySelector('.problem-link'))`,
+      30_000,
+      "the engine's answer",
+    );
     await sleep(100);
   };
 
