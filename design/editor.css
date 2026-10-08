@@ -1,0 +1,409 @@
+/* M4.2 step 0 (design prototype, dev-only): the level editor's layout, two takes. */
+
+body {
+  margin: 0;
+  background: #070414;
+}
+
+#sheet {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 16px;
+  display: grid;
+  gap: 20px;
+}
+
+.sheet-head h1 {
+  margin: 0;
+  font: 700 20px "Orbitron", var(--font-ui);
+  letter-spacing: 0.06em;
+  color: #3be0ff;
+}
+
+.sheet-head p {
+  margin: 4px 0 0;
+  max-width: 120ch;
+  color: #a69ed6;
+  font: 15px/1.5 var(--font-ui);
+}
+
+.pane {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 var(--font-ui);
+  padding: 14px;
+  border: 1px solid var(--border);
+  --side-col: 418px;
+}
+
+.pane[data-scheme="dark"] {
+  color-scheme: dark;
+}
+
+.pane[data-scheme="light"] {
+  color-scheme: light;
+}
+
+.pane-name {
+  margin: 0 0 8px;
+  font: 700 12px var(--font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 13px;
+}
+
+.grow {
+  flex: 1;
+}
+
+.ed-toolbar {
+  margin-bottom: 12px;
+}
+
+.ed-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+}
+
+.ed-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ed {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+}
+
+.ed-a {
+  grid-template-columns: var(--side-col) minmax(0, 1fr) var(--side-col);
+}
+
+.ed-b {
+  grid-template-columns: 340px minmax(0, 1fr);
+}
+
+.ed-left,
+.ed-right {
+  padding: 12px;
+}
+
+.ed-middle {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* -- palette ------------------------------------------------------------------------------------- */
+
+.pal-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.pal-group + .pal-group {
+  margin-top: 12px;
+}
+
+.pal-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.tool {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  font: inherit;
+  color: var(--text);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+}
+
+.tool.active {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.tool kbd {
+  font: 12px var(--font-code);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  padding: 0 5px;
+}
+
+.pal-sprite {
+  width: 36px;
+  height: 36px;
+  overflow: visible;
+}
+
+.pal-glyph {
+  font: 700 38px var(--font-code);
+  fill: var(--accent);
+}
+
+/* the strip above the board (take B): one row of icon buttons per group */
+.palette-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.palette-strip .pal-group + .pal-group {
+  margin-top: 0;
+}
+
+.palette-strip .pal-title {
+  margin-bottom: 2px;
+}
+
+.palette-strip .pal-tools {
+  display: flex;
+  gap: 4px;
+}
+
+.tool.compact {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding: 3px;
+  gap: 0;
+}
+
+.tool.compact .tool-name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.tool.compact .pal-sprite {
+  width: 38px;
+  height: 38px;
+}
+
+/* -- the board and its marks -------------------------------------------------------------------------- */
+
+.ed-board {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.ed-board .board {
+  width: 100%;
+  height: auto;
+  max-height: 560px;
+}
+
+.ed-cursor {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+}
+
+.ed-selected {
+  fill: var(--selection);
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.ed-brackets {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 5;
+}
+
+.ed-problem {
+  fill: none;
+  stroke: var(--hot);
+  stroke-width: 3;
+}
+
+.ed-badge {
+  fill: var(--hot);
+}
+
+.ed-badge-mark {
+  fill: #fff;
+  font: 700 14px var(--font-ui);
+}
+
+.ed-status {
+  margin: 0;
+  font: 14px var(--font-code);
+}
+
+.ed-keys {
+  margin: 0;
+}
+
+/* -- properties --------------------------------------------------------------------------------------- */
+
+.props-body {
+  display: grid;
+  gap: 10px;
+  padding: 12px 4px 4px;
+}
+
+.props-what {
+  margin: 0;
+}
+
+.field {
+  display: grid;
+  gap: 3px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.field-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  padding: 0;
+}
+
+.field input[type="text"],
+.field textarea,
+.field select {
+  font: inherit;
+  color: var(--text);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.route {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.route li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.problems {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.problems ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.problem-link {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: var(--bad-bg);
+  border: 1px solid var(--bad);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.problem-badge {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--hot);
+  color: #fff;
+  font: 700 12px var(--font-ui);
+}
+
+/* -- take B: the panel beside its square ----------------------------------------------------------------- */
+
+.popover {
+  position: absolute;
+  width: 300px;
+  padding: 10px 12px 12px;
+  background: var(--panel);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 24px var(--shadow);
+  z-index: 2;
+}
+
+.pop-right {
+  margin-left: 10px;
+}
+
+.pop-left {
+  transform: translateX(calc(-100% - 10px));
+}
+
+.pop-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

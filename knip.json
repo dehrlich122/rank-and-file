@@ -1,4 +1,4 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["scripts/e2e/screenshot.mjs", "demo/serve.mjs", "design/tiles.ts", "design/shoot.mjs", "design/contrast.mjs", "design/directions.ts", "design/round4.ts", "design/round5.ts", "design/sheet.ts", "design/shoot-directions.mjs", "design/shoot-compare.mjs", "design/knights.ts"]
+  "entry": ["scripts/e2e/screenshot.mjs", "demo/serve.mjs", "design/tiles.ts", "design/shoot.mjs", "design/contrast.mjs", "design/directions.ts", "design/round4.ts", "design/round5.ts", "design/sheet.ts", "design/shoot-directions.mjs", "design/shoot-compare.mjs", "design/knights.ts", "design/editor.ts", "design/shoot-editor.mjs"]
 }
