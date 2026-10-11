@@ -11,3 +11,4 @@ __pycache__/
 .vite/
 release/
 handoff.md
+.claude/worktrees/
