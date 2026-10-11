@@ -39,6 +39,8 @@ again, so do the WP well and report honestly; don't widen it.
   the level). An e2e check never puts editor contents in a message or a return value.
 - **Stay in your lane.** Never push, merge, rebase, switch branches, start a dev server or run `npm run e2e`
   unless the brief says so; never use `git add -A` or `git add .`.
+- **One plain git command per shell call.** The worktree sandbox refuses git chained with `;`, `|`, `&&` or
+  shell tricks it can't verify stay inside your worktree.
 - **Repo idioms** (CLAUDE.md has the detail): DOM through `h()`; colours only through CSS tokens; the engine stays
   plain Python and is the only judge of rules; `src/py/protocol.ts` mirrors the engine's dataclasses; new error
   wording goes in `errors.py` with a test; constraints use `ast`/`tokenize`. Match the surrounding code's naming,
