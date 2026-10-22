@@ -158,6 +158,7 @@ bridge function takes strings and returns a JSON string.
 |---|---|
 | `loadLevel` | Validate a level (the parsed YAML) and describe it for drawing. A refusal carries `at`: where the problem is (a square, an enemy's number, a field, a legend symbol), for the level editor (M4.2) |
 | `editorOptions` | What the level editor offers (M4.2), read from the checker's own tables: each piece's abilities, the details each tile takes, enemy keys, clocks, facings, the board size limit |
+| `solveStart` / `solveStep` | The level editor's solvability check (M4.3, `search.py`): start it, then ask again until `done`. Each step works about 150 ms and reports counts and words per board (a route of plain calls and its lines, no route, gave up, or can't judge code clocks), never the route. Not asking again cancels it |
 | `runLevel` | Run code against a level (with the number of hints opened, for scoring); returns the full recording |
 | `loadSandbox` / `runSandbox` | The small open board lesson snippets run on |
 | `codex` | A level's Codex entries: its abilities and the built-ins taught so far ([Codex.md](Codex.md)) |
@@ -222,6 +223,7 @@ variants:                    # optional: the same level on other maps, which it 
 mastery: true                # optional (M3.2): the chapter's optional mastery challenge
 lesson: ch01/ch01-l03.md
 starter: ""                  # optional initial editor contents
+solution: ""                 # optional (M4.3): the author's code, in a level made in the editor; never in `levels/`
 lesson_board:                # optional (QA-019): the board the lesson's snippets run on
   map: |                     # map, legend, enemies and start, as above; no objectives
     ...
@@ -330,10 +332,13 @@ abilities or `ast` node names are errors, so typos fail in the level checker.
 
 What a level must have *(M4.2)*: `id`, `title`, `map` and `api`. A level made in the level editor has no
 `chapter` (0), `lesson` or `trains`, so the engine doesn't insist on them; `test_levels.py` still does for every
-level in the repo. A board is at most 12 squares along a side (`MAX_SIDE`; the repo's levels all fit).
+level in the repo. A board is at most 12 squares along a side (`MAX_SIDE`; the repo's levels all fit), a level has at most 6 boards
+(`MAX_BOARDS`), and `LIMITS` caps every free-text field (title 60 characters, brief 600, trains 200, a hint 600 and
+at most 5 hints, text on a square or a phrase to say 300, 12 enemies a board, starter and solution 2,000): they guard
+shared levels, and every level in the repo fits.
 Every `LevelError` carries `at`, saying where, for the editor: any of `square` ("c4"), `enemy` (its number from
-1, as in the message), `field` (a key of the level) or `squares` (several, e.g. every square that uses
-a wrong legend entry). The message is the same either way.
+1, as in the message), `field` (a key of the level), `squares` (several, e.g. every square that uses
+a wrong legend entry) or `board` (M4.3: 1-based, for a problem on one of a level's other maps). The message is the same either way.
 `max_lines` counts lines containing code (blank and comment-only lines don't
 count), as if every statement had its own line *(M3.3)*: a second statement
 after `;`, a loop's body on the loop's own line, or `else:` with its body
@@ -379,6 +384,7 @@ engine/rankfile/   the Python game engine (no third-party dependencies)
   tracer.py runner.py         line tracing and recording; running code and judging outcomes
   constraints.py repl.py      ast rules and lint warnings; the scratch REPL
   codex.py                    the Codex: entries from docstrings, a level's list, help()
+  search.py                   the solvability search (M4.3): a route of plain calls per board, run in slices
   bridge.py                   JSON functions the worker calls
 engine/tests/      pytest suite, including the level checker (test_levels.py)
 levels/ lessons/ solutions/   level content (chNN/ folders, plus practice/)

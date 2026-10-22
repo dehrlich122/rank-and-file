@@ -3,7 +3,7 @@
 // A draft is plain data. `draftToLevelInfo` turns it into what the board draws, straight away and
 // with no rules: whether the level is *valid* is only ever the engine's say (levelData.ts exports the
 // draft to the level format, and the `loadLevel` request checks it). Anything the editor doesn't edit
-// (hints, constraints, par, objectives, other boards...) waits in `extra`, written back as it was.
+// (hints, constraints, par, objectives...) waits in `extra`, written back as it was.
 import type { Clock, Enemy, Facing, LevelInfo, Pos, TileKind } from "../py/protocol";
 
 /** One square: its tile, and the details some tiles take (the engine's `TILE_DETAILS`). */
@@ -29,6 +29,16 @@ export interface DraftEnemy {
   strategy?: string;
 }
 
+/** What is on one board of a level: the first board's fields are in `Draft` itself, the others' are these (M4.3, boards.ts). */
+export interface DraftBoard {
+  width: number;
+  height: number;
+  cells: Cell[][]; // cells[y][x]; y = 0 is the bottom rank
+  start: Pos;
+  goal: Pos | null;
+  enemies: DraftEnemy[];
+}
+
 export interface Draft {
   id: string; // "my-<random>", unique in this browser
   title: string;
@@ -44,8 +54,9 @@ export interface Draft {
   goal: Pos | null;
   spots: Pos[]; // squares a hidden goal might be on (drawn as ?), instead of a goal
   enemies: DraftEnemy[];
+  boards: DraftBoard[]; // the level's other boards (M4.3), each a map the same program must solve; none for most levels
   api: string[]; // the abilities the piece has
-  extra: Record<string, unknown>; // the level file's other keys, kept as they were (including its `legend`)
+  extra: Record<string, unknown>; // the level file's other keys, kept as they were
 }
 
 export const DETAIL_KEYS = ["text", "passphrase", "question", "every", "open", "clock"] as const;
@@ -92,6 +103,7 @@ export function blankDraft(width = 8, height = 8, id = newId()): Draft {
     goal: [width - 1, height - 1],
     spots: [],
     enemies: [],
+    boards: [],
     api: ["move", "turn_left", "turn_right"],
     extra: {},
   };

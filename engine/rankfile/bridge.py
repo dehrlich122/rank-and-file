@@ -10,11 +10,14 @@ import json
 
 from . import runner
 from .codex import entries as codex_entries
+from .constraints import code_lines as count_code_lines
 from .levels import LevelError, parse_level, sandbox_level
 from .levels import editor_options as level_editor_options
 from .repl import Repl
+from .search import Search
 
 _repl = Repl()
+_search: Search | None = None  # the solvability check in progress (M4.3); starting another replaces it
 
 
 def run_snippet(code: str) -> str:
@@ -35,10 +38,37 @@ def editor_options() -> str:
     return json.dumps(level_editor_options())
 
 
+def solve_start(level_json: str) -> str:
+    """Begin the solvability check of a level (search.py). Returns {"ok": true, "cases": n} or {"ok": false, "error": ...}."""
+    global _search
+    try:
+        _search = Search(parse_level(json.loads(level_json)))
+    except LevelError as exc:
+        _search = None
+        return json.dumps({"ok": False, "error": str(exc)})
+    return json.dumps({"ok": True, "cases": len(_search.cases)})
+
+
+def solve_step(seconds: float = 0.15) -> str:
+    """Work on the check for about `seconds`, then report how far it got (counts and words, never the route)."""
+    global _search
+    if _search is None:
+        return json.dumps({"done": True, "case": 0, "cases": 0, "unit": "board", "positions": 0, "results": []})
+    progress = _search.step(float(seconds))
+    if progress["done"]:
+        _search = None  # an answer is given once; asking again gets "nothing running"
+    return json.dumps(progress)
+
+
 def run_level(level_json: str, code: str, hints_used: int = 0, solution_seen: bool = False) -> str:
     level = parse_level(json.loads(level_json))
     result = runner.run_level(level, code, hints_used=int(hints_used), solution_seen=bool(solution_seen))
     return json.dumps(result.to_dict())
+
+
+def code_lines(code: str) -> str:
+    """How many lines of code the engine counts in `code`, as par and `max_lines` count them (M4.3: an author's solution)."""
+    return json.dumps(count_code_lines(code))
 
 
 def load_sandbox(api_json: str, board_json: str = "null") -> str:

@@ -2,8 +2,9 @@
 
     node scripts/venv.mjs scripts.compare_levels <file.json>
 
-The file maps a level id to {original, exported, info}: the level's data as `levels/` has it, the same level after
-the editor read it as a draft and wrote it again, and what the editor would draw from the draft. For each level the
+The file maps a level id to {original, exported, info, boards}: the level's data as `levels/` has it, the same level after
+the editor read it as a draft and wrote it again, what the editor would draw from the draft, and what it draws for each
+of its boards. For each level the
 engine must describe `exported` exactly as it describes `original`, and `info`'s drawing fields must equal the
 engine's. It prints counts and the names of fields that differ, never their values: a level's description holds
 its hints (see CLAUDE.md: no spoilers).
@@ -39,6 +40,9 @@ def main(path: str) -> int:
         gates = [{k: v for k, v in gate.items() if k != "text"} for gate in wanted["timed_gates"]]
         if gates != [{k: v for k, v in gate.items() if k != "text"} for gate in drawn["timed_gates"]]:
             problems.append("drawn: timed_gates")
+        for number, board in enumerate(wanted["boards"], start=1):  # a level with other boards: the editor draws each as the engine does
+            problems += [f"board {number} drawn: {key}" for key in differences(board, entry["boards"][number - 1], DRAWN)]
+            problems += [f"board {number} drawn start: {key}" for key in differences(board["start"], entry["boards"][number - 1]["start"], DRAWN_START)]
         if problems:
             failures.append(f"{level_id}: {', '.join(problems)}")
     print(f"{len(levels)} levels checked, {len(failures)} differ")

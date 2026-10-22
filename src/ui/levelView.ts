@@ -7,6 +7,7 @@ import type { LevelInfo, LevelResult } from "../py/protocol";
 import { BoardView, squareName } from "./board";
 import { ChipTooltip, codexHover, renderCodex, type CodexLookup, type CodexView } from "./codex";
 import { h } from "./dom";
+import type { SolutionSource } from "./compare";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
 import { masteryTag } from "./lessonsMenu";
@@ -17,7 +18,8 @@ import { icon, type IconName } from "./icons";
 import { Player, buildFrames, consoleAt, controlStates } from "./playback";
 import type { ReplPanel } from "./repl";
 import type { SettingsDialog } from "./settingsDialog";
-import { progress } from "../progress";
+import { sharedBanner, sharedFrame } from "./sharedLevel";
+import { progress as curriculumProgress, ProgressStore } from "../progress";
 import { tierCleared } from "../promotion";
 import { SPEEDS, motionReduced, settings } from "../settings";
 import { sound } from "../sound";
@@ -35,9 +37,22 @@ const AUTOPLAY_LIMIT = 150; // longer runs open at the end instead of playing
 /** ✓ or ✗: how one case of a run ended. */
 const verdict = (c: LevelResult) => (c.status === "solved" ? "✓" : "✗");
 
-/** How a level is opened. Test-play (M4.2) is a level from the editor: no lesson, hints or solution, no progress, and a way back. */
+/**
+ * How a level is opened. Test-play (M4.2) is a level from the editor: no lesson, nothing saved, and a way back. It plays
+ * as a player would see the level (its hints, its stars, the offer of a solution once one is kept), with a progress
+ * store of its own that is gone when the screen is. `progress` and `solution` say where another kind of level keeps its
+ * progress and finds its solution; left out, they are the curriculum's.
+ *
+ * A shared level (M4.3, someone else's level opened from a link) is outside the curriculum like test-play (no lesson, no
+ * next level, no crown or promotion, the Codex counts the curriculum and then its own abilities), but it is played for
+ * real: its stars, hints and code are saved, in the `progress` it is given. `remix` makes a draft of the player's own.
+ */
 export interface LevelOptions {
-  testPlay?: { back: string };
+  // `keep` lets the author keep the code that solved the level as its solution; `kept` says what is kept now
+  testPlay?: { back: string; keep: (code: string) => void; kept: () => string };
+  shared?: { remix: () => void };
+  progress?: ProgressStore;
+  solution?: SolutionSource | null;
 }
 
 const testCodes = new Map<string, string>(); // the code typed in a test-play, kept for the session only
@@ -45,6 +60,9 @@ const testCodes = new Map<string, string>(); // the code typed in a test-play, k
 export function mountLevel(root: HTMLElement, context: LevelContext, source: LevelSource, options: LevelOptions = {}): () => void {
   const { client } = context;
   const testPlay = options.testPlay;
+  const shared = options.shared;
+  const outside = Boolean(testPlay || shared); // a level of no chapter: nothing of the curriculum's applies
+  const store = options.progress ?? (testPlay ? new ProgressStore(null) : curriculumProgress);
   let level: LevelInfo | null = null;
   let board: BoardView | null = null;
   let caseBoard: BoardView | null = null; // the board of the case being replayed (M2), shown instead
@@ -234,8 +252,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         codeInfo,
       ),
   );
-  root.replaceChildren(layout);
-  if (testPlay) {
+  root.replaceChildren(shared ? sharedFrame(sharedBanner(shared.remix), layout) : layout);
+  if (outside) {
     learnTab.hidden = true; // there is no lesson: it opens on the challenge
     showTab("challenge");
   }
@@ -264,11 +282,11 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const editor: EditorView = createEditor({
     parent: editorHost,
     extensions: [...callCompletion({ known, piece: () => level?.piece ?? null, api: () => level?.api ?? [] }), codexHover(() => codex)],
-    code: (testPlay ? testCodes.get(source.id) : progress.level(source.id).code) ?? String(source.data.starter ?? ""),
+    code: (testPlay ? testCodes.get(source.id) : store.level(source.id).code) ?? String(source.data.starter ?? ""),
     onRun: () => void run(),
     onChange: (code) => {
       if (testPlay) testCodes.set(source.id, code);
-      else progress.update(source.id, { code });
+      else store.update(source.id, { code });
       if (player && code !== recordedCode) dropRecording();
     },
     placeholder: `Write your code here, then press Run.\nYour pawn is called ${String(source.data.piece ?? "pawn")}.`,
@@ -289,8 +307,9 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       board = new BoardView(level);
       if (level.boards.length) showBoards(0, null); // with its other boards beside it (QA-032)
       else boardHost.replaceChildren(board.element);
-      if (!testPlay) help = new HelpPanel(source.id, level.hints, () => getCode(editor));
-      challengePanel.replaceChildren(...describeChallenge(level, openCodexEntry, chipTooltip, () => codex, !testPlay), ...(help ? [help.element] : []));
+      // a level from the editor offers a solution only once its author has kept one
+      help = new HelpPanel(source.id, level.hints, () => getCode(editor), { store, solution: outside ? (options.solution ?? null) : options.solution });
+      challengePanel.replaceChildren(...describeChallenge(level, openCodexEntry, chipTooltip, () => codex), help.element);
       updateControls();
       // Scratch Python gets a stand-in for this level's piece, and its tooltips follow this level's Codex.
       context.repl.setLevel({ piece: level.piece, api: level.api, codex: () => codex });
@@ -303,8 +322,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   /** The Codex tab and the hover tooltips: everything taught so far (docs/Codex.md). */
   async function loadCodex(loaded: LevelInfo): Promise<void> {
     try {
-      // a level from the editor is in no chapter: it counts everything the curriculum teaches, then its own abilities
-      const taught = testPlay ? [...codexChapters(), { curriculum: false, levels: [{ id: source.id, data: source.data, lesson: "" }] }] : codexChapters();
+      // a level from the editor, or someone else's, is in no chapter: it counts everything the curriculum teaches, then its own abilities
+      const taught = outside ? [...codexChapters(), { curriculum: false, levels: [{ id: source.id, data: source.data, lesson: "" }] }] : codexChapters();
       const entries = await client.call("codex", { levelId: source.id, chapters: taught });
       codex = renderCodex(entries, loaded.piece);
       codexPanel.replaceChildren(codex.element);
@@ -328,7 +347,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     running = true;
     updateControls();
     try {
-      const { hints: hintsUsed, solutionSeen } = testPlay ? { hints: 0, solutionSeen: false } : progress.level(source.id);
+      const { hints: hintsUsed, solutionSeen } = store.level(source.id);
       const result = await client.call("runLevel", { level: source.data, code: recordedCode, hintsUsed, solutionSeen });
       runResult = result;
       help?.recordRun(result); // once per run, here rather than in playback, which can reach the end many times
@@ -406,24 +425,27 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     // The verdict and what's on offer follow the run as a whole; the details
     // come from the recording on show (the run, or one of its cases).
     const whole = runResult ?? result;
-    const run = testPlay ? { ...whole, stars: [] } : whole; // a level from the editor has no stars to earn
     // the outcome sounds once playback has played its way here: not on a jump to the end (afterMs is 0)
-    if (afterMs > 0) for (const { sound: name, after } of outcomeSounds(run)) sound.play(name, afterMs / 1000 + after);
+    if (afterMs > 0) for (const { sound: name, after } of outcomeSounds(whole)) sound.play(name, afterMs / 1000 + after);
     const actions: HTMLElement[] = [];
-    if (help) actions.push(...help.outcomeActions(run, recordedCode ?? "", showHelp));
-    if (run.status === "solved") {
-      const next = nextLevel(source.id); // none for a level from the editor: it's in no chapter
+    if (whole.status === "solved" && testPlay) actions.push(keepSolution(testPlay.keep, testPlay.kept, recordedCode ?? ""));
+    if (help) actions.push(...help.outcomeActions(whole, recordedCode ?? "", showHelp));
+    if (whole.status === "solved") {
+      const next = nextLevel(source.id); // none for a level from the editor, or a shared one: it's in no chapter
+      const onward = (href: string, label: string) => h("a", { class: "btn btn-primary btn-small", href }, label);
       actions.push(
         testPlay
-          ? h("a", { class: "btn btn-primary btn-small", href: testPlay.back }, "← Back to the editor")
-          : next
-            ? h("a", { class: "btn btn-primary btn-small", href: `#/level/${next.id}` }, "Next level →")
-            : h("a", { class: "btn btn-primary btn-small", href: "#/lessons" }, "Back to Lessons"),
+          ? onward(testPlay.back, "← Back to the editor")
+          : shared
+            ? onward("#/editor", "← Shared with me") // the list lives on the My levels page
+            : next
+              ? onward(`#/level/${next.id}`, "Next level →")
+              : onward("#/lessons", "Back to Lessons"),
       );
       window.setTimeout(() => shownBoard()?.setCelebrating(true), afterMs);
       // clearing a tier's last core level earns its promotion: the ceremony follows the celebration, once
       const tier = chapters.find((c) => c.chapter === source.chapter)?.tier;
-      if (tier && !source.mastery && tierCleared(tier) && !progress.hasSeen("promotion", tier)) {
+      if (!outside && tier && !source.mastery && tierCleared(tier) && !curriculumProgress.hasSeen("promotion", tier)) {
         if (motionReduced()) {
           // no automatic jump without motion: offer it instead
           actions.push(h("a", { class: "btn btn-small", href: `#/promotion/${tier}` }, "Promotion earned: watch it"));
@@ -433,7 +455,20 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         }
       }
     }
-    outcomeHost.replaceChildren(outcomeCard(run, result, actions));
+    outcomeHost.replaceChildren(outcomeCard(whole, result, actions));
+  }
+
+  /** In test-play, after a solved run: keep the code that solved it as the level's solution (shown to players after three failed runs). */
+  function keepSolution(keep: (code: string) => void, kept: () => string, code: string): HTMLElement {
+    const group = h("div", { class: "keep-solution" });
+    const done = (text: string) => group.replaceChildren(h("p", { class: "small", role: "status" }, text));
+    if (kept() === code) done("This is the level's solution.");
+    else
+      group.replaceChildren(
+        h("button", { class: "btn btn-small", onClick: () => (keep(code), done("Kept as the level's solution.")) }, "Keep this as the level's solution"),
+        h("p", { class: "muted small" }, "It is shown to players after three failed runs."),
+      );
+    return group;
   }
 
   // -- several cases (M2): a hidden goal's ? squares ----------------------------------------
@@ -567,10 +602,10 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   };
 }
 
-function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, tooltip: ChipTooltip, codex: () => CodexLookup | null, withStars: boolean): HTMLElement[] {
+function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, tooltip: ChipTooltip, codex: () => CodexLookup | null): HTMLElement[] {
   const parts: HTMLElement[] = [
     h("h2", { class: "challenge-title" }, level.title),
-    h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), level.trains),
+    ...(level.trains ? [h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), level.trains)] : []), // a level from the editor may not say
   ];
   if (level.mastery) {
     parts.push(
@@ -590,7 +625,7 @@ function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, 
   }
   if (level.obstacles.length) parts.push(h("h3", {}, "Obstacles"), list("obstacles", level.obstacles));
   if (level.rules.length) parts.push(h("h3", {}, "Rules"), list("rules", level.rules));
-  if (withStars) parts.push(h("h3", {}, "Stars"), list("star-goals", level.stars));
+  parts.push(h("h3", {}, "Stars"), list("star-goals", level.stars));
 
   // Each ability is a way into the Codex: hover for its entry, click to open it there.
   const chip = (name: string) => {
