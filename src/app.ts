@@ -21,7 +21,7 @@ import { unlockedPieces } from "./promotion";
 import { progress } from "./progress";
 import { PyClient, startPythonWorker, type ClientStatus } from "./py/client";
 import { applyToDocument, settings } from "./settings";
-import { openRemix, sharedLevels, sharedProgress } from "./share/shared";
+import { sharedLevels, sharedProgress } from "./share/shared";
 import { sound } from "./sound";
 import { authorSolution } from "./ui/compare";
 import { h } from "./ui/dom";
@@ -29,11 +29,12 @@ import { icon } from "./ui/icons";
 import { mountEditor } from "./ui/editorScreen";
 import { mountEditorList } from "./ui/editorList";
 import { mountLessons } from "./ui/lessonsMenu";
+import { sharedHost, testPlayHost } from "./ui/levelHost";
 import { mountLevel, type LevelContext } from "./ui/levelView";
 import { mountPromotion } from "./ui/promotionScreen";
 import { ReplPanel } from "./ui/repl";
 import { SettingsDialog } from "./ui/settingsDialog";
-import { authorSolution as sharedSolution, openShared, sharedProblem, sharedSource } from "./ui/sharedLevel";
+import { openShared, sharedProblem, sharedSource } from "./ui/sharedLevel";
 import { mountTitle } from "./ui/titleScreen";
 import { mountStyleguide } from "./ui/styleguide";
 
@@ -117,7 +118,7 @@ export function startApp(root: HTMLElement): void {
     const source = sharedSource(data);
     crumbs.replaceChildren(h("span", {}, "Shared level"), h("span", { class: "crumb-sep" }, "/"), h("span", {}, source.title));
     document.title = `${source.title} · Shared level · Rank & File`;
-    return mountLevel(main, context, source, { shared: { remix: () => openRemix(data) },progress: sharedProgress, solution: sharedSolution(data) });
+    return mountLevel(main, context, source, sharedHost(data));
   }
 
   /** A level that can't be opened: a plain page that says why, with the way back. */
@@ -201,7 +202,7 @@ export function startApp(root: HTMLElement): void {
       };
       // as a player of the shared level will see it: the offer exists only if a solution was kept before this screen opened
       const solution = kept() ? authorSolution(kept) : null;
-      unmount = mountLevel(main, context, testPlaySource(draft), { testPlay: { back: `#/editor/${id}`, keep, kept }, solution });
+      unmount = mountLevel(main, context, testPlaySource(draft), testPlayHost({ back: `#/editor/${id}`, keep, kept, solution }));
       document.title = `${draft.title} · Test-play · Rank & File`;
     } else if (/^#\/editor\/[\w-]+$/.test(hash)) {
       const name = h("span", {}, "Editing");
