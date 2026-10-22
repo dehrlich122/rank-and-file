@@ -8,6 +8,7 @@ import type { CodexChapter } from "./py/protocol";
 const levelFiles = import.meta.glob<string>("/levels/*/*.yaml", { query: "?raw", import: "default", eager: true });
 const lessonFiles = import.meta.glob<string>("/lessons/**/*.md", { query: "?raw", import: "default", eager: true });
 const chapterFile = import.meta.glob<string>("/levels/chapters.yaml", { query: "?raw", import: "default", eager: true });
+const challengeFile = import.meta.glob<string>("/levels/challenges.yaml", { query: "?raw", import: "default", eager: true });
 
 export interface LevelSource {
   id: string;
@@ -17,6 +18,17 @@ export interface LevelSource {
   mastery: boolean; // the chapter's optional mastery challenge (M3.2)
   lesson: string; // Markdown
   data: Record<string, unknown>; // the parsed YAML, sent to the engine as-is
+  set?: string; // a challenge's Free Play set (M4.4); its chapter is 0 and it has no lesson
+  difficulty?: number; // 1 to 5 (pass, try, raise, assert, while True:), when the level has one (M4.4)
+}
+
+/** A Free Play challenge set (M4.4, levels/challenges.yaml): its levels, in id order. */
+export interface ChallengeSet {
+  set: string;
+  title: string;
+  tier: string;
+  summary: string;
+  levels: LevelSource[];
 }
 
 export interface Chapter {
@@ -37,14 +49,17 @@ function loadLevels(): LevelSource[] {
     .map(([path, text]) => {
       const data = parseYaml(text) as Record<string, unknown>;
       const lessonPath = `/lessons/${String(data.lesson)}`;
+      const set = typeof data.set === "string" ? data.set : undefined; // a challenge: no chapter, no lesson (M4.4)
       return {
         id: String(data.id),
-        chapter: Number(data.chapter),
+        chapter: set ? 0 : Number(data.chapter),
         title: String(data.title),
-        trains: String(data.trains),
+        trains: String(data.trains ?? ""),
         mastery: data.mastery === true,
-        lesson: lessonFiles[lessonPath] ?? `*Lesson file ${lessonPath} is missing (level file ${path}).*`,
+        lesson: set ? "" : (lessonFiles[lessonPath] ?? `*Lesson file ${lessonPath} is missing (level file ${path}).*`),
         data,
+        ...(set ? { set } : {}),
+        ...(typeof data.difficulty === "number" ? { difficulty: data.difficulty } : {}),
       };
     })
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -55,8 +70,13 @@ function loadChapters(levels: LevelSource[]): Chapter[] {
   return listed.map((chapter) => ({
     ...chapter,
     curriculum: chapter.curriculum !== false,
-    levels: levels.filter((level) => level.chapter === chapter.chapter),
+    levels: levels.filter((level) => !level.set && level.chapter === chapter.chapter),
   }));
+}
+
+function loadChallengeSets(levels: LevelSource[]): ChallengeSet[] {
+  const listed = (parseYaml(Object.values(challengeFile)[0] ?? "[]") as Array<Omit<ChallengeSet, "levels">> | null) ?? [];
+  return listed.map((set) => ({ ...set, levels: levels.filter((level) => level.set === set.set) }));
 }
 
 /** "Chapter 1 · First Moves"; a chapter outside the curriculum is just its title. */
@@ -66,6 +86,7 @@ export function chapterName(chapter: Chapter): string {
 
 const levels = loadLevels();
 export const chapters = loadChapters(levels);
+export const challengeSets = loadChallengeSets(levels);
 
 export function findLevel(id: string): LevelSource | undefined {
   return levels.find((level) => level.id === id);
@@ -96,10 +117,19 @@ export async function loadSolution(id: string): Promise<Solution | null> {
  * work out which functions a level's Codex lists (codex.history, docs/Codex.md).
  */
 export function codexChapters(): CodexChapter[] {
-  return chapters.map((chapter) => ({
-    curriculum: chapter.curriculum,
-    levels: chapter.levels.map((level) => ({ id: level.id, data: level.data, lesson: level.lesson })),
-  }));
+  const entry = (curriculum: boolean, chapter: number, tier: string, list: LevelSource[]): CodexChapter => ({
+    curriculum,
+    chapter,
+    tier,
+    levels: list.map((level) => ({ id: level.id, data: level.data, lesson: level.lesson })),
+  });
+  return chapters.flatMap((chapter, i) => {
+    const own = entry(chapter.curriculum, chapter.chapter, chapter.tier, chapter.levels);
+    // a tier's challenge sets come straight after its last curriculum chapter, so their Codex counts the whole tier (M4.4)
+    const lastOfTier = chapter.curriculum && !chapters.slice(i + 1).some((later) => later.curriculum && later.tier === chapter.tier);
+    if (!lastOfTier) return [own];
+    return [own, ...challengeSets.filter((set) => set.tier === chapter.tier).map((set) => entry(false, 0, set.tier, set.levels))];
+  });
 }
 
 /** A level's name where another screen mentions it: "1.4 The Password", or "Testing ground: Clockwork" outside the curriculum. */
@@ -109,7 +139,17 @@ export function levelLabel(id: string): string {
     const level = chapter.levels[index];
     if (level) return chapter.curriculum ? `${chapter.chapter}.${index + 1} ${level.title}` : `${chapter.title}: ${level.title}`;
   }
+  for (const set of challengeSets) {
+    const level = set.levels.find((l) => l.id === id);
+    if (level) return `${set.title}: ${level.title}`;
+  }
   return id;
+}
+
+/** The challenge after `id` in its set (M4.4), or undefined after the last. */
+export function nextChallenge(id: string): LevelSource | undefined {
+  const set = challengeSets.find((s) => s.levels.some((level) => level.id === id));
+  return set?.levels[set.levels.findIndex((level) => level.id === id) + 1];
 }
 
 /** The level after `id` in play order (chapters.yaml), within the curriculum only. */

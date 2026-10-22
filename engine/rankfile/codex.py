@@ -400,6 +400,22 @@ def history(level_id: str, chapters: list[dict]) -> list[dict]:
     return []
 
 
+def level_tags(data: dict, chapters: list[dict]) -> dict:
+    """A level's tier, worked out from what it needs (M4.4, docs/M4/M4.4.md decision 4): the latest curriculum chapter
+    that brings in one of its abilities, a construct its rules require, or its piece; that chapter's tier.
+
+    `chapters` is every chapter in play order, as for `history`, each also with its "chapter" number and "tier".
+    Returns {"tier": str | None, "chapter": int | None}.
+
+    Contract stub: the tier of the first curriculum chapter whose levels use this level's piece. WP M4.4-4a replaces it.
+    """
+    piece = parse_level(data).piece
+    for chapter in chapters:
+        if chapter["curriculum"] and any(item["data"].get("piece", "pawn") == piece for item in chapter["levels"]):
+            return {"tier": chapter.get("tier"), "chapter": None}
+    return {"tier": None, "chapter": None}
+
+
 def entries(level_id: str, chapters: list[dict]) -> list[Entry]:
     """A level's Codex: its piece's abilities, then every built-in and text method taught so far.
 

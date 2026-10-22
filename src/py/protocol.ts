@@ -78,6 +78,9 @@ export interface LevelInfo {
   stars: string[]; // what each of the three stars asks for, in words
   hints: string[]; // tiered: nudge, concept reminder, partial example
   mastery: boolean; // a chapter's optional mastery challenge (M3.2)
+  set: string; // the Free Play set a challenge belongs to (M4.4); "" for any other level
+  difficulty: number | null; // 1 to 5 (pass, try, raise, assert, while True:), set by the author (M4.4)
+  draws_on: number[]; // the chapters a challenge mixes, for its "Draws on" chips (M4.4)
   boards: LevelInfo[]; // a level with other maps (M3.2): every board, first to last, the others shown small beside it (QA-032); otherwise empty
 }
 
@@ -218,7 +221,17 @@ export interface CodexEntry {
 /** A chapter as the engine needs it to work out "taught so far" (codex.history): its levels' files and lessons. */
 export interface CodexChapter {
   curriculum: boolean;
+  // M4.4: its number in chapters.yaml (a challenge set's is 0) and its tier; content.codexChapters() always gives both,
+  // and only the entry a level from the editor or a shared level adds for itself leaves them out
+  chapter?: number;
+  tier?: string;
   levels: Array<{ id: string; data: unknown; lesson: string }>;
+}
+
+/** A level's tier, worked out by the engine from what the level needs (M4.4, codex.level_tags). */
+interface LevelTags {
+  tier: string | null; // null: nothing it needs is taught by any chapter
+  chapter: number | null; // the curriculum chapter that brings in the last thing it needs
 }
 
 /** Every request the worker understands: its arguments and its result. */
@@ -234,6 +247,7 @@ export interface Requests {
   runLevel: { args: { level: unknown; code: string; hintsUsed: number; solutionSeen: boolean }; result: LevelResult };
   runSandbox: { args: { code: string; api: string[]; board?: unknown }; result: LevelResult };
   codex: { args: { levelId: string; chapters: CodexChapter[] }; result: CodexEntry[] }; // chapters: all of them, in play order
+  levelTags: { args: { level: unknown; chapters: CodexChapter[] }; result: LevelTags }; // M4.4: the tier the engine works out
   // level: the one on screen, for the session's stand-in piece (Scratch Python has no board)
   replPush: { args: { line: string; level: { piece: string; api: string[] } | null }; result: ReplResult };
   replReset: { args: Record<string, never>; result: { ok: true } };
