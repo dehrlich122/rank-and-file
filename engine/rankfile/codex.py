@@ -404,16 +404,43 @@ def level_tags(data: dict, chapters: list[dict]) -> dict:
     """A level's tier, worked out from what it needs (M4.4, docs/M4/M4.4.md decision 4): the latest curriculum chapter
     that brings in one of its abilities, a construct its rules require, or its piece; that chapter's tier.
 
+    An ability or a piece is brought in by the first curriculum level that has it, a construct by the first whose
+    lesson snippets use it. What no curriculum chapter teaches is ignored.
+
     `chapters` is every chapter in play order, as for `history`, each also with its "chapter" number and "tier".
     Returns {"tier": str | None, "chapter": int | None}.
-
-    Contract stub: the tier of the first curriculum chapter whose levels use this level's piece. WP M4.4-4a replaces it.
     """
-    piece = parse_level(data).piece
+    level = parse_level(data)
+    abilities, nodes, pieces = set(level.api), set(level.constraints.require_nodes), {level.piece}
+    latest: dict | None = None
     for chapter in chapters:
-        if chapter["curriculum"] and any(item["data"].get("piece", "pawn") == piece for item in chapter["levels"]):
-            return {"tier": chapter.get("tier"), "chapter": None}
-    return {"tier": None, "chapter": None}
+        if not chapter["curriculum"] or not (abilities or nodes or pieces):
+            continue
+        found = False
+        for item in chapter["levels"]:
+            seen = item["data"]
+            brought = abilities & set(seen.get("api", []))
+            abilities -= brought
+            found = found or bool(brought) or seen.get("piece", "pawn") in pieces
+            pieces.discard(seen.get("piece", "pawn"))
+            if nodes:
+                used = _nodes_used(item["lesson"]) & nodes
+                nodes -= used
+                found = found or bool(used)
+        if found:
+            latest = chapter  # later chapters come later in play order, so the last one found is the latest
+    return {"tier": latest["tier"], "chapter": latest["chapter"]} if latest else {"tier": None, "chapter": None}
+
+
+def _nodes_used(lesson: str) -> set[str]:
+    """The names of the syntax a lesson's snippets use ("For", "While"...). A snippet that isn't Python adds none."""
+    used: set[str] = set()
+    for code in lesson_snippets(lesson):
+        try:
+            used |= {type(node).__name__ for node in ast.walk(ast.parse(code))}
+        except SyntaxError:
+            continue
+    return used
 
 
 def entries(level_id: str, chapters: list[dict]) -> list[Entry]:

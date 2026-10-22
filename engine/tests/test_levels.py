@@ -206,6 +206,35 @@ def chapters_in_play_order() -> list[dict]:
     return order
 
 
+def test_a_level_is_tiered_by_the_latest_chapter_that_teaches_what_it_needs():
+    """On the real curriculum: a made-up level with a move and a required `while` is as late as the chapter that teaches while."""
+    made_up = {"id": "q", "title": "q", "map": "P . G", "api": ["move"], "constraints": {"require_nodes": ["While"]}}
+    answer = codex.level_tags(made_up, chapters_in_play_order())
+    assert answer["chapter"] == 5 and answer["tier"] == "pawn"
+    assert codex.level_tags({**made_up, "constraints": {}}, chapters_in_play_order())["chapter"] == 1
+
+
+def test_every_curriculum_level_is_tiered_by_its_own_chapter():
+    """The rule against the real curriculum: nothing a level needs comes from a later chapter than its own."""
+    for chapter in chapters_in_play_order():
+        if not chapter["curriculum"]:
+            continue
+        for item in chapter["levels"]:
+            answer = codex.level_tags(item["data"], chapters_in_play_order())
+            assert answer["tier"] == chapter["tier"], f"{item['id']}: tiered {answer['tier']} (chapter {answer['chapter']}), not by its own chapter {chapter['chapter']}"
+            assert answer["chapter"] <= chapter["chapter"], f"{item['id']}: needs something chapter {answer['chapter']} teaches, after its own"
+
+
+def test_every_challenge_is_tiered_as_its_set_says():
+    """A challenge's tier is worked out from what it needs, and must be its set's (levels/challenges.yaml)."""
+    tiers = {entry["set"]: entry["tier"] for entry in listed_sets()}
+    for path in LEVEL_FILES:
+        level = load(path)
+        if level.challenge_set:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            assert codex.level_tags(data, chapters_in_play_order())["tier"] == tiers[level.challenge_set], f"{level.id}: needs more than the {tiers[level.challenge_set]} tier teaches"
+
+
 def test_lesson_builtins_have_codex_entries(level_file):
     """Every built-in a lesson calls is documented, so the Codex can list it."""
     if load(level_file).challenge_set:
