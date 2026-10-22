@@ -4,18 +4,17 @@
 import { chapterName, chapters, findLevel } from "../content";
 import { blankDraft, newId, type Draft } from "../editor/draft";
 import { drafts } from "../editor/drafts";
-import { draftToYaml, ImportError, yamlToDraft } from "../editor/levelData";
+import { ImportError, yamlToDraft } from "../editor/levelData";
 import { editorOptions } from "../editor/options";
 import { readSolution, setSolution } from "../editor/rules";
 import { copyOfLevel } from "../editor/starts";
 import type { PyClient } from "../py/client";
-import { codeFromText } from "../share/codec";
-import { remixOf, sharedLevels, sharedProgress } from "../share/shared";
+import { codeFromText, MAX_LEVEL_BYTES } from "../share/codec";
+import { openRemix, sharedLevels, sharedProgress } from "../share/shared";
 import { confirmStep } from "./dialog";
-import { download, fileName } from "./download";
+import { downloadLevel } from "./download";
 import { h } from "./dom";
 
-const MAX_FILE_BYTES = 64 * 1024; // a level file is a few KB; more than this isn't one
 const when = (ms: number): string => new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
 /** A shared level's stars as the list shows them: "★★☆", or "not solved yet". */
@@ -78,7 +77,7 @@ export function mountEditorList(root: HTMLElement, client: PyClient): () => void
 
   function remix(id: string): void {
     const data = sharedLevels.get(id);
-    if (data) open(remixOf(data));
+    if (data) openRemix(data);
   }
 
   function askRemove(id: string, name: string): void {
@@ -104,7 +103,7 @@ export function mountEditorList(root: HTMLElement, client: PyClient): () => void
 
   function exportLevel(id: string): void {
     const draft = drafts.load(id);
-    if (draft) download(`${fileName(draft.title)}.yaml`, draftToYaml(draft));
+    if (draft) downloadLevel(draft);
   }
 
   function ask(id: string, name: string): void {
@@ -129,7 +128,7 @@ export function mountEditorList(root: HTMLElement, client: PyClient): () => void
     const chosen = file.files?.[0];
     file.value = "";
     if (!chosen) return;
-    if (chosen.size > MAX_FILE_BYTES) return void (notice.textContent = `${chosen.name} is too big to be a level (over ${MAX_FILE_BYTES / 1024} KB).`);
+    if (chosen.size > MAX_LEVEL_BYTES) return void (notice.textContent = `${chosen.name} is too big to be a level (over ${MAX_LEVEL_BYTES / 1024} KB).`);
     try {
       const options = await editorOptions(client);
       const imported = yamlToDraft(await chosen.text(), { maxSide: options.max_side, id: newId() });

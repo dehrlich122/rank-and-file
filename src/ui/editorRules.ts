@@ -106,7 +106,7 @@ function parSection(ctx: PropsContext): HTMLElement {
     field("Par (lines of code)", numberInput(par ?? undefined, 1, (n) => ctx.change((d) => setPar(d, n), "par")), "Meeting it earns the second star.", "par"),
     lines !== null && lines !== par ? h("button", { class: "btn btn-small", onClick: () => ctx.change((d) => setPar(d, lines), undefined, true) }, `Use my solution's ${lines} lines`) : null,
     solutionBlock(ctx),
-    h("div", { class: "field", "data-field": "starter" }, h("span", { class: "field-label" }, "Starter code"), starter, counter(starter, options.limits.starter ?? 2000), h("span", { class: "muted small" }, "What the player's editor begins with. Optional.")),
+    h("div", { class: "field", "data-field": "starter" }, h("span", { class: "field-label" }, "Starter code"), starter, counter(starter, options.limits.starter), h("span", { class: "muted small" }, "What the player's editor begins with. Optional.")),
   );
 }
 
@@ -145,7 +145,7 @@ const TIERS = [
 ] as const;
 
 export function hintsFields(ctx: PropsContext): HTMLElement {
-  const limit = ctx.options.limits.hint ?? 600;
+  const limit = ctx.options.limits.hint;
   const tiers = readHints(ctx.draft);
   const areas: HTMLTextAreaElement[] = [];
   const notes: HTMLElement[] = [];

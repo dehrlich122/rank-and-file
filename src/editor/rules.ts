@@ -4,6 +4,7 @@
 // them; these functions read them into something a form can show, and write a change back as the file would say it
 // (a default is left out, so a level with no rules still exports without the keys). Nothing here judges a rule: whether
 // "collect all" makes sense on a board with no gems is the engine's to say. Items the form doesn't know stay where they were.
+import { asRecord } from "../storage";
 import type { Draft } from "./draft";
 
 /** How many of something an objective asks for: nothing, every one, or at least this many. */
@@ -68,15 +69,15 @@ export interface Limits {
   ban_nodes: string[];
 }
 
-const positive = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) ? value : null);
+const finite = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) ? value : null);
 const names = (value: unknown): string[] => (Array.isArray(value) ? value.filter((name): name is string => typeof name === "string") : []);
 
 export function readLimits(draft: Draft): Limits {
-  const c = (draft.extra.constraints ?? {}) as Record<string, unknown>;
+  const c = asRecord(draft.extra.constraints);
   return {
-    max_lines: positive(c.max_lines),
-    max_numbers: positive(c.max_numbers),
-    min_comments: positive(c.min_comments) ?? 0,
+    max_lines: finite(c.max_lines),
+    max_numbers: finite(c.max_numbers),
+    min_comments: finite(c.min_comments) ?? 0,
     require_nodes: names(c.require_nodes),
     ban_nodes: names(c.ban_nodes),
   };
@@ -84,8 +85,7 @@ export function readLimits(draft: Draft): Limits {
 
 /** The draft with some limits changed; a limit that is off (empty, zero, no constructs) isn't written. */
 export function setLimits(draft: Draft, change: Partial<Limits>): Draft {
-  const old = (draft.extra.constraints && typeof draft.extra.constraints === "object" && !Array.isArray(draft.extra.constraints) ? draft.extra.constraints : {}) as Record<string, unknown>;
-  const next: Record<string, unknown> = { ...old };
+  const next: Record<string, unknown> = { ...asRecord(draft.extra.constraints) };
   for (const [key, value] of Object.entries(change)) {
     const off = value === null || value === undefined || value === 0 || (Array.isArray(value) && value.length === 0);
     if (off) delete next[key];
@@ -97,13 +97,12 @@ export function setLimits(draft: Draft, change: Partial<Limits>): Draft {
 // -- par ---------------------------------------------------------------------------------------------------------------
 
 export function readPar(draft: Draft): number | null {
-  return positive((draft.extra.par as Record<string, unknown> | undefined)?.lines);
+  return finite(asRecord(draft.extra.par).lines);
 }
 
 /** The draft with this par (lines of code), or none. */
 export function setPar(draft: Draft, lines: number | null | undefined): Draft {
-  const old = (draft.extra.par && typeof draft.extra.par === "object" && !Array.isArray(draft.extra.par) ? draft.extra.par : {}) as Record<string, unknown>;
-  const { lines: _lines, ...rest } = old;
+  const { lines: _lines, ...rest } = asRecord(draft.extra.par);
   const next = lines ? { ...rest, lines } : rest;
   return withExtra(draft, "par", Object.keys(next).length ? next : undefined);
 }

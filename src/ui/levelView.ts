@@ -49,7 +49,7 @@ const verdict = (c: LevelResult) => (c.status === "solved" ? "✓" : "✗");
  */
 export interface LevelOptions {
   // `keep` lets the author keep the code that solved the level as its solution; `kept` says what is kept now
-  testPlay?: { back: string; keep?: (code: string) => void; kept?: () => string };
+  testPlay?: { back: string; keep: (code: string) => void; kept: () => string };
   shared?: { remix: () => void };
   progress?: ProgressStore;
   solution?: SolutionSource | null;
@@ -425,13 +425,12 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     // The verdict and what's on offer follow the run as a whole; the details
     // come from the recording on show (the run, or one of its cases).
     const whole = runResult ?? result;
-    const run = whole;
     // the outcome sounds once playback has played its way here: not on a jump to the end (afterMs is 0)
-    if (afterMs > 0) for (const { sound: name, after } of outcomeSounds(run)) sound.play(name, afterMs / 1000 + after);
+    if (afterMs > 0) for (const { sound: name, after } of outcomeSounds(whole)) sound.play(name, afterMs / 1000 + after);
     const actions: HTMLElement[] = [];
-    if (run.status === "solved" && testPlay?.keep) actions.push(keepSolution(testPlay.keep, testPlay.kept, recordedCode ?? ""));
-    if (help) actions.push(...help.outcomeActions(run, recordedCode ?? "", showHelp));
-    if (run.status === "solved") {
+    if (whole.status === "solved" && testPlay) actions.push(keepSolution(testPlay.keep, testPlay.kept, recordedCode ?? ""));
+    if (help) actions.push(...help.outcomeActions(whole, recordedCode ?? "", showHelp));
+    if (whole.status === "solved") {
       const next = nextLevel(source.id); // none for a level from the editor, or a shared one: it's in no chapter
       const onward = (href: string, label: string) => h("a", { class: "btn btn-primary btn-small", href }, label);
       actions.push(
@@ -456,14 +455,14 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         }
       }
     }
-    outcomeHost.replaceChildren(outcomeCard(run, result, actions));
+    outcomeHost.replaceChildren(outcomeCard(whole, result, actions));
   }
 
   /** In test-play, after a solved run: keep the code that solved it as the level's solution (shown to players after three failed runs). */
-  function keepSolution(keep: (code: string) => void, kept: (() => string) | undefined, code: string): HTMLElement {
+  function keepSolution(keep: (code: string) => void, kept: () => string, code: string): HTMLElement {
     const group = h("div", { class: "keep-solution" });
     const done = (text: string) => group.replaceChildren(h("p", { class: "small", role: "status" }, text));
-    if (kept?.() === code) done("This is the level's solution.");
+    if (kept() === code) done("This is the level's solution.");
     else
       group.replaceChildren(
         h("button", { class: "btn btn-small", onClick: () => (keep(code), done("Kept as the level's solution.")) }, "Keep this as the level's solution"),

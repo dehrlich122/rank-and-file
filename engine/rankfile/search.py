@@ -46,20 +46,30 @@ class RouteSearch:
         self.status: str | None = None  # None while searching; then ROUTE, NO_ROUTE, GAVE_UP or CLOCKS
         self.actions: list[tuple] = []  # the route, when there is one
         self.lines = 0  # lines of code it takes
+        self._queue: list[tuple] = []  # the frontier; dropped once there is an answer, so a finished board holds no memory
+        self._best: dict[tuple, tuple[int, int]] = {}  # the cheapest (lines, turns) that reach each state
+        self._reached = 0  # positions reached, kept once the frontier is dropped
         start = World(level)
         if start.code_clocked:
-            self.status = CLOCKS
+            self._finish(CLOCKS)
             return
         self._actions = _actions(level)
         first = _key(start, "", "")
         self._order = count()  # breaks ties between equal costs, so worlds are never compared
-        self._queue = [((0, 0), next(self._order), first, start, (), "")]
-        self._best = {first: (0, 0)}  # the cheapest (lines, turns) that reach each state
+        self._queue.append(((0, 0), next(self._order), first, start, (), ""))
+        self._best[first] = (0, 0)
 
     @property
     def positions(self) -> int:
         """How many positions it has reached so far."""
-        return min(len(self._best), self.max_states) if self.status != CLOCKS else 0
+        return self._reached if self.status is not None else min(len(self._best), self.max_states)
+
+    def _finish(self, status: str) -> bool:
+        """Settle on an answer, keeping its counts and dropping the frontier."""
+        self.status = status
+        self._reached = min(len(self._best), self.max_states)
+        self._queue, self._best = [], {}
+        return True
 
     def run(self, seconds: float | None = None) -> bool:
         """Search for up to `seconds` (no limit if None). True once it has an answer."""
@@ -74,8 +84,8 @@ class RouteSearch:
             if best[key] < (lines, turns):
                 continue  # reached more cheaply since
             if not level.nothing_to_do and not unmet_objectives(level, world, said):
-                self.status, self.actions, self.lines = ROUTE, list(path), lines
-                return True
+                self.actions, self.lines = list(path), lines
+                return self._finish(ROUTE)
             for action in self._actions:
                 after = _try(level, world, action)
                 if after is None:
@@ -88,11 +98,9 @@ class RouteSearch:
                     continue
                 best[next_key] = next_cost
                 if len(best) > self.max_states:
-                    self.status = GAVE_UP
-                    return True
+                    return self._finish(GAVE_UP)
                 heappush(queue, (next_cost, next(self._order), next_key, after, (*path, action), spoken))
-        self.status = NO_ROUTE
-        return True
+        return self._finish(NO_ROUTE)
 
 
 class Search:
@@ -128,11 +136,6 @@ class Search:
     def _result(self, index: int) -> dict:
         case, search = self.cases[index], self._searches[index]
         return {"label": case.label, "where": case.where, "status": search.status, "lines": search.lines if search.status == ROUTE else None, "positions": search.positions}
-
-    def route(self, index: int = 0) -> list[tuple] | None:
-        """The actions of a case's route, for the scripts that write reference solutions. Never sent to the UI."""
-        search = self._searches[index]
-        return search.actions if search.status == ROUTE else None
 
 
 def _actions(level: Level) -> list[tuple]:

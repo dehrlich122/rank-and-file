@@ -56,6 +56,14 @@ describe("limits", () => {
     expect(draft.extra.constraints).toEqual({ max_lines: 5, secret_rule: 1 });
   });
 
+  it("read a constraints key that isn't a mapping as no limits, and replace it on a change", () => {
+    for (const odd of [null, "x", 7, ["max_lines"]]) {
+      expect(readLimits(draftWith({ constraints: odd })).max_lines).toBeNull();
+      expect(setLimits(draftWith({ constraints: odd }), { max_lines: 3 }).extra.constraints).toEqual({ max_lines: 3 });
+    }
+    expect(readPar(draftWith({ par: "3" }))).toBeNull();
+  });
+
   it("treat zero comments as off", () => {
     expect(setLimits(draftWith({ constraints: { min_comments: 2 } }), { min_comments: 0 }).extra.constraints).toBeUndefined();
   });

@@ -2,17 +2,17 @@
 // .yaml file. Nothing here judges a rule: the engine accepts the level and runs the kept solution; this only reads
 // what it answered and words it.
 import type { Draft } from "../editor/draft";
-import { draftToLevelData, draftToYaml } from "../editor/levelData";
+import { draftToLevelData } from "../editor/levelData";
 import { readPar, readSolution } from "../editor/rules";
 import type { PyClient } from "../py/client";
-import type { ErrorInfo, LevelResult } from "../py/protocol";
+import type { ErrorInfo, LevelResult, Requests } from "../py/protocol";
 import { encodeLevel, shareLink, ShareError } from "../share/codec";
 import { dialogHead, modal } from "./dialog";
-import { download, fileName } from "./download";
+import { downloadLevel } from "./download";
 import { h } from "./dom";
 
-/** What the engine said about loading the level. */
-type Accepted = { ok: true } | { ok: false; error: string };
+/** What the engine said about loading the level: the parts of its answer the checks read. */
+type Accepted = { ok: true } | Pick<Extract<Requests["loadLevel"]["result"], { ok: false }>, "ok" | "error">;
 
 /** The parts of a run's answer the checks read. */
 interface RunAnswer {
@@ -97,8 +97,8 @@ export function openShareDialog(client: PyClient, whole: () => Draft, setParTo: 
     const link = h("input", { type: "text", readonly: true, disabled: !enabled, "aria-label": "Link", value: enabled ? shareLink(code) : "" });
     const text = h("textarea", { readonly: true, rows: "3", disabled: !enabled, "aria-label": "Code, to paste into My levels" });
     text.value = code ?? "";
-    const yaml = h("button", { class: "btn btn-small", disabled: !enabled, onClick: () => download(`${fileName(whole().title)}.yaml`, draftToYaml(whole())) }, "Download a .yaml file");
-    out.className = enabled ? "share-out" : "share-out blocked";
+    const yaml = h("button", { class: "btn btn-small", disabled: !enabled, onClick: () => downloadLevel(whole()) }, "Download a .yaml file");
+    out.classList.toggle("blocked", !enabled);
     out.replaceChildren(
       h("label", { class: "small muted" }, "LINK"),
       copyRow(link, "Copy the link", enabled),
@@ -119,9 +119,8 @@ export function openShareDialog(client: PyClient, whole: () => Draft, setParTo: 
     let code: string | null = null;
     try {
       const loaded = await client.call("loadLevel", { level });
-      const accepted: Accepted = loaded.ok ? { ok: true } : { ok: false, error: loaded.error };
       const answer = loaded.ok && solution.trim() ? await client.call("runLevel", { level, code: solution, hintsUsed: 0, solutionSeen: false }) : null;
-      lines = shareChecks(accepted, solution, answer, par);
+      lines = shareChecks(loaded, solution, answer, par);
       if (lines.every((line) => line.ok)) {
         try {
           code = await encodeLevel(level);
@@ -135,25 +134,24 @@ export function openShareDialog(client: PyClient, whole: () => Draft, setParTo: 
     }
     if (mine !== generation) return;
     checks.replaceChildren(
-      ...lines.map((line) =>
-        item(
-          line.ok ? "✓" : "✗",
-          line.text,
-          line.setPar === undefined
+      ...lines.map((line) => {
+        const target = line.setPar;
+        const button =
+          target === undefined
             ? undefined
             : h(
                 "button",
                 {
                   class: "btn btn-small",
                   onClick: () => {
-                    setParTo(line.setPar ?? 0);
+                    setParTo(target);
                     void run();
                   },
                 },
-                `Set par to ${line.setPar}`,
-              ),
-        ),
-      ),
+                `Set par to ${target}`,
+              );
+        return item(line.ok ? "✓" : "✗", line.text, button);
+      }),
     );
     renderOut(code);
   }

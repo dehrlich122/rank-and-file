@@ -7,6 +7,7 @@
 import type { EditorView } from "@codemirror/view";
 import { marked } from "marked";
 import { loadSolution, type Solution } from "../content";
+import { capitalise } from "../editor/draft";
 import { dialogHead, modal } from "./dialog";
 import { h } from "./dom";
 import { createEditor } from "./editor";
@@ -21,7 +22,15 @@ export interface SolutionSource {
 /** The curriculum's reference solution for a level: a lazy file, fetched only when the comparison opens. */
 export const idiomaticSolution = (levelId: string): SolutionSource => ({ name: "an idiomatic solution", explained: true, load: () => loadSolution(levelId) });
 
-const capitalised = (text: string): string => text.replace(/^./, (c) => c.toUpperCase());
+/** An author's own solution, offered as text: `code` is read when the comparison opens, and blank code means there is none. */
+export const authorSolution = (code: () => string): SolutionSource => ({
+  name: "the author's solution",
+  explained: false,
+  load: async () => {
+    const text = code();
+    return text.trim() ? { code: text, note: "" } : null;
+  },
+});
 
 export function openComparison(source: SolutionSource, yourCode: string): void {
   const editors: EditorView[] = [];
@@ -61,7 +70,7 @@ export function openComparison(source: SolutionSource, yourCode: string): void {
           "div",
           { class: "compare-columns" },
           codePane("Your code", yourCode, "compare-yours"),
-          codePane(capitalised(source.name), solution.code, "compare-idiomatic"),
+          codePane(capitalise(source.name), solution.code, "compare-idiomatic"),
         ),
         ...(note ? [note] : []),
       );

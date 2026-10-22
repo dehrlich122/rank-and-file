@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { drafts } from "../editor/drafts";
 import { memoryStorage } from "../storage.fake";
-import { remixOf, SharedStore } from "./shared";
+import { openRemix, remixOf, SharedStore } from "./shared";
 
 const level = (id: string, title: string, extra: Record<string, unknown> = {}) => ({
   id,
@@ -45,5 +46,18 @@ describe("remixing a shared level", () => {
 
   it("keeps the title within the engine's limit", () => {
     expect(remixOf(level("shared-aaa", "x".repeat(60)), "my-remix").title.length).toBe(60);
+  });
+
+  it("opens in the editor, saved among your own levels", () => {
+    vi.stubGlobal("location", { hash: "" });
+    try {
+      openRemix(level("shared-aaa", "The Long Corridor"));
+      const id = /^#\/editor\/([\w-]+)$/.exec(location.hash)?.[1];
+      expect(id).toBeDefined();
+      expect(drafts.load(id!)?.title).toBe("The Long Corridor (remix)");
+      drafts.remove(id!);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
