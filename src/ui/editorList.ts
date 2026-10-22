@@ -28,10 +28,12 @@ export function mountEditorList(root: HTMLElement, client: PyClient): () => void
   const list = h("ul", { class: "my-levels" });
   const shared = h("ul", { class: "my-levels" });
 
+  /** Save a level and open it in the editor; with something to tell first, stay here and say it (QA-044). */
   function open(draft: Draft, message?: string): void {
     drafts.save(draft);
-    if (message) notice.textContent = message;
-    location.hash = `#/editor/${draft.id}`;
+    if (!message) return void (location.hash = `#/editor/${draft.id}`);
+    notice.textContent = message;
+    draw();
   }
 
   function draw(): void {
@@ -132,7 +134,7 @@ export function mountEditorList(root: HTMLElement, client: PyClient): () => void
       const options = await editorOptions(client);
       const imported = yamlToDraft(await chosen.text(), { maxSide: options.max_side, id: newId() });
       const left = readSolution(imported) !== "";
-      open(setSolution(imported, null), left ? `Opened ${chosen.name}. Its solution was left out: solve it in test-play to keep your own.` : undefined);
+      open(setSolution(imported, null), left ? `Added ${chosen.name} to your levels. Its solution was left out: solve it in test-play to keep your own.` : undefined);
     } catch (error) {
       notice.textContent = error instanceof ImportError ? `Couldn't open ${chosen.name}: ${error.message}` : `Couldn't read ${chosen.name}.`;
     }
