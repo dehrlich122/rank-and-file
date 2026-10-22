@@ -1,5 +1,6 @@
 // Free Play (M4.4, docs/M4/M4.4.md): the hub at #/free, a directory like Lessons, and its sections at #/free/<section>.
 // Contract placeholder: the hub's rows link to every section; the Challenges and Shared pages are built by WP 4d.
+import type { PyClient } from "../py/client";
 import { h } from "./dom";
 
 /** Free Play's sections, in the hub's order: the address of each, its glyph, name and one line on what it holds. */
@@ -13,8 +14,11 @@ const FREE_SECTIONS = [
 
 export type FreeSection = (typeof FREE_SECTIONS)[number]["id"];
 
-/** Mount the hub (`section` null) or one of its pages in `main`. Returns what to call to leave it. */
-export function mountFreePlay(main: HTMLElement, section: FreeSection | null): () => void {
+/**
+ * Mount the hub (`section` null) or one of its pages in `main`. Returns what to call to leave it. The Sandbox and Skins
+ * pages have their own screens (app.ts); `client` asks the engine for the tiers of levels outside the curriculum.
+ */
+export function mountFreePlay(main: HTMLElement, section: FreeSection | null, _client: PyClient): () => void {
   const page = FREE_SECTIONS.find((s) => s.id === section);
   if (page) {
     main.replaceChildren(h("div", { class: "free-play" }, h("h1", { class: "free-title" }, page.name), h("p", { class: "muted" }, page.line)));

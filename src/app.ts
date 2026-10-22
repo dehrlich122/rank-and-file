@@ -201,7 +201,7 @@ export function startApp(root: HTMLElement): void {
       const section = (freeMatch[1] ?? null) as FreeSection | null;
       const names: Record<string, string> = { challenges: "Challenges", shared: "Shared with me", sandbox: "Sandbox", skins: "Skins" };
       crumbs.replaceChildren(...(section ? [h("a", { href: "#/free" }, "Free Play"), h("span", { class: "crumb-sep" }, "/"), h("span", {}, names[section]!)] : [h("span", {}, "Free Play")]));
-      unmount = section === "sandbox" ? mountSandbox(main, client) : section === "skins" ? mountSkins(main) : mountFreePlay(main, section);
+      unmount = section === "sandbox" ? mountSandbox(main, client) : section === "skins" ? mountSkins(main) : mountFreePlay(main, section, client);
       focusHeading();
       document.title = `${section ? `${names[section]} · ` : ""}Free Play · Rank & File`;
     } else if (playMatch) {
