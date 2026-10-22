@@ -108,6 +108,17 @@ export function renderLesson(markdown: string, context: LessonContext): Lesson {
   };
 }
 
+export interface SnippetOptions {
+  onChange?: (code: string) => void;
+  compact?: boolean; // default true, the lesson's small editor
+}
+
+/** One runnable snippet outside a lesson (the Free Play Sandbox): its own editor, Run, board and console. */
+export function renderSnippet(code: string, context: LessonContext, options: SnippetOptions = {}): { element: HTMLElement; dispose(): void } {
+  const loadSandbox = () => context.client.ready().then(() => context.client.call("loadSandbox", { api: context.api, board: context.board }));
+  return new Snippet(code, context, loadSandbox, options);
+}
+
 class Snippet {
   readonly element: HTMLElement;
   private readonly editor: EditorView;
@@ -123,6 +134,7 @@ class Snippet {
     code: string,
     private readonly context: LessonContext,
     private readonly loadSandbox: () => Promise<LevelInfo>,
+    options: SnippetOptions = {},
   ) {
     const editorHost = h("div", { class: "snippet-editor" });
     this.runButton = h("button", { class: "btn btn-small btn-primary", onClick: () => void this.run() }, "Run ▶");
@@ -140,7 +152,8 @@ class Snippet {
     this.editor = createEditor({
       parent: editorHost,
       code: code.trimEnd(),
-      compact: true,
+      compact: options.compact ?? true,
+      onChange: options.onChange,
       onRun: () => void this.run(),
       extensions: [codexHover(context.codex)],
     });

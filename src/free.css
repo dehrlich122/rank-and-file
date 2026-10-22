@@ -282,3 +282,29 @@
 .skin-card.worn {
   border-color: var(--accent);
 }
+
+/* The Sandbox: the lesson snippet's editor and board, larger */
+.sandbox .snippet {
+  margin: 14px 0 0;
+  padding: 14px;
+}
+
+.sandbox .snippet-editor .cm-editor {
+  min-height: 220px;
+}
+
+.sandbox .snippet-row {
+  gap: 16px;
+}
+
+.sandbox .snippet-board {
+  width: min(46vw, 420px);
+}
+
+.sandbox .board-mini {
+  width: 100%;
+}
+
+.sandbox .board-mini .coords {
+  display: block;
+}
