@@ -131,6 +131,19 @@ export function setStarter(draft: Draft, code: string): Draft {
   return withExtra(draft, "starter", code.trim() ? code : undefined);
 }
 
+// -- difficulty --------------------------------------------------------------------------------------------------------
+
+/** How hard the level is, 1 to 5, for Free Play's lists; null when the file doesn't say. */
+export function readDifficulty(draft: Draft): number | null {
+  const value = draft.extra.difficulty;
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 5 ? value : null;
+}
+
+/** The draft with this difficulty (1 to 5); null takes it away. */
+export function setDifficulty(draft: Draft, step: number | null): Draft {
+  return withExtra(draft, "difficulty", step ?? undefined);
+}
+
 // -- the author's solution ---------------------------------------------------------------------------------------------
 
 export const readSolution = (draft: Draft): string => (typeof draft.extra.solution === "string" ? draft.extra.solution : "");
