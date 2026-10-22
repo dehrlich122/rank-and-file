@@ -5,7 +5,7 @@
 import type { LevelSource } from "../content";
 import type { Requests } from "../py/protocol";
 import { decodeLevel, ShareError } from "../share/codec";
-import type { SolutionSource } from "./compare";
+import { authorSolution as authorSolutionOf, type SolutionSource } from "./compare";
 import { h } from "./dom";
 
 type LevelCheck = Requests["loadLevel"]["result"];
@@ -29,8 +29,7 @@ export function sharedSource(data: Record<string, unknown>): LevelSource {
  */
 export function authorSolution(data: Record<string, unknown>): SolutionSource | null {
   const code = data.solution;
-  if (typeof code !== "string" || !code.trim()) return null;
-  return { name: "the author's solution", explained: false, load: async () => ({ code, note: "" }) };
+  return typeof code === "string" && code.trim() ? authorSolutionOf(() => code) : null;
 }
 
 export type SharedOpening = { ok: true; data: Record<string, unknown> } | { ok: false; reason: string };

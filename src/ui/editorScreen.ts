@@ -9,7 +9,7 @@ import { addBoard, boardCount, boardName, commitBoard, removeBoard, viewOf, type
 import { clearBoard, enemyAt, erase, extendRoute, fill, moveEnemy, occupantOf, paint, placeEnemy, placeGoal, placeStart, resize, rotateStart, toggleSpot, type Edit } from "../editor/edit";
 import { History } from "../editor/history";
 import { startSolve, type SolveRun } from "../editor/solve";
-import { draftToLevelData, draftToYaml } from "../editor/levelData";
+import { draftToLevelData } from "../editor/levelData";
 import { editorOptions } from "../editor/options";
 import { readSolution, setPar } from "../editor/rules";
 import type { Problem } from "../editor/problems";
@@ -18,7 +18,7 @@ import type { EditorOptions, Enemy, LevelInfo, Pos, TileKind } from "../py/proto
 import { sound } from "../sound";
 import { BoardView } from "./board";
 import { confirmStep } from "./dialog";
-import { download, fileName } from "./download";
+import { downloadLevel } from "./download";
 import { h } from "./dom";
 import { renderProblems, renderProps, type Selection, type Tab } from "./editorProps";
 import { readAloud } from "./editorRules";
@@ -146,7 +146,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   const undoButton = h("button", { class: "btn btn-small", onClick: () => undo() }, "Undo");
   const redoButton = h("button", { class: "btn btn-small", onClick: () => redo() }, "Redo");
   const clearButton = h("button", { class: "btn btn-small", onClick: () => askToClear() }, "Clear board");
-  const exportButton = h("button", { class: "btn btn-small", onClick: () => download(`${fileName(whole().title)}.yaml`, draftToYaml(whole())) }, "Export");
+  const exportButton = h("button", { class: "btn btn-small", onClick: () => downloadLevel(whole()) }, "Export");
   const shareButton = h(
     "button",
     { class: "btn btn-small", "aria-haspopup": "dialog", onClick: () => openShareDialog(client, whole, (lines) => commit(setPar(draft(), lines), `Par is ${lines} lines.`)) },
@@ -249,35 +249,28 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
 
   const refreshSolve = () => propsHost.querySelector(".solve-box")?.replaceWith(propsContext().solve());
 
+  /** The check is now in this state, with this search running (none, once it has ended), and the box shows it. */
+  function settle(state: SolveState, run: SolveRun | null = null): void {
+    solveRun = run;
+    solveState = state;
+    refreshSolve();
+  }
+
   function startCheck(): void {
     if (!verdict?.level || verdict.revision !== revision) return;
     solveRun?.cancel();
     const about = revision;
-    solveState = { kind: "searching", progress: null };
-    refreshSolve();
+    settle({ kind: "searching", progress: null });
     solveRun = startSolve(client, draftToLevelData(whole()), {
-      progress: (progress) => {
-        solveState = { kind: "searching", progress };
-        refreshSolve();
-      },
-      done: (progress) => {
-        solveRun = null;
-        solveState = { kind: "done", revision: about, progress };
-        refreshSolve();
-      },
-      failed: (message) => {
-        solveRun = null;
-        solveState = { kind: "failed", message };
-        refreshSolve();
-      },
+      progress: (progress) => settle({ kind: "searching", progress }, solveRun),
+      done: (progress) => settle({ kind: "done", revision: about, progress }),
+      failed: (message) => settle({ kind: "failed", message }),
     });
   }
 
   function cancelCheck(note?: string): void {
     solveRun?.cancel();
-    solveRun = null;
-    solveState = { kind: "idle", note };
-    refreshSolve();
+    settle({ kind: "idle", note });
   }
 
   function askToRemove(): void {

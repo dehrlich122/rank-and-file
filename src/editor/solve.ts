@@ -4,6 +4,7 @@
 // back is counts and words, never the route; this file runs the slices and puts the answers into words.
 import type { PyClient } from "../py/client";
 import type { SolveProgress } from "../py/protocol";
+import { capitalise } from "./draft";
 
 const SLICE_SECONDS = 0.15;
 
@@ -47,8 +48,6 @@ export function startSolve(client: Pick<PyClient, "ready" | "call">, level: unkn
 // -- the answers in words ------------------------------------------------------------------------------------------
 
 export type Mark = "ok" | "none" | "gave" | "skip";
-
-const capitalise = (text: string): string => text.replace(/^./, (c) => c.toUpperCase());
 
 /** One line for each board (or place the goal could be) the check has finished. */
 export function solveLines(progress: SolveProgress): Array<{ mark: Mark; text: string }> {

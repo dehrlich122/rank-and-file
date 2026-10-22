@@ -4,6 +4,7 @@
 // in a store of its own (`sharedProgress`), apart from the curriculum's: Settings → Reset progress clears that, never
 // this list.
 import { newId, type Draft } from "../editor/draft";
+import { drafts } from "../editor/drafts";
 import { levelDataToDraft } from "../editor/levelData";
 import { ProgressStore } from "../progress";
 import { asRecord, browserStorage, readJson, writeJson, type StorageLike } from "../storage";
@@ -81,6 +82,13 @@ export function remixOf(data: Record<string, unknown>, id = newId()): Draft {
   const { solution: _dropped, ...extra } = draft.extra;
   const suffix = " (remix)";
   return { ...draft, title: `${draft.title.slice(0, TITLE_LIMIT - suffix.length)}${suffix}`, extra };
+}
+
+/** Make a remix of a shared level, keep it among the player's own, and open it in the editor. */
+export function openRemix(data: Record<string, unknown>): void {
+  const draft = remixOf(data);
+  drafts.save(draft);
+  location.hash = `#/editor/${draft.id}`;
 }
 
 /** The player's kept shared levels. */

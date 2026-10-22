@@ -21,9 +21,9 @@ import { unlockedPieces } from "./promotion";
 import { progress } from "./progress";
 import { PyClient, startPythonWorker, type ClientStatus } from "./py/client";
 import { applyToDocument, settings } from "./settings";
-import { remixOf, sharedLevels, sharedProgress } from "./share/shared";
+import { openRemix, sharedLevels, sharedProgress } from "./share/shared";
 import { sound } from "./sound";
-import type { SolutionSource } from "./ui/compare";
+import { authorSolution } from "./ui/compare";
 import { h } from "./ui/dom";
 import { icon } from "./ui/icons";
 import { mountEditor } from "./ui/editorScreen";
@@ -33,7 +33,7 @@ import { mountLevel, type LevelContext } from "./ui/levelView";
 import { mountPromotion } from "./ui/promotionScreen";
 import { ReplPanel } from "./ui/repl";
 import { SettingsDialog } from "./ui/settingsDialog";
-import { authorSolution, openShared, sharedProblem, sharedSource } from "./ui/sharedLevel";
+import { authorSolution as sharedSolution, openShared, sharedProblem, sharedSource } from "./ui/sharedLevel";
 import { mountTitle } from "./ui/titleScreen";
 import { mountStyleguide } from "./ui/styleguide";
 
@@ -117,12 +117,7 @@ export function startApp(root: HTMLElement): void {
     const source = sharedSource(data);
     crumbs.replaceChildren(h("span", {}, "Shared level"), h("span", { class: "crumb-sep" }, "/"), h("span", {}, source.title));
     document.title = `${source.title} · Shared level · Rank & File`;
-    const remix = () => {
-      const draft = remixOf(data); // a draft of the player's own, without the author's solution
-      drafts.save(draft);
-      location.hash = `#/editor/${draft.id}`;
-    };
-    return mountLevel(main, context, source, { shared: { remix }, progress: sharedProgress, solution: authorSolution(data) });
+    return mountLevel(main, context, source, { shared: { remix: () => openRemix(data) },progress: sharedProgress, solution: sharedSolution(data) });
   }
 
   /** A level that can't be opened: a plain page that says why, with the way back. */
@@ -205,9 +200,7 @@ export function startApp(root: HTMLElement): void {
         if (saved) drafts.save(setSolution(saved, code));
       };
       // as a player of the shared level will see it: the offer exists only if a solution was kept before this screen opened
-      const solution: SolutionSource | null = kept()
-        ? { name: "the author's solution", explained: false, load: async () => (kept() ? { code: kept(), note: "" } : null) }
-        : null;
+      const solution = kept() ? authorSolution(kept) : null;
       unmount = mountLevel(main, context, testPlaySource(draft), { testPlay: { back: `#/editor/${id}`, keep, kept }, solution });
       document.title = `${draft.title} · Test-play · Rank & File`;
     } else if (/^#\/editor\/[\w-]+$/.test(hash)) {

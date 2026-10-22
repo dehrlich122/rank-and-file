@@ -111,7 +111,7 @@ export interface EditorOptions {
   facings: Facing[];
   timed_gate: { open: number; clock: Clock }; // a timed gate's defaults
   constructs: Array<{ node: string; label: string }>; // what a level may require or ban: an `ast` node's name and how to say it (M4.3)
-  limits: Record<string, number>; // how long each text may be, and how many hints and enemies (LIMITS)
+  limits: Record<string, number> & { starter: number; hint: number }; // how long each text may be, and how many hints and enemies (LIMITS)
   max_boards: number; // a level and its other boards
 }
 
@@ -228,7 +228,7 @@ export interface Requests {
   editorOptions: { args: Record<string, never>; result: EditorOptions };
   // The solvability check, in slices (M4.3): start it, then ask again until `done`; not asking again cancels it.
   solveStart: { args: { level: unknown }; result: { ok: true; cases: number } | { ok: false; error: string } };
-  solveStep: { args: { seconds?: number }; result: SolveProgress };
+  solveStep: { args: { seconds: number }; result: SolveProgress };
   codeLines: { args: { code: string }; result: number }; // lines as par counts them (M4.3: the author's kept solution)
   loadSandbox: { args: { api: string[]; board?: unknown }; result: LevelInfo }; // board: a level's lesson_board (QA-019)
   runLevel: { args: { level: unknown; code: string; hintsUsed: number; solutionSeen: boolean }; result: LevelResult };

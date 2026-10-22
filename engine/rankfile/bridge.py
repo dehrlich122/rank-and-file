@@ -51,9 +51,13 @@ def solve_start(level_json: str) -> str:
 
 def solve_step(seconds: float = 0.15) -> str:
     """Work on the check for about `seconds`, then report how far it got (counts and words, never the route)."""
+    global _search
     if _search is None:
         return json.dumps({"done": True, "case": 0, "cases": 0, "unit": "board", "positions": 0, "results": []})
-    return json.dumps(_search.step(float(seconds)))
+    progress = _search.step(float(seconds))
+    if progress["done"]:
+        _search = None  # an answer is given once; asking again gets "nothing running"
+    return json.dumps(progress)
 
 
 def run_level(level_json: str, code: str, hints_used: int = 0, solution_seen: bool = False) -> str:
