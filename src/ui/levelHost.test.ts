@@ -1,11 +1,11 @@
 // The level host (M4.4-0): what each way of opening the level screen says. No DOM: the pieces that build elements
 // (the banner, Keep) are only checked for being there.
 import { describe, expect, it, vi } from "vitest";
-import { chapters } from "../content";
+import { challengeSets, chapters } from "../content";
 import { progress, ProgressStore } from "../progress";
 import { sharedProgress } from "../share/shared";
 import type { SolutionSource } from "./compare";
-import { lessonHost, sharedHost, testPlayHost } from "./levelHost";
+import { challengeHost, lessonHost, sharedHost, testPlayHost } from "./levelHost";
 
 const curriculum = chapters.filter((chapter) => chapter.curriculum).flatMap((chapter) => chapter.levels);
 
@@ -99,5 +99,22 @@ describe("sharedHost", () => {
 
   it("goes back to the list on My levels", () => {
     expect(sharedHost({ id: "shared-x" }).onward("shared-x")).toEqual({ href: "#/editor", label: "← Shared with me" });
+  });
+});
+
+describe("challengeHost", () => {
+  it("is a challenge: no lesson, no crown, the curriculum's progress and its references", () => {
+    const host = challengeHost();
+    expect([host.kind, host.learn, host.curriculum, host.progress === progress, host.solution]).toEqual(["challenge", false, false, true, undefined]);
+  });
+
+  it("goes on to the next challenge in its set, then back to Free Play", () => {
+    for (const set of challengeSets) {
+      set.levels.forEach((level, i) => {
+        const next = set.levels[i + 1];
+        expect(challengeHost().onward(level.id).href).toBe(next ? `#/challenge/${next.id}` : "#/free/challenges");
+      });
+    }
+    expect(challengeHost().onward("not-a-challenge")).toEqual({ href: "#/free/challenges", label: "Back to Free Play" });
   });
 });

@@ -656,18 +656,20 @@ export default async function uiChecks({ browser: b, base, root, check }) {
 
   // -- M3.7: the start menu, Lessons and the Piece setting (last, because each fresh page load starts Python and a
   // renderer that has loaded it many times in a row has died; see QA.md)
-  await check("M3.7: the start menu has four entries; Free Play says coming soon; Enter on Lessons opens it", async () => {
+  await check("M3.7: the start menu has four entries; Enter on Free Play opens its hub (M4.4) and Enter on Lessons opens Lessons", async () => {
     await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/` });
     await b.waitFor(`document.querySelector('.title-scene .ts-menu')`, 30_000, "start menu");
     const labels = await b.evaluate(`[...document.querySelectorAll('.ts-item')].map((e) => e.textContent.replace('▶', '').trim())`);
+    const soon = await b.evaluate(`document.querySelectorAll('.ts-item.soon').length`);
     await b.key("ArrowDown");
     await b.key("Enter");
-    const note = await b.evaluate(`document.querySelector('.ts-note').textContent`);
-    await b.key("ArrowUp");
+    await b.waitFor(`location.hash === '#/free' && document.querySelector('.free-play h1')`, 5000, "Free Play");
+    await b.send("Page.navigate", { url: `${base}#/` });
+    await b.waitFor(`document.querySelector('.title-scene .ts-menu')`, 30_000, "start menu again");
     await b.key("Enter");
     await b.waitFor(`location.hash === '#/lessons'`, 5000, "Lessons");
-    expect(labels.length === 4 && labels[1].startsWith("Free Play") && note.includes("coming soon"), JSON.stringify({ labels, note }));
-    return `${labels.length} entries · ${note}`;
+    expect(labels.length === 4 && labels[1] === "Free Play" && soon === 0, JSON.stringify({ labels, soon }));
+    return `${labels.length} entries, none coming soon; Free Play and Lessons open`;
   });
 
   await check("M3.7: on a fresh start Lessons opens only Chapter 1 and selects its first level; folders opened by hand are remembered", async () => {

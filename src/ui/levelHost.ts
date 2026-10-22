@@ -1,7 +1,7 @@
 // How the level screen is opened (M4.4-0). `mountLevel` is one screen for every kind of level; a LevelHost says everything
 // that differs between kinds, so the screen reads the host and has no branch of its own per kind. A new kind of level is
 // one more builder here.
-import { nextLevel } from "../content";
+import { nextChallenge, nextLevel } from "../content";
 import { progress as curriculumProgress, ProgressStore } from "../progress";
 import { openRemix, sharedProgress } from "../share/shared";
 import type { SolutionSource } from "./compare";
@@ -22,7 +22,7 @@ import { authorSolution, sharedBanner, sharedFrame } from "./sharedLevel";
  * stars, hints and code are saved, in the shared levels' own store, and a banner offers a remix.
  */
 export interface LevelHost {
-  kind: "lesson" | "testPlay" | "shared";
+  kind: "lesson" | "testPlay" | "shared" | "challenge";
   progress: ProgressStore; // where stars, hints and code are kept
   solution: SolutionSource | null | undefined; // undefined: the curriculum's reference by id (HelpPanel's default); null: none offered
   learn: boolean; // the Learn tab (a lesson); without it the screen opens on the Challenge tab
@@ -67,6 +67,25 @@ export function testPlayHost(options: { back: string; keep: (code: string) => vo
     codes: { get: (id) => testCodes.get(id), set: (id, code) => void testCodes.set(id, code) },
     solvedActions: (code) => [keepSolution(options.keep, options.kept, code)],
     onward: () => ({ href: options.back, label: "← Back to the editor" }),
+  };
+}
+
+/**
+ * A challenge from a Free Play set (M4.4): no lesson (the Codex counts the whole tier, since content.codexChapters puts its
+ * set after the tier's last chapter), the curriculum's progress (challenge ids can't clash with a chapter's) and reference
+ * solutions, no crown or promotion, on to the next challenge in the set.
+ */
+export function challengeHost(): LevelHost {
+  return {
+    kind: "challenge",
+    progress: curriculumProgress,
+    solution: undefined,
+    learn: false,
+    curriculum: false,
+    onward: (id) => {
+      const next = nextChallenge(id);
+      return next ? { href: `#/challenge/${next.id}`, label: "Next challenge →" } : { href: "#/free/challenges", label: "Back to Free Play" };
+    },
   };
 }
 

@@ -10,9 +10,12 @@
 //   #/editor/<id>/play test-play: the level opened in the real level screen
 //   #/play/<code>      a level someone shared, opened from its link (M4.3)
 //   #/shared/<id>      a shared level already kept in this browser ("Shared with me")
+//   #/free             Free Play's hub (M4.4)
+//   #/free/<section>   one of its pages: challenges, shared, sandbox, skins (My levels stays at #/editor)
+//   #/challenge/<id>   a challenge from a Free Play set (M4.4)
 //   #/harness          the raw Python harness from Milestone 0
 //   #/styleguide       the look at every size, in both themes (M3.7)
-import { chapterName, chapters, findLevel } from "./content";
+import { challengeSets, chapterName, chapters, findLevel } from "./content";
 import { drafts } from "./editor/drafts";
 import { readSolution, setSolution } from "./editor/rules";
 import { testPlaySource } from "./editor/starts";
@@ -29,7 +32,8 @@ import { icon } from "./ui/icons";
 import { mountEditor } from "./ui/editorScreen";
 import { mountEditorList } from "./ui/editorList";
 import { mountLessons } from "./ui/lessonsMenu";
-import { sharedHost, testPlayHost } from "./ui/levelHost";
+import { mountFreePlay, type FreeSection } from "./ui/freePlay";
+import { challengeHost, sharedHost, testPlayHost } from "./ui/levelHost";
 import { mountLevel, type LevelContext } from "./ui/levelView";
 import { mountPromotion } from "./ui/promotionScreen";
 import { ReplPanel } from "./ui/repl";
@@ -159,7 +163,12 @@ export function startApp(root: HTMLElement): void {
     unmount = () => {};
     const hash = location.hash || "#/";
     const levelMatch = /^#\/level\/([\w-]+)$/.exec(hash);
-    const source = levelMatch ? findLevel(levelMatch[1]!) : undefined;
+    const found = levelMatch ? findLevel(levelMatch[1]!) : undefined;
+    if (found?.set) return void location.replace(`#/challenge/${found.id}`); // a challenge has its own screen (M4.4)
+    const source = found;
+    const challengeMatch = /^#\/challenge\/([\w-]+)$/.exec(hash);
+    const challenge = challengeMatch ? findLevel(challengeMatch[1]!) : undefined;
+    const freeMatch = /^#\/free(?:\/(challenges|shared|sandbox|skins))?$/.exec(hash);
     const playMatch = /^#\/play\/(.+)$/.exec(hash);
     const sharedMatch = /^#\/shared\/([\w-]+)$/.exec(hash);
     if (source) {
@@ -174,6 +183,25 @@ export function startApp(root: HTMLElement): void {
       );
       unmount = mountLevel(main, context, source);
       document.title = `${source.title} · Rank & File`;
+    } else if (challenge?.set) {
+      const set = challengeSets.find((s) => s.set === challenge.set);
+      const number = (set?.levels.indexOf(challenge) ?? -1) + 1;
+      crumbs.replaceChildren(
+        h("a", { href: "#/free" }, "Free Play"),
+        h("span", { class: "crumb-sep" }, "/"),
+        h("a", { href: "#/free/challenges" }, set?.title ?? "Challenges"),
+        h("span", { class: "crumb-sep" }, "/"),
+        h("span", {}, `${number}. ${challenge.title}`),
+      );
+      unmount = mountLevel(main, context, challenge, challengeHost());
+      document.title = `${challenge.title} · Free Play · Rank & File`;
+    } else if (freeMatch) {
+      const section = (freeMatch[1] ?? null) as FreeSection | null;
+      const names: Record<string, string> = { challenges: "Challenges", shared: "Shared with me", sandbox: "Sandbox", skins: "Skins" };
+      crumbs.replaceChildren(...(section ? [h("a", { href: "#/free" }, "Free Play"), h("span", { class: "crumb-sep" }, "/"), h("span", {}, names[section]!)] : [h("span", {}, "Free Play")]));
+      unmount = mountFreePlay(main, section);
+      focusHeading();
+      document.title = `${section ? `${names[section]} · ` : ""}Free Play · Rank & File`;
     } else if (playMatch) {
       unmount = openSharedCode(playMatch[1]!);
     } else if (sharedMatch) {
@@ -233,7 +261,7 @@ export function startApp(root: HTMLElement): void {
       document.title = "Promotion · Rank & File";
     } else {
       crumbs.replaceChildren();
-      unmount = mountTitle(main, { lessons: () => (location.hash = "#/lessons"), editor: () => (location.hash = "#/editor"), settings: () => dialog.open() });
+      unmount = mountTitle(main, { lessons: () => (location.hash = "#/lessons"), freePlay: () => (location.hash = "#/free"), editor: () => (location.hash = "#/editor"), settings: () => dialog.open() });
       document.title = "Rank & File";
     }
     // every screen eases in (the CSS skips it with reduced motion)
