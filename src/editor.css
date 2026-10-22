@@ -563,6 +563,10 @@
   margin-top: 8px;
 }
 
+.share-out > .btn {
+  justify-self: start;
+}
+
 .share-out.blocked {
   opacity: 0.55;
 }
