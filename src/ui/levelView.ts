@@ -1,10 +1,11 @@
 // A level: the lesson and challenge on the left, the board in the middle, the
 // code editor and what the program is doing on the right.
 import type { EditorView } from "@codemirror/view";
-import { chapters, codexChapters, type LevelSource } from "../content";
+import { challengeSets, chapters, codexChapters, type LevelSource } from "../content";
 import { PythonHungError, StoppedError, type PyClient } from "../py/client";
 import type { LevelInfo, LevelResult } from "../py/protocol";
 import { BoardView, squareName } from "./board";
+import { levelTagsRow } from "./challengeTags";
 import { ChipTooltip, codexHover, renderCodex, type CodexLookup, type CodexView } from "./codex";
 import { h } from "./dom";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
@@ -52,6 +53,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   let running = false;
   let lastResult: LevelResult | null = null; // the recording on show: the run itself, or one of its cases
   let recordedCode: string | null = null; // the code the current (or last) recording was made from
+  let disposed = false; // the player left: a late answer from Python must not touch what is on screen now
   let codex: CodexView | null = null; // the Codex tab, and the entries hover tooltips use, once the engine has sent them
 
   // -- left: Learn / Challenge / Codex ----------------------------------------------
@@ -285,7 +287,9 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       if (level.boards.length) showBoards(0, null); // with its other boards beside it (QA-032)
       else boardHost.replaceChildren(board.element);
       help = new HelpPanel(source.id, level.hints, () => getCode(editor), { store, solution: host.solution });
-      challengePanel.replaceChildren(...describeChallenge(level, openCodexEntry, chipTooltip, () => codex), help.element);
+      const tagsSlot = h("div", { class: "level-tags" });
+      challengePanel.replaceChildren(...describeChallenge(level, tagsSlot, openCodexEntry, chipTooltip, () => codex), help.element);
+      void showTags(level, tagsSlot);
       updateControls();
       // Scratch Python gets a stand-in for this level's piece, and its tooltips follow this level's Codex.
       context.repl.setLevel({ piece: level.piece, api: level.api, codex: () => codex });
@@ -294,6 +298,20 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       boardHost.replaceChildren(noticeCard("bad", "Python couldn't start", String(error)));
     }
   })();
+
+  /** The tags in the Challenge panel: a challenge knows its tier from its set, a level of the editor or a stranger's asks the engine, and fills in when it answers. */
+  async function showTags(loaded: LevelInfo, slot: HTMLElement): Promise<void> {
+    const show = (tier: string | null) => slot.replaceChildren(...levelTagsRow(loaded, host.kind, tier));
+    if (host.tier === "set") return show(challengeSets.find((set) => set.set === source.set)?.tier ?? null);
+    show(null);
+    if (host.tier !== "engine") return;
+    try {
+      const { tier } = await client.call("levelTags", { level: source.data, chapters: codexChapters() });
+      if (!disposed) show(tier);
+    } catch {
+      // the engine can't say: the difficulty alone stays
+    }
+  }
 
   /** The Codex tab and the hover tooltips: everything taught so far (docs/Codex.md). */
   async function loadCodex(loaded: LevelInfo): Promise<void> {
@@ -542,6 +560,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   }
 
   return () => {
+    disposed = true;
     window.clearTimeout(promotionTimer);
     stopFollowingSettings();
     wideScreen.removeEventListener("change", placePlayback);
@@ -556,7 +575,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   };
 }
 
-function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, tooltip: ChipTooltip, codex: () => CodexLookup | null): HTMLElement[] {
+function describeChallenge(level: LevelInfo, tags: HTMLElement, openEntry: (name: string) => void, tooltip: ChipTooltip, codex: () => CodexLookup | null): HTMLElement[] {
   const parts: HTMLElement[] = [
     h("h2", { class: "challenge-title" }, level.title),
     ...(level.trains ? [h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), level.trains)] : []), // a level from the editor may not say
@@ -566,6 +585,7 @@ function describeChallenge(level: LevelInfo, openEntry: (name: string) => void, 
       h("p", { class: "mastery-note" }, masteryTag(), " A harder challenge for the whole chapter, played for par."),
     );
   }
+  parts.push(tags);
   if (level.brief) parts.push(h("p", {}, level.brief));
 
   // The goals and rules come worded from the engine (Level.describe), which owns

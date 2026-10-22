@@ -26,6 +26,7 @@ export interface LevelHost {
   progress: ProgressStore; // where stars, hints and code are kept
   solution: SolutionSource | null | undefined; // undefined: the curriculum's reference by id (HelpPanel's default); null: none offered
   learn: boolean; // the Learn tab (a lesson); without it the screen opens on the Challenge tab
+  tier: "set" | "engine" | null; // where the Challenge panel gets the level's tier tag: its Free Play set, the engine (levelTags), or nowhere (a lesson level)
   curriculum: boolean; // counts toward crowns and promotions; its Codex is the curriculum's own
   frame?: (layout: HTMLElement) => HTMLElement; // wraps the screen (a shared level's banner)
   back?: { href: string; label: string }; // a toolbar link before Run (test-play's "← Editor")
@@ -41,6 +42,7 @@ export function lessonHost(): LevelHost {
     progress: curriculumProgress,
     solution: undefined,
     learn: true,
+    tier: null,
     curriculum: true,
     onward: (id) => {
       const next = nextLevel(id);
@@ -62,6 +64,7 @@ export function testPlayHost(options: { back: string; keep: (code: string) => vo
     progress: new ProgressStore(null),
     solution: options.solution,
     learn: false,
+    tier: "engine",
     curriculum: false,
     back: { href: options.back, label: "← Editor" },
     codes: { get: (id) => testCodes.get(id), set: (id, code) => void testCodes.set(id, code) },
@@ -81,6 +84,7 @@ export function challengeHost(): LevelHost {
     progress: curriculumProgress,
     solution: undefined,
     learn: false,
+    tier: "set",
     curriculum: false,
     onward: (id) => {
       const next = nextChallenge(id);
@@ -96,9 +100,10 @@ export function sharedHost(data: Record<string, unknown>): LevelHost {
     progress: sharedProgress,
     solution: authorSolution(data),
     learn: false,
+    tier: "engine",
     curriculum: false,
     frame: (layout) => sharedFrame(sharedBanner(() => openRemix(data)), layout),
-    onward: () => ({ href: "#/editor", label: "← Shared with me" }), // the list lives on the My levels page
+    onward: () => ({ href: "#/free/shared", label: "← Shared with me" }),
   };
 }
 

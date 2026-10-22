@@ -119,17 +119,26 @@ export function startApp(root: HTMLElement): void {
     heading.focus({ preventScroll: true });
   }
 
+  /** The crumbs of a page under Free Play: Free Play, the section (a link unless it is the page), then more. */
+  function freeCrumbs(section: { name: string; href: string } | null, ...rest: Array<string | HTMLElement>): void {
+    const sep = () => h("span", { class: "crumb-sep" }, "/");
+    const trail = [h("a", { href: "#/free" }, "Free Play"), ...(section ? [h("a", { href: section.href }, section.name)] : []), ...rest.map((part) => (typeof part === "string" ? h("span", {}, part) : part))];
+    crumbs.replaceChildren(...trail.flatMap((part, i) => (i ? [sep(), part] : [part])));
+  }
+  const MY_LEVELS = { name: "My levels", href: "#/editor" };
+  const SHARED = { name: "Shared with me", href: "#/free/shared" };
+
   /** A level someone else made, on the level screen: kept in this browser, with progress of its own. */
   function showShared(data: Record<string, unknown>): () => void {
     const source = sharedSource(data);
-    crumbs.replaceChildren(h("span", {}, "Shared level"), h("span", { class: "crumb-sep" }, "/"), h("span", {}, source.title));
+    freeCrumbs(SHARED, source.title);
     document.title = `${source.title} · Shared level · Rank & File`;
     return mountLevel(main, context, source, sharedHost(data));
   }
 
   /** A level that can't be opened: a plain page that says why, with the way back. */
   function showSharedProblem(reason: string): void {
-    crumbs.replaceChildren(h("span", {}, "Shared level"));
+    freeCrumbs(SHARED);
     main.replaceChildren(sharedProblem(reason));
     focusHeading();
     document.title = "This level can't be opened · Rank & File";
@@ -137,7 +146,7 @@ export function startApp(root: HTMLElement): void {
 
   /** A link's code: decoded, checked by the engine, kept, and only then opened. A level that fails any of that never opens. */
   function openSharedCode(code: string): () => void {
-    crumbs.replaceChildren(h("span", {}, "Shared level"));
+    freeCrumbs(SHARED);
     main.replaceChildren(h("div", { class: "editor-missing" }, h("p", { class: "muted", role: "status" }, "Opening the level…")));
     document.title = "Opening a level · Rank & File";
     let cancelled = false; // the player went elsewhere while the code was being checked
@@ -213,7 +222,7 @@ export function startApp(root: HTMLElement): void {
         unmount = showShared(data);
       } else showSharedProblem("This shared level isn't in this browser any more.");
     } else if (hash === "#/editor") {
-      crumbs.replaceChildren(h("span", {}, "My levels"));
+      freeCrumbs(null, "My levels");
       unmount = mountEditorList(main, client);
       focusHeading();
       document.title = "My levels · Rank & File";
@@ -221,7 +230,7 @@ export function startApp(root: HTMLElement): void {
       const id = hash.split("/")[2]!;
       const draft = drafts.load(id);
       if (!draft) return void (location.hash = "#/editor");
-      crumbs.replaceChildren(h("a", { href: "#/editor" }, "My levels"), h("span", { class: "crumb-sep" }, "/"), h("a", { href: `#/editor/${id}` }, draft.title), h("span", { class: "crumb-sep" }, "/"), h("span", {}, "Test-play"));
+      freeCrumbs(MY_LEVELS, h("a", { href: `#/editor/${id}` }, draft.title), "Test-play");
       const kept = () => {
         const saved = drafts.load(id);
         return saved ? readSolution(saved) : "";
@@ -236,7 +245,7 @@ export function startApp(root: HTMLElement): void {
       document.title = `${draft.title} · Test-play · Rank & File`;
     } else if (/^#\/editor\/[\w-]+$/.test(hash)) {
       const name = h("span", {}, "Editing");
-      crumbs.replaceChildren(h("a", { href: "#/editor" }, "My levels"), h("span", { class: "crumb-sep" }, "/"), name);
+      freeCrumbs(MY_LEVELS, name);
       unmount = mountEditor(main, client, hash.slice("#/editor/".length), (title) => {
         name.textContent = title;
         document.title = `${title} · Editor · Rank & File`;
