@@ -11,6 +11,7 @@ import { History } from "../editor/history";
 import { startSolve, type SolveRun } from "../editor/solve";
 import { draftToLevelData, draftToYaml } from "../editor/levelData";
 import { editorOptions } from "../editor/options";
+import { readSolution } from "../editor/rules";
 import type { Problem } from "../editor/problems";
 import type { PyClient } from "../py/client";
 import type { EditorOptions, Enemy, LevelInfo, Pos, TileKind } from "../py/protocol";
@@ -533,8 +534,30 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     testButton.title = !verdict || !checked ? "Checking the level…" : verdict.problem ? `Fix the problem first: ${verdict.problem.message}` : "Play this level, with the real level screen";
   }
 
+  // -- the kept solution's length, which only the engine counts ----------------------------------------------------
+
+  let counted: { text: string; lines: number | null } = { text: "", lines: null };
+
+  /** The engine's line count for the kept solution, when it is known for the text kept now; asks for it otherwise. */
+  function solutionLines(): number | null {
+    const text = readSolution(whole());
+    if (!text) return null;
+    if (counted.text === text) return counted.lines;
+    counted = { text, lines: null };
+    void client.call("codeLines", { code: text }).then(
+      (lines) => {
+        if (!live || counted.text !== text) return; // the solution has changed since: that answer is stale
+        counted = { text, lines };
+        drawProps();
+      },
+      () => {}, // no count: the panel keeps saying "counting"
+    );
+    return null;
+  }
+
   const propsContext = () => ({
     draft: draft(),
+    solutionLines: solutionLines(),
     options: options!,
     selection,
     tab,

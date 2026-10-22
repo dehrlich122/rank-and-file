@@ -131,3 +131,12 @@ export const readStarter = (draft: Draft): string => (typeof draft.extra.starter
 export function setStarter(draft: Draft, code: string): Draft {
   return withExtra(draft, "starter", code.trim() ? code : undefined);
 }
+
+// -- the author's solution ---------------------------------------------------------------------------------------------
+
+export const readSolution = (draft: Draft): string => (typeof draft.extra.solution === "string" ? draft.extra.solution : "");
+
+/** The draft keeping this code as the level's solution; null or blank code takes it away. */
+export function setSolution(draft: Draft, code: string | null): Draft {
+  return withExtra(draft, "solution", code?.trim() ? code : undefined);
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { blankDraft, type Draft } from "./draft";
-import { readHints, readLimits, readObjectives, readPar, readStarter, setHints, setLimits, setObjectives, setPar, setStarter } from "./rules";
+import { readHints, readLimits, readObjectives, readPar, readSolution, readStarter, setHints, setLimits, setObjectives, setPar, setSolution, setStarter } from "./rules";
 
 const draftWith = (extra: Record<string, unknown>): Draft => ({ ...blankDraft(4, 4, "my-test"), extra });
 
@@ -90,5 +90,24 @@ describe("starter code", () => {
     const draft = setStarter(blankDraft(), "# go\n");
     expect(readStarter(draft)).toBe("# go\n");
     expect("starter" in setStarter(draft, "  \n").extra).toBe(false);
+  });
+});
+
+describe("the author's solution", () => {
+  it("reads as empty on a draft with none", () => {
+    expect(readSolution(blankDraft())).toBe("");
+  });
+
+  it("is kept as written, and removed by null or by blank code", () => {
+    const draft = setSolution(blankDraft(), "# placeholder\n");
+    expect(readSolution(draft)).toBe("# placeholder\n");
+    expect("solution" in setSolution(draft, null).extra).toBe(false);
+    expect("solution" in setSolution(draft, " \n").extra).toBe(false);
+  });
+
+  it("leaves the other keys alone", () => {
+    const draft = draftWith({ par: { lines: 3 }, starter: "# s" });
+    expect(setSolution(draft, "# x").extra).toEqual({ par: { lines: 3 }, starter: "# s", solution: "# x" });
+    expect(setSolution(setSolution(draft, "# x"), null).extra).toEqual(draft.extra);
   });
 });

@@ -12,6 +12,7 @@
 //   #/styleguide       the look at every size, in both themes (M3.7)
 import { chapterName, chapters, findLevel } from "./content";
 import { drafts } from "./editor/drafts";
+import { readSolution, setSolution } from "./editor/rules";
 import { testPlaySource } from "./editor/starts";
 import { mountHarness } from "./harness";
 import { unlockedPieces } from "./promotion";
@@ -20,6 +21,7 @@ import { PyClient, startPythonWorker, type ClientStatus } from "./py/client";
 import { applyToDocument, settings } from "./settings";
 import { sharedProgress } from "./share/shared";
 import { sound } from "./sound";
+import type { SolutionSource } from "./ui/compare";
 import { h } from "./ui/dom";
 import { icon } from "./ui/icons";
 import { mountEditor } from "./ui/editorScreen";
@@ -135,7 +137,19 @@ export function startApp(root: HTMLElement): void {
       const draft = drafts.load(id);
       if (!draft) return void (location.hash = "#/editor");
       crumbs.replaceChildren(h("a", { href: "#/editor" }, "My levels"), h("span", { class: "crumb-sep" }, "/"), h("a", { href: `#/editor/${id}` }, draft.title), h("span", { class: "crumb-sep" }, "/"), h("span", {}, "Test-play"));
-      unmount = mountLevel(main, context, testPlaySource(draft), { testPlay: { back: `#/editor/${id}` } });
+      const kept = () => {
+        const saved = drafts.load(id);
+        return saved ? readSolution(saved) : "";
+      };
+      const keep = (code: string) => {
+        const saved = drafts.load(id);
+        if (saved) drafts.save(setSolution(saved, code));
+      };
+      // as a player of the shared level will see it: the offer exists only if a solution was kept before this screen opened
+      const solution: SolutionSource | null = kept()
+        ? { name: "the author's solution", explained: false, load: async () => (kept() ? { code: kept(), note: "" } : null) }
+        : null;
+      unmount = mountLevel(main, context, testPlaySource(draft), { testPlay: { back: `#/editor/${id}`, keep, kept }, solution });
       document.title = `${draft.title} · Test-play · Rank & File`;
     } else if (/^#\/editor\/[\w-]+$/.test(hash)) {
       const name = h("span", {}, "Editing");

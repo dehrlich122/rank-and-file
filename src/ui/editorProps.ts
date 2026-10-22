@@ -20,6 +20,7 @@ export interface PropsContext {
   problem: Problem | null;
   checking: boolean; // the problem shown is for an older draft
   info: LevelInfo | null; // the engine's description of this very draft, when it accepts it: what the player will read
+  solutionLines: number | null; // the engine's count of the kept solution's lines; null when none is kept or it hasn't answered
   // A change made in the panel, as the draft it makes or an update of the draft *as it is now* (a field's closure holds
   // the draft the panel was drawn from, which an earlier change in another field has already moved on from). Typing in a
   // field is one undo step (`burst`); `redraw` rebuilds the panel after a change that alters its fields.
