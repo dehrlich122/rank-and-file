@@ -1,0 +1,151 @@
+/* M4.4 step 1 (design prototype, dev-only): free play. Pane framing only; the components are the real ones in src/free.css. */
+
+body {
+  margin: 0;
+  background: #070414;
+}
+
+#sheet {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 16px;
+  display: grid;
+  gap: 20px;
+}
+
+.sheet-head h1 {
+  margin: 0;
+  font: 700 20px "Orbitron", var(--font-ui);
+  letter-spacing: 0.06em;
+  color: #3be0ff;
+}
+
+.sheet-head p {
+  margin: 4px 0 0;
+  max-width: 120ch;
+  color: #a69ed6;
+  font: 15px/1.5 var(--font-ui);
+}
+
+.pane {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 var(--font-ui);
+  padding: 14px;
+  border: 1px solid var(--border);
+  --side-col: 418px;
+}
+
+.pane[data-scheme="dark"] {
+  color-scheme: dark;
+}
+
+.pane[data-scheme="light"] {
+  color-scheme: light;
+}
+
+.pane-name {
+  margin: 0 0 8px;
+  font: 700 12px var(--font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 13px;
+}
+
+.grow {
+  flex: 1;
+}
+
+.pane-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 16px;
+}
+
+.pane-sub {
+  margin: 0 12px 0 0;
+  font: 600 12px var(--font-ui);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.stack {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* the reduced-motion look, shown whatever this browser's setting is */
+.reduced-demo .diff-tag[data-step="5"] {
+  animation: none;
+  background: repeating-linear-gradient(-45deg, color-mix(in srgb, currentColor 20%, transparent) 0 4px, transparent 4px 8px);
+}
+
+.meter-tag {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font: 600 11px var(--font-code);
+}
+
+.meter-tag[data-step="1"] { color: var(--diff-1); }
+.meter-tag[data-step="2"] { color: var(--diff-2); }
+.meter-tag[data-step="3"] { color: var(--diff-3); }
+.meter-tag[data-step="4"] { color: var(--diff-4); }
+.meter-tag[data-step="5"] { color: var(--diff-5); }
+
+.meter-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.meter-bar {
+  width: 5px;
+  border: 1px solid currentColor;
+}
+
+.meter-bar.on {
+  background: currentColor;
+}
+
+.challenge-mock {
+  max-width: 418px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.challenge-mock h2 {
+  margin: 0;
+}
+
+.sandbox-mock {
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+}
+
+.skin-art {
+  display: grid;
+  place-items: center;
+}

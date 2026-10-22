@@ -1,0 +1,284 @@
+/* Free play (M4.4): the hub, the challenge lists, the tier and difficulty tags, the "Draws on" chips.
+   Colours are the tokens in styles.css; the difficulty colours are --diff-1 … --diff-5. */
+
+/* -- the tags: never on the board, never colour alone ------------------------------------------ */
+
+.diff-tag,
+.tier-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.diff-tag code {
+  font: 600 12px var(--font-code);
+  color: inherit;
+  background: none;
+  padding: 0;
+}
+
+.diff-tag[data-step="1"] { color: var(--diff-1); }
+.diff-tag[data-step="2"] { color: var(--diff-2); }
+.diff-tag[data-step="3"] { color: var(--diff-3); }
+.diff-tag[data-step="4"] { color: var(--diff-4); }
+.diff-tag[data-step="5"] { color: var(--diff-5); }
+
+/* five pips, filled up to the step: the tag reads in greyscale */
+.diff-pips {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.diff-pip {
+  width: 6px;
+  height: 6px;
+  border: 1px solid currentColor;
+}
+
+.diff-pip.on {
+  background: currentColor;
+}
+
+/* the hardest step pulses once every 2 s (one flash in two seconds, far under three a second) */
+.diff-tag[data-step="5"] {
+  animation: diff-pulse 2s ease-in-out infinite;
+}
+
+@keyframes diff-pulse {
+  0%,
+  70%,
+  100% {
+    background-color: transparent;
+  }
+  82% {
+    background-color: color-mix(in srgb, currentColor 22%, transparent);
+  }
+}
+
+/* with Animations reduced: steady warning stripes instead of the pulse */
+:root[data-motion="reduced"] .diff-tag[data-step="5"] {
+  animation: none;
+  background: repeating-linear-gradient(-45deg, color-mix(in srgb, currentColor 20%, transparent) 0 4px, transparent 4px 8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) .diff-tag[data-step="5"] {
+    animation: none;
+    background: repeating-linear-gradient(-45deg, color-mix(in srgb, currentColor 20%, transparent) 0 4px, transparent 4px 8px);
+  }
+}
+
+.tier-tag {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+/* -- the hub: a directory, like Lessons ------------------------------------------------------- */
+
+.free-play {
+  max-width: 880px;
+  margin: 0 auto;
+  display: grid;
+  gap: 14px;
+}
+
+.free-title {
+  margin: 0;
+  font: 700 26px var(--font-display);
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.fp-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.fp-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.fp-row:hover,
+.fp-row:focus-visible {
+  border-color: var(--accent);
+}
+
+.fp-glyph {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--frame);
+  color: var(--accent);
+  font-size: 18px;
+}
+
+.fp-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.fp-text strong {
+  font: 700 15px var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+.fp-count {
+  flex: none;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* -- a list's filter and sort row ------------------------------------------------------------ */
+
+.list-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  font-size: 13px;
+}
+
+.list-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.list-controls .grow {
+  flex: 1;
+}
+
+/* -- a challenge row and the set's heading --------------------------------------------------- */
+
+.set-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 6px 0 2px;
+}
+
+.set-head h2 {
+  margin: 0;
+  font: 700 17px var(--font-display);
+  letter-spacing: 0.05em;
+}
+
+.ch-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.ch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.ch-row:hover,
+.ch-row:focus-visible {
+  border-color: var(--accent);
+}
+
+.ch-row .lrow-text {
+  flex: 1;
+}
+
+.ch-row .tags {
+  flex: none;
+}
+
+/* -- "Draws on": the chapters a challenge mixes, each a link to its Lessons folder ---------------- */
+
+.draws-on {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.draws-on-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.chapter-chip {
+  padding: 1px 8px;
+  border: 1px dashed var(--frame);
+  color: var(--text);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.chapter-chip:hover,
+.chapter-chip:focus-visible {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* -- the Sandbox and the Skins gallery ------------------------------------------------------- */
+
+.skins {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.skin-card {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  text-align: center;
+}
+
+.skin-card.locked .skin-art {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.skin-card.worn {
+  border-color: var(--accent);
+}
