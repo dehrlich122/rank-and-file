@@ -584,7 +584,20 @@
 }
 
 /* the person the level came from is not named: a shared level says only that it is shared */
+/* a shared level's screen: the banner above the level grid, which keeps the rest of the height */
+.shared-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.shared-frame > .level {
+  flex: 1;
+  min-height: 0;
+}
+
 .shared-banner {
+  margin: 12px 12px 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

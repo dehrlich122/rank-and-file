@@ -75,7 +75,7 @@ export function sharedProblem(reason: string): HTMLElement {
 export function sharedBanner(remix: () => void): HTMLElement {
   return h(
     "div",
-    { class: "panel shared-banner", style: "margin: 12px 12px 0" },
+    { class: "panel shared-banner" },
     h("strong", {}, "Shared level"),
     h("span", { class: "muted" }, "Made by someone else. Your stars and hints are kept here, apart from the lessons."),
     h("button", { class: "btn btn-small", onClick: remix }, "Open in the editor"),
@@ -84,5 +84,5 @@ export function sharedBanner(remix: () => void): HTMLElement {
 
 /** The banner above the level screen, in a column that gives the screen the height that is left. */
 export function sharedFrame(banner: HTMLElement, screen: HTMLElement): HTMLElement {
-  return h("div", { class: "shared-frame", style: "display: flex; flex-direction: column; height: 100%" }, banner, screen);
+  return h("div", { class: "shared-frame" }, banner, screen);
 }
