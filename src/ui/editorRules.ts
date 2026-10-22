@@ -5,7 +5,7 @@
 // Every change is an update of the draft as it is *now* (not the draft the panel was drawn from), and a control that
 // changes what another shows (a radio and its number, a hint and the one after it) updates that itself, so the panel
 // is only rebuilt for adding and removing a phrase, and a field being typed in never loses its focus.
-import { readHints, readLimits, readObjectives, readPar, readStarter, setHints, setLimits, setObjectives, setPar, setStarter, type Count, type Objectives } from "../editor/rules";
+import { readHints, readLimits, readObjectives, readPar, readSolution, readStarter, setHints, setLimits, setObjectives, setPar, setSolution, setStarter, type Count, type Objectives } from "../editor/rules";
 import { h } from "./dom";
 import { check, counter, field, numberInput, radio, textArea, textInput } from "./editorFields";
 import type { PropsContext } from "./editorProps";
@@ -97,12 +97,34 @@ function limitsSection(ctx: PropsContext): HTMLElement {
 function parSection(ctx: PropsContext): HTMLElement {
   const { draft, options } = ctx;
   const starter = textArea(readStarter(draft), 3, (code) => ctx.change((d) => setStarter(d, code), "starter"));
+  const par = readPar(draft);
+  const lines = readSolution(draft) ? ctx.solutionLines : null;
   return h(
     "section",
     { class: "rules-section" },
     h("h3", {}, "Par and starter code"),
-    field("Par (lines of code)", numberInput(readPar(draft) ?? undefined, 1, (n) => ctx.change((d) => setPar(d, n), "par")), "Meeting it earns the second star.", "par"),
+    field("Par (lines of code)", numberInput(par ?? undefined, 1, (n) => ctx.change((d) => setPar(d, n), "par")), "Meeting it earns the second star.", "par"),
+    lines !== null && lines !== par ? h("button", { class: "btn btn-small", onClick: () => ctx.change((d) => setPar(d, lines), undefined, true) }, `Use my solution's ${lines} lines`) : null,
+    solutionBlock(ctx),
     h("div", { class: "field", "data-field": "starter" }, h("span", { class: "field-label" }, "Starter code"), starter, counter(starter, options.limits.starter ?? 2000), h("span", { class: "muted small" }, "What the player's editor begins with. Optional.")),
+  );
+}
+
+/** The solution the author kept in test-play, with its length as the engine counts it. */
+function solutionBlock(ctx: PropsContext): HTMLElement {
+  const kept = readSolution(ctx.draft) !== "";
+  return h(
+    "div",
+    { class: "field", "data-field": "solution" },
+    h("span", { class: "field-label" }, "Your solution"),
+    kept
+      ? h(
+          "div",
+          { class: "field-row" },
+          h("span", {}, ctx.solutionLines === null ? "Kept: counting…" : `Kept: ${ctx.solutionLines} ${ctx.solutionLines === 1 ? "line" : "lines"}`),
+          h("button", { class: "btn btn-small", onClick: () => ctx.change((d) => setSolution(d, null), undefined, true) }, "Remove"),
+        )
+      : h("span", { class: "muted small" }, "Solve the level in test-play and press \"Keep this as the level's solution\". Players are offered it after three failed runs."),
   );
 }
 
