@@ -83,7 +83,7 @@ export function remixOf(data: Record<string, unknown>, id = newId()): Draft {
   return { ...draft, title: `${draft.title.slice(0, TITLE_LIMIT - suffix.length)}${suffix}`, extra };
 }
 
-/** The player's kept shared levels. @public (for knip, until the screens that list and open them import it) */
+/** The player's kept shared levels. */
 export const sharedLevels = new SharedStore();
 
 /** Stars, hints, failed runs and code on shared levels, apart from the curriculum's progress. */
