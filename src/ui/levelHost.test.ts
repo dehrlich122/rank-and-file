@@ -97,8 +97,14 @@ describe("sharedHost", () => {
     expect((await offered!.load())?.code).toBe("some code");
   });
 
-  it("goes back to the list on My levels", () => {
-    expect(sharedHost({ id: "shared-x" }).onward("shared-x")).toEqual({ href: "#/editor", label: "← Shared with me" });
+  it("goes back to Shared with me", () => {
+    expect(sharedHost({ id: "shared-x" }).onward("shared-x")).toEqual({ href: "#/free/shared", label: "← Shared with me" });
+  });
+});
+
+describe("where each kind gets its tier tag", () => {
+  it("lessons have none, challenges take their set's, the rest ask the engine", () => {
+    expect([lessonHost().tier, challengeHost().tier, testPlay().tier, sharedHost({ id: "shared-x" }).tier]).toEqual([null, "set", "engine", "engine"]);
   });
 });
 
