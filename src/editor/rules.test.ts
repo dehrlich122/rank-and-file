@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { blankDraft, type Draft } from "./draft";
-import { readHints, readLimits, readObjectives, readPar, readSolution, readStarter, setHints, setLimits, setObjectives, setPar, setSolution, setStarter } from "./rules";
+import { readDifficulty, readHints, readLimits, readObjectives, readPar, readSolution, readStarter, setDifficulty, setHints, setLimits, setObjectives, setPar, setSolution, setStarter } from "./rules";
 
 const draftWith = (extra: Record<string, unknown>): Draft => ({ ...blankDraft(4, 4, "my-test"), extra });
 
@@ -117,5 +117,21 @@ describe("the author's solution", () => {
     const draft = draftWith({ par: { lines: 3 }, starter: "# s" });
     expect(setSolution(draft, "# x").extra).toEqual({ par: { lines: 3 }, starter: "# s", solution: "# x" });
     expect(setSolution(setSolution(draft, "# x"), null).extra).toEqual(draft.extra);
+  });
+});
+
+describe("difficulty", () => {
+  it("reads a whole number 1 to 5 and nothing else", () => {
+    expect(readDifficulty(blankDraft())).toBeNull();
+    expect(readDifficulty(draftWith({ difficulty: 3 }))).toBe(3);
+    for (const bad of [0, 6, 2.5, "3", null]) expect(readDifficulty(draftWith({ difficulty: bad }))).toBeNull();
+  });
+
+  it("sets it, replaces it, and clears it without leaving a key; other keys stay", () => {
+    const draft = draftWith({ par: { lines: 2 } });
+    const set = setDifficulty(draft, 4);
+    expect(set.extra).toEqual({ par: { lines: 2 }, difficulty: 4 });
+    expect(setDifficulty(set, 1).extra.difficulty).toBe(1);
+    expect(setDifficulty(set, null).extra).toEqual(draft.extra);
   });
 });

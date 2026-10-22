@@ -5,7 +5,9 @@ import { copyKeys, DETAIL_KEYS, PLAIN_ENEMY_KEYS, squareName, words, type Cell, 
 import { removeCorner, removeEnemy, withCell, withEnemy, type Edit } from "../editor/edit";
 import type { Problem } from "../editor/problems";
 import type { Clock, EditorOptions, LevelInfo, Pos } from "../py/protocol";
+import { readDifficulty, setDifficulty } from "../editor/rules";
 import { h } from "./dom";
+import { DIFFICULTY_WORDS } from "./tags";
 import { hintsFields, rulesFields } from "./editorRules";
 import { check, field, numberInput, select, textArea, textInput } from "./editorFields";
 
@@ -55,6 +57,9 @@ export function renderProps(ctx: PropsContext): HTMLElement {
 
 // -- the Level tab ----------------------------------------------------------------------------------------------
 
+/** "None", then "1 · pass" … "5 · while True:"; a choice's place in the list is its difficulty. */
+const DIFFICULTY_CHOICES = ["None", ...DIFFICULTY_WORDS.map((word, i) => `${i + 1} · ${word}`)];
+
 function levelFields(ctx: PropsContext): HTMLElement {
   const { draft, options } = ctx;
   const abilities = options.pieces[draft.piece] ?? [];
@@ -64,6 +69,12 @@ function levelFields(ctx: PropsContext): HTMLElement {
     field("Title", textInput(draft.title, (title) => ctx.change((d) => ({ ...d, title }), "title")), undefined, "title"),
     field("Brief", textArea(draft.brief, 3, (brief) => ctx.change((d) => ({ ...d, brief }), "brief")), "What the player is asked to do.", "brief"),
     field("What it trains", textInput(draft.trains, (trains) => ctx.change((d) => ({ ...d, trains }), "trains")), "A few words, shown above the challenge.", "trains"),
+    field(
+      "Difficulty",
+      select(DIFFICULTY_CHOICES[readDifficulty(draft) ?? 0]!, DIFFICULTY_CHOICES, (choice) => ctx.change((d) => setDifficulty(d, DIFFICULTY_CHOICES.indexOf(choice) || null))),
+      "How hard it is, for Free Play's lists. Shown as a tag; never on the board.",
+      "difficulty",
+    ),
     h(
       "fieldset",
       { class: "field", "data-field": "api" },
