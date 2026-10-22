@@ -18,6 +18,7 @@ import { icon, type IconName } from "./icons";
 import { Player, buildFrames, consoleAt, controlStates } from "./playback";
 import type { ReplPanel } from "./repl";
 import type { SettingsDialog } from "./settingsDialog";
+import { sharedBanner, sharedFrame } from "./sharedLevel";
 import { progress as curriculumProgress, ProgressStore } from "../progress";
 import { tierCleared } from "../promotion";
 import { SPEEDS, motionReduced, settings } from "../settings";
@@ -39,12 +40,17 @@ const verdict = (c: LevelResult) => (c.status === "solved" ? "✓" : "✗");
 /**
  * How a level is opened. Test-play (M4.2) is a level from the editor: no lesson, nothing saved, and a way back. It plays
  * as a player would see the level (its hints, its stars, the offer of a solution once one is kept), with a progress
- * store of its own that is gone when the screen is. `progress` and `solution` say where another kind of level (M4.3's
- * shared levels) keeps its progress and finds its solution; left out, they are the curriculum's.
+ * store of its own that is gone when the screen is. `progress` and `solution` say where another kind of level keeps its
+ * progress and finds its solution; left out, they are the curriculum's.
+ *
+ * A shared level (M4.3, someone else's level opened from a link) is outside the curriculum like test-play (no lesson, no
+ * next level, no crown or promotion, the Codex counts the curriculum and then its own abilities), but it is played for
+ * real: its stars, hints and code are saved, in the `progress` it is given. `remix` makes a draft of the player's own.
  */
 export interface LevelOptions {
   // `keep` lets the author keep the code that solved the level as its solution; `kept` says what is kept now
   testPlay?: { back: string; keep?: (code: string) => void; kept?: () => string };
+  shared?: { remix: () => void };
   progress?: ProgressStore;
   solution?: SolutionSource | null;
 }
@@ -54,6 +60,8 @@ const testCodes = new Map<string, string>(); // the code typed in a test-play, k
 export function mountLevel(root: HTMLElement, context: LevelContext, source: LevelSource, options: LevelOptions = {}): () => void {
   const { client } = context;
   const testPlay = options.testPlay;
+  const shared = options.shared;
+  const outside = Boolean(testPlay || shared); // a level of no chapter: nothing of the curriculum's applies
   const store = options.progress ?? (testPlay ? new ProgressStore(null) : curriculumProgress);
   let level: LevelInfo | null = null;
   let board: BoardView | null = null;
@@ -244,8 +252,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         codeInfo,
       ),
   );
-  root.replaceChildren(layout);
-  if (testPlay) {
+  root.replaceChildren(shared ? sharedFrame(sharedBanner(shared.remix), layout) : layout);
+  if (outside) {
     learnTab.hidden = true; // there is no lesson: it opens on the challenge
     showTab("challenge");
   }
@@ -300,7 +308,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       if (level.boards.length) showBoards(0, null); // with its other boards beside it (QA-032)
       else boardHost.replaceChildren(board.element);
       // a level from the editor offers a solution only once its author has kept one
-      help = new HelpPanel(source.id, level.hints, () => getCode(editor), { store, solution: testPlay ? (options.solution ?? null) : options.solution });
+      help = new HelpPanel(source.id, level.hints, () => getCode(editor), { store, solution: outside ? (options.solution ?? null) : options.solution });
       challengePanel.replaceChildren(...describeChallenge(level, openCodexEntry, chipTooltip, () => codex), help.element);
       updateControls();
       // Scratch Python gets a stand-in for this level's piece, and its tooltips follow this level's Codex.
@@ -314,8 +322,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   /** The Codex tab and the hover tooltips: everything taught so far (docs/Codex.md). */
   async function loadCodex(loaded: LevelInfo): Promise<void> {
     try {
-      // a level from the editor is in no chapter: it counts everything the curriculum teaches, then its own abilities
-      const taught = testPlay ? [...codexChapters(), { curriculum: false, levels: [{ id: source.id, data: source.data, lesson: "" }] }] : codexChapters();
+      // a level from the editor, or someone else's, is in no chapter: it counts everything the curriculum teaches, then its own abilities
+      const taught = outside ? [...codexChapters(), { curriculum: false, levels: [{ id: source.id, data: source.data, lesson: "" }] }] : codexChapters();
       const entries = await client.call("codex", { levelId: source.id, chapters: taught });
       codex = renderCodex(entries, loaded.piece);
       codexPanel.replaceChildren(codex.element);
@@ -424,18 +432,21 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     if (run.status === "solved" && testPlay?.keep) actions.push(keepSolution(testPlay.keep, testPlay.kept, recordedCode ?? ""));
     if (help) actions.push(...help.outcomeActions(run, recordedCode ?? "", showHelp));
     if (run.status === "solved") {
-      const next = nextLevel(source.id); // none for a level from the editor: it's in no chapter
+      const next = nextLevel(source.id); // none for a level from the editor, or a shared one: it's in no chapter
+      const onward = (href: string, label: string) => h("a", { class: "btn btn-primary btn-small", href }, label);
       actions.push(
         testPlay
-          ? h("a", { class: "btn btn-primary btn-small", href: testPlay.back }, "← Back to the editor")
-          : next
-            ? h("a", { class: "btn btn-primary btn-small", href: `#/level/${next.id}` }, "Next level →")
-            : h("a", { class: "btn btn-primary btn-small", href: "#/lessons" }, "Back to Lessons"),
+          ? onward(testPlay.back, "← Back to the editor")
+          : shared
+            ? onward("#/editor", "← Shared with me") // the list lives on the My levels page
+            : next
+              ? onward(`#/level/${next.id}`, "Next level →")
+              : onward("#/lessons", "Back to Lessons"),
       );
       window.setTimeout(() => shownBoard()?.setCelebrating(true), afterMs);
       // clearing a tier's last core level earns its promotion: the ceremony follows the celebration, once
       const tier = chapters.find((c) => c.chapter === source.chapter)?.tier;
-      if (!testPlay && tier && !source.mastery && tierCleared(tier) && !curriculumProgress.hasSeen("promotion", tier)) {
+      if (!outside && tier && !source.mastery && tierCleared(tier) && !curriculumProgress.hasSeen("promotion", tier)) {
         if (motionReduced()) {
           // no automatic jump without motion: offer it instead
           actions.push(h("a", { class: "btn btn-small", href: `#/promotion/${tier}` }, "Promotion earned: watch it"));
