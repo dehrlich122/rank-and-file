@@ -11,7 +11,7 @@ import { History } from "../editor/history";
 import { startSolve, type SolveRun } from "../editor/solve";
 import { draftToLevelData, draftToYaml } from "../editor/levelData";
 import { editorOptions } from "../editor/options";
-import { readSolution } from "../editor/rules";
+import { readSolution, setPar } from "../editor/rules";
 import type { Problem } from "../editor/problems";
 import type { PyClient } from "../py/client";
 import type { EditorOptions, Enemy, LevelInfo, Pos, TileKind } from "../py/protocol";
@@ -23,6 +23,7 @@ import { h } from "./dom";
 import { renderProblems, renderProps, type Selection, type Tab } from "./editorProps";
 import { readAloud } from "./editorRules";
 import { renderSolve, type SolveState } from "./editorSolve";
+import { openShareDialog } from "./shareDialog";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite } from "./sprites";
 import { M, S } from "./sprites/floor";
 import { svg } from "./svg";
@@ -146,6 +147,11 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   const redoButton = h("button", { class: "btn btn-small", onClick: () => redo() }, "Redo");
   const clearButton = h("button", { class: "btn btn-small", onClick: () => askToClear() }, "Clear board");
   const exportButton = h("button", { class: "btn btn-small", onClick: () => download(`${fileName(whole().title)}.yaml`, draftToYaml(whole())) }, "Export");
+  const shareButton = h(
+    "button",
+    { class: "btn btn-small", "aria-haspopup": "dialog", onClick: () => openShareDialog(client, whole, (lines) => commit(setPar(draft(), lines), `Par is ${lines} lines.`)) },
+    "Share…",
+  );
   const testButton = h("button", { class: "btn btn-small btn-primary", onClick: () => (location.hash = `#/editor/${id}/play`) }, "Test-play");
   const widthInput = h("input", { type: "number", min: "2", "aria-label": "Width in squares" });
   const heightInput = h("input", { type: "number", min: "2", "aria-label": "Height in squares" });
@@ -163,6 +169,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     h("span", { class: "grow" }),
     h("span", { class: "muted small" }, "Saved in this browser"),
     exportButton,
+    shareButton,
     testButton,
   );
   const boardRow = h("div", { class: "board-row", role: "group", "aria-label": "Boards" });
