@@ -33,6 +33,8 @@ import { mountEditor } from "./ui/editorScreen";
 import { mountEditorList } from "./ui/editorList";
 import { mountLessons } from "./ui/lessonsMenu";
 import { mountFreePlay, type FreeSection } from "./ui/freePlay";
+import { mountSandbox } from "./ui/sandboxScreen";
+import { mountSkins } from "./ui/skinsScreen";
 import { challengeHost, sharedHost, testPlayHost } from "./ui/levelHost";
 import { mountLevel, type LevelContext } from "./ui/levelView";
 import { mountPromotion } from "./ui/promotionScreen";
@@ -199,7 +201,7 @@ export function startApp(root: HTMLElement): void {
       const section = (freeMatch[1] ?? null) as FreeSection | null;
       const names: Record<string, string> = { challenges: "Challenges", shared: "Shared with me", sandbox: "Sandbox", skins: "Skins" };
       crumbs.replaceChildren(...(section ? [h("a", { href: "#/free" }, "Free Play"), h("span", { class: "crumb-sep" }, "/"), h("span", {}, names[section]!)] : [h("span", {}, "Free Play")]));
-      unmount = mountFreePlay(main, section);
+      unmount = section === "sandbox" ? mountSandbox(main, client) : section === "skins" ? mountSkins(main) : mountFreePlay(main, section);
       focusHeading();
       document.title = `${section ? `${names[section]} · ` : ""}Free Play · Rank & File`;
     } else if (playMatch) {

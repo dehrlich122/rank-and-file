@@ -350,7 +350,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     }
   }
 
-  const askToClear =() => ask("Clear every tile, enemy and ? square? The start and the goal stay. You can undo it.", "Yes, clear the board", "Keep it", () => commit(clearBoard(draft()), "Cleared the board."));
+  const askToClear = () => ask("Clear every tile, enemy and ? square? The start and the goal stay. You can undo it.", "Yes, clear the board", "Keep it", () => commit(clearBoard(draft()), "Cleared the board."));
 
   function resizeTo(width: number, height: number): void {
     const max = options?.max_side ?? 12;

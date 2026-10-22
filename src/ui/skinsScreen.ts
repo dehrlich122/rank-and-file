@@ -40,13 +40,15 @@ export function skinCards(store: ProgressStore = progress): SkinCard[] {
 export function mountSkins(main: HTMLElement, store: ProgressStore = progress): () => void {
   const grid = h("div", { class: "skins" });
   const paint = () => {
+    // "Wear it" repaints the grid: keep keyboard focus on the card now worn rather than losing it to the page
+    const hadFocus = grid.contains(document.activeElement);
     grid.replaceChildren(
       ...skinCards(store).map((card) => {
         const art = svg("svg", { viewBox: "-38 -38 76 76", width: 120, height: 120, role: "img", "aria-label": `The ${card.name}` }, hero(card.piece, card.piece === "knight" ? "east" : "south"));
         const label = card.worn ? "Worn" : card.unlocked ? "Wear it" : "Locked";
         return h(
           "div",
-          { class: `skin-card${card.worn ? " worn" : ""}${card.unlocked ? "" : " locked"}` },
+          { class: `skin-card${card.worn ? " worn" : ""}${card.unlocked ? "" : " locked"}`, tabindex: "-1", "data-piece": card.piece },
           h("div", { class: "skin-art" }, art),
           h("strong", {}, card.name),
           h("span", { class: "muted small" }, card.how),
@@ -54,6 +56,7 @@ export function mountSkins(main: HTMLElement, store: ProgressStore = progress): 
         );
       }),
     );
+    if (hadFocus) grid.querySelector<HTMLElement>(".skin-card.worn")?.focus();
   };
   paint();
   main.replaceChildren(h("div", { class: "free-play" }, h("h1", { class: "free-title" }, "Skins"), grid));
