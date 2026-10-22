@@ -148,6 +148,14 @@ def test_the_bridge_reports_where_the_problem_is():
     assert json.loads(bridge.load_level(json.dumps(made())))["ok"] is True
 
 
+def test_the_bridge_counts_lines_as_par_does():
+    import json
+
+    # a comment and a blank line don't count; a second statement after `;` does
+    assert json.loads(bridge.code_lines("# go\npawn.move()\n\npawn.move(); pawn.move()\n")) == 3
+    assert json.loads(bridge.code_lines("")) == 0
+
+
 # -- the size limit ----------------------------------------------------------------------------------
 
 

@@ -18,6 +18,7 @@ import { unlockedPieces } from "./promotion";
 import { progress } from "./progress";
 import { PyClient, startPythonWorker, type ClientStatus } from "./py/client";
 import { applyToDocument, settings } from "./settings";
+import { sharedProgress } from "./share/shared";
 import { sound } from "./sound";
 import { h } from "./ui/dom";
 import { icon } from "./ui/icons";
@@ -39,6 +40,7 @@ export function startApp(root: HTMLElement): void {
     settings,
     () => {
       progress.reset();
+      sharedProgress.reset(); // shared levels' stars, hints and code; the levels themselves stay (M4.3)
       context.knownCalls.clear();
       route(); // redraw the screen from the cleared progress
     },

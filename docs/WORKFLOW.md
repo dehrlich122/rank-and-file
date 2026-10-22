@@ -4,6 +4,12 @@
 An Opus orchestrator plans, writes the shared contract, hands work packages to Sonnet workers in their own git
 worktrees, then merges and validates. The plan that set this up, and why, is summarised at the end.
 
+**Autonomous run** *(Designer, 2026-10-22)*: for the rest of M4 (M4.3 step 5, M4.4, M4.5) no phase stops for the
+designer. Gate 1 becomes the orchestrator's recommendation, recorded under "Decided without the designer" in the
+spec; QA1 becomes e2e checks plus an automated QA pass (findings logged in `docs/QA.md` as automated); QA2 becomes
+`/simplify`, the full `npm run e2e` and a retest list in the PR. Each sub-milestone is pushed with a PR (stacked on
+the one before) but **never merged**: the designer merges. Handoffs still need the designer's `/clear` + `go`.
+
 ## The three phases
 
 **1. Draft** (orchestrator with the designer). `docs/M<n>/M<n>.md` holds the goals, every open decision as

@@ -6,6 +6,7 @@ Vulture only follows Python calls. These are used from elsewhere:
 from rankfile import bridge, codex, exceptions, levels, pieces, runner, tracer
 
 # Called from JavaScript by the Web Worker (src/py/worker.ts), by name.
+bridge.code_lines
 bridge.codex
 bridge.load_level
 bridge.load_sandbox

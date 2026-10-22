@@ -26,9 +26,19 @@ export class ProgressStore {
   private levels: Record<string, LevelProgress>;
   private seen: string[]; // "promotion:pawn", "crown:3"
 
-  constructor(private readonly storage: StorageLike | null = browserStorage()) {
-    this.levels = sanitize(readJson(storage, STORAGE_KEY));
-    const seen = readJson(storage, SEEN_KEY);
+  private readonly seenKey: string | null;
+
+  /**
+   * `key` is where the levels' progress is saved: the curriculum's by default; shared levels (M4.3) keep theirs under
+   * another key. Only the curriculum's store remembers ceremonies and crowns. `storage` null keeps it in memory.
+   */
+  constructor(
+    private readonly storage: StorageLike | null = browserStorage(),
+    private readonly key: string = STORAGE_KEY,
+  ) {
+    this.seenKey = key === STORAGE_KEY ? SEEN_KEY : null;
+    this.levels = sanitize(readJson(storage, key));
+    const seen = this.seenKey ? readJson(storage, this.seenKey) : null;
     this.seen = Array.isArray(seen) ? seen.filter((key): key is string => typeof key === "string") : [];
   }
 
@@ -55,7 +65,7 @@ export class ProgressStore {
 
   update(id: string, changes: Partial<LevelProgress>): void {
     this.levels = { ...this.levels, [id]: { ...this.level(id), ...changes } };
-    writeJson(this.storage, STORAGE_KEY, this.levels);
+    writeJson(this.storage, this.key, this.levels);
   }
 
   /** Whether the player has already been shown `tier`'s promotion ceremony, or `chapter`'s crown. */
@@ -66,14 +76,14 @@ export class ProgressStore {
   markSeen(kind: "promotion" | "crown", key: string | number): void {
     if (this.hasSeen(kind, key)) return;
     this.seen = [...this.seen, `${kind}:${key}`];
-    writeJson(this.storage, SEEN_KEY, this.seen);
+    if (this.seenKey) writeJson(this.storage, this.seenKey, this.seen);
   }
 
   reset(): void {
     this.levels = {};
     this.seen = [];
-    writeJson(this.storage, STORAGE_KEY, this.levels);
-    writeJson(this.storage, SEEN_KEY, this.seen);
+    writeJson(this.storage, this.key, this.levels);
+    if (this.seenKey) writeJson(this.storage, this.seenKey, this.seen);
   }
 }
 

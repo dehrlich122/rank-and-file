@@ -10,6 +10,7 @@ import json
 
 from . import runner
 from .codex import entries as codex_entries
+from .constraints import code_lines as count_code_lines
 from .levels import LevelError, parse_level, sandbox_level
 from .levels import editor_options as level_editor_options
 from .repl import Repl
@@ -59,6 +60,11 @@ def run_level(level_json: str, code: str, hints_used: int = 0, solution_seen: bo
     level = parse_level(json.loads(level_json))
     result = runner.run_level(level, code, hints_used=int(hints_used), solution_seen=bool(solution_seen))
     return json.dumps(result.to_dict())
+
+
+def code_lines(code: str) -> str:
+    """How many lines of code the engine counts in `code`, as par and `max_lines` count them (M4.3: an author's solution)."""
+    return json.dumps(count_code_lines(code))
 
 
 def load_sandbox(api_json: str, board_json: str = "null") -> str:

@@ -229,6 +229,7 @@ export interface Requests {
   // The solvability check, in slices (M4.3): start it, then ask again until `done`; not asking again cancels it.
   solveStart: { args: { level: unknown }; result: { ok: true; cases: number } | { ok: false; error: string } };
   solveStep: { args: { seconds?: number }; result: SolveProgress };
+  codeLines: { args: { code: string }; result: number }; // lines as par counts them (M4.3: the author's kept solution)
   loadSandbox: { args: { api: string[]; board?: unknown }; result: LevelInfo }; // board: a level's lesson_board (QA-019)
   runLevel: { args: { level: unknown; code: string; hintsUsed: number; solutionSeen: boolean }; result: LevelResult };
   runSandbox: { args: { code: string; api: string[]; board?: unknown }; result: LevelResult };
