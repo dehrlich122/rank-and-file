@@ -112,7 +112,7 @@ function hub(main: HTMLElement): void {
 
 function challengesPage(main: HTMLElement): void {
   const tiers = [...new Set(challengeSets.map((set) => set.tier))];
-  const groups = h("div", { class: "free-play" });
+  const groups = h("div", { class: "ch-sets" });
   const controls = listControlsHost("challenges", tiers, () => draw());
 
   const row = (level: LevelSource, n: number): HTMLElement => {

@@ -87,7 +87,7 @@ export function mountSharedList(root: HTMLElement, client: PyClient): () => void
     h(
       "div",
       { class: "editor-list" },
-      h("h1", {},"Shared with me"),
+      h("h1", {}, "Shared with me"),
       h("p", { class: "muted" }, "Levels others sent you, kept in this browser. Your stars on them are kept apart from the lessons'."),
       h("div", { class: "toolbar" }, h("button", { class: "btn", onClick: () => ((linkForm.hidden = false), linkInput.focus()) }, "Open a link or code")),
       linkForm,

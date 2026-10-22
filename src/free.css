@@ -180,6 +180,15 @@
   flex: 1;
 }
 
+.list-controls select {
+  font: inherit;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+
 /* -- a challenge row and the set's heading --------------------------------------------------- */
 
 .set-head {
@@ -337,4 +346,9 @@
 
 .my-level {
   flex-wrap: wrap;
+}
+
+/* the Challenges page: the sets under the filter row */
+.ch-sets {
+  margin-top: 14px;
 }
