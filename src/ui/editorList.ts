@@ -1,19 +1,22 @@
 // My levels (M4.2): `#/editor`. The levels made in the editor, saved in this browser, newest edit first. From here a
 // new level starts blank, from a lesson level's board, or from a .yaml file; and each can be duplicated, exported
-// or deleted.
-import { chapterName, chapters, findLevel } from "../content";
+// or deleted. Each row carries its tier and difficulty tags (M4.4), and the list filters and sorts by both. The
+// helpers at the top are shared with the Shared with me page (sharedList.ts).
+import { chapterName, chapters, codexChapters, findLevel } from "../content";
 import { blankDraft, newId, type Draft } from "../editor/draft";
 import { drafts } from "../editor/drafts";
-import { ImportError, yamlToDraft } from "../editor/levelData";
+import { draftToLevelData, ImportError, yamlToDraft } from "../editor/levelData";
 import { editorOptions } from "../editor/options";
 import { readSolution, setSolution } from "../editor/rules";
 import { copyOfLevel } from "../editor/starts";
 import type { PyClient } from "../py/client";
-import { codeFromText, MAX_LEVEL_BYTES } from "../share/codec";
-import { openRemix, sharedLevels, sharedProgress } from "../share/shared";
+import { MAX_LEVEL_BYTES } from "../share/codec";
+import { sharedLevels } from "../share/shared";
 import { confirmStep } from "./dialog";
 import { downloadLevel } from "./download";
 import { h } from "./dom";
+import { applyList, listControls, listState, saveListState, type ListState } from "./listControls";
+import { difficultyTag, tierTag } from "./tags";
 
 const when = (ms: number): string => new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
@@ -21,11 +24,85 @@ const when = (ms: number): string => new Date(ms).toLocaleString(undefined, { da
 export const starsText = (stars: number): string => (stars > 0 ? "★".repeat(stars) + "☆".repeat(Math.max(0, 3 - stars)) : "not solved yet");
 export const boardsText = (boards: number): string => `${boards} ${boards === 1 ? "board" : "boards"}`;
 
+/** The curriculum's tiers in play order: what the Tier filter of My levels and Shared with me offers. */
+export const curriculumTiers = (): string[] => [...new Set(chapters.filter((c) => c.curriculum).map((c) => c.tier))];
+
+/**
+ * The filter and sort row of the list `listId`, remembered for the session. The row keeps the state it was built
+ * with, so it is rebuilt on each change (keeping the focus on the same control); `onChange` then redraws the list.
+ */
+export function listControlsHost(listId: string, tiers: string[], onChange: () => void): { element: HTMLElement; state: () => ListState } {
+  let state = listState(listId);
+  const element = h("div", {});
+  const paint = (): void => {
+    const at = [...element.querySelectorAll("select")].indexOf(document.activeElement as HTMLSelectElement);
+    element.replaceChildren(
+      listControls(tiers, state, (next) => {
+        state = next;
+        saveListState(listId, next);
+        paint();
+        onChange();
+      }),
+    );
+    if (at >= 0) element.querySelectorAll("select")[at]?.focus();
+  };
+  paint();
+  return { element, state: () => state };
+}
+
+const tagsOf = (tier: string | null, difficulty: number | null): HTMLElement[] => [...(tier ? [tierTag(tier)] : []), ...(difficulty ? [difficultyTag(difficulty)] : [])];
+
+/**
+ * The engine's tier for a level outside the curriculum (request `levelTags`), asked once per level and never waited
+ * for: a row is drawn at once with its difficulty tag and gets its tier tag when the answer comes. A level the engine
+ * refuses has no tier tag. With a Tier filter on (`filtering`) an answer redraws the list instead (`redraw`).
+ */
+export function tierTags(client: PyClient, filtering: () => boolean, redraw: () => void) {
+  const tiers = new Map<string, string | null>();
+  const asked = new Set<string>();
+  const slots = new Map<string, { element: HTMLElement; difficulty: number | null }>();
+  let stopped = false;
+  return {
+    /** Ask for this level's tier, once. `data` builds the level's data when it is needed. */
+    ask(id: string, data: () => unknown): void {
+      if (asked.has(id)) return;
+      asked.add(id);
+      void client.ready()
+        .then(() => client.call("levelTags", { level: data(), chapters: codexChapters() }))
+        .then(
+          (result) => result.tier,
+          () => null,
+        )
+        .then((tier) => {
+          if (stopped) return;
+          tiers.set(id, tier);
+          const slot = slots.get(id);
+          if (filtering()) redraw();
+          else slot?.element.replaceChildren(...tagsOf(tier, slot.difficulty));
+        });
+    },
+    tier: (id: string): string | null => tiers.get(id) ?? null,
+    /** The tags cell of a row. */
+    slot(id: string, difficulty: number | null): HTMLElement {
+      const element = h("span", { class: "tags" }, ...tagsOf(tiers.get(id) ?? null, difficulty));
+      slots.set(id, { element, difficulty });
+      return element;
+    },
+    stop: (): void => void (stopped = true),
+  };
+}
+
 export function mountEditorList(root: HTMLElement, client: PyClient): () => void {
   const confirmHost = h("div", { class: "ed-confirm" });
   const notice = h("p", { class: "muted", role: "status" });
   const list = h("ul", { class: "my-levels" });
-  const shared = h("ul", { class: "my-levels" });
+  const sharedLink = h("a", { href: "#/free/shared" });
+  const tags = tierTags(
+    client,
+    () => controls.state().tier !== null,
+    () => draw(),
+  );
+  const controls = listControlsHost("my-levels", curriculumTiers(), () => draw());
 
   /** Save a level and open it in the editor; with something to tell first, stay here and say it (QA-044). */
   function open(draft: Draft, message?: string): void {
@@ -36,7 +113,15 @@ export function mountEditorList(root: HTMLElement, client: PyClient): () => void
   }
 
   function draw(): void {
-    const levels = drafts.list();
+    const all = drafts.list();
+    for (const level of all) {
+      tags.ask(level.id, () => {
+        const draft = drafts.load(level.id);
+        return draft ? draftToLevelData(draft) : null;
+      });
+    }
+    const levels = applyList(all, controls.state(), (level) => ({ tier: tags.tier(level.id), difficulty: level.difficulty }));
+    sharedLink.textContent = `Shared with me (${sharedLevels.list().length}) →`;
     list.replaceChildren(
       ...(levels.length
         ? levels.map((level) =>
@@ -44,52 +129,13 @@ export function mountEditorList(root: HTMLElement, client: PyClient): () => void
               "li",
               { class: "my-level panel" },
               h("a", { class: "my-level-open", href: `#/editor/${level.id}` }, h("strong", {}, level.title), h("span", { class: "muted small" }, ` · ${level.width} × ${level.height} · edited ${when(level.edited)}`)),
+              tags.slot(level.id, level.difficulty),
               h("button", { class: "btn btn-small", "aria-label": `Duplicate ${level.title}`, onClick: () => duplicate(level.id) }, "Duplicate"),
               h("button", { class: "btn btn-small", "aria-label": `Export ${level.title}`, onClick: () => exportLevel(level.id) }, "Export"),
               h("button", { class: "btn btn-small", "aria-label": `Delete ${level.title}`, onClick: () => ask(level.id, level.title) }, "Delete"),
             ),
           )
-        : [h("li", { class: "muted" }, "You haven't made a level yet.")]),
-    );
-  }
-
-  function drawShared(): void {
-    const kept = sharedLevels.list();
-    shared.replaceChildren(
-      ...(kept.length
-        ? kept.map((level) =>
-            h(
-              "li",
-              { class: "my-level panel" },
-              h(
-                "a",
-                { class: "my-level-open", href: `#/shared/${level.id}` },
-                h("strong", {}, level.title),
-                h("span", { class: "muted small" }, ` · ${starsText(sharedProgress.level(level.id).stars)} · ${boardsText(level.boards)}`),
-              ),
-              h("button", { class: "btn btn-small", "aria-label": `Remix ${level.title}`, onClick: () => remix(level.id) }, "Remix"),
-              h("button", { class: "btn btn-small", "aria-label": `Remove ${level.title}`, onClick: () => askRemove(level.id, level.title) }, "Remove"),
-            ),
-          )
-        : [h("li", { class: "muted" }, "Levels opened from a link or code are kept here.")]),
-    );
-  }
-
-  function remix(id: string): void {
-    const data = sharedLevels.get(id);
-    if (data) openRemix(data);
-  }
-
-  function askRemove(id: string, name: string): void {
-    confirmHost.replaceChildren(
-      confirmStep(`Remove "${name}" from Shared with me? Your stars on it stay.`, "Yes, remove it", "Keep it", (yes) => {
-        confirmHost.replaceChildren();
-        if (yes) {
-          sharedLevels.remove(id);
-          notice.textContent = `Removed "${name}" from Shared with me.`;
-          drawShared();
-        }
-      }),
+        : [h("li", { class: "muted" }, all.length ? "No levels match these filters." : "You haven't made a level yet.")]),
     );
   }
 
@@ -150,26 +196,6 @@ export function mountEditorList(root: HTMLElement, client: PyClient): () => void
     if (level) open(copyOfLevel(level.data));
   };
 
-  const linkInput = h("input", { type: "text", id: "link-or-code", autocomplete: "off", spellcheck: "false" });
-  const linkForm = h(
-    "form",
-    { class: "toolbar", hidden: "" },
-    h("label", { for: "link-or-code" }, "A link or code"),
-    linkInput,
-    h("button", { class: "btn btn-primary", type: "submit" }, "Open"),
-    h("button", { class: "btn", type: "button", onClick: () => closeLink() }, "Cancel"),
-  );
-  linkForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const code = codeFromText(linkInput.value);
-    if (code) location.hash = `#/play/${code}`;
-    else notice.textContent = "That isn't a link or code for a Rank & File level.";
-  });
-  function closeLink(): void {
-    linkForm.hidden = true;
-    linkInput.value = "";
-  }
-
   root.replaceChildren(
     h(
       "div",
@@ -181,10 +207,8 @@ export function mountEditorList(root: HTMLElement, client: PyClient): () => void
         { class: "toolbar" },
         h("button", { class: "btn btn-primary", onClick: () => open(blankDraft()) }, "New level"),
         h("button", { class: "btn", onClick: () => file.click() }, "Import a .yaml file"),
-        h("button", { class: "btn", onClick: () => ((linkForm.hidden = false), linkInput.focus()) }, "Open a link or code"),
         file,
       ),
-      linkForm,
       h(
         "div",
         { class: "toolbar ed-copy" },
@@ -192,14 +216,13 @@ export function mountEditorList(root: HTMLElement, client: PyClient): () => void
         picker,
         h("button", { class: "btn btn-small", onClick: copy }, "Copy it"),
       ),
+      h("p", { class: "muted" }, "Levels sent to you, by link or code, are in ", sharedLink),
+      controls.element,
       notice,
       confirmHost,
       list,
-      h("h2", { class: "my-levels-title" }, "Shared with me"),
-      shared,
     ),
   );
   draw();
-  drawShared();
-  return () => {};
+  return () => tags.stop();
 }

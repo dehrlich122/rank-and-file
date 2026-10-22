@@ -7,8 +7,10 @@ import { PROMOTIONS, tierCleared } from "../promotion";
 import type { SettingsStore } from "../settings";
 import { sound } from "../sound";
 import { h } from "./dom";
+import { tierHasChallenges } from "./freePlay";
 import { hero } from "./sprites";
 import { svg } from "./svg";
+import { tierName } from "./tags";
 
 /** Mount the ceremony for `tier`. Without a promotion earned there is nothing to show, so it goes back to Lessons. */
 export function mountPromotion(main: HTMLElement, tier: string, progress: ProgressStore, settings: SettingsStore): () => void {
@@ -54,6 +56,7 @@ export function mountPromotion(main: HTMLElement, tier: string, progress: Progre
         ),
         h("p", { class: "pr-teaser" }, promotion.teaser),
         h("div", { class: "pr-actions" }, h("a", { class: "btn btn-primary", href: "#/lessons" }, "Back to Lessons"), wear),
+        ...(tierHasChallenges(tier) ? [h("a", { class: "pr-free", href: "#/free/challenges" }, `Free Play: the ${tierName(tier)} tier's challenges →`)] : []),
       ),
     ),
   );

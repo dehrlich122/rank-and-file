@@ -30,6 +30,14 @@ describe("Shared with me", () => {
     expect(new SharedStore(storage).list().map((s) => s.id)).toEqual(["shared-bbb"]);
   });
 
+  it("lists a difficulty only when it is a step from 1 to 5", () => {
+    const store = new SharedStore(memoryStorage());
+    store.keep(level("shared-aaa", "A", { difficulty: 3 }));
+    store.keep(level("shared-bbb", "B", { difficulty: 6 }));
+    store.keep(level("shared-ccc", "C"));
+    expect(Object.fromEntries(store.list().map((s) => [s.id, s.difficulty]))).toEqual({ "shared-aaa": 3, "shared-bbb": null, "shared-ccc": null });
+  });
+
   it("skips damaged entries", () => {
     const storage = memoryStorage({ "rank-and-file:shared": JSON.stringify({ levels: { a: { data: 3, opened: 1 }, b: "x" } }) });
     expect(new SharedStore(storage).list()).toEqual([]);
