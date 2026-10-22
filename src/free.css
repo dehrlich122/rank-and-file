@@ -312,3 +312,29 @@
 .sandbox .board-mini .coords {
   display: block;
 }
+
+/* -- pointers into Free Play, and rows that carry tags ----------------------------------------- */
+
+.tier-next {
+  display: block;
+  margin: 6px 0 2px;
+  padding: 8px 12px;
+  border: 1px dashed var(--border);
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.tier-next:hover,
+.tier-next:focus-visible {
+  border-color: var(--accent);
+}
+
+.pr-free {
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.my-level {
+  flex-wrap: wrap;
+}
