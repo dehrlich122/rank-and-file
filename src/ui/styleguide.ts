@@ -7,8 +7,10 @@ import { BoardView } from "./board";
 import { contrastRatio } from "../contrast";
 import { h } from "./dom";
 import { crown, enemy, goal, hero, tile, type EnemyKind, type Skin, type TileName } from "./sprites";
+import { listControls } from "./listControls";
 import { svg } from "./svg";
 import { EVENTS, LEVEL, STATES, state } from "./styleguideSample";
+import { difficultyTag, tierTag } from "./tags";
 
 const FACINGS: Facing[] = ["north", "east", "south", "west"];
 const FOES: Array<[string, EnemyKind]> = [
@@ -94,6 +96,9 @@ export function mountStyleguide(main: HTMLElement): () => void {
       h("div", { class: "sg-board-row" }, board(false), h("div", { class: "sg-board-side" }, h("p", {}, "The smallest main board: 20px squares. The halftone switches to bigger dots."), board(true))),
       h("h3", {}, "Colours: contrast against the panel · dark square · light square"),
       h("div", { class: "sg-swatches" }),
+      h("h3", {}, "Tags: difficulty, tier, and a list's filter and sort row"),
+      h("div", { class: "tags" }, ...[1, 2, 3, 4, 5].map(difficultyTag), tierTag("pawn"), tierTag("knight")),
+      listControls(["pawn", "knight"], { tier: null, difficulty: null, sort: "order" }, () => {}),
       h("h3", {}, "The hero, facing each way"),
       h("div", { class: "sg-sheet" }, ...FACINGS.map((face) => figure(`pawn, ${face}`, () => hero("pawn", face))), ...FACINGS.map((face) => figure(`knight, ${face}`, () => hero("knight", face)))),
       h("h3", {}, "Enemies at rest, mid-break and snapping back"),

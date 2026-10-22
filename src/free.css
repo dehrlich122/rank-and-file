@@ -165,6 +165,10 @@
   font-size: 13px;
 }
 
+.tags + .list-controls {
+  margin-top: 10px;
+}
+
 .list-controls label {
   display: inline-flex;
   align-items: center;
