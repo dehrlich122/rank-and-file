@@ -333,8 +333,31 @@
 
 .skins {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  justify-content: center;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 260px));
   gap: 12px;
+}
+
+.skins-intro {
+  margin: 0 0 14px;
+}
+
+.skin-how.skin-locked {
+  font-style: italic;
+}
+
+.skin-status {
+  font-size: 14px;
+}
+
+.skin-worn {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.skin-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .skin-card {
@@ -362,8 +385,16 @@
   padding: 14px;
 }
 
+.sandbox {
+  --sandbox-board: clamp(200px, calc(100vh - 480px), 420px);
+}
+
+.sandbox p {
+  margin: 0;
+}
+
 .sandbox .snippet-editor .cm-editor {
-  min-height: 220px;
+  min-height: 180px;
 }
 
 .sandbox .snippet-row {
@@ -371,11 +402,60 @@
 }
 
 .sandbox .snippet-board {
-  width: min(46vw, 420px);
+  width: var(--sandbox-board);
+}
+
+.sandbox .snippet-board:has(.board-loading) {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--border);
 }
 
 .sandbox .board-mini {
   width: 100%;
+  max-height: var(--sandbox-board);
+}
+
+/* Wide windows: the board sits beside the editor and its Run bar, as tall as the screen allows */
+@media (min-width: 1181px) {
+  .sandbox.free-play {
+    max-width: 1180px;
+  }
+
+  .sandbox {
+    --sandbox-board: clamp(240px, calc(100vh - 300px), 560px);
+  }
+
+  .sandbox .snippet {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px 16px;
+  }
+
+  .sandbox .snippet-row {
+    display: contents;
+  }
+
+  .sandbox .snippet-editor {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .sandbox .snippet-bar {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .sandbox .snippet-board {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: start;
+  }
+
+  .sandbox .snippet-editor .cm-editor {
+    min-height: 220px;
+  }
 }
 
 .sandbox .board-mini .coords {
