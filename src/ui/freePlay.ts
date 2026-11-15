@@ -103,7 +103,7 @@ function hub(main: HTMLElement): void {
     h(
       "div",
       { class: "free-play" },
-      h("h1", { class: "free-title" }, "Free Play"),
+      h("h1", { class: "lessons-title" }, "Free Play"),
       h("p", { class: "muted" }, "No lessons here: puzzles that mix what you've learned, levels you made or were sent, and a board to try things on."),
       h("div", { class: "hud-frame" }, h("ul", { class: "fp-rows" }, ...FREE_SECTIONS.map(row))),
     ),
@@ -133,6 +133,7 @@ function challengesPage(main: HTMLElement): void {
 
   function draw(): void {
     const shown = challengeGroups(challengeSets, controls.state(), (id) => progress.solved(id));
+    controls.show(challengeSets.some((set) => set.levels.length > 0)); // nothing to filter while no set has a level
     groups.replaceChildren(
       ...(shown.length
         ? shown.flatMap(({ set, solved, levels }) => [
@@ -147,7 +148,7 @@ function challengesPage(main: HTMLElement): void {
     );
   }
 
-  main.replaceChildren(h("div", { class: "free-play" }, h("h1", { class: "free-title" }, "Challenges"), controls.element, groups));
+  main.replaceChildren(h("div", { class: "free-play" }, h("h1", { class: "lessons-title" }, "Challenges"), controls.element, groups));
   draw();
 }
 
