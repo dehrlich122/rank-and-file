@@ -7,7 +7,7 @@ import pytest
 from rankfile import codex
 from rankfile.pieces import PIECES, Pawn
 from rankfile.repl import Repl
-from rankfile.runner import run_sandbox
+from rankfile.runner import run_level, run_sandbox
 
 FENCE = "```"
 
@@ -145,6 +145,11 @@ def test_help_on_the_piece_lists_what_it_knows_here():
     output = run_sandbox("help(pawn)", ["move", "wait", "turn_left"]).output
     listed = [line.strip() for line in output.splitlines() if line.startswith("    pawn.")]
     assert listed == ["pawn.move(squares=1)", "pawn.turn_left()", "pawn.wait(ticks=1)"]  # the pawn's own order
+
+
+def test_help_on_the_piece_says_here_in_the_sandbox_and_in_this_level_in_a_level(corridor):
+    assert "your piece. Here it knows:" in run_sandbox("help(pawn)", ["move"]).output
+    assert "your piece. In this level it knows:" in run_level(corridor, "help(pawn)").output
 
 
 def test_help_on_a_locked_ability_says_it_isnt_learned_yet():

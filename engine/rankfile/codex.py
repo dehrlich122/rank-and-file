@@ -37,6 +37,7 @@ import re
 import textwrap
 from dataclasses import asdict, dataclass, field
 
+from .exceptions import it_knows
 from .levels import parse_level
 from .pieces import PIECES, Piece
 
@@ -564,7 +565,7 @@ def _overview(piece: Piece) -> str:
     known = [ability_entry(type(piece), ability) for ability in piece._unlocked]  # in the piece's own order
     if not known:
         return f"Help on {name}: your piece. It doesn't know anything yet."
-    lines = [f"Help on {name}: your piece. In this level it knows:", ""]
+    lines = [f"Help on {name}: your piece. {it_knows(piece._sandbox)}:", ""]
     for entry in known:
         lines += [f"    {entry.calls[0]}", *_fill(entry.paragraphs[0], 8), ""]
     lines.append(f"help({known[0].name}) tells you more about one of them.")

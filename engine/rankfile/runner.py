@@ -142,7 +142,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
     """One run of `code` on one board: check it, run it, and judge the outcome."""
     started = time.perf_counter()
     world = World(level)
-    piece = PIECES[level.piece](world, level.api)
+    piece = PIECES[level.piece](world, level.api, level.sandbox)
     namespace = codex.player_namespace(**{level.piece: piece})
     start = world.state()
 
