@@ -40,6 +40,11 @@ export async function launch({ width = 1400, height = 860 } = {}) {
       // A fresh profile installs the machine's external extensions about 2.5 s after launch, and the page's renderer
       // could die (STATUS_BREAKPOINT) if that landed while a Python worker was loading (QA5). The checks need none.
       "--disable-extensions",
+      // The usual automation flags: no component updates, background requests, default apps or built-in extensions.
+      "--disable-component-update",
+      "--disable-background-networking",
+      "--disable-default-apps",
+      "--disable-component-extensions-with-background-pages",
       "about:blank",
     ],
     { stdio: "ignore" },
@@ -166,5 +171,8 @@ export async function launch({ width = 1400, height = 860 } = {}) {
     } catch {}
   };
 
-  return { send, evaluate, waitFor, key, screenshot, logs, listeners, close };
+  /** Why the page is dead (it crashed, or the connection closed), or null while it is alive. */
+  const crashed = () => dead;
+
+  return { send, evaluate, waitFor, key, screenshot, logs, listeners, close, crashed };
 }

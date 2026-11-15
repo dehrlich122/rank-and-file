@@ -8,6 +8,14 @@ import { join } from "node:path";
 
 class CheckFailed extends Error {}
 
+/** Thrown out of `check` when the browser died during it: the suite unwinds and the runner starts a new Chrome. */
+export class ChromeDied extends Error {
+  constructor(label, reason) {
+    super(`Chrome died at "${label}": ${reason}`);
+    this.label = label;
+  }
+}
+
 const SPOILERS = ".cm-content, .hint-list, .compare-note";
 
 export function expect(condition, message) {
@@ -25,6 +33,9 @@ export function createSuite(name, browser, outDir) {
       entry.detail = (await fn()) ?? "";
       entry.ok = true;
     } catch (error) {
+      // A dead Chrome fails every later check too, so stop the suite for the runner to restart it. This one is
+      // not recorded: it says nothing about the game.
+      if (browser.crashed()) throw new ChromeDied(label, browser.crashed());
       entry.error = error instanceof CheckFailed ? error.message : `${error.name}: ${error.message}`;
       entry.screenshot = await saveFailureScreenshot(label).catch((e) => `screenshot failed: ${e.message}`);
     }
