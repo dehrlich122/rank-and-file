@@ -66,7 +66,13 @@ interface TierAnswer {
   refused: boolean;
 }
 
-const tierTagsOf = ({ tier, refused }: TierAnswer): HTMLElement[] => (refused ? [problemTag()] : tier ? [tierTag(tier)] : []);
+/**
+ * Whether a failed request is the engine refusing the level: the worker reports a Python `LevelError` as an error
+ * whose message is its traceback. A stopped or hung worker, or one that crashed, is only "couldn't ask".
+ */
+const refusedByEngine = (error: unknown): boolean => error instanceof Error && !(error instanceof StoppedError) && !(error instanceof PythonHungError) && /\bLevelError: /.test(error.message);
+
+const tierTagsOf =({ tier, refused }: TierAnswer): HTMLElement[] => (refused ? [problemTag()] : tier ? [tierTag(tier)] : []);
 
 /**
  * The engine's tier for a level outside the curriculum (request `levelTags`), asked once per level and never waited
@@ -91,7 +97,7 @@ export function tierTags(client: PyClient, filtering: () => boolean, redraw: () 
       const { tier } = await client.call("levelTags", { level: data(), chapters: codexChapters() });
       return { tier, refused: false };
     } catch (error) {
-      return error instanceof StoppedError || error instanceof PythonHungError ? NO_ANSWER : { tier: null, refused: true };
+      return { tier: null, refused: refusedByEngine(error) };
     }
   }
   return {

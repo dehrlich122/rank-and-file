@@ -370,7 +370,9 @@
 .my-level-open {
   color: inherit;
   text-decoration: none;
-  flex: 1;
+  flex: 1 1 14em; /* the title may wrap, even a long word of it, before the buttons do */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .my-level-open:hover strong {

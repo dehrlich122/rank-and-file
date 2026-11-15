@@ -107,10 +107,17 @@
 /* My levels and Shared with me: the tags have a fixed place in the row, the tier's room kept while the engine answers */
 .tags-fixed {
   display: grid;
-  grid-template-columns: 7.5rem 10.5rem;
+  grid-template-columns: 6rem 8.5rem; /* "has problems" and "while True:" with its pips */
   gap: 6px;
   align-items: center;
   flex: none;
+}
+
+.tags-tier,
+.tags-diff {
+  display: flex;
+  align-items: center;
+  min-height: 22px; /* a tag's height, so an empty slot holds its place */
 }
 
 .problem-tag {
