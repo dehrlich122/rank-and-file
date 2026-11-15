@@ -405,4 +405,149 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     }
     return `saved, asked to replace, bad ids refused${made ? " (drafts/ made and removed)" : ""}`;
   });
+
+  // -- QA1 fixes (Session 17) ------------------------------------------------------------------------------------------
+  await check("QA-046: the Title box stops at its limit however much is typed, and a saved level with a longer title says 'has problems' on My levels", async () => {
+    await load("#/editor", { fresh: true });
+    await myLevelsReady();
+    await clickButton("New level");
+    await editorReady();
+    await settled();
+    await b.evaluate(`document.querySelector('[data-field="title"] input').focus()`);
+    await b.key("a", { code: "KeyA", modifiers: 2 }); // Ctrl+A, so the typed text replaces the title
+    await b.send("Input.insertText", { text: "x".repeat(100) });
+    const found = await b.evaluate(`(() => { const i = document.querySelector('[data-field="title"] input'); return { length: i.value.length, max: i.getAttribute('maxlength') }; })()`);
+    expect(found.max !== null && Number(found.max) > 0 && Number(found.max) < 100, `maxlength attribute: ${found.max}`);
+    expect(found.length === Number(found.max), `typed 100, the box holds ${found.length} of ${found.max}`);
+    // a level saved with a title past the limit (an old save, or one written by hand): the engine refuses it
+    const { id: _id, ...data } = corridor("y".repeat(100));
+    await setStorage("rank-and-file:editor", { levels: { "qa046-too-long": { data, edited: Date.now() } } });
+    await load("#/editor");
+    await myLevelsReady();
+    await b.waitFor(`[...document.querySelectorAll('.my-level .problem-tag')].some((t) => t.textContent.trim() === 'has problems')`, 60_000, "the 'has problems' mark");
+    return `limit ${found.max}; the too-long level is marked`;
+  });
+
+  await check("QA-047: every Free Play page's heading sits at the same height, in the same type, as Lessons' (within 1px)", async () => {
+    const look = () =>
+      b.evaluate(`(() => {
+        const h = document.querySelector('main h1, .lessons-title');
+        const s = getComputedStyle(h);
+        return { gap: h.getBoundingClientRect().top - document.querySelector('.topbar').getBoundingClientRect().bottom, family: s.fontFamily, transform: s.textTransform, color: s.color };
+      })()`);
+    await load("#/lessons", { fresh: true });
+    await b.waitFor(`document.querySelector('.lessons-title')`, 30_000, "Lessons");
+    await sleep(300);
+    const lessons = await look();
+    const bad = [];
+    for (const page of ["#/free", "#/free/challenges", "#/editor", "#/free/shared", "#/free/sandbox", "#/free/skins"]) {
+      await load(page);
+      await b.waitFor(`location.hash === ${JSON.stringify(page)} && document.querySelector('main h1')`, 60_000, `the page ${page}`);
+      await sleep(300);
+      const now = await look();
+      if (Math.abs(now.gap - lessons.gap) > 1 || now.family !== lessons.family || now.transform !== lessons.transform || now.color !== lessons.color) {
+        bad.push(`${page}: gap ${now.gap} vs ${lessons.gap}, ${now.family === lessons.family ? "" : "font "}${now.transform === lessons.transform ? "" : "case "}${now.color === lessons.color ? "" : "colour"}`);
+      }
+    }
+    expect(bad.length === 0, `headings differ from Lessons': ${bad.join("; ")}`);
+    return `7 headings at gap ${Math.round(lessons.gap)}px, ${lessons.transform}`;
+  });
+
+  await check("QA-048: Open a link or code: its note sits right under the box, an empty try and a junk try each say so, and Esc closes the form with focus back on the button", async () => {
+    await load("#/free/shared", { fresh: true });
+    await b.waitFor(`document.querySelector('.editor-list h1')?.textContent === 'Shared with me'`, 30_000, "Shared with me");
+    await clickButton("Open a link or code", ".editor-list");
+    expect(await b.evaluate(`!document.querySelector('.link-form').hidden`), "the form opens");
+    const submit = () => b.evaluate(`document.querySelector('.link-form').requestSubmit()`);
+    await submit();
+    const empty = await text(".link-note");
+    expect(empty === "Paste a link or code first.", `empty try said: ${empty}`);
+    expect(await b.evaluate(`document.querySelector('.link-form .toolbar').nextElementSibling === document.querySelector('.link-note')`), "the note is the input row's next sibling");
+    await b.evaluate(`(() => { const i = document.querySelector('#link-or-code'); i.value = 'not a level'; })()`);
+    await submit();
+    const junk = await text(".link-note");
+    expect(junk !== "" && junk !== empty, `junk try said: ${junk}`);
+    await b.evaluate(`document.querySelector('#link-or-code').focus()`);
+    await b.key("Escape");
+    expect(await b.evaluate(`document.querySelector('.link-form').hidden`), "Esc hides the form");
+    expect(!(await exists("dialog[open]")), "Esc did not open Settings");
+    const back = await b.evaluate(`document.activeElement?.tagName === 'BUTTON' && document.activeElement.textContent === 'Open a link or code'`);
+    expect(back, "focus is back on the Open a link or code button");
+    return "note under the box, both tries answered, Esc closes";
+  });
+
+  await check("QA-049: no filter row on an empty list; with two levels and nothing matching, 'Clear filters' resets Tier and Difficulty, keeps the sort, and both rows return", async () => {
+    const filterRowShown = () =>
+      b.evaluate(`[...document.querySelectorAll('.list-controls-host, .list-controls')].some((e) => e.getClientRects().length > 0)`);
+    await load("#/editor", { fresh: true });
+    await myLevelsReady();
+    expect(!(await filterRowShown()), "a filter row on the empty My levels");
+    await goto("#/free/shared");
+    await b.waitFor(`document.querySelector('.editor-list h1')?.textContent === 'Shared with me'`, 30_000, "Shared with me");
+    expect(!(await filterRowShown()), "a filter row on the empty Shared with me");
+    await goto("#/free/challenges");
+    await b.waitFor(`document.querySelector('.set-head')`, 30_000, "Challenges");
+    expect(!(await filterRowShown()), "a filter row on Challenges");
+    await makeLevels([2, 5]);
+    expect(await filterRowShown(), "no filter row once there are levels");
+    try {
+      await control("Sort", "hardest");
+      await control("Difficulty", "3");
+      expect((await rows()) === 0, `${await rows()} rows with nothing matching`);
+      await clickButton("Clear filters", ".my-levels");
+      expect((await controlValue("Tier")) === "" && (await controlValue("Difficulty")) === "", `Tier "${await controlValue("Tier")}", Difficulty "${await controlValue("Difficulty")}"`);
+      expect((await controlValue("Sort")) === "hardest", `Sort is ${await controlValue("Sort")}`);
+      expect((await rows()) === 2, `${await rows()} rows after clearing`);
+      expect(await filterRowShown(), "the filter row stays");
+    } finally {
+      await control("Sort", "order");
+    }
+    return "hidden while empty; cleared, sort kept, both rows back";
+  });
+
+  await check("QA-050: My levels tags stay in fixed columns: the tier and difficulty columns line up across rows, do not move when the engine answers, and no tags cell is a bare dash", async () => {
+    await makeLevels([2]);
+    await clickButton("New level"); // a second level, with no difficulty
+    await editorReady();
+    await settled();
+    await goto("#/editor");
+    await myLevelsReady();
+    await load("#/editor");
+    await b.waitFor(`document.querySelectorAll('.my-levels .my-level .tags-tier').length === 2`, 30_000, "both rows' tag columns");
+    // x is measured from the row's own left edge: the whole page may shift a few pixels (a scrollbar, the fonts
+    // swapping in) while the engine starts, and that is not the tags moving
+    const columns = () =>
+      b.evaluate(`[...document.querySelectorAll('.my-levels .my-level')].map((li) => { const left = li.getBoundingClientRect().left; return { tier: li.querySelector('.tags-tier').getBoundingClientRect().left - left, diff: li.querySelector('.tags-diff').getBoundingClientRect().left - left, diffTags: li.querySelectorAll('.diff-tag').length }; })`);
+    const early = await columns();
+    expect(early.length === 2 && early.some((r) => r.diffTags === 1) && early.some((r) => r.diffTags === 0), `rows: ${JSON.stringify(early)}`);
+    expect(Math.abs(early[0].tier - early[1].tier) < 0.5 && Math.abs(early[0].diff - early[1].diff) < 0.5, `columns differ between rows: ${JSON.stringify(early)}`);
+    await b.waitFor(`document.querySelectorAll('.my-levels .tags-tier > *').length === 2`, 60_000, "both tier tags");
+    const late = await columns();
+    expect(early.every((r, i) => Math.abs(r.tier - late[i].tier) < 0.5 && Math.abs(r.diff - late[i].diff) < 0.5), `columns moved when the engine answered: ${JSON.stringify(early)} then ${JSON.stringify(late)}`);
+    const dashes = await b.evaluate(`[...document.querySelectorAll('.my-levels .tags')].filter((t) => /^\\s*[-\\u2013\\u2014]\\s*$/.test(t.textContent)).length`);
+    expect(dashes === 0, `${dashes} tags cells are a bare dash`);
+    return "columns fixed across rows and over the engine's answer";
+  });
+
+  await check("QA-051: on My levels, the lesson-level picker and its Copy it button sit on one line at 1440 and 1000 wide", async () => {
+    await load("#/editor", { fresh: true });
+    await myLevelsReady();
+    const seen = [];
+    try {
+      for (const width of [1440, 1000]) {
+        await b.send("Emulation.setDeviceMetricsOverride", { width, height: 860, deviceScaleFactor: 1, mobile: false });
+        await sleep(300);
+        const at = await b.evaluate(`(() => {
+          const s = document.querySelector('.ed-copy select').getBoundingClientRect();
+          const k = document.querySelector('.ed-copy-pick button').getBoundingClientRect();
+          return { centre: (k.top + k.bottom) / 2, top: s.top, bottom: s.bottom };
+        })()`);
+        expect(at.centre >= at.top && at.centre <= at.bottom, `at ${width}: the button's centre ${Math.round(at.centre)} is outside the select (${Math.round(at.top)} to ${Math.round(at.bottom)})`);
+        seen.push(width);
+      }
+    } finally {
+      await b.send("Emulation.setDeviceMetricsOverride", { width: 1400, height: 860, deviceScaleFactor: 1, mobile: false });
+    }
+    return `aligned at ${seen.join(" and ")}`;
+  });
 }
