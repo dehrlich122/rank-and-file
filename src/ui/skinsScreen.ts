@@ -59,6 +59,6 @@ export function mountSkins(main: HTMLElement, store: ProgressStore = progress): 
     if (hadFocus) grid.querySelector<HTMLElement>(".skin-card.worn")?.focus();
   };
   paint();
-  main.replaceChildren(h("div", { class: "free-play" }, h("h1", { class: "free-title" }, "Skins"), grid));
+  main.replaceChildren(h("div", { class: "free-play" }, h("h1", { class: "lessons-title" }, "Skins"), grid));
   return settings.subscribe(paint);
 }

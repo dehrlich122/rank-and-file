@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DIFFICULTY_WORDS, difficultyTag, tierTag } from "./tags";
+import { DIFFICULTY_WORDS, difficultyTag, problemTag, tierTag } from "./tags";
 
 // Vitest runs in Node here, so stand in a document that keeps what h() sets: tag, attributes and children.
 class Fake {
@@ -45,6 +45,15 @@ describe("difficultyTag", () => {
   it("refuses steps outside 1 to 5", () => {
     expect(() => difficultyTag(0)).toThrow();
     expect(() => difficultyTag(6)).toThrow();
+  });
+});
+
+describe("problemTag", () => {
+  it("says in words that the level has problems, and is not a tier tag's text", () => {
+    const tag = make(problemTag());
+    expect(tag.text).toBe("has problems");
+    expect(tag.find("problem-tag").length).toBe(1);
+    expect(tag.attrs.get("title")?.includes("editor")).toBe(true);
   });
 });
 
