@@ -95,11 +95,63 @@
   gap: 14px;
 }
 
-.free-title {
+/* every Free Play page sits under the top bar like Lessons does (its heading is .lessons-title) */
+.free-play {
+  padding-top: 24px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+/* My levels and Shared with me: the tags have a fixed place in the row, the tier's room kept while the engine answers */
+.tags-fixed {
+  display: grid;
+  grid-template-columns: 7.5rem 10.5rem;
+  gap: 6px;
+  align-items: center;
+  flex: none;
+}
+
+.problem-tag {
+  color: var(--bad);
+}
+
+.link-note {
   margin: 0;
-  font: 700 26px var(--font-display);
-  letter-spacing: 0.06em;
-  color: var(--accent);
+}
+
+.link-note:not(:empty) {
+  margin-top: 4px;
+}
+
+.list-controls-host {
+  margin-bottom: -4px; /* the gap to the list below matches the list's own row gap (8px) */
+}
+
+.editor-list > [role="status"]:empty {
+  position: absolute; /* a live region with nothing in it takes no row of the grid */
+}
+
+.link-form .toolbar input {
+  flex: 1;
+  min-width: 10em;
+}
+
+.ed-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.ed-copy-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ed-copy-pick select {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .fp-rows {
@@ -180,7 +232,8 @@
   flex: 1;
 }
 
-.list-controls select {
+.list-controls select,
+.ed-copy select {
   font: inherit;
   padding: 2px 6px;
   border-radius: 6px;

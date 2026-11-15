@@ -96,7 +96,7 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     expect(found.every((r) => r.count.length > 0), "every row has a count");
     expect((await crumbs()) === "Free Play", `crumbs: ${await crumbs()}`);
     expect(await headingFocused(), "the heading is focused");
-    expect((await text(".free-title")) === "Free Play", "the heading says Free Play");
+    expect((await text(".free-play h1")) === "Free Play", "the heading says Free Play");
     return found.map((r) => `${r.name}: ${r.count}`).join(" | ");
   });
 
@@ -127,7 +127,7 @@ export default async function freeChecks({ browser: b, base, root, check }) {
   });
 
   // -- Challenges ----------------------------------------------------------------------------------------------
-  await check("M4.4: Challenges lists The Last Rank with its Pawn tier tag and says its challenges are coming soon; the filter row is there", async () => {
+  await check("M4.4: Challenges lists The Last Rank with its Pawn tier tag and says its challenges are coming soon; no filter row yet (QA-049)", async () => {
     await load("#/free/challenges", { fresh: true });
     await b.waitFor(`document.querySelector('.set-head')`, 30_000, "the Challenges page");
     expect((await text(".set-head h2")) === "The Last Rank", `set: ${await text(".set-head h2")}`);
@@ -135,10 +135,8 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     expect(tag.includes("Pawn"), `tier tag: ${tag}`);
     expect((await text(".free-play")).includes("Its challenges are coming soon."), "the coming soon line");
     expect(!(await exists(".ch-row")), "no challenge rows until M4.5 adds them");
-    const labels = await b.evaluate(`[...document.querySelectorAll('.list-controls label')].map((l) => l.firstChild.textContent).join()`);
-    expect(labels === "Tier,Difficulty,Sort", `controls: ${labels}`);
-    const tiers = await b.evaluate(`[...document.querySelector('.list-controls select').options].map((o) => o.textContent).join()`);
-    expect(tiers === "Any,Pawn", `tier options: ${tiers}`);
+    // QA-049: no filter row while no set has a level to filter
+    expect(!(await b.evaluate(`!!document.querySelector('.list-controls') && !document.querySelector('.list-controls-host').hidden`)), "no filter row while no set has a level");
     return `The Last Rank, ${tag.trim()}`;
   });
 
