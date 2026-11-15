@@ -31,6 +31,7 @@ level checker uses the same rule.
 import ast
 import builtins
 import contextlib
+import functools
 import inspect
 import io
 import re
@@ -433,7 +434,8 @@ def level_tags(data: dict, chapters: list[dict]) -> dict:
     return {"tier": latest["tier"], "chapter": latest["chapter"]} if latest else {"tier": None, "chapter": None}
 
 
-def _nodes_used(lesson: str) -> set[str]:
+@functools.lru_cache(maxsize=256)  # a list asks about every level in it, and the lessons are the same each time
+def _nodes_used(lesson: str) -> frozenset[str]:
     """The names of the syntax a lesson's snippets use ("For", "While"...). A snippet that isn't Python adds none."""
     used: set[str] = set()
     for code in lesson_snippets(lesson):
@@ -441,7 +443,7 @@ def _nodes_used(lesson: str) -> set[str]:
             used |= {type(node).__name__ for node in ast.walk(ast.parse(code))}
         except SyntaxError:
             continue
-    return used
+    return frozenset(used)
 
 
 def entries(level_id: str, chapters: list[dict]) -> list[Entry]:

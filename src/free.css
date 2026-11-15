@@ -93,11 +93,7 @@
   margin: 0 auto;
   display: grid;
   gap: 14px;
-}
-
-/* every Free Play page sits under the top bar like Lessons does (its heading is .lessons-title) */
-.free-play {
-  padding-top: 24px;
+  padding-top: 24px; /* every Free Play page sits under the top bar like Lessons does (its heading is .lessons-title) */
 }
 
 .nowrap {
@@ -224,7 +220,7 @@
   font-size: 13px;
 }
 
-.tags + .list-controls {
+.tags + .list-controls-host {
   margin-top: 10px;
 }
 
@@ -346,11 +342,8 @@
   font-style: italic;
 }
 
-.skin-status {
-  font-size: 14px;
-}
-
 .skin-worn {
+  font-size: 14px;
   color: var(--accent);
   font-weight: 650;
 }

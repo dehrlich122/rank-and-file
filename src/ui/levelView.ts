@@ -1,11 +1,12 @@
 // A level: the lesson and challenge on the left, the board in the middle, the
 // code editor and what the program is doing on the right.
 import type { EditorView } from "@codemirror/view";
-import { challengeSets, chapters, codexChapters, type LevelSource } from "../content";
+import { challengeSetOf, chapters, codexChapters, type LevelSource } from "../content";
 import { PythonHungError, StoppedError, type PyClient } from "../py/client";
 import type { LevelInfo, LevelResult } from "../py/protocol";
 import { BoardView, squareName } from "./board";
 import { levelTagsRow } from "./challengeTags";
+import { askTier } from "./tierTags";
 import { ChipTooltip, codexHover, renderCodex, type CodexLookup, type CodexView } from "./codex";
 import { h } from "./dom";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
@@ -289,11 +290,11 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       help = new HelpPanel(source.id, level.hints, () => getCode(editor), { store, solution: host.solution });
       const tagsSlot = h("div", { class: "level-tags" });
       challengePanel.replaceChildren(...describeChallenge(level, tagsSlot, openCodexEntry, chipTooltip, () => codex), help.element);
-      void showTags(level, tagsSlot);
       updateControls();
       // Scratch Python gets a stand-in for this level's piece, and its tooltips follow this level's Codex.
       context.repl.setLevel({ piece: level.piece, api: level.api, codex: () => codex });
       void loadCodex(level);
+      void showTags(level, tagsSlot); // after the Codex: the tooltips matter more than a tag
     } catch (error) {
       boardHost.replaceChildren(noticeCard("bad", "Python couldn't start", String(error)));
     }
@@ -301,16 +302,12 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
 
   /** The tags in the Challenge panel: a challenge knows its tier from its set, a level of the editor or a stranger's asks the engine, and fills in when it answers. */
   async function showTags(loaded: LevelInfo, slot: HTMLElement): Promise<void> {
-    const show = (tier: string | null) => slot.replaceChildren(...levelTagsRow(loaded, host.kind, tier));
-    if (host.tier === "set") return show(challengeSets.find((set) => set.set === source.set)?.tier ?? null);
+    const show = (tier: string | null) => slot.replaceChildren(...levelTagsRow(loaded, tier, host.tier === "set"));
+    if (host.tier === "set") return show(challengeSetOf(source)?.tier ?? null);
     show(null);
     if (host.tier !== "engine") return;
-    try {
-      const { tier } = await client.call("levelTags", { level: source.data, chapters: codexChapters() });
-      if (!disposed) show(tier);
-    } catch {
-      // the engine can't say: the difficulty alone stays
-    }
+    const { tier } = await askTier(client, source.data); // when the engine can't say, the difficulty alone stays
+    if (!disposed) show(tier);
   }
 
   /** The Codex tab and the hover tooltips: everything taught so far (docs/Codex.md). */

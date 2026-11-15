@@ -35,6 +35,11 @@ export function browserStorage(): StorageLike | null {
 }
 
 /** Treat anything that isn't a plain object as an empty one. */
+/** A level's difficulty as its file gives it: a whole number from 1 to 5 (the engine's rule), or null for anything else. */
+export function asDifficulty(raw: unknown): number | null {
+  return typeof raw === "number" && Number.isInteger(raw) && raw >= 1 && raw <= 5 ? raw : null;
+}
+
 export function asRecord(raw: unknown): Record<string, unknown> {
   return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
 }

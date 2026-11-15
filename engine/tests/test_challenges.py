@@ -73,5 +73,9 @@ def test_draws_on_is_a_list_of_chapter_numbers(value):
 def test_level_tags_answers_a_tier_and_a_chapter():
     chapters = [{"curriculum": True, "chapter": 1, "tier": "pawn", "levels": [{"id": "x", "data": challenge(), "lesson": ""}]}]
     answer = json.loads(bridge.level_tags(json.dumps(challenge()), json.dumps(chapters)))
-    assert set(answer) == {"tier", "chapter"}
-    assert answer["tier"] == "pawn"
+    assert answer == {"tier": "pawn", "chapter": 1, "refused": False}
+
+
+def test_level_tags_says_when_the_engine_refuses_the_level():
+    answer = json.loads(bridge.level_tags(json.dumps(challenge(difficulty=9)), "[]"))
+    assert answer == {"tier": None, "chapter": None, "refused": True}

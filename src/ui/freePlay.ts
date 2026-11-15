@@ -1,14 +1,13 @@
 // Free Play (M4.4, docs/M4/M4.4.md): the hub at #/free, a directory like Lessons, and its pages at #/free/<section>.
 // This file draws the hub, the Challenges page and (through sharedList.ts) Shared with me. The Sandbox and Skins have
 // screens of their own (app.ts routes them), and My levels stays at #/editor.
-import { challengeSets, chapterName, chapters, type ChallengeSet, type LevelSource } from "../content";
+import { challengeSets, chapterName, drawnChapters, type ChallengeSet, type LevelSource } from "../content";
 import { drafts } from "../editor/drafts";
 import { progress } from "../progress";
 import type { PyClient } from "../py/client";
 import { sharedLevels } from "../share/shared";
 import { h } from "./dom";
-import { listControlsHost, starsText } from "./editorList";
-import { applyList, type ListState } from "./listControls";
+import { applyList, listControls, starsText, type ListState } from "./listControls";
 import { sandboxAbilities } from "./sandboxScreen";
 import { mountSharedList } from "./sharedList";
 import { skinCards } from "./skinsScreen";
@@ -23,7 +22,19 @@ const FREE_SECTIONS = [
   { id: "skins", href: "#/free/skins", glyph: "◆", name: "Skins", line: "The looks your promotions unlocked" },
 ] as const;
 
-export type FreeSection = (typeof FREE_SECTIONS)[number]["id"];
+/** A section with a page of its own at `#/free/<id>` (My levels stays at `#/editor`). */
+export type FreePage = Exclude<(typeof FREE_SECTIONS)[number]["id"], "levels">;
+type FreeSection = (typeof FREE_SECTIONS)[number]["id"];
+
+/** The section an address under `#/free/` names (its first part), or null when there is no such page. */
+export function freePage(path: string): FreePage | null {
+  const first = path.split("/")[0];
+  const section = FREE_SECTIONS.find((s) => s.id === first);
+  return section && section.id !== "levels" ? section.id : null;
+}
+
+/** A section's name, as its row, crumbs and title say it. */
+export const freeSectionName = (id: FreeSection): string => FREE_SECTIONS.find((s) => s.id === id)!.name;
 
 const countOf = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
@@ -68,13 +79,9 @@ export function challengeGroups(sets: ChallengeSet[], state: ListState, solved: 
     }));
 }
 
-/** Whether a tier has a challenge set, so the places that point to Free Play only do so where there is something there. */
-export const tierHasChallenges = (tier: string, sets: ChallengeSet[] = challengeSets): boolean => sets.some((set) => set.tier === tier);
-
 /** The "Draws on" line of a challenge: the names of the chapters it mixes, "" when it names none. */
 export function drawsOnText(level: LevelSource): string {
-  const named = Array.isArray(level.data.draws_on) ? level.data.draws_on : [];
-  const names = named.flatMap((n) => chapters.filter((chapter) => chapter.chapter === n).map(chapterName));
+  const names = drawnChapters(level.data.draws_on).map(chapterName);
   return names.length ? `Draws on ${names.join("; ")}` : "";
 }
 
@@ -113,7 +120,7 @@ function hub(main: HTMLElement): void {
 function challengesPage(main: HTMLElement): void {
   const tiers = [...new Set(challengeSets.map((set) => set.tier))];
   const groups = h("div", { class: "ch-sets" });
-  const controls = listControlsHost("challenges", tiers, () => draw());
+  const controls = listControls("challenges", tiers, () => draw());
 
   const row = (level: LevelSource, n: number): HTMLElement => {
     const best = progress.level(level.id).stars;
@@ -156,7 +163,7 @@ function challengesPage(main: HTMLElement): void {
  * Mount the hub (`section` null) or one of its pages in `main`. Returns what to call to leave it. The Sandbox and Skins
  * pages have their own screens (app.ts); `client` asks the engine for the tiers of levels outside the curriculum.
  */
-export function mountFreePlay(main: HTMLElement, section: FreeSection | null, client: PyClient): () => void {
+export function mountFreePlay(main: HTMLElement, section: "challenges" | "shared" | null, client: PyClient): () => void {
   if (section === "shared") return mountSharedList(main, client);
   if (section === "challenges") challengesPage(main);
   else hub(main);

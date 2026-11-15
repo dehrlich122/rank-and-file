@@ -1,6 +1,8 @@
 // Checking a "Save to the repo" request (dev only): the plain rules, apart from the file writing that
 // scripts/save-level-plugin.ts does. Nothing is written outside `drafts/`, whatever the request says.
 
+/** Where the dev server takes a save: the plugin listens there, and the editor posts to it. */
+export const SAVE_PATH = "/__rank-and-file/save-level";
 export const MAX_SAVE_BYTES = 256 * 1024;
 const MAX_ID_LENGTH = 60;
 

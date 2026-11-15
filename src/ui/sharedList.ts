@@ -1,13 +1,14 @@
 // Shared with me (M4.3, moved into Free Play in M4.4): `#/free/shared`. Every shared level the player has opened,
 // kept in this browser, with the form to open another from a link or code. Each row carries its tier and difficulty
 // tags, and the list filters and sorts by both.
+import { curriculumTiers } from "../content";
 import type { PyClient } from "../py/client";
 import { codeFromText } from "../share/codec";
 import { openRemix, sharedLevels, sharedProgress } from "../share/shared";
 import { confirmStep } from "./dialog";
 import { h } from "./dom";
-import { boardsText, curriculumTiers, listControlsHost, noMatchRow, starsText, tierTags } from "./editorList";
-import { applyList } from "./listControls";
+import { applyList, boardsText, listControls, noMatchRow, starsText } from "./listControls";
+import { tierTags } from "./tierTags";
 
 export function mountSharedList(root: HTMLElement, client: PyClient): () => void {
   const confirmHost = h("div", { class: "ed-confirm" });
@@ -18,7 +19,7 @@ export function mountSharedList(root: HTMLElement, client: PyClient): () => void
     () => controls.state().tier !== null,
     () => drawShared(),
   );
-  const controls = listControlsHost("shared", curriculumTiers(), () => drawShared());
+  const controls = listControls("shared", curriculumTiers(), () => drawShared());
 
   function drawShared(): void {
     const all = sharedLevels.list();

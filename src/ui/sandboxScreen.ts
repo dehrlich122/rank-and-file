@@ -50,11 +50,14 @@ export function boardIsLoaded(host: { querySelector(selector: string): unknown }
   return !host.querySelector(".board-loading");
 }
 
+/** Reset progress: the Sandbox starts from its own code again (QA-057). */
+export const resetSandbox = (): void => writeJson(browserStorage(), STORAGE_KEY, "");
+
 /** Mount the Sandbox in `main`. Returns what to call to leave it. */
-export function mountSandbox(main: HTMLElement, client: PyClient, store: ProgressStore = progress): () => void {
+export function mountSandbox(main: HTMLElement, client: PyClient): () => void {
   const storage = browserStorage();
   const saved = readJson(storage, STORAGE_KEY);
-  const abilities = sandboxAbilities(store);
+  const abilities = sandboxAbilities();
   let lookup: CodexLookup | null = null; // hover tooltips, once the engine has sent the Codex
   let disposed = false;
   const snippet = renderSnippet(
@@ -93,7 +96,7 @@ export function mountSandbox(main: HTMLElement, client: PyClient, store: Progres
   client.ready().then(
     async () => {
       try {
-        const entries = await client.call("codex", { levelId: "sandbox", chapters: sandboxCodexChapters(abilities, store) });
+        const entries = await client.call("codex", { levelId: "sandbox", chapters: sandboxCodexChapters(abilities, progress) });
         if (!disposed) lookup = { piece: "pawn", entries: new Map(entries.map((entry) => [entry.name, entry])) };
       } catch {
         // no tooltips: the Sandbox still works

@@ -12,6 +12,7 @@ import { startSolve, type SolveRun } from "../editor/solve";
 import { draftToLevelData, draftToYaml } from "../editor/levelData";
 import { editorOptions } from "../editor/options";
 import { readSolution, setPar } from "../editor/rules";
+import { SAVE_PATH } from "../editor/saveRequest";
 import type { Problem } from "../editor/problems";
 import type { PyClient } from "../py/client";
 import type { EditorOptions, Enemy, LevelInfo, Pos, TileKind } from "../py/protocol";
@@ -341,7 +342,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     if (!import.meta.env.DEV) return;
     const solution = readSolution(whole());
     try {
-      const response = await fetch("/__rank-and-file/save-level", {
+      const response = await fetch(SAVE_PATH, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id, yaml: draftToYaml(whole()), ...(solution ? { solution } : {}), overwrite }),

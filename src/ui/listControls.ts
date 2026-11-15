@@ -1,6 +1,6 @@
-// The row of filters and sort above a Free Play list (M4.4). Pure state plus a small view.
+// The row of filters and sort above a Free Play list (M4.4), and the small things the lists' rows share.
 import { h } from "./dom";
-import { DIFFICULTY_WORDS, tierName } from "./tags";
+import { DIFFICULTY_WORDS, tierLabel } from "./tags";
 
 export interface ListState {
   /** null = any */
@@ -19,14 +19,6 @@ const SORTS: Array<[ListState["sort"], string]> = [
 // Remembered per list for this visit only; nothing is stored.
 const remembered = new Map<string, ListState>();
 
-export function listState(listId: string): ListState {
-  return { ...(remembered.get(listId) ?? { tier: null, difficulty: null, sort: "order" }) };
-}
-
-export function saveListState(listId: string, state: ListState): void {
-  remembered.set(listId, { ...state });
-}
-
 /** Filter by tier and difficulty, then sort. Stable; an item without a difficulty goes last in both sorts. */
 export function applyList<T>(items: T[], state: ListState, read: (item: T) => { tier: string | null; difficulty: number | null }): T[] {
   const kept = items.filter((item) => {
@@ -43,28 +35,51 @@ export function applyList<T>(items: T[], state: ListState, read: (item: T) => { 
   });
 }
 
-function pick(label: string, options: Array<[string, string]>, current: string, onPick: (value: string) => void): HTMLElement {
+function pick(label: string, options: Array<[string, string]>, current: string, onPick: (value: string) => void): { label: HTMLElement; select: HTMLSelectElement } {
   const select = h(
     "select",
     { onChange: () => onPick(select.value) },
     ...options.map(([value, text]) => h("option", { value, selected: value === current }, text)),
   );
-  return h("label", {}, label, select);
+  return { label: h("label", {}, label, select), select };
 }
 
-/** The row: Tier and Difficulty filters, then Sort on the right. `onChange` gets the whole next state. */
-export function listControls(tiers: string[], state: ListState, onChange: (next: ListState) => void): HTMLElement {
+/**
+ * The filter and sort row of the list `listId`: Tier and Difficulty filters, then Sort on the right, remembered for
+ * this visit. `onChange` runs after each change, to redraw the list from `state()`.
+ */
+export function listControls(listId: string, tiers: string[], onChange: () => void): { element: HTMLElement; state: () => ListState; show: (on: boolean) => void; clear: () => void } {
+  let state: ListState = remembered.get(listId) ?? { tier: null, difficulty: null, sort: "order" };
+  const set = (change: Partial<ListState>): void => {
+    state = { ...state, ...change };
+    remembered.set(listId, state);
+    onChange();
+  };
   const any: [string, string] = ["", "Any"];
-  const tierOptions = tiers.map((t): [string, string] => [t, tierName(t)]);
-  const difficultyOptions = DIFFICULTY_WORDS.map((w, i): [string, string] => [String(i + 1), w]);
-  return h(
-    "div",
-    { class: "list-controls" },
-    pick("Tier", [any, ...tierOptions], state.tier ?? "", (v) => onChange({ ...state, tier: v === "" ? null : v })),
-    pick("Difficulty", [any, ...difficultyOptions], state.difficulty === null ? "" : String(state.difficulty), (v) =>
-      onChange({ ...state, difficulty: v === "" ? null : Number(v) }),
-    ),
-    h("span", { class: "grow" }),
-    pick("Sort", SORTS, state.sort, (v) => onChange({ ...state, sort: v as ListState["sort"] })),
+  const tier = pick("Tier", [any, ...tiers.map((t): [string, string] => [t, tierLabel(t)])], state.tier ?? "", (v) => set({ tier: v === "" ? null : v }));
+  const difficulty = pick("Difficulty", [any, ...DIFFICULTY_WORDS.map((w, i): [string, string] => [String(i + 1), w])], state.difficulty === null ? "" : String(state.difficulty), (v) =>
+    set({ difficulty: v === "" ? null : Number(v) }),
   );
+  const sort = pick("Sort", SORTS, state.sort, (v) => set({ sort: v as ListState["sort"] }));
+  const element = h("div", { class: "list-controls-host" }, h("div", { class: "list-controls" }, tier.label, difficulty.label, h("span", { class: "grow" }), sort.label));
+  return {
+    element,
+    state: () => state,
+    /** The row is there only while its list has something in it (QA-049). */
+    show: (on) => void (element.hidden = !on),
+    /** Tier and Difficulty back to any; the sort stays. */
+    clear: () => {
+      tier.select.value = "";
+      difficulty.select.value = "";
+      set({ tier: null, difficulty: null });
+    },
+  };
 }
+
+/** What a list says when its filters leave nothing, with the way out. */
+export const noMatchRow = (clear: () => void): HTMLElement =>
+  h("li", { class: "muted" }, "No levels match these filters. ", h("button", { class: "btn btn-small", onClick: clear }, "Clear filters"));
+
+/** A level's stars as a list row shows them: "★★☆", or "not solved yet". */
+export const starsText = (stars: number): string => (stars > 0 ? "★".repeat(stars) + "☆".repeat(Math.max(0, 3 - stars)) : "not solved yet");
+export const boardsText = (boards: number): string => `${boards} ${boards === 1 ? "board" : "boards"}`;

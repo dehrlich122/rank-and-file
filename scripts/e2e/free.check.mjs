@@ -267,7 +267,7 @@ export default async function freeChecks({ browser: b, base, root, check }) {
       const c = document.querySelector('.skin-card[data-piece="${piece}"]');
       return {
         worn: c.classList.contains('worn'), locked: c.classList.contains('locked'), name: c.querySelector('strong').textContent,
-        button: c.querySelector('button')?.textContent ?? null, status: c.querySelector('.skin-status')?.textContent ?? '',
+        button: c.querySelector('button')?.textContent ?? null, status: c.querySelector('.skin-worn')?.textContent ?? '',
         how: c.querySelector('.skin-how')?.textContent ?? '', focused: document.activeElement === c,
       };
     })()`);

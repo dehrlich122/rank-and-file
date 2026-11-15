@@ -7,7 +7,7 @@ import { newId, type Draft } from "../editor/draft";
 import { drafts } from "../editor/drafts";
 import { levelDataToDraft } from "../editor/levelData";
 import { ProgressStore } from "../progress";
-import { asRecord, browserStorage, readJson, writeJson, type StorageLike } from "../storage";
+import { asDifficulty, asRecord, browserStorage, readJson, writeJson, type StorageLike } from "../storage";
 
 const STORAGE_KEY = "rank-and-file:shared";
 const PROGRESS_KEY = "rank-and-file:shared-progress";
@@ -48,7 +48,7 @@ export class SharedStore {
         title: typeof data.title === "string" ? data.title : "Untitled",
         boards: 1 + (Array.isArray(data.variants) ? data.variants.length : 0),
         opened,
-        difficulty: typeof data.difficulty === "number" && Number.isInteger(data.difficulty) && data.difficulty >= 1 && data.difficulty <= 5 ? data.difficulty : null,
+        difficulty: asDifficulty(data.difficulty),
       }))
       .sort((a, b) => b.opened - a.opened);
   }

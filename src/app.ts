@@ -15,7 +15,7 @@
 //   #/challenge/<id>   a challenge from a Free Play set (M4.4)
 //   #/harness          the raw Python harness from Milestone 0
 //   #/styleguide       the look at every size, in both themes (M3.7)
-import { challengeSets, chapterName, chapters, findLevel } from "./content";
+import { challengeSetOf, chapterName, chapters, findLevel } from "./content";
 import { drafts } from "./editor/drafts";
 import { readSolution, setSolution } from "./editor/rules";
 import { testPlaySource } from "./editor/starts";
@@ -26,15 +26,14 @@ import { PyClient, startPythonWorker, type ClientStatus } from "./py/client";
 import { applyToDocument, settings } from "./settings";
 import { sharedLevels, sharedProgress } from "./share/shared";
 import { sound } from "./sound";
-import { browserStorage, writeJson } from "./storage";
 import { authorSolution } from "./ui/compare";
 import { h } from "./ui/dom";
 import { icon } from "./ui/icons";
 import { mountEditor } from "./ui/editorScreen";
 import { mountEditorList } from "./ui/editorList";
 import { mountLessons } from "./ui/lessonsMenu";
-import { mountFreePlay, type FreeSection } from "./ui/freePlay";
-import { mountSandbox } from "./ui/sandboxScreen";
+import { freePage, freeSectionName, mountFreePlay } from "./ui/freePlay";
+import { mountSandbox, resetSandbox } from "./ui/sandboxScreen";
 import { mountSkins } from "./ui/skinsScreen";
 import { challengeHost, sharedHost, testPlayHost } from "./ui/levelHost";
 import { mountLevel, type LevelContext } from "./ui/levelView";
@@ -44,8 +43,6 @@ import { SettingsDialog } from "./ui/settingsDialog";
 import { openShared, sharedProblem, sharedSource } from "./ui/sharedLevel";
 import { mountTitle } from "./ui/titleScreen";
 import { mountStyleguide } from "./ui/styleguide";
-
-const SANDBOX_CODE_KEY = "rank-and-file:sandbox"; // where ui/sandboxScreen.ts keeps the Sandbox's code
 
 export function startApp(root: HTMLElement): void {
   applyToDocument(settings.get());
@@ -57,7 +54,7 @@ export function startApp(root: HTMLElement): void {
       progress.reset();
       sharedProgress.reset(); // shared levels' stars, hints and code; the levels themselves stay (M4.3)
       settings.set({ piece: "pawn" }); // the skins are locked again (QA-052)
-      writeJson(browserStorage(), SANDBOX_CODE_KEY, ""); // the Sandbox starts from its default code again (QA-057)
+      resetSandbox(); // the Sandbox starts from its default code again (QA-057)
       context.knownCalls.clear();
       route(); // redraw the screen from the cleared progress
     },
@@ -124,14 +121,15 @@ export function startApp(root: HTMLElement): void {
     heading.focus({ preventScroll: true });
   }
 
-  /** The crumbs of a page under Free Play: Free Play, the section (a link unless it is the page), then more. */
+  /** The crumbs of a page under Free Play: Free Play (a link unless it is the page), the section it is in (a link), then the page's own parts. */
   function freeCrumbs(section: { name: string; href: string } | null, ...rest: Array<string | HTMLElement>): void {
     const sep = () => h("span", { class: "crumb-sep" }, "/");
-    const trail = [h("a", { href: "#/free" }, "Free Play"), ...(section ? [h("a", { href: section.href }, section.name)] : []), ...rest.map((part) => (typeof part === "string" ? h("span", {}, part) : part))];
+    const home = section || rest.length ? h("a", { href: "#/free" }, "Free Play") : h("span", {}, "Free Play");
+    const trail = [home, ...(section ? [h("a", { href: section.href }, section.name)] : []), ...rest.map((part) => (typeof part === "string" ? h("span", {}, part) : part))];
     crumbs.replaceChildren(...trail.flatMap((part, i) => (i ? [sep(), part] : [part])));
   }
-  const MY_LEVELS = { name: "My levels", href: "#/editor" };
-  const SHARED = { name: "Shared with me", href: "#/free/shared" };
+  const MY_LEVELS = { name: freeSectionName("levels"), href: "#/editor" };
+  const SHARED = { name: freeSectionName("shared"), href: "#/free/shared" };
 
   /** A level someone else made, on the level screen: kept in this browser, with progress of its own. */
   function showShared(data: Record<string, unknown>): () => void {
@@ -179,16 +177,15 @@ export function startApp(root: HTMLElement): void {
     unmount = () => {};
     const hash = location.hash || "#/";
     const levelMatch = /^#\/level\/([\w-]+)$/.exec(hash);
-    const found = levelMatch ? findLevel(levelMatch[1]!) : undefined;
-    if (found?.set) return void location.replace(`#/challenge/${found.id}`); // a challenge has its own screen (M4.4)
-    const source = found;
+    const source = levelMatch ? findLevel(levelMatch[1]!) : undefined;
+    if (source?.set) return void location.replace(`#/challenge/${source.id}`); // a challenge has its own screen (M4.4)
     const challengeMatch = /^#\/challenge\/([\w-]+)$/.exec(hash);
     const challenge = challengeMatch ? findLevel(challengeMatch[1]!) : undefined;
     const freeMatch = /^#\/free(?:\/(.*))?$/.exec(hash);
+    const section = freeMatch?.[1] === undefined ? null : freePage(freeMatch[1]);
     if (freeMatch?.[1] !== undefined) {
       // an unknown page goes to the hub, and extra path after a page to that page (QA-056); Back still works
-      const first = /^(challenges|shared|sandbox|skins)(?:\/|$)/.exec(freeMatch[1])?.[1];
-      const canonical = first ? `#/free/${first}` : "#/free";
+      const canonical = section ? `#/free/${section}` : "#/free";
       if (hash !== canonical) return void location.replace(canonical);
     }
     const playMatch = /^#\/play\/(.+)$/.exec(hash);
@@ -206,24 +203,17 @@ export function startApp(root: HTMLElement): void {
       unmount = mountLevel(main, context, source);
       document.title = `${source.title} · Rank & File`;
     } else if (challenge?.set) {
-      const set = challengeSets.find((s) => s.set === challenge.set);
+      const set = challengeSetOf(challenge);
       const number = (set?.levels.indexOf(challenge) ?? -1) + 1;
-      crumbs.replaceChildren(
-        h("a", { href: "#/free" }, "Free Play"),
-        h("span", { class: "crumb-sep" }, "/"),
-        h("a", { href: "#/free/challenges" }, set?.title ?? "Challenges"),
-        h("span", { class: "crumb-sep" }, "/"),
-        h("span", {}, `${number}. ${challenge.title}`),
-      );
+      freeCrumbs({ name: set?.title ?? "Challenges", href: "#/free/challenges" }, `${number}. ${challenge.title}`);
       unmount = mountLevel(main, context, challenge, challengeHost());
       document.title = `${challenge.title} · Free Play · Rank & File`;
     } else if (freeMatch) {
-      const section = (freeMatch[1] ?? null) as FreeSection | null;
-      const names: Record<string, string> = { challenges: "Challenges", shared: "Shared with me", sandbox: "Sandbox", skins: "Skins" };
-      crumbs.replaceChildren(...(section ? [h("a", { href: "#/free" }, "Free Play"), h("span", { class: "crumb-sep" }, "/"), h("span", {}, names[section]!)] : [h("span", {}, "Free Play")]));
+      const name = section && freeSectionName(section);
+      freeCrumbs(null, ...(name ? [name] : []));
       unmount = section === "sandbox" ? mountSandbox(main, client) : section === "skins" ? mountSkins(main) : mountFreePlay(main, section, client);
       focusHeading();
-      document.title = `${section ? `${names[section]} · ` : ""}Free Play · Rank & File`;
+      document.title = `${name ? `${name} · ` : ""}Free Play · Rank & File`;
     } else if (playMatch) {
       unmount = openSharedCode(playMatch[1]!);
     } else if (sharedMatch) {

@@ -1,7 +1,7 @@
 // Lessons (M3.7): a directory, not a long page. Chapter folders under tier headings, inside a HUD frame, with a
 // detail pane for the selected level. Nothing is locked. On load the folder holding the next unsolved level is
 // the only one open (and that level is selected); folders the player opens by hand are remembered.
-import type { Chapter } from "../content";
+import { tierHasChallenges, type Chapter } from "../content";
 import type { PyClient } from "../py/client";
 import type { LevelInfo } from "../py/protocol";
 import type { ProgressStore } from "../progress";
@@ -10,11 +10,10 @@ import { sound } from "../sound";
 import { asRecord, browserStorage, readJson, writeJson } from "../storage";
 import { BoardView } from "./board";
 import { h } from "./dom";
-import { tierHasChallenges } from "./freePlay";
 import { icon } from "./icons";
 import { crown } from "./sprites";
 import { svg } from "./svg";
-import { tierName as tierLabel } from "./tags";
+import { tierLabel } from "./tags";
 import { folderName, tierName, VOICE } from "./voice";
 
 /** The tag on a chapter's optional mastery challenge (M3.2): on its row, and in its Challenge panel. */

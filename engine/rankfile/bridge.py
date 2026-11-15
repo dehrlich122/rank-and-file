@@ -86,8 +86,15 @@ def codex(level_id: str, chapters_json: str) -> str:
 
 
 def level_tags(level_json: str, chapters_json: str) -> str:
-    """A level's tier, worked out by the engine (M4.4): {"tier", "chapter"}. `chapters` as for `codex`."""
-    return json.dumps(codex_level_tags(json.loads(level_json), json.loads(chapters_json)))
+    """A level's tier, worked out by the engine (M4.4): {"tier", "chapter", "refused"}. `chapters` as for `codex`.
+
+    A level the engine refuses has no tier, and `refused` says so (My levels marks its row, QA-046).
+    """
+    try:
+        tags = codex_level_tags(json.loads(level_json), json.loads(chapters_json))
+    except LevelError:
+        return json.dumps({"tier": None, "chapter": None, "refused": True})
+    return json.dumps({**tags, "refused": False})
 
 
 def repl_push(line: str, level_json: str) -> str:

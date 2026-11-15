@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { chapters, type ChallengeSet, type LevelSource } from "../content";
-import { challengeGroups, drawsOnText, hubCounts, tierHasChallenges, type HubFacts } from "./freePlay";
+import { chapters, tierHasChallenges, type ChallengeSet, type LevelSource } from "../content";
+import { challengeGroups, drawsOnText, freePage, freeSectionName, hubCounts, type HubFacts } from "./freePlay";
 import type { ListState } from "./listControls";
 
 const level = (id: string, difficulty?: number, draws_on: number[] = []): LevelSource => ({ id, chapter: 0, title: id, trains: "", mastery: false, lesson: "", data: { draws_on }, set: "s", difficulty });
@@ -65,5 +65,19 @@ describe("drawsOnText", () => {
     expect(drawsOnText(level("a", 1, [first.chapter]))).toBe(`Draws on Chapter ${first.chapter} · ${first.title}`);
     expect(drawsOnText(level("a", 1))).toBe("");
     expect(drawsOnText(level("a", 1, [9999]))).toBe("");
+  });
+});
+
+describe("freePage", () => {
+  it("names the page an address under #/free/ opens, by its first part", () => {
+    expect(freePage("skins")).toBe("skins");
+    expect(freePage("sandbox/extra")).toBe("sandbox");
+    expect(freePage("challenges")).toBe("challenges");
+    expect(freeSectionName("shared")).toBe("Shared with me");
+  });
+  it("has no page for an unknown part, or for My levels, which lives at #/editor", () => {
+    expect(freePage("nonsense")).toBeNull();
+    expect(freePage("")).toBeNull();
+    expect(freePage("levels")).toBeNull();
   });
 });

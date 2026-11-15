@@ -2,9 +2,8 @@
 // `apply: "serve"` keeps it out of every build. The request is checked by src/editor/saveRequest.ts.
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { checkSaveRequest, MAX_SAVE_BYTES } from "../src/editor/saveRequest.ts";
+import { checkSaveRequest, MAX_SAVE_BYTES, SAVE_PATH } from "../src/editor/saveRequest.ts";
 
-const SAVE_PATH = "/__rank-and-file/save-level";
 
 /**
  * What one request does to `drafts/`. `{ exists: true }` (a 200, not an error the browser logs) means a file is there

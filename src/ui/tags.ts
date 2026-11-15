@@ -1,11 +1,12 @@
 // The two tags a Free Play level carries (M4.4): its tier and its difficulty. The CSS is in free.css.
+import { capitalise } from "../editor/draft";
 import { h } from "./dom";
 
 /** The keyword that names each difficulty; step n is index n - 1. Harder steps are ones a beginner can't write yet. */
 export const DIFFICULTY_WORDS = ["pass", "try", "raise", "assert", "while True:"] as const;
 
 /** The tier's name as shown (pawn becomes Pawn). */
-export const tierName = (tier: string): string => tier.charAt(0).toUpperCase() + tier.slice(1);
+export const tierLabel = capitalise;
 
 /** Difficulty `step` (1-5): the keyword and five pips, filled up to the step, so it reads without colour. */
 export function difficultyTag(step: number): HTMLElement {
@@ -27,6 +28,6 @@ export function problemTag(): HTMLElement {
 
 /** The tier whose lessons the level needs. */
 export function tierTag(tier: string): HTMLElement {
-  const name = tierName(tier);
+  const name = tierLabel(tier);
   return h("span", { class: "tier-tag", title: `Needs what the ${name} tier teaches` }, `♟ ${name}`);
 }

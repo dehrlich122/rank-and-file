@@ -3,7 +3,7 @@ import { chapters } from "../content";
 import { ProgressStore } from "../progress";
 import { memoryStorage } from "../storage.fake";
 import { type Fake, fakeDocument } from "./dom.fake";
-import { mountSkins, skinCardElement, skinCards, type SkinCard } from "./skinsScreen";
+import { skinCardElement, skinCards, type SkinCard } from "./skinsScreen";
 
 // The art is drawn with SVG namespaces the Fake document below doesn't have: stand in plain elements.
 vi.mock("./svg", () => ({ svg: () => document.createElement("svg") }));
@@ -25,10 +25,6 @@ describe("skinCards", () => {
     for (const level of pawnTier().levels.filter((l) => !l.mastery)) store.update(level.id, { stars: 1 });
     expect(knight()).toMatchObject({ unlocked: true, how: "Unlocked by the Pawn tier's promotion" });
   });
-
-  it("is mounted by the Free Play route", () => {
-    expect(typeof mountSkins).toBe("function");
-  });
 });
 
 describe("skinCardElement", () => {
@@ -49,13 +45,13 @@ describe("skinCardElement", () => {
   it("marks the worn skin with a word and no button", () => {
     const worn = make({ worn: true });
     expect(worn.find("skin-worn")[0]!.text).toBe("✓ Worn");
-    expect(worn.buttons().length).toBe(0);
+    expect(worn.all("button").length).toBe(0);
     expect(worn.find("worn").length).toBe(1);
   });
 
   it("has no button on a locked card, and the how line says it is locked", () => {
     const locked = make({ unlocked: false, how: "Clear Chapter 6 to unlock" });
-    expect(locked.buttons().length).toBe(0);
+    expect(locked.all("button").length).toBe(0);
     expect(locked.find("locked").length).toBe(1);
     expect(locked.find("skin-locked")[0]!.text).toBe("Locked: clear Chapter 6 to unlock");
   });
@@ -63,7 +59,7 @@ describe("skinCardElement", () => {
   it("offers Wear it on an unlocked skin that isn't worn", () => {
     let wore = 0;
     const open = make({}, () => wore++);
-    expect(open.buttons().map((b) => b.text)).toEqual(["Wear it"]);
+    expect(open.all("button").map((b) => b.text)).toEqual(["Wear it"]);
     expect(open.find("skin-how")[0]!.text).toBe("Unlocked by the Pawn tier's promotion");
     expect(wore).toBe(0);
   });

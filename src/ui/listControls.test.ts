@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { applyList, listControls, listState, saveListState, type ListState } from "./listControls";
+import { asFake, type Fake, fakeDocument } from "./dom.fake";
+import { applyList, boardsText, listControls, starsText, type ListState } from "./listControls";
 
 const any: ListState = { tier: null, difficulty: null, sort: "order" };
 type Item = { id: string; tier: string | null; difficulty: number | null };
@@ -26,60 +27,68 @@ describe("applyList", () => {
   });
 });
 
-describe("listState", () => {
-  it("defaults for an unknown list and remembers what was saved", () => {
-    expect(listState("nowhere")).toEqual(any);
-    saveListState("mine", { tier: "pawn", difficulty: 2, sort: "hardest" });
-    expect(listState("mine")).toEqual({ tier: "pawn", difficulty: 2, sort: "hardest" });
-    expect(listState("other")).toEqual(any);
+describe("listControls", () => {
+  beforeEach(() => vi.stubGlobal("document", fakeDocument));
+  afterEach(() => vi.unstubAllGlobals());
+
+  const choose = (select: Fake | undefined, value: string) => {
+    select!.value = value;
+    select!.fire("change");
+  };
+  const rowOf = (listId: string, onChange = () => {}) => {
+    const controls = listControls(listId, ["pawn", "knight"], onChange);
+    const [tier, difficulty, sort] = asFake(controls.element).all("select");
+    return { controls, tier, difficulty, sort };
+  };
+
+  it("keeps each choice and tells the list after every change", () => {
+    const seen: ListState[] = [];
+    const row = rowOf("a", () => seen.push(row.controls.state()));
+    choose(row.tier, "knight");
+    choose(row.difficulty, "4");
+    choose(row.sort, "hardest");
+    choose(row.difficulty, "");
+    expect(seen).toEqual([
+      { tier: "knight", difficulty: null, sort: "order" },
+      { tier: "knight", difficulty: 4, sort: "order" },
+      { tier: "knight", difficulty: 4, sort: "hardest" },
+      { tier: "knight", difficulty: null, sort: "hardest" },
+    ]);
+  });
+  it("remembers a list's choices for the visit, apart from other lists'", () => {
+    const first = rowOf("mine");
+    choose(first.tier, "pawn");
+    choose(first.sort, "easiest");
+    expect(rowOf("mine").controls.state()).toEqual({ tier: "pawn", difficulty: null, sort: "easiest" });
+    expect(rowOf("other").controls.state()).toEqual(any);
+  });
+  it("clears the filters, in the selects too, and keeps the sort", () => {
+    let changes = 0;
+    const row = rowOf("b", () => changes++);
+    choose(row.tier, "pawn");
+    choose(row.difficulty, "2");
+    choose(row.sort, "hardest");
+    row.controls.clear();
+    expect(row.controls.state()).toEqual({ tier: null, difficulty: null, sort: "hardest" });
+    expect([row.tier!.value, row.difficulty!.value]).toEqual(["", ""]);
+    expect(changes).toBe(4);
+  });
+  it("labels each select and offers Any first", () => {
+    const row = asFake(listControls("c", ["pawn"], () => {}).element);
+    expect(row.all("label").length).toBe(3);
+    expect(row.all("select")[0]!.all("option")[0]!.text).toBe("Any");
+    expect(row.find("list-controls").length).toBe(1);
   });
 });
 
-// A document with just enough to build selects and fire a change (Node has no DOM here).
-class Fake {
-  kids: Array<Fake | string> = [];
-  value = "";
-  fire: (() => void) | undefined;
-  constructor(readonly tag: string) {}
-  setAttribute() {}
-  addEventListener(_type: string, fn: () => void) {
-    this.fire = fn;
-  }
-  append(...nodes: Array<Fake | string>) {
-    this.kids.push(...nodes);
-  }
-  all(tag: string): Fake[] {
-    const sub = this.kids.filter((k): k is Fake => typeof k !== "string").flatMap((k) => k.all(tag));
-    return this.tag === tag ? [this, ...sub] : sub;
-  }
-}
-
-describe("listControls", () => {
-  beforeEach(() => vi.stubGlobal("document", { createElement: (tag: string) => new Fake(tag) }));
-  afterEach(() => vi.unstubAllGlobals());
-
-  it("reports the whole next state with only the changed field different", () => {
-    const seen: ListState[] = [];
-    const row = listControls(["pawn", "knight"], { ...any, sort: "easiest" }, (s) => seen.push(s)) as unknown as Fake;
-    const [tier, difficulty, sort] = row.all("select");
-    const choose = (select: Fake | undefined, value: string) => {
-      select!.value = value;
-      select!.fire!();
-    };
-    choose(tier, "knight");
-    choose(difficulty, "4");
-    choose(sort, "hardest");
-    choose(difficulty, "");
-    expect(seen).toEqual([
-      { tier: "knight", difficulty: null, sort: "easiest" },
-      { tier: null, difficulty: 4, sort: "easiest" },
-      { tier: null, difficulty: null, sort: "hardest" },
-      { tier: null, difficulty: null, sort: "easiest" },
-    ]);
+describe("what the lists' rows say", () => {
+  it("words the stars", () => {
+    expect(starsText(0)).toBe("not solved yet");
+    expect(starsText(2)).toBe("★★☆");
+    expect(starsText(3)).toBe("★★★");
   });
-  it("labels each select and offers Any first", () => {
-    const row = listControls(["pawn"], any, () => {}) as unknown as Fake;
-    expect(row.all("label").length).toBe(3);
-    expect(row.all("select")[0]!.all("option")[0]!.kids[0]).toBe("Any");
+  it("words the boards", () => {
+    expect(boardsText(1)).toBe("1 board");
+    expect(boardsText(3)).toBe("3 boards");
   });
 });

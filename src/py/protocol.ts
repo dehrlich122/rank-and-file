@@ -232,6 +232,7 @@ export interface CodexChapter {
 interface LevelTags {
   tier: string | null; // null: nothing it needs is taught by any chapter
   chapter: number | null; // the curriculum chapter that brings in the last thing it needs
+  refused: boolean; // the engine won't open the level at all (loadLevel says why)
 }
 
 /** Every request the worker understands: its arguments and its result. */

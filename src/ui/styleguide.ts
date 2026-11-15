@@ -98,7 +98,7 @@ export function mountStyleguide(main: HTMLElement): () => void {
       h("div", { class: "sg-swatches" }),
       h("h3", {}, "Tags: difficulty, tier, and a list's filter and sort row"),
       h("div", { class: "tags" }, ...[1, 2, 3, 4, 5].map(difficultyTag), tierTag("pawn"), tierTag("knight")),
-      listControls(["pawn", "knight"], { tier: null, difficulty: null, sort: "order" }, () => {}),
+      listControls("styleguide", ["pawn", "knight"], () => {}).element,
       h("h3", {}, "The hero, facing each way"),
       h("div", { class: "sg-sheet" }, ...FACINGS.map((face) => figure(`pawn, ${face}`, () => hero("pawn", face))), ...FACINGS.map((face) => figure(`knight, ${face}`, () => hero("knight", face)))),
       h("h3", {}, "Enemies at rest, mid-break and snapping back"),

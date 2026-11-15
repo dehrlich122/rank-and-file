@@ -3,8 +3,7 @@ import { chapters } from "../content";
 import { ProgressStore } from "../progress";
 import { memoryStorage } from "../storage.fake";
 import { type Fake, fakeDocument } from "./dom.fake";
-import { abilitiesLine, boardIsLoaded, mountSandbox, sandboxAbilities } from "./sandboxScreen";
-
+import { abilitiesLine, boardIsLoaded, sandboxAbilities } from "./sandboxScreen";
 
 const apiOf = (id: string) => chapters.flatMap((c) => c.levels).find((l) => l.id === id)!.data.api as string[];
 const solve = (store: ProgressStore, id: string) => store.update(id, { stars: 1 });
@@ -29,10 +28,6 @@ describe("sandboxAbilities", () => {
     const store = new ProgressStore(memoryStorage());
     for (const chapter of chapters.filter((c) => !c.curriculum)) chapter.levels.forEach((level) => solve(store, level.id));
     expect(sandboxAbilities(store)).toEqual(["move"]);
-  });
-
-  it("is mounted by the Free Play route", () => {
-    expect(typeof mountSandbox).toBe("function");
   });
 });
 

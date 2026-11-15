@@ -4,6 +4,7 @@
 // (levels.parse_level) is what actually checks and interprets a level.
 import { parse } from "yaml";
 import type { CodexChapter } from "./py/protocol";
+import { asDifficulty } from "./storage";
 
 const levelFiles = import.meta.glob<string>("/levels/*/*.yaml", { query: "?raw", import: "default", eager: true });
 const lessonFiles = import.meta.glob<string>("/lessons/**/*.md", { query: "?raw", import: "default", eager: true });
@@ -50,6 +51,7 @@ function loadLevels(): LevelSource[] {
       const data = parseYaml(text) as Record<string, unknown>;
       const lessonPath = `/lessons/${String(data.lesson)}`;
       const set = typeof data.set === "string" ? data.set : undefined; // a challenge: no chapter, no lesson (M4.4)
+      const difficulty = asDifficulty(data.difficulty);
       return {
         id: String(data.id),
         chapter: set ? 0 : Number(data.chapter),
@@ -59,7 +61,7 @@ function loadLevels(): LevelSource[] {
         lesson: set ? "" : (lessonFiles[lessonPath] ?? `*Lesson file ${lessonPath} is missing (level file ${path}).*`),
         data,
         ...(set ? { set } : {}),
-        ...(typeof data.difficulty === "number" ? { difficulty: data.difficulty } : {}),
+        ...(difficulty ? { difficulty } : {}),
       };
     })
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -87,6 +89,20 @@ export function chapterName(chapter: Chapter): string {
 const levels = loadLevels();
 export const chapters = loadChapters(levels);
 export const challengeSets = loadChallengeSets(levels);
+
+/** The curriculum's tiers in play order: what the Tier filter of My levels and Shared with me offers. */
+export const curriculumTiers = (): string[] => [...new Set(chapters.filter((c) => c.curriculum).map((c) => c.tier))];
+
+/** The Free Play set a challenge belongs to (M4.4). */
+export const challengeSetOf = (level: LevelSource): ChallengeSet | undefined => challengeSets.find((set) => set.set === level.set);
+
+/** Whether a tier has a challenge set, so the places that point to Free Play only do so where there is something there. */
+export const tierHasChallenges = (tier: string, sets: ChallengeSet[] = challengeSets): boolean => sets.some((set) => set.tier === tier);
+
+/** The chapters a challenge says it draws on (`draws_on`: chapter numbers): the curriculum chapters that exist, in the order given. */
+export function drawnChapters(numbers: unknown): Chapter[] {
+  return (Array.isArray(numbers) ? numbers : []).flatMap((number) => chapters.find((c) => c.curriculum && c.chapter === number) ?? []);
+}
 
 export function findLevel(id: string): LevelSource | undefined {
   return levels.find((level) => level.id === id);
