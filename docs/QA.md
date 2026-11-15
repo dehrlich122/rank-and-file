@@ -1770,7 +1770,52 @@ findings follow these.
   - **Plan:** a fixed place for the tags; space kept for the tier tag while the engine works it out; the date kept whole.
 - **QA-051 · "Or start from a lesson level's board": a native select, and "Copy it" wraps under it** *(automated; older than M4.4)* · Open
   - **Plan:** the styled select the filters use; the button on the select's line.
+
+Part 2 (Sandbox, Skins, the pointers, Save to the repo, unknown routes). The console was clean except where noted.
+
+- **QA-052 · Reset progress leaves the knight chosen in Settings → Piece** *(automated)* · Open
+  - **Observed:** wear the Charger, then Reset progress: the board and Skins fall back to the pawn, but the setting stays
+    `knight`. Settings → Piece then shows the knight ticked and locked and the pawn unticked, and the knight comes back
+    worn by itself when the tier is cleared again.
+  - **Plan:** Reset progress puts the piece back to the pawn.
+- **QA-053 · Running empty or comment-only code throws in the page** *(automated)* · Open
+  - **Observed:** in the Sandbox, Run with nothing (or only a comment): the status stays "Line –" and the console has
+    `RangeError: Invalid line number 0` from the editor's active-line marker (the snippet player shared with lessons).
+  - **Plan:** no line is marked when no line ran; the status says it finished.
+- **QA-054 · The Sandbox's editor has no Codex tooltips** *(automated)* · Open
+  - **Observed:** hovering `move` shows nothing there; it does in a level and in a lesson snippet. `help()` works.
+  - **Plan:** the Sandbox editor gets the same tooltips, for what the player has met.
+- **QA-055 · Save to the repo: a stale solution file, a refused level saved silently, Esc, console noise** *(automated; dev only)* · Open
+  - **Observed:** saving again after removing the kept solution leaves the old `drafts/<id>.py`; a draft the engine
+    refuses is saved with no word about it; Esc on "Replace it?" opens Settings and leaves the question up; a replace
+    logs two 409 errors in the console.
+  - **Plan:** a save with no solution removes the old `.py` and says so; a refused draft is still saved (drafts are
+    work in progress) but the status says the engine refuses it; Esc answers "Keep it"; no console errors on the way.
+- **QA-056 · Unknown Free Play routes fall back to the start menu** *(automated)* · Open
+  - **Observed:** `#/free/nonsense`, `#/free/` and `#/free/sandbox/extra` all show the start menu with the bad address
+    left in the bar. (So do `#/nonsense` and `#/level/nonsense`, as before M4.4.)
+  - **Plan:** an unknown `#/free/…` goes to the hub, and extra path after a known section to that section.
+- **QA-057 · Reset progress says it clears "the code you wrote" but keeps the Sandbox's** *(automated)* · Open
+  - **Plan:** Reset progress clears the Sandbox's code too.
+- **QA-058 · The Sandbox's layout** *(automated)* · Open
+  - **Observed:** at 1440 × 900 the board sits to the right under the editor and runs past the fold (its first rank and
+    file letters cut); at 1000 × 800 the pawn's start row is below the fold; the line of abilities has no label and big
+    gaps round it; while Python loads there is no board and no note, and Run is live. Errors say "In this level it
+    knows…" where there is no level.
+  - **Plan:** code and board side by side on a wide window, the board within the fold; "You can use: …" before the
+    abilities; a loading note where the board will be; the Sandbox's wording for an ability it doesn't have.
+- **QA-059 · The Skins page** *(automated)* · Open
+  - **Observed:** no line saying what the page is; "Worn" and "Locked" are look-alike disabled buttons; on a fresh
+    browser nothing on the page takes the Tab key, so a keyboard player can't reach a locked card's words; the gallery
+    says "Charger" where Settings → Piece says "Knight".
+  - **Plan:** an intro line; "Worn" and "Locked" as words with their own look, not disabled buttons; cards reachable
+    by Tab; Settings → Piece names the skin as the gallery does ("Knight · Charger").
+- **QA-060 · The promotion screen's Free Play link is below the fold** *(automated)* · Open
+  - **Plan:** the link sits with the buttons, in view at 900px high.
 - **For the designer (no change made):**
+  - Facing north, the worn Charger on a board is a narrow spire that looks little like the horse head on its card
+    (which faces east). M3.7's approved design; say if it should change.
+  - `import os` works in the Sandbox as in lesson snippets (it sees only Pyodide's own in-browser files).
   - The Difficulty filter lists only the keywords (`pass` … `while True:`), with no pips or numbers. A first-time
     player can't tell which is easiest from the select alone (the sort's "Easiest first" helps).
   - In greyscale the step-5 tag's text is a little dimmer than the others; it still reads by keyword and pips.
