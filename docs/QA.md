@@ -1736,6 +1736,47 @@ workers' reports; the e2e checks of WPs 5f and 5g stand in for the hand test.
 
 ---
 
+## Session 17 — 2026-11-15 · M4.4 Free Play, automated (`m4-4-free-play`)
+
+The autonomous run: found by workers that drove the real app in headless Chrome from a journey script (two sizes, both
+themes) and looked at screenshots. Part 1 covered the hub, Challenges, My levels, tags and filters, Test-play and
+Shared with me; no console errors on any of them. The designer is hand-testing M4.3 and M4.4 at the same time; their
+findings follow these.
+
+- **QA-046 · A title over 60 characters makes a level the list can't tag, and nothing says why** *(found 2026-11-15, automated)* · Open
+  - **Observed:** the editor's Title field takes any length. Past 60 characters the engine refuses the level (Problems
+    says so in the editor), and My levels shows that row with no tier tag and no sign that the level is refused.
+  - **Plan:** the Title field stops at the engine's limit; a row whose level the engine refuses says so in the list.
+- **QA-047 · Free Play's pages have no gap under the top bar, and three heading styles** *(automated)* · Open
+  - **Observed:** the `h1` on the hub, Challenges, My levels and Shared with me sits flush under the bar (Lessons has
+    24px). The hub and Challenges headings are cyan display type in mixed case; My levels and Shared with me are plain
+    white sans; Lessons is uppercase display.
+  - **Plan:** one heading style and Lessons' top padding on every Free Play page (Sandbox and Skins to be measured).
+- **QA-048 · "Open a link or code": the empty box, where the message shows, and the input's look** *(automated)* · Open
+  - **Observed:** with the box empty, Open says "That isn't a link or code…"; the message appears below the filter row,
+    away from the input, and doesn't visibly change on a second try; the input is a native grey box on the dark theme;
+    Esc in the box opens Settings and leaves the form open.
+  - **Plan:** "Paste a link or code first" for an empty box; the message directly under the input; the app's input
+    style; Esc closes the form first.
+- **QA-049 · The filter row shows over empty lists; no way to clear filters that match nothing** *(automated)* · Open
+  - **Observed:** Tier, Difficulty and Sort show above "You haven't made a level yet", above an empty Shared with me and
+    above a set with no challenges. "No levels match these filters." offers nothing to press. About 55px of empty space
+    sits between the row and the list.
+  - **Plan:** no filter row when a list has nothing in it; "Clear filters" beside the no-match message; a tighter gap.
+- **QA-050 · My levels' tags jump about** *(automated)* · Open
+  - **Observed:** tags are right-aligned beside the buttons, so their place shifts from row to row; the tier tag arrives
+    about a second after the row (and reads "-" first after a reload), which shifts the layout; at 1000px the "edited"
+    line wraps with an orphan.
+  - **Plan:** a fixed place for the tags; space kept for the tier tag while the engine works it out; the date kept whole.
+- **QA-051 · "Or start from a lesson level's board": a native select, and "Copy it" wraps under it** *(automated; older than M4.4)* · Open
+  - **Plan:** the styled select the filters use; the button on the select's line.
+- **For the designer (no change made):**
+  - The Difficulty filter lists only the keywords (`pass` … `while True:`), with no pips or numbers. A first-time
+    player can't tell which is easiest from the select alone (the sort's "Easiest first" helps).
+  - In greyscale the step-5 tag's text is a little dimmer than the others; it still reads by keyword and pips.
+
+---
+
 ## Queued work
 
 Planned tasks that aren't QA findings, in the order they should happen.
