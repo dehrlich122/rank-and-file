@@ -37,6 +37,9 @@ export async function launch({ width = 1400, height = 860 } = {}) {
       "--no-first-run",
       "--no-default-browser-check",
       `--window-size=${width},${height}`,
+      // A fresh profile installs the machine's external extensions about 2.5 s after launch, and the page's renderer
+      // could die (STATUS_BREAKPOINT) if that landed while a Python worker was loading (QA5). The checks need none.
+      "--disable-extensions",
       "about:blank",
     ],
     { stdio: "ignore" },
@@ -113,11 +116,13 @@ export async function launch({ width = 1400, height = 860 } = {}) {
     return result.result.value;
   };
 
-  /** Poll an expression until it's truthy; returns its value. */
+  /** Poll an expression until it's truthy; returns its value. A crashed page fails at once rather than at the timeout. */
   const waitFor = async (expression, timeoutMs = 30_000, label = expression) => {
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
-      const value = await evaluate(expression).catch(() => undefined);
+      const value = await evaluate(expression).catch((error) => {
+        if (dead) throw error;
+      });
       if (value) return value;
       await sleep(100);
     }
