@@ -430,6 +430,8 @@
   .sandbox .snippet {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
+    /* the editor fills the board's height; Run sits right under it, level with the board's foot */
+    grid-template-rows: 1fr auto;
     gap: 12px 16px;
   }
 
@@ -445,6 +447,7 @@
   .sandbox .snippet-bar {
     grid-column: 1;
     grid-row: 2;
+    align-self: start;
   }
 
   .sandbox .snippet-board {

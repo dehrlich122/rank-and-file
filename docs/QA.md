@@ -1740,78 +1740,107 @@ workers' reports; the e2e checks of WPs 5f and 5g stand in for the hand test.
 
 The autonomous run: found by workers that drove the real app in headless Chrome from a journey script (two sizes, both
 themes) and looked at screenshots. Part 1 covered the hub, Challenges, My levels, tags and filters, Test-play and
-Shared with me; no console errors on any of them. The designer is hand-testing M4.3 and M4.4 at the same time; their
-findings follow these.
+Shared with me; no console errors on any of them.
 
-- **QA-046 · A title over 60 characters makes a level the list can't tag, and nothing says why** *(found 2026-11-15, automated)* · Open
+An item marked Fixed with only a **Plan** line was built as the plan says. Details worth knowing: only a real engine
+refusal shows "has problems" on a My levels row (a crash or a hang shows nothing); the tag columns are 6rem and 8.5rem;
+on a board with no level (the Sandbox, lesson snippets) errors and `help(pawn)` say "Here it knows…"; Settings → Piece
+says "Knight · Charger"; on a wide window the Sandbox's editor fills the board's height with Run under it.
+
+**M4.3's hand test** *(Designer, 2026-11-15)*: done on this branch's build (M4.3 plus Free Play), with the lists from
+`docs/M4/M4.3.md` (Shared with me at its new place); "checked out", no findings. The designer's M4.4 findings, if any,
+follow the automated ones.
+
+- **QA-046 · A title over 60 characters makes a level the list can't tag, and nothing says why** *(found 2026-11-15, automated)* · Fixed
   - **Observed:** the editor's Title field takes any length. Past 60 characters the engine refuses the level (Problems
     says so in the editor), and My levels shows that row with no tier tag and no sign that the level is refused.
   - **Plan:** the Title field stops at the engine's limit; a row whose level the engine refuses says so in the list.
-- **QA-047 · Free Play's pages have no gap under the top bar, and three heading styles** *(automated)* · Open
+- **QA-047 · Free Play's pages have no gap under the top bar, and three heading styles** *(automated)* · Fixed
   - **Observed:** the `h1` on the hub, Challenges, My levels and Shared with me sits flush under the bar (Lessons has
     24px). The hub and Challenges headings are cyan display type in mixed case; My levels and Shared with me are plain
     white sans; Lessons is uppercase display.
   - **Plan:** one heading style and Lessons' top padding on every Free Play page (Sandbox and Skins to be measured).
-- **QA-048 · "Open a link or code": the empty box, where the message shows, and the input's look** *(automated)* · Open
+- **QA-048 · "Open a link or code": the empty box, where the message shows, and the input's look** *(automated)* · Fixed
   - **Observed:** with the box empty, Open says "That isn't a link or code…"; the message appears below the filter row,
     away from the input, and doesn't visibly change on a second try; the input is a native grey box on the dark theme;
     Esc in the box opens Settings and leaves the form open.
   - **Plan:** "Paste a link or code first" for an empty box; the message directly under the input; the app's input
     style; Esc closes the form first.
-- **QA-049 · The filter row shows over empty lists; no way to clear filters that match nothing** *(automated)* · Open
+- **QA-049 · The filter row shows over empty lists; no way to clear filters that match nothing** *(automated)* · Fixed
   - **Observed:** Tier, Difficulty and Sort show above "You haven't made a level yet", above an empty Shared with me and
     above a set with no challenges. "No levels match these filters." offers nothing to press. About 55px of empty space
     sits between the row and the list.
   - **Plan:** no filter row when a list has nothing in it; "Clear filters" beside the no-match message; a tighter gap.
-- **QA-050 · My levels' tags jump about** *(automated)* · Open
+- **QA-050 · My levels' tags jump about** *(automated)* · Fixed
   - **Observed:** tags are right-aligned beside the buttons, so their place shifts from row to row; the tier tag arrives
     about a second after the row (and reads "-" first after a reload), which shifts the layout; at 1000px the "edited"
     line wraps with an orphan.
   - **Plan:** a fixed place for the tags; space kept for the tier tag while the engine works it out; the date kept whole.
-- **QA-051 · "Or start from a lesson level's board": a native select, and "Copy it" wraps under it** *(automated; older than M4.4)* · Open
+- **QA-051 · "Or start from a lesson level's board": a native select, and "Copy it" wraps under it** *(automated; older than M4.4)* · Fixed
   - **Plan:** the styled select the filters use; the button on the select's line.
 
 Part 2 (Sandbox, Skins, the pointers, Save to the repo, unknown routes). The console was clean except where noted.
 
-- **QA-052 · Reset progress leaves the knight chosen in Settings → Piece** *(automated)* · Open
+- **QA-052 · Reset progress leaves the knight chosen in Settings → Piece** *(automated)* · Fixed
   - **Observed:** wear the Charger, then Reset progress: the board and Skins fall back to the pawn, but the setting stays
     `knight`. Settings → Piece then shows the knight ticked and locked and the pawn unticked, and the knight comes back
     worn by itself when the tier is cleared again.
-  - **Plan:** Reset progress puts the piece back to the pawn.
-- **QA-053 · Running empty or comment-only code throws in the page** *(automated)* · Open
+  - **Fixed:** Reset progress puts the piece back to the pawn, and an open Settings dialog shows the pawn ticked and
+    the knight locked at once.
+  - **Retest:** wear the Charger (Free Play → Skins), Settings → Reset progress: Settings → Piece shows the pawn.
+- **QA-053 · Running empty or comment-only code throws in the page** *(automated)* · Fixed
   - **Observed:** in the Sandbox, Run with nothing (or only a comment): the status stays "Line –" and the console has
     `RangeError: Invalid line number 0` from the editor's active-line marker (the snippet player shared with lessons).
-  - **Plan:** no line is marked when no line ran; the status says it finished.
-- **QA-054 · The Sandbox's editor has no Codex tooltips** *(automated)* · Open
+  - **Cause:** the engine reports line 0 for a run in which no line ran, and the editor's marker only checked the
+    line wasn't past the end.
+  - **Fixed:** no line is marked and the status reads "✓ Finished", in the Sandbox, lesson snippets and levels.
+  - **Retest:** Sandbox, delete all the code, Run: "✓ Finished".
+- **QA-054 · The Sandbox's editor has no Codex tooltips** *(automated)* · Fixed
   - **Observed:** hovering `move` shows nothing there; it does in a level and in a lesson snippet. `help()` works.
   - **Plan:** the Sandbox editor gets the same tooltips, for what the player has met.
-- **QA-055 · Save to the repo: a stale solution file, a refused level saved silently, Esc, console noise** *(automated; dev only)* · Open
+- **QA-055 · Save to the repo: a stale solution file, a refused level saved silently, Esc, console noise** *(automated; dev only)* · Fixed
   - **Observed:** saving again after removing the kept solution leaves the old `drafts/<id>.py`; a draft the engine
     refuses is saved with no word about it; Esc on "Replace it?" opens Settings and leaves the question up; a replace
     logs two 409 errors in the console.
   - **Plan:** a save with no solution removes the old `.py` and says so; a refused draft is still saved (drafts are
     work in progress) but the status says the engine refuses it; Esc answers "Keep it"; no console errors on the way.
-- **QA-056 · Unknown Free Play routes fall back to the start menu** *(automated)* · Open
+  - **Fixed** as planned. Esc answers "no" only on this confirm step; whether every in-page confirm step should do
+    the same is open for the designer (today Esc there opens Settings).
+  - **Retest:** keep a solution, Save to the repo, remove the solution, save again and replace: the status says the old
+    `.py` was removed. Delete `drafts/` afterwards.
+- **QA-056 · Unknown Free Play routes fall back to the start menu** *(automated)* · Fixed
   - **Observed:** `#/free/nonsense`, `#/free/` and `#/free/sandbox/extra` all show the start menu with the bad address
     left in the bar. (So do `#/nonsense` and `#/level/nonsense`, as before M4.4.)
-  - **Plan:** an unknown `#/free/…` goes to the hub, and extra path after a known section to that section.
-- **QA-057 · Reset progress says it clears "the code you wrote" but keeps the Sandbox's** *(automated)* · Open
-  - **Plan:** Reset progress clears the Sandbox's code too.
-- **QA-058 · The Sandbox's layout** *(automated)* · Open
+  - **Fixed:** an unknown `#/free/…` goes to the hub, and extra path after a known section to that section; the
+    address is corrected and Back still works.
+- **QA-057 · Reset progress says it clears "the code you wrote" but keeps the Sandbox's** *(automated)* · Fixed
+  - **Fixed:** Reset progress clears the Sandbox's code too; it shows its starting code again.
+- **QA-058 · The Sandbox's layout** *(automated)* · Fixed
   - **Observed:** at 1440 × 900 the board sits to the right under the editor and runs past the fold (its first rank and
     file letters cut); at 1000 × 800 the pawn's start row is below the fold; the line of abilities has no label and big
     gaps round it; while Python loads there is no board and no note, and Run is live. Errors say "In this level it
     knows…" where there is no level.
   - **Plan:** code and board side by side on a wide window, the board within the fold; "You can use: …" before the
     abilities; a loading note where the board will be; the Sandbox's wording for an ability it doesn't have.
-- **QA-059 · The Skins page** *(automated)* · Open
+- **QA-059 · The Skins page** *(automated)* · Fixed
   - **Observed:** no line saying what the page is; "Worn" and "Locked" are look-alike disabled buttons; on a fresh
     browser nothing on the page takes the Tab key, so a keyboard player can't reach a locked card's words; the gallery
     says "Charger" where Settings → Piece says "Knight".
   - **Plan:** an intro line; "Worn" and "Locked" as words with their own look, not disabled buttons; cards reachable
     by Tab; Settings → Piece names the skin as the gallery does ("Knight · Charger").
-- **QA-060 · The promotion screen's Free Play link is below the fold** *(automated)* · Open
-  - **Plan:** the link sits with the buttons, in view at 900px high.
+- **QA-060 · The promotion screen's Free Play link is below the fold** *(automated)* · Fixed
+  - **Fixed:** in a window under 980px high the ceremony is drawn tighter (a smaller sun, less space), so the buttons
+    and the link are in view at 1440 × 900 and 1000 × 800. Taller windows are unchanged.
+  - **Retest:** replay the promotion from Lessons in a normal laptop window: the Free Play link shows without scrolling,
+    and the ceremony still looks right.
+- **QA-061 · The Sandbox is bare; the level editor is the better sandbox** *(Designer, 2026-11-15, hand test)* · Open, needs a decision
+  - **Observed:** "kind of janky… very bare bones, only gives access to some of the features. The level editor
+    currently works more effectively as a sandbox." (It is an empty 8 × 8 board, a code box and Run, with only the
+    abilities of lesson levels already solved: decision 7 in `docs/M4/M4.4.md`, made without the designer.)
+  - **Decided** *(Designer, 2026-11-15)*: **the Sandbox becomes the editor.** Free Play's Sandbox row opens a scratch
+    level in the editor's test-play: paint what you like, write code against it, nothing to name or save. It replaces
+    the separate Sandbox screen. To be built in a later QA package, not in this pass; until then the Sandbox stays as
+    polished by QA-054 and QA-058.
 - **For the designer (no change made):**
   - Facing north, the worn Charger on a board is a narrow spire that looks little like the horse head on its card
     (which faces east). M3.7's approved design; say if it should change.
