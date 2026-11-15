@@ -1,10 +1,29 @@
 // "Save to the repo" (dev only): the editor posts a draft here and it lands in drafts/ at the repo root.
 // `apply: "serve"` keeps it out of every build. The request is checked by src/editor/saveRequest.ts.
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { checkSaveRequest, MAX_SAVE_BYTES } from "../src/editor/saveRequest.ts";
 
 const SAVE_PATH = "/__rank-and-file/save-level";
+
+/**
+ * What one request does to `drafts/`. `{ exists: true }` (a 200, not an error the browser logs) means a file is there
+ * and the request didn't say to replace it; nothing is written then. A save with no solution removes the old
+ * `drafts/<id>.py` an earlier save left, and says so in `removed`. Only `drafts/<id>.yaml` and `drafts/<id>.py` for an id
+ * the check accepted are ever touched.
+ */
+export function saveDraft(root: string, body: unknown, size: number): { status: number; body: unknown } {
+  const checked = checkSaveRequest(body, size);
+  if (!checked.ok) return { status: checked.status, body: { reason: checked.reason } };
+  const level = checked.files[0]!.path;
+  if (existsSync(join(root, level)) && !checked.overwrite) return { status: 200, body: { exists: true } };
+  mkdirSync(join(root, "drafts"), { recursive: true });
+  for (const file of checked.files) writeFileSync(join(root, file.path), file.text, "utf8");
+  const solution = level.replace(/\.yaml$/, ".py");
+  const removed = !checked.files.some((file) => file.path === solution) && existsSync(join(root, solution)) ? [solution] : [];
+  for (const path of removed) rmSync(join(root, path), { force: true });
+  return { status: 200, body: { saved: checked.files.map((file) => file.path), removed } };
+}
 
 export function saveLevelPlugin(root: string) {
   return {
@@ -31,12 +50,8 @@ export function saveLevelPlugin(root: string) {
           } catch {
             return reply(400, { reason: "The request must be JSON." });
           }
-          const checked = checkSaveRequest(body, size);
-          if (!checked.ok) return reply(checked.status, { reason: checked.reason });
-          if (existsSync(join(root, checked.files[0]!.path)) && !checked.overwrite) return reply(409, { exists: true });
-          mkdirSync(join(root, "drafts"), { recursive: true });
-          for (const file of checked.files) writeFileSync(join(root, file.path), file.text, "utf8");
-          reply(200, { saved: checked.files.map((file) => file.path) });
+          const answer = saveDraft(root, body, size);
+          reply(answer.status, answer.body);
         });
       });
     },

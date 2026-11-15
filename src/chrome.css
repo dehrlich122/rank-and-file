@@ -497,6 +497,54 @@
   gap: 10px;
 }
 
+/* A window under 980px high gets the ceremony drawn tighter, so the buttons and the Free Play link stay in view
+   (QA-060). The stage and the horizon move up together and the sun shrinks with them, so the picture is the same. */
+@media (max-height: 980px) {
+  .title-scene.promotion {
+    --horizon: 252px;
+    min-height: 100%;
+  }
+
+  .promotion .ts-body {
+    padding-top: 14px;
+  }
+
+  .pr-body {
+    gap: 8px;
+    padding-bottom: 20px;
+  }
+
+  .pr-title {
+    font-size: 42px;
+  }
+
+  .pr-stage {
+    margin-top: 70px;
+  }
+
+  .pr-piece {
+    width: 100px;
+    height: 100px;
+  }
+
+  .promotion .ts-sun {
+    top: calc(var(--horizon) - 142px);
+    width: 180px;
+    height: 180px;
+    margin-left: -90px;
+  }
+
+  .pr-card {
+    padding: 8px 18px;
+  }
+
+  .pr-card ul {
+    gap: 2px;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+}
+
 @keyframes promote-in {
   0% {
     opacity: 0;
