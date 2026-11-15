@@ -14,6 +14,10 @@
   gap: 12px;
 }
 
+.editor-list {
+  padding-top: 24px; /* the same gap under the top bar as Lessons (QA-047) */
+}
+
 .editor-list,
 .editor-missing {
   max-width: 760px;
@@ -257,6 +261,7 @@
   padding: 0;
 }
 
+.editor-list input[type="text"],
 .level-editor input[type="text"],
 .level-editor input[type="number"],
 .level-editor textarea,

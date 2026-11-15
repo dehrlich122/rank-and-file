@@ -20,6 +20,11 @@ export function difficultyTag(step: number): HTMLElement {
   );
 }
 
+/** The mark a list row carries in place of its tier when the engine refused the level: words, not colour alone. */
+export function problemTag(): HTMLElement {
+  return h("span", { class: "tier-tag problem-tag", title: "The engine can't open this level as it is. Open it in the editor to see why." }, "has problems");
+}
+
 /** The tier whose lessons the level needs. */
 export function tierTag(tier: string): HTMLElement {
   const name = tierName(tier);

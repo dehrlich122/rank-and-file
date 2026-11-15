@@ -6,7 +6,7 @@ import { codeFromText } from "../share/codec";
 import { openRemix, sharedLevels, sharedProgress } from "../share/shared";
 import { confirmStep } from "./dialog";
 import { h } from "./dom";
-import { boardsText, curriculumTiers, listControlsHost, starsText, tierTags } from "./editorList";
+import { boardsText, curriculumTiers, listControlsHost, noMatchRow, starsText, tierTags } from "./editorList";
 import { applyList } from "./listControls";
 
 export function mountSharedList(root: HTMLElement, client: PyClient): () => void {
@@ -24,6 +24,7 @@ export function mountSharedList(root: HTMLElement, client: PyClient): () => void
     const all = sharedLevels.list();
     for (const level of all) tags.ask(level.id, () => sharedLevels.get(level.id));
     const kept = applyList(all, controls.state(), (level) => ({ tier: tags.tier(level.id), difficulty: level.difficulty }));
+    controls.show(all.length > 0);
     shared.replaceChildren(
       ...(kept.length
         ? kept.map((level) =>
@@ -41,7 +42,7 @@ export function mountSharedList(root: HTMLElement, client: PyClient): () => void
               h("button", { class: "btn btn-small", "aria-label": `Remove ${level.title}`, onClick: () => askRemove(level.id, level.title) }, "Remove"),
             ),
           )
-        : [h("li", { class: "muted" }, all.length ? "No levels match these filters." : "Levels opened from a link or code are kept here.")]),
+        : [all.length ? noMatchRow(controls.clear) : h("li", { class: "muted" }, "Levels opened from a link or code are kept here.")]),
     );
   }
 
@@ -64,32 +65,48 @@ export function mountSharedList(root: HTMLElement, client: PyClient): () => void
   }
 
   const linkInput = h("input", { type: "text", id: "link-or-code", autocomplete: "off", spellcheck: "false" });
+  // What the last try said, directly under the box; each try replaces it.
+  const linkNote = h("p", { class: "muted small link-note", role: "status" });
   const linkForm = h(
     "form",
-    { class: "toolbar", hidden: "" },
-    h("label", { for: "link-or-code" }, "A link or code"),
-    linkInput,
-    h("button", { class: "btn btn-primary", type: "submit" }, "Open"),
-    h("button", { class: "btn", type: "button", onClick: () => closeLink() }, "Cancel"),
+    { class: "link-form", hidden: "" },
+    h(
+      "div",
+      { class: "toolbar" },
+      h("label", { for: "link-or-code" }, "A link or code"),
+      linkInput,
+      h("button", { class: "btn btn-primary", type: "submit" }, "Open"),
+      h("button", { class: "btn", type: "button", onClick: () => closeLink() }, "Cancel"),
+    ),
+    linkNote,
   );
   linkForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    const code = codeFromText(linkInput.value);
+    const code = linkInput.value.trim() === "" ? null : codeFromText(linkInput.value);
     if (code) location.hash = `#/play/${code}`;
-    else notice.textContent = "That isn't a link or code for a Rank & File level.";
+    else linkNote.textContent = linkInput.value.trim() === "" ? "Paste a link or code first." : "That isn't a link or code for a Rank & File level.";
+  });
+  // Esc closes the form; the app's own Esc (Settings) leaves a key that something here already used
+  linkForm.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    closeLink();
+    openButton.focus();
   });
   function closeLink(): void {
     linkForm.hidden = true;
     linkInput.value = "";
+    linkNote.textContent = "";
   }
+  const openButton = h("button", { class: "btn", onClick: () => ((linkForm.hidden = false), linkInput.focus()) }, "Open a link or code");
 
   root.replaceChildren(
     h(
       "div",
       { class: "editor-list" },
-      h("h1", {}, "Shared with me"),
+      h("h1", { class: "lessons-title" }, "Shared with me"),
       h("p", { class: "muted" }, "Levels others sent you, kept in this browser. Your stars on them are kept apart from the lessons'."),
-      h("div", { class: "toolbar" }, h("button", { class: "btn", onClick: () => ((linkForm.hidden = false), linkInput.focus()) }, "Open a link or code")),
+      h("div", { class: "toolbar" }, openButton),
       linkForm,
       controls.element,
       notice,

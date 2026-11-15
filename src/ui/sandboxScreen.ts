@@ -43,7 +43,7 @@ export function mountSandbox(main: HTMLElement, client: PyClient, store: Progres
     h(
       "div",
       { class: "free-play sandbox" },
-      h("h1", { class: "free-title" }, "Sandbox"),
+      h("h1", { class: "lessons-title" }, "Sandbox"),
       h("p", {}, "Every ability you've met, on an open board. No goal, no stars: try things."),
       h("p", { class: "muted small" }, abilities.join(" · ")),
       snippet.element,

@@ -63,10 +63,12 @@ const DIFFICULTY_CHOICES = ["None", ...DIFFICULTY_WORDS.map((word, i) => `${i + 
 function levelFields(ctx: PropsContext): HTMLElement {
   const { draft, options } = ctx;
   const abilities = options.pieces[draft.piece] ?? [];
+  const titleLimit = options.limits.title;
   return h(
     "div",
     { class: "props-body" },
-    field("Title", textInput(draft.title, (title) => ctx.change((d) => ({ ...d, title }), "title")), undefined, "title"),
+    // the title stops where the engine's limit does (QA-046); typing past it isn't possible, so no row of My levels is refused for it
+    field("Title", textInput(draft.title, (title) => ctx.change((d) => ({ ...d, title }), "title"), titleLimit ? { maxlength: String(titleLimit) } : {}), undefined, "title"),
     field("Brief", textArea(draft.brief, 3, (brief) => ctx.change((d) => ({ ...d, brief }), "brief")), "What the player is asked to do.", "brief"),
     field("What it trains", textInput(draft.trains, (trains) => ctx.change((d) => ({ ...d, trains }), "trains")), "A few words, shown above the challenge.", "trains"),
     field(
