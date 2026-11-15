@@ -26,6 +26,7 @@ import { PyClient, startPythonWorker, type ClientStatus } from "./py/client";
 import { applyToDocument, settings } from "./settings";
 import { sharedLevels, sharedProgress } from "./share/shared";
 import { sound } from "./sound";
+import { browserStorage, writeJson } from "./storage";
 import { authorSolution } from "./ui/compare";
 import { h } from "./ui/dom";
 import { icon } from "./ui/icons";
@@ -44,6 +45,8 @@ import { openShared, sharedProblem, sharedSource } from "./ui/sharedLevel";
 import { mountTitle } from "./ui/titleScreen";
 import { mountStyleguide } from "./ui/styleguide";
 
+const SANDBOX_CODE_KEY = "rank-and-file:sandbox"; // where ui/sandboxScreen.ts keeps the Sandbox's code
+
 export function startApp(root: HTMLElement): void {
   applyToDocument(settings.get());
   settings.subscribe(applyToDocument);
@@ -53,6 +56,8 @@ export function startApp(root: HTMLElement): void {
     () => {
       progress.reset();
       sharedProgress.reset(); // shared levels' stars, hints and code; the levels themselves stay (M4.3)
+      settings.set({ piece: "pawn" }); // the skins are locked again (QA-052)
+      writeJson(browserStorage(), SANDBOX_CODE_KEY, ""); // the Sandbox starts from its default code again (QA-057)
       context.knownCalls.clear();
       route(); // redraw the screen from the cleared progress
     },
@@ -179,7 +184,13 @@ export function startApp(root: HTMLElement): void {
     const source = found;
     const challengeMatch = /^#\/challenge\/([\w-]+)$/.exec(hash);
     const challenge = challengeMatch ? findLevel(challengeMatch[1]!) : undefined;
-    const freeMatch = /^#\/free(?:\/(challenges|shared|sandbox|skins))?$/.exec(hash);
+    const freeMatch = /^#\/free(?:\/(.*))?$/.exec(hash);
+    if (freeMatch?.[1] !== undefined) {
+      // an unknown page goes to the hub, and extra path after a page to that page (QA-056); Back still works
+      const first = /^(challenges|shared|sandbox|skins)(?:\/|$)/.exec(freeMatch[1])?.[1];
+      const canonical = first ? `#/free/${first}` : "#/free";
+      if (hash !== canonical) return void location.replace(canonical);
+    }
     const playMatch = /^#\/play\/(.+)$/.exec(hash);
     const sharedMatch = /^#\/shared\/([\w-]+)$/.exec(hash);
     if (source) {

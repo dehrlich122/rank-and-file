@@ -6,7 +6,7 @@ import { BUTTONS, levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 export default async function uiChecks({ browser: b, base, root, check }) {
-  const { solution, openLevel, setCode, clickButton } = levelHelpers(b, base, root);
+  const { solution, openLevel, setCode, clickButton, editorText } = levelHelpers(b, base, root);
   const dialogOpen = () => b.evaluate(`document.querySelector('.settings-dialog').open`);
   const choose = (key, value) => b.evaluate(`document.querySelector('input[name="setting-${key}"][value="${value}"]').click()`);
   const closeDialog = () => b.evaluate(`document.querySelector('.settings-dialog').close()`);
@@ -955,5 +955,134 @@ export default async function uiChecks({ browser: b, base, root, check }) {
 
   await check("settings are reset after the checks", async () => {
     await b.evaluate(`localStorage.clear()`);
+  });
+
+  // -- M4.4 QA2 fixes (QA-052, QA-053, QA-056, QA-057) -------------------------------------------
+  const SETTINGS_KEY = "rank-and-file:settings";
+  const SOLVED_CHAPTER_6 = Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`ch06-l0${n}`, { stars: 3, hints: 0, failedRuns: 0, helped: false, solutionSeen: false, code: null }]));
+  const startFresh = async (hash) => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}${hash}` });
+    await b.waitFor(`!!document.querySelector('.topbar .settings-button')`, 60_000, `the page at ${hash}`);
+  };
+  const reloadAt = async (hash) => {
+    await b.send("Page.navigate", { url: `${base}?reload=${Date.now()}${hash}` });
+    await b.waitFor(`!!document.querySelector('.topbar .settings-button')`, 60_000, `the page at ${hash}`);
+  };
+  /** Settings → Reset progress → Yes, through the dialog's own buttons. */
+  const resetProgressViaDialog = async () => {
+    await b.evaluate(`document.querySelector('.topbar .settings-button').click()`);
+    await clickButton("Reset progress…", ".settings-dialog");
+    await clickButton("Yes, reset", ".settings-dialog");
+    await b.waitFor(`document.querySelector('.settings-dialog .reset-progress')?.textContent.includes('Progress reset.')`, 10_000, "the reset");
+  };
+  const pieceRadio = (value) =>
+    b.evaluate(`(() => { const r = document.querySelector('input[name="setting-piece"][value="${value}"]'); return { checked: r.checked, disabled: r.disabled }; })()`);
+
+  await check("QA-052: Reset progress puts Settings → Piece back to the pawn, and the open dialog shows it", async () => {
+    await startFresh("#/");
+    const kept = await b.evaluate(`localStorage.getItem(${JSON.stringify(SETTINGS_KEY)})`);
+    try {
+      await b.evaluate(`localStorage.setItem('rank-and-file:progress', ${JSON.stringify(JSON.stringify(SOLVED_CHAPTER_6))}); localStorage.setItem(${JSON.stringify(SETTINGS_KEY)}, JSON.stringify({ ...JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS_KEY)}) ?? '{}'), piece: 'knight' })); true`);
+      await reloadAt("#/");
+      await b.evaluate(`document.querySelector('.topbar .settings-button').click()`);
+      const before = await pieceRadio("knight");
+      expect(before.checked && !before.disabled, `before: the knight is ticked and open (${JSON.stringify(before)})`);
+      await b.evaluate(`document.querySelector('.settings-dialog').close()`);
+      await resetProgressViaDialog();
+      expect(await b.evaluate(`document.querySelector('.settings-dialog').open`), "the dialog is still open");
+      const pawn = await pieceRadio("pawn");
+      const knight = await pieceRadio("knight");
+      expect(pawn.checked && !knight.checked, `after the reset the pawn is ticked, not the knight (${JSON.stringify({ pawn, knight })})`);
+      expect(knight.disabled, "the knight is locked again, in the dialog that stayed open");
+      expect((await b.evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS_KEY)})).piece`)) === "pawn", "the saved setting is the pawn");
+      return "pawn ticked, knight locked and unticked, setting saved as pawn";
+    } finally {
+      await b.evaluate(`document.querySelector('.settings-dialog')?.close(); ${kept === null ? `localStorage.removeItem(${JSON.stringify(SETTINGS_KEY)})` : `localStorage.setItem(${JSON.stringify(SETTINGS_KEY)}, ${JSON.stringify(kept)})`}; true`);
+    }
+  });
+
+  await check("QA-057: Reset progress clears the Sandbox's saved code, so it shows its default code again", async () => {
+    await startFresh("#/free/sandbox");
+    await b.waitFor(`document.querySelector('.sandbox .cm-content') && document.querySelector('.sandbox .snippet-board .piece')`, 90_000, "the Sandbox");
+    const text = () => editorText(".sandbox");
+    const starter = await text();
+    await setCode("answer = 42", ".sandbox .cm-content");
+    await sleep(200);
+    expect((await text()) === "answer = 42", "the typed code is in the Sandbox");
+    expect((await b.evaluate(`localStorage.getItem('rank-and-file:sandbox')`)) !== null, "the code is saved");
+    await resetProgressViaDialog();
+    await b.evaluate(`document.querySelector('.settings-dialog').close()`);
+    await b.waitFor(`!!document.querySelector('.sandbox .cm-content')`, 10_000, "the Sandbox redrawn");
+    expect((await text()) === starter, "after the reset the Sandbox shows its default code");
+    await reloadAt("#/free/sandbox");
+    await b.waitFor(`!!document.querySelector('.sandbox .cm-content')`, 60_000, "the Sandbox after a reload");
+    expect((await text()) === starter, "and it still does after a reload");
+    return "default code after the reset and after a reload";
+  });
+
+  await check("QA-053: running empty or comment-only code finishes quietly: no exception, no line marked, status Finished", async () => {
+    await startFresh("#/free/sandbox");
+    await b.waitFor(`document.querySelector('.sandbox .snippet-board .piece') && document.querySelector('.sandbox .btn-primary')`, 90_000, "the Sandbox");
+    const exceptions = (since) => b.logs.slice(since).filter((line) => line.startsWith("[exception]"));
+    const runWith = async (label, type) => {
+      await b.evaluate(`document.querySelector('.sandbox .cm-content').focus()`);
+      await b.key("a", { code: "KeyA", modifiers: 2 }); // Ctrl+A
+      await b.key("Backspace", { code: "Backspace" });
+      if (type) await b.send("Input.insertText", { text: type });
+      await b.evaluate(`document.querySelector('.sandbox .snippet-status').textContent = ''`);
+      const since = b.logs.length;
+      await b.evaluate(`document.querySelector('.sandbox .btn-primary').click()`);
+      await b.waitFor(`document.querySelector('.sandbox .snippet-status')?.textContent.includes('Finished')`, 15_000, `${label}: the status to say it finished`);
+      await sleep(400);
+      expect(exceptions(since).length === 0, `${label}: no exception in the page`);
+      expect((await b.evaluate(`document.querySelectorAll('.sandbox .cm-step-line').length`)) === 0, `${label}: no line is marked`);
+      expect(!(await b.evaluate(`!!document.querySelector('.sandbox .error-detail')`)), `${label}: no error card`);
+    };
+    await runWith("empty code", "");
+    await runWith("a comment only", "# nothing to run");
+    await runWith("one real line", "pawn.move()"); // a run that has lines still works
+    // the level screen, with its code emptied (read-only look: levelView.ts is not part of this fix)
+    await openLevel("ch01-l01", { fresh: true });
+    await b.evaluate(`document.querySelector('.level-right .cm-content').focus()`);
+    await b.key("a", { code: "KeyA", modifiers: 2 });
+    await b.key("Backspace", { code: "Backspace" });
+    const since = b.logs.length;
+    await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
+    await sleep(2500);
+    expect(exceptions(since).length === 0, `the level screen's Run with empty code threw: ${exceptions(since).join(" | ")}`);
+    return "Sandbox: empty, comment-only and normal runs finish; the level screen's empty Run throws nothing";
+  });
+
+  await check("QA-056: an unknown #/free/… shows the hub, extra path after a page shows that page, and the address is corrected", async () => {
+    await startFresh("#/");
+    const titleOf = { "#/free": "Free Play · Rank & File", "#/free/sandbox": "Sandbox · Free Play · Rank & File", "#/free/skins": "Skins · Free Play · Rank & File", "#/free/challenges": "Challenges · Free Play · Rank & File", "#/free/shared": "Shared with me · Free Play · Rank & File" };
+    const cases = [
+      ["#/free/nonsense", "#/free"],
+      ["#/free/", "#/free"],
+      ["#/free/sandbox/extra", "#/free/sandbox"],
+      ["#/free/skins/x", "#/free/skins"],
+      ["#/free/challenges/x", "#/free/challenges"],
+      ["#/free/shared", "#/free/shared"],
+      ["#/free/shared/x", "#/free/shared"],
+      ["#/free", "#/free"],
+    ];
+    for (const [from, to] of cases) {
+      await b.evaluate(`location.hash = '#/'`);
+      await b.waitFor(`document.title === 'Rank & File'`, 10_000, "the start menu");
+      await b.evaluate(`location.hash = ${JSON.stringify(from)}`);
+      await b.waitFor(`location.hash === ${JSON.stringify(to)} && document.title === ${JSON.stringify(titleOf[to])}`, 10_000, `${from} to land on ${to} (now ${await b.evaluate("location.hash + ' / ' + document.title")})`);
+    }
+    // Back still works: the bad address replaced itself, so Back leaves Free Play for where the player was
+    await b.evaluate(`location.hash = '#/'`);
+    await b.waitFor(`document.title === 'Rank & File'`, 10_000, "the start menu");
+    await b.evaluate(`location.hash = '#/free/nonsense'`);
+    await b.waitFor(`location.hash === '#/free' && document.title === ${JSON.stringify(titleOf["#/free"])}`, 10_000, "the hub");
+    await b.evaluate(`history.back()`);
+    await b.waitFor(`location.hash === '#/' && document.title === 'Rank & File'`, 10_000, "Back to land on the start menu");
+    // other unknown routes stay as they were
+    await b.evaluate(`location.hash = '#/nonsense'`);
+    await sleep(300);
+    expect((await b.evaluate(`location.hash`)) === "#/nonsense" && (await b.evaluate(`document.title`)) === "Rank & File", "#/nonsense is left alone");
+    return "unknown and extra paths corrected, Back works, #/nonsense untouched";
   });
 }

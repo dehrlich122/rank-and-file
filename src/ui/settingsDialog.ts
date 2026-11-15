@@ -153,7 +153,10 @@ export class SettingsDialog {
       dialogHead("settings-title", "Settings", "Done", () => this.element.close()),
       ...groups,
       soundSettings.element,
-      resetProgress(onResetProgress),
+      resetProgress(() => {
+        onResetProgress();
+        this.lockPieces(); // the dialog stays open: a skin that is locked again shows it now
+      }),
       h("p", { class: "muted small" }, "Esc opens and closes this menu. In the code editor, Ctrl+M then Tab moves focus out of the editor."),
     );
     this.show = modal(this.element);
