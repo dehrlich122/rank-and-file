@@ -15,5 +15,5 @@ export default defineConfig({
     // loaded once, so Vite's default 500 kB warning isn't useful here.
     chunkSizeWarningLimit: 1000,
   },
-  test: { include: ["src/**/*.test.ts"] },
+  test: { include: ["src/**/*.test.ts", "scripts/save-level-plugin.test.ts"] },
 });

@@ -320,15 +320,20 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   const redo = () => step(() => history.redo(), "Redone.");
 
   /** A question in the page with a yes and a no; the board gets the focus back once it's answered. */
-  function ask(question: string, yes: string, no: string, onYes: () => void, onNo?: () => void): void {
-    confirmHost.replaceChildren(
-      confirmStep(question, yes, no, (confirmed) => {
-        confirmHost.replaceChildren();
-        if (confirmed) onYes();
-        else onNo?.();
-        host.focus();
-      }),
-    );
+  function ask(question: string, yes: string, no: string, onYes: () => void, onNo?: () => void, escKeeps = false): void {
+    const step = confirmStep(question, yes, no, (confirmed) => {
+      confirmHost.replaceChildren();
+      if (confirmed) onYes();
+      else onNo?.();
+      host.focus();
+    });
+    // Esc answers the "no" (and is not left for the app's Esc, which opens Settings)
+    if (escKeeps) step.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      step.querySelectorAll("button")[1]?.click();
+    });
+    confirmHost.replaceChildren(step);
   }
 
   /** Save the whole level (and its kept solution) as drafts/<id>.yaml, asking before it replaces one. Dev only. */
@@ -341,9 +346,17 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id, yaml: draftToYaml(whole()), ...(solution ? { solution } : {}), overwrite }),
       });
-      const result = (await response.json().catch(() => ({}))) as { saved?: string[]; exists?: boolean; reason?: string };
-      if (response.status === 409 && result.exists) return ask(`drafts/${id}.yaml exists. Replace it?`, "Yes, replace it", "Keep it", () => void saveToRepo(true), () => say("Not saved."));
-      if (response.ok && result.saved) return say(`Saved ${result.saved.join(" and ")}`);
+      const result = (await response.json().catch(() => ({}))) as { saved?: string[]; removed?: string[]; exists?: boolean; reason?: string };
+      if (response.ok && result.exists) return ask(`drafts/${id}.yaml exists. Replace it?`, "Yes, replace it", "Keep it", () => void saveToRepo(true), () => say("Not saved."), true);
+      if (response.ok && result.saved) {
+        // a draft is work in progress, so a level the engine refuses is saved too, with a word about it
+        const refused = verdict?.problem && verdict.revision === revision;
+        return say(
+          `Saved ${result.saved.join(" and ")}.` +
+            (result.removed?.length ? ` Removed the old ${result.removed.join(" and ")}.` : "") +
+            (refused ? " The engine refuses this level as it stands (see Problems)." : ""),
+        );
+      }
       say(`Not saved: ${result.reason ?? `the server said ${response.status}`}`);
     } catch {
       say("Not saved: the dev server didn't answer.");
