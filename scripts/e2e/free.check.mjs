@@ -254,7 +254,8 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     expect(start !== end, "the piece moved");
     // what was typed is kept in the browser, and is there after a reload
     await load("#/free/sandbox");
-    await b.waitFor(`document.querySelector('.sandbox .cm-content')`, 60_000, "the Sandbox again");
+    // (`!!`: a CodeMirror node can't be returned by value, so a bare element would read as "not there")
+    await b.waitFor(`!!document.querySelector('.sandbox .cm-content')`, 60_000, "the Sandbox again");
     const kept = await b.evaluate(`[...document.querySelectorAll('.sandbox .cm-line')].map((l) => l.textContent).join('\\n')`);
     expect(kept.trimEnd() === program.trimEnd(), "the code is still there after a reload");
     return "ran, moved, kept";
