@@ -184,7 +184,8 @@ export function setCode(view: EditorView, code: string): void {
 /** Highlight the line being played back (null to clear). */
 export function setActiveLine(view: EditorView, line: number | null): void {
   view.dispatch({ effects: setActive.of(line) });
-  if (line !== null && line <= view.state.doc.lines) {
+  // the engine reports line 0 for a run in which no line ran (empty or comment-only code): nothing to scroll to
+  if (line !== null && line >= 1 && line <= view.state.doc.lines) {
     view.dispatch({ effects: EditorView.scrollIntoView(view.state.doc.line(line).from, { y: "nearest" }) });
   }
 }
