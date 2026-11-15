@@ -9,14 +9,14 @@ import { draftToLevelData, ImportError, yamlToDraft } from "../editor/levelData"
 import { editorOptions } from "../editor/options";
 import { readSolution, setSolution } from "../editor/rules";
 import { copyOfLevel } from "../editor/starts";
-import type { PyClient } from "../py/client";
+import { PythonHungError, StoppedError, type PyClient } from "../py/client";
 import { MAX_LEVEL_BYTES } from "../share/codec";
 import { sharedLevels } from "../share/shared";
 import { confirmStep } from "./dialog";
 import { downloadLevel } from "./download";
 import { h } from "./dom";
 import { applyList, listControls, listState, saveListState, type ListState } from "./listControls";
-import { difficultyTag, tierTag } from "./tags";
+import { difficultyTag, problemTag, tierTag } from "./tags";
 
 const when = (ms: number): string => new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
@@ -31,62 +31,93 @@ export const curriculumTiers = (): string[] => [...new Set(chapters.filter((c) =
  * The filter and sort row of the list `listId`, remembered for the session. The row keeps the state it was built
  * with, so it is rebuilt on each change (keeping the focus on the same control); `onChange` then redraws the list.
  */
-export function listControlsHost(listId: string, tiers: string[], onChange: () => void): { element: HTMLElement; state: () => ListState } {
+export function listControlsHost(listId: string, tiers: string[], onChange: () => void): { element: HTMLElement; state: () => ListState; show: (on: boolean) => void; clear: () => void } {
   let state = listState(listId);
-  const element = h("div", {});
+  const element = h("div", { class: "list-controls-host" });
+  const set = (next: ListState): void => {
+    state = next;
+    saveListState(listId, next);
+    paint();
+    onChange();
+  };
   const paint = (): void => {
     const at = [...element.querySelectorAll("select")].indexOf(document.activeElement as HTMLSelectElement);
-    element.replaceChildren(
-      listControls(tiers, state, (next) => {
-        state = next;
-        saveListState(listId, next);
-        paint();
-        onChange();
-      }),
-    );
+    element.replaceChildren(listControls(tiers, state, set));
     if (at >= 0) element.querySelectorAll("select")[at]?.focus();
   };
   paint();
-  return { element, state: () => state };
+  return {
+    element,
+    state: () => state,
+    /** The row is there only while its list has something in it (QA-049). */
+    show: (on) => void (element.hidden = !on),
+    /** Tier and Difficulty back to any; the sort stays. */
+    clear: () => set({ ...state, tier: null, difficulty: null }),
+  };
 }
 
-const tagsOf = (tier: string | null, difficulty: number | null): HTMLElement[] => [...(tier ? [tierTag(tier)] : []), ...(difficulty ? [difficultyTag(difficulty)] : [])];
+/** What a list says when its filters leave nothing, with the way out. */
+export const noMatchRow = (clear: () => void): HTMLElement =>
+  h("li", { class: "muted" }, "No levels match these filters. ", h("button", { class: "btn btn-small", onClick: clear }, "Clear filters"));
+
+/** What the engine said about a level's tier: `refused` when it would not open the level at all. */
+interface TierAnswer {
+  tier: string | null;
+  refused: boolean;
+}
+
+/**
+ * Whether a failed request is the engine refusing the level: the worker reports a Python `LevelError` as an error
+ * whose message is its traceback. A stopped or hung worker, or one that crashed, is only "couldn't ask".
+ */
+const refusedByEngine = (error: unknown): boolean => error instanceof Error && !(error instanceof StoppedError) && !(error instanceof PythonHungError) && /\bLevelError: /.test(error.message);
+
+const tierTagsOf =({ tier, refused }: TierAnswer): HTMLElement[] => (refused ? [problemTag()] : tier ? [tierTag(tier)] : []);
 
 /**
  * The engine's tier for a level outside the curriculum (request `levelTags`), asked once per level and never waited
- * for: a row is drawn at once with its difficulty tag and gets its tier tag when the answer comes. A level the engine
- * refuses has no tier tag. With a Tier filter on (`filtering`) an answer redraws the list instead (`redraw`).
+ * for: a row is drawn at once with its difficulty tag, the room for the tier tag kept, and gets the tier tag when the
+ * answer comes. A level the engine refuses gets the "has problems" mark in its place (QA-046); an answer that is only
+ * "couldn't ask" (the worker stopped or failed) leaves the place empty. With a Tier filter on (`filtering`) an answer
+ * redraws the list instead (`redraw`).
  */
 export function tierTags(client: PyClient, filtering: () => boolean, redraw: () => void) {
-  const tiers = new Map<string, string | null>();
+  const answers = new Map<string, TierAnswer>();
   const asked = new Set<string>();
-  const slots = new Map<string, { element: HTMLElement; difficulty: number | null }>();
+  const slots = new Map<string, HTMLElement>();
   let stopped = false;
+  const NO_ANSWER: TierAnswer = { tier: null, refused: false };
+  async function answer(data: () => unknown): Promise<TierAnswer> {
+    try {
+      await client.ready();
+    } catch {
+      return NO_ANSWER;
+    }
+    try {
+      const { tier } = await client.call("levelTags", { level: data(), chapters: codexChapters() });
+      return { tier, refused: false };
+    } catch (error) {
+      return { tier: null, refused: refusedByEngine(error) };
+    }
+  }
   return {
     /** Ask for this level's tier, once. `data` builds the level's data when it is needed. */
     ask(id: string, data: () => unknown): void {
       if (asked.has(id)) return;
       asked.add(id);
-      void client.ready()
-        .then(() => client.call("levelTags", { level: data(), chapters: codexChapters() }))
-        .then(
-          (result) => result.tier,
-          () => null,
-        )
-        .then((tier) => {
-          if (stopped) return;
-          tiers.set(id, tier);
-          const slot = slots.get(id);
-          if (filtering()) redraw();
-          else slot?.element.replaceChildren(...tagsOf(tier, slot.difficulty));
-        });
+      void answer(data).then((found) => {
+        if (stopped) return;
+        answers.set(id, found);
+        if (filtering()) redraw();
+        else slots.get(id)?.replaceChildren(...tierTagsOf(found));
+      });
     },
-    tier: (id: string): string | null => tiers.get(id) ?? null,
-    /** The tags cell of a row. */
+    tier: (id: string): string | null => answers.get(id)?.tier ?? null,
+    /** The tags cell of a row: a fixed place for the tier tag, then one for the difficulty tag, so no row's tags move. */
     slot(id: string, difficulty: number | null): HTMLElement {
-      const element = h("span", { class: "tags" }, ...tagsOf(tiers.get(id) ?? null, difficulty));
-      slots.set(id, { element, difficulty });
-      return element;
+      const tier = h("span", { class: "tags-tier" }, ...tierTagsOf(answers.get(id) ?? NO_ANSWER));
+      slots.set(id, tier);
+      return h("span", { class: "tags tags-fixed" }, tier, h("span", { class: "tags-diff" }, ...(difficulty ? [difficultyTag(difficulty)] : [])));
     },
     stop: (): void => void (stopped = true),
   };
@@ -122,20 +153,21 @@ export function mountEditorList(root: HTMLElement, client: PyClient): () => void
     }
     const levels = applyList(all, controls.state(), (level) => ({ tier: tags.tier(level.id), difficulty: level.difficulty }));
     sharedLink.textContent = `Shared with me (${sharedLevels.list().length}) →`;
+    controls.show(all.length > 0);
     list.replaceChildren(
       ...(levels.length
         ? levels.map((level) =>
             h(
               "li",
               { class: "my-level panel" },
-              h("a", { class: "my-level-open", href: `#/editor/${level.id}` }, h("strong", {}, level.title), h("span", { class: "muted small" }, ` · ${level.width} × ${level.height} · edited ${when(level.edited)}`)),
+              h("a", { class: "my-level-open", href: `#/editor/${level.id}` }, h("strong", {}, level.title), h("span", { class: "muted small" }, ` · ${level.width} × ${level.height} · `, h("span", { class: "nowrap" }, `edited ${when(level.edited)}`))),
               tags.slot(level.id, level.difficulty),
               h("button", { class: "btn btn-small", "aria-label": `Duplicate ${level.title}`, onClick: () => duplicate(level.id) }, "Duplicate"),
               h("button", { class: "btn btn-small", "aria-label": `Export ${level.title}`, onClick: () => exportLevel(level.id) }, "Export"),
               h("button", { class: "btn btn-small", "aria-label": `Delete ${level.title}`, onClick: () => ask(level.id, level.title) }, "Delete"),
             ),
           )
-        : [h("li", { class: "muted" }, all.length ? "No levels match these filters." : "You haven't made a level yet.")]),
+        : [all.length ? noMatchRow(controls.clear) : h("li", { class: "muted" }, "You haven't made a level yet.")]),
     );
   }
 
@@ -200,7 +232,7 @@ export function mountEditorList(root: HTMLElement, client: PyClient): () => void
     h(
       "div",
       { class: "editor-list" },
-      h("h1", {}, "My levels"),
+      h("h1", { class: "lessons-title" }, "My levels"),
       h("p", { class: "muted" }, "Levels you make are kept in this browser. Nothing leaves the browser unless you export or share one."),
       h(
         "div",
@@ -211,10 +243,9 @@ export function mountEditorList(root: HTMLElement, client: PyClient): () => void
       ),
       h(
         "div",
-        { class: "toolbar ed-copy" },
+        { class: "ed-copy" },
         h("span", { class: "muted" }, "Or start from a lesson level's board and rules (never its hints or solution):"),
-        picker,
-        h("button", { class: "btn btn-small", onClick: copy }, "Copy it"),
+        h("div", { class: "ed-copy-pick" }, picker, h("button", { class: "btn btn-small", onClick: copy }, "Copy it")),
       ),
       h("p", { class: "muted" }, "Levels sent to you, by link or code, are in ", sharedLink),
       controls.element,

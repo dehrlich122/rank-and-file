@@ -95,11 +95,70 @@
   gap: 14px;
 }
 
-.free-title {
+/* every Free Play page sits under the top bar like Lessons does (its heading is .lessons-title) */
+.free-play {
+  padding-top: 24px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+/* My levels and Shared with me: the tags have a fixed place in the row, the tier's room kept while the engine answers */
+.tags-fixed {
+  display: grid;
+  grid-template-columns: 6rem 8.5rem; /* "has problems" and "while True:" with its pips */
+  gap: 6px;
+  align-items: center;
+  flex: none;
+}
+
+.tags-tier,
+.tags-diff {
+  display: flex;
+  align-items: center;
+  min-height: 22px; /* a tag's height, so an empty slot holds its place */
+}
+
+.problem-tag {
+  color: var(--bad);
+}
+
+.link-note {
   margin: 0;
-  font: 700 26px var(--font-display);
-  letter-spacing: 0.06em;
-  color: var(--accent);
+}
+
+.link-note:not(:empty) {
+  margin-top: 4px;
+}
+
+.list-controls-host {
+  margin-bottom: -4px; /* the gap to the list below matches the list's own row gap (8px) */
+}
+
+.editor-list > [role="status"]:empty {
+  position: absolute; /* a live region with nothing in it takes no row of the grid */
+}
+
+.link-form .toolbar input {
+  flex: 1;
+  min-width: 10em;
+}
+
+.ed-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.ed-copy-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ed-copy-pick select {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .fp-rows {
@@ -180,7 +239,8 @@
   flex: 1;
 }
 
-.list-controls select {
+.list-controls select,
+.ed-copy select {
   font: inherit;
   padding: 2px 6px;
   border-radius: 6px;
@@ -273,8 +333,31 @@
 
 .skins {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  justify-content: center;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 260px));
   gap: 12px;
+}
+
+.skins-intro {
+  margin: 0 0 14px;
+}
+
+.skin-how.skin-locked {
+  font-style: italic;
+}
+
+.skin-status {
+  font-size: 14px;
+}
+
+.skin-worn {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.skin-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .skin-card {
@@ -302,8 +385,16 @@
   padding: 14px;
 }
 
+.sandbox {
+  --sandbox-board: clamp(200px, calc(100vh - 480px), 420px);
+}
+
+.sandbox p {
+  margin: 0;
+}
+
 .sandbox .snippet-editor .cm-editor {
-  min-height: 220px;
+  min-height: 180px;
 }
 
 .sandbox .snippet-row {
@@ -311,11 +402,60 @@
 }
 
 .sandbox .snippet-board {
-  width: min(46vw, 420px);
+  width: var(--sandbox-board);
+}
+
+.sandbox .snippet-board:has(.board-loading) {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--border);
 }
 
 .sandbox .board-mini {
   width: 100%;
+  max-height: var(--sandbox-board);
+}
+
+/* Wide windows: the board sits beside the editor and its Run bar, as tall as the screen allows */
+@media (min-width: 1181px) {
+  .sandbox.free-play {
+    max-width: 1180px;
+  }
+
+  .sandbox {
+    --sandbox-board: clamp(240px, calc(100vh - 300px), 560px);
+  }
+
+  .sandbox .snippet {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px 16px;
+  }
+
+  .sandbox .snippet-row {
+    display: contents;
+  }
+
+  .sandbox .snippet-editor {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .sandbox .snippet-bar {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .sandbox .snippet-board {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: start;
+  }
+
+  .sandbox .snippet-editor .cm-editor {
+    min-height: 220px;
+  }
 }
 
 .sandbox .board-mini .coords {

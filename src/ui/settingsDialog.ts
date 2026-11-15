@@ -3,6 +3,7 @@
 // Every change applies straight away through the settings store; there's no
 // Save button. The browser's <dialog> closes on Esc and keeps keyboard focus
 // inside while it's open; on close, focus goes back to where it was.
+import { SKIN_NAMES } from "../promotion";
 import { CODE_SIZES, SPEEDS, type CodeSize, type Piece, type Settings, type SettingsStore } from "../settings";
 import { sound, TRACKS } from "../sound";
 import { confirmStep, dialogHead, modal } from "./dialog";
@@ -34,7 +35,7 @@ const GROUPS: Array<{ key: keyof Settings; title: string; hint?: string; choices
     hint: "How your piece looks, on every level. A skin unlocks when you earn its promotion: the knight, by clearing Chapter 6.",
     choices: [
       { value: "pawn", label: "Pawn" },
-      { value: "knight", label: "Knight" },
+      { value: "knight", label: `Knight · ${SKIN_NAMES.knight}` },
     ],
   },
   {

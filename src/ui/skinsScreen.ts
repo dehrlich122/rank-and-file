@@ -1,7 +1,7 @@
 // Free Play's Skins gallery (M4.4): each piece skin large, whether it is unlocked and by what, and a button to wear
 // it (the same setting as Settings → Piece).
 import { chapterName } from "../content";
-import { lastChapterOf, PROMOTIONS, tierCleared, wornPiece } from "../promotion";
+import { lastChapterOf, PROMOTIONS, SKIN_NAMES, tierCleared, wornPiece } from "../promotion";
 import { progress, type ProgressStore } from "../progress";
 import { settings, type Piece } from "../settings";
 import { h } from "./dom";
@@ -16,7 +16,27 @@ export interface SkinCard {
   how: string;
 }
 
-const SKIN_NAMES: Record<Piece, string> = { pawn: "Pawn", knight: "Charger" };
+const lc = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+
+/** One skin's card: its art, name, status and how it is earned; a button to wear it when it can be. */
+export function skinCardElement(card: SkinCard, onWear: () => void): HTMLElement {
+  const art = svg("svg", { viewBox: "-38 -38 76 76", width: 120, height: 120, role: "img", "aria-label": `The ${card.name}` }, hero(card.piece, card.piece === "knight" ? "east" : "south"));
+  const state = card.worn ? "worn" : card.unlocked ? "not worn" : "locked";
+  return h(
+    "div",
+    {
+      class: `skin-card${card.worn ? " worn" : ""}${card.unlocked ? "" : " locked"}`,
+      tabindex: "0",
+      "aria-label": `${card.name}, ${state}: ${lc(card.how)}`,
+      "data-piece": card.piece,
+    },
+    h("div", { class: "skin-art" }, art),
+    h("strong", {}, card.name),
+    h("span", { class: `muted small skin-how${card.unlocked ? "" : " skin-locked"}` }, card.unlocked ? card.how : `Locked: ${lc(card.how)}`),
+    card.worn && h("span", { class: "skin-status skin-worn" }, h("span", { "aria-hidden": "true" }, "✓ "), "Worn"),
+    card.unlocked && !card.worn && h("button", { class: "btn btn-small", onClick: onWear }, "Wear it"),
+  );
+}
 
 /** The pawn, then the skin each promotion earns. */
 export function skinCards(store: ProgressStore = progress): SkinCard[] {
@@ -43,22 +63,13 @@ export function mountSkins(main: HTMLElement, store: ProgressStore = progress): 
     // "Wear it" repaints the grid: keep keyboard focus on the card now worn rather than losing it to the page
     const hadFocus = grid.contains(document.activeElement);
     grid.replaceChildren(
-      ...skinCards(store).map((card) => {
-        const art = svg("svg", { viewBox: "-38 -38 76 76", width: 120, height: 120, role: "img", "aria-label": `The ${card.name}` }, hero(card.piece, card.piece === "knight" ? "east" : "south"));
-        const label = card.worn ? "Worn" : card.unlocked ? "Wear it" : "Locked";
-        return h(
-          "div",
-          { class: `skin-card${card.worn ? " worn" : ""}${card.unlocked ? "" : " locked"}`, tabindex: "-1", "data-piece": card.piece },
-          h("div", { class: "skin-art" }, art),
-          h("strong", {}, card.name),
-          h("span", { class: "muted small" }, card.how),
-          h("button", { class: "btn btn-small", disabled: card.worn || !card.unlocked, onClick: () => settings.set({ piece: card.piece }) }, label),
-        );
-      }),
+      ...skinCards(store).map((card) => skinCardElement(card, () => settings.set({ piece: card.piece }))),
     );
     if (hadFocus) grid.querySelector<HTMLElement>(".skin-card.worn")?.focus();
   };
   paint();
-  main.replaceChildren(h("div", { class: "free-play" }, h("h1", { class: "free-title" }, "Skins"), grid));
+  main.replaceChildren(
+    h("div", { class: "free-play" }, h("h1", { class: "lessons-title" }, "Skins"), h("p", { class: "muted skins-intro" }, "Skins change how your piece looks. Promotions unlock them."), grid),
+  );
   return settings.subscribe(paint);
 }

@@ -35,12 +35,17 @@ class BridgeError(GameError):
     """The piece tried to lay a plank with none to lay, or where there's no pit (QA-017)."""
 
 
+def it_knows(sandbox: bool) -> str:
+    """The start of "what the piece can do" in a message. The Sandbox and lesson snippets have no level, so they say "Here"."""
+    return "Here it knows" if sandbox else "In this level it knows"
+
+
 class LockedAbilityError(GameError, AttributeError):
     """The level hasn't unlocked this ability yet."""
 
-    def __init__(self, piece: str, ability: str, unlocked: list[str]):
+    def __init__(self, piece: str, ability: str, unlocked: list[str], sandbox: bool = False):
         knows = ", ".join(unlocked) if unlocked else "nothing yet"
-        super().__init__(f"Your {piece} hasn't learned `{ability}` yet. In this level it knows: {knows}.")
+        super().__init__(f"Your {piece} hasn't learned `{ability}` yet. {it_knows(sandbox)}: {knows}.")
         self.name = ability
 
 

@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chapters } from "../content";
 import { ProgressStore } from "../progress";
 import { memoryStorage } from "../storage.fake";
-import { mountSandbox, sandboxAbilities } from "./sandboxScreen";
+import { type Fake, fakeDocument } from "./dom.fake";
+import { abilitiesLine, boardIsLoaded, mountSandbox, sandboxAbilities } from "./sandboxScreen";
+
 
 const apiOf = (id: string) => chapters.flatMap((c) => c.levels).find((l) => l.id === id)!.data.api as string[];
 const solve = (store: ProgressStore, id: string) => store.update(id, { stars: 1 });
@@ -31,5 +33,23 @@ describe("sandboxAbilities", () => {
 
   it("is mounted by the Free Play route", () => {
     expect(typeof mountSandbox).toBe("function");
+  });
+});
+
+describe("the Sandbox's page furniture", () => {
+  beforeEach(() => vi.stubGlobal("document", fakeDocument));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("lists the abilities in code, after 'You can use:'", () => {
+    const line = abilitiesLine(["move", "turn_left"]) as unknown as Fake;
+    expect(line.text).toBe("You can use: move · turn_left");
+    expect(line.children.filter((k) => typeof k !== "string" && k.tag === "code").length).toBe(2);
+    expect((abilitiesLine(["move"]) as unknown as Fake).text).toBe("You can use: move");
+  });
+
+  it("holds Run back while the loading note is in the board's place", () => {
+    const loading = { querySelector: (selector: string) => (selector === ".board-loading" ? {} : null) };
+    expect(boardIsLoaded(loading)).toBe(false);
+    expect(boardIsLoaded({ querySelector: () => null })).toBe(true);
   });
 });
