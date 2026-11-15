@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, replace
 
 from .board import Board, Direction, Pos, Tile, Timer, sign, square_name
-from .constraints import describe_rules
+from .constraints import NODE_NAMES, describe_rules
 from .pieces import PIECES
 from .words import and_list, count
 from .world import CHASERS, CHESS_LINES, CLOCKS, World
@@ -76,6 +76,9 @@ def editor_options() -> dict:
         "clocks": list(CLOCKS),
         "facings": [direction.value for direction in Direction],
         "timed_gate": {"open": Timer.open, "clock": Timer.clock},
+        "constructs": [{"node": node, "label": label} for node, label in NODE_NAMES.items()],  # what a level may require or ban (M4.3)
+        "limits": LIMITS,
+        "max_boards": MAX_BOARDS,
     }
 
 
@@ -97,12 +100,16 @@ CLOCK_TICKS = {
 ALLOWED_KEYS = {
     "id", "chapter", "title", "trains", "brief", "piece", "map", "legend", "start",
     "objectives", "api", "constraints", "par", "hints", "lesson", "starter", "variants",
-    "enemies", "lesson_board", "mastery",
+    "enemies", "lesson_board", "mastery", "solution",
 }  # fmt: skip
 # A level made in the editor (M4.2) has no chapter, lesson or "trains" line, so only these are required here;
 # the level checker (engine/tests/test_levels.py) still asks the repo's levels for all of them.
 REQUIRED_KEYS = {"id", "title", "map", "api"}
 MAX_SIDE = 12  # squares along a board's edge (M4.2): the editor's limit, and a shared level's
+MAX_BOARDS = 6  # a level and its other maps (M4.3); the repo's most is 4
+# How long each free-text field may be, and how many hints and enemies a level may have (M4.3). They guard what
+# arrives in a shared level; every level in the repo fits (engine/tests/test_editor_levels.py), well within them.
+LIMITS = {"title": 60, "brief": 600, "trains": 200, "hint": 600, "hints": 5, "text": 300, "enemies": 12, "solution": 2000, "starter": 2000}
 
 
 @dataclass
@@ -205,6 +212,7 @@ class Level:
     planks: int = 0  # planks the piece starts with (QA-017)
     lesson_board: dict | None = None  # the board the lesson's snippets run on, as the level file gives it (QA-019)
     mastery: bool = False  # a chapter's optional mastery challenge (M3.2)
+    solution: str = ""  # the author's solution, in a level made in the editor (M4.3); never in describe(), never run by the engine on its own
 
     def cases(self) -> list[Case]:
         """Every situation a solution must handle: one per square a hidden goal
@@ -367,6 +375,7 @@ def parse_level(data: dict) -> Level:
     if missing:
         raise LevelError(f"missing key(s): {', '.join(sorted(missing))}")
 
+    _check_limits(data)
     piece = data.get("piece", "pawn")
     if piece not in PIECES:
         raise LevelError(f"unknown piece {piece!r}; expected one of {sorted(PIECES)}", at={"field": "piece"})
@@ -399,6 +408,7 @@ def parse_level(data: dict) -> Level:
         brief=str(data.get("brief", "")),
         starter=str(data.get("starter", "")),
         mastery=data.get("mastery", False),
+        solution=_parse_solution(data.get("solution")),
     )
     if not isinstance(level.mastery, bool):
         raise LevelError("mastery is true or false", at={"field": "mastery"})
@@ -505,6 +515,8 @@ def _parse_details(symbol: str, tile: Tile, meaning: dict) -> dict:
             _check_clock(f"legend {symbol!r}", value)
         elif not isinstance(value, str) or not value:
             raise LevelError(f"legend {symbol!r}: a {tile.value} needs {key}")
+        elif len(value) > LIMITS["text"]:
+            raise LevelError(f"legend {symbol!r}: the {key} may be at most {LIMITS['text']} characters")
     open_for = details.get("open", Timer.open)
     if tile is Tile.TIMED_GATE and details["every"] <= open_for:
         raise LevelError(f"legend {symbol!r}: a timed gate's every must be more than its open ({open_for}), or it would never shut")
@@ -562,6 +574,38 @@ def gate_rule(pos: Pos, timer: Timer) -> str:
 
 def names(squares: list[Pos]) -> list[str]:
     return [square_name(pos) for pos in squares]
+
+
+def _check_limits(data: dict) -> None:
+    """The length of each free-text field, and how many hints, enemies and boards there are (LIMITS, MAX_BOARDS)."""
+    for key in ("title", "brief", "trains", "starter"):
+        value = data.get(key)
+        if isinstance(value, str) and len(value) > LIMITS[key]:
+            raise LevelError(f"{key} may be at most {LIMITS[key]} characters", at={"field": key})
+    hints = data.get("hints")
+    if isinstance(hints, list):
+        if len(hints) > LIMITS["hints"]:
+            raise LevelError(f"a level may have at most {LIMITS['hints']} hints", at={"field": "hints"})
+        if any(isinstance(hint, str) and len(hint) > LIMITS["hint"] for hint in hints):
+            raise LevelError(f"a hint may be at most {LIMITS['hint']} characters", at={"field": "hints"})
+    if isinstance(data.get("variants"), list) and len(data["variants"]) + 1 > MAX_BOARDS:
+        raise LevelError(f"a level may have at most {MAX_BOARDS} boards", at={"field": "variants"})
+    for item in data.get("objectives") or []:
+        phrase = item.get("say") if isinstance(item, dict) else None
+        if isinstance(phrase, str) and len(phrase) > LIMITS["text"]:
+            raise LevelError(f"a phrase to say may be at most {LIMITS['text']} characters", at={"field": "objectives"})
+
+
+@_locate(field="solution")
+def _parse_solution(value) -> str:
+    """The author's solution (M4.3): text, kept as written. The engine never runs it on its own."""
+    if value is None:
+        return ""
+    if not isinstance(value, str) or not value.strip():
+        raise LevelError("solution must be code, as text")
+    if len(value) > LIMITS["solution"]:
+        raise LevelError(f"a solution may be at most {LIMITS['solution']} characters")
+    return value
 
 
 def _text(data: dict, key: str) -> str:
@@ -656,6 +700,15 @@ def _parse_board(text: str, legend: dict, objectives: Objectives) -> tuple[Board
     return board, start, goal, spots
 
 
+@contextmanager
+def _on_board(number: int):
+    """Errors inside are about another board: the message says which, and `at` gets its number (board 1 is the level's own)."""
+    try:
+        yield
+    except LevelError as exc:
+        raise LevelError(f"board {number + 1}: {exc}", at={"field": "variants", **(exc.at or {}), "board": number + 1}) from None
+
+
 def _parse_variants(items, legend: dict, level: Level) -> list[Level]:
     """Each other map is the level on another board: same objectives and abilities,
     and the same legend, though a board can give a symbol its own entry (M3.2),
@@ -664,22 +717,19 @@ def _parse_variants(items, legend: dict, level: Level) -> list[Level]:
         raise LevelError("variants must be a list of {map: ...} entries")
     variants = []
     for number, item in enumerate(items, start=1):
-        if not isinstance(item, dict) or "map" not in item or set(item) - {"map", "legend", "enemies"}:
-            raise LevelError(f"variant {number} must have a map, and optionally a legend and enemies, and nothing else")
-        if not isinstance(item.get("legend", {}), dict):
-            raise LevelError(f"variant {number}: legend must be a mapping of symbols to tiles")
-        try:
-            board, start, goal, spots = _parse_board(item["map"], {**legend, **item.get("legend", {})}, level.objectives)
-        except LevelError as exc:
-            raise LevelError(f"variant {number}: {exc}") from None
-        if spots:
-            raise LevelError(f"variant {number}: ? squares are only for the level's own map")
-        try:
-            enemies = _parse_enemies(item["enemies"]) if "enemies" in item else level.enemies
-            variant = replace(level, board=board, start=start, goal=goal, variants=[], enemies=enemies)
-            _check_enemies(variant)
-        except LevelError as exc:
-            raise LevelError(f"variant {number}: {exc}") from None
+        with _locate(field="variants", board=number + 1):
+            if not isinstance(item, dict) or "map" not in item or set(item) - {"map", "legend", "enemies"}:
+                raise LevelError(f"board {number + 1} must have a map, and optionally a legend and enemies, and nothing else")
+            if not isinstance(item.get("legend", {}), dict):
+                raise LevelError(f"board {number + 1}: legend must be a mapping of symbols to tiles")
+            with _on_board(number):
+                board, start, goal, spots = _parse_board(item["map"], {**legend, **item.get("legend", {})}, level.objectives)
+            if spots:
+                raise LevelError(f"board {number + 1}: ? squares are only for the level's own map")
+            with _on_board(number):
+                enemies = _parse_enemies(item["enemies"]) if "enemies" in item else level.enemies
+                variant = replace(level, board=board, start=start, goal=goal, variants=[], enemies=enemies)
+                _check_enemies(variant)
         variants.append(variant)
     return variants
 
@@ -687,6 +737,8 @@ def _parse_variants(items, legend: dict, level: Level) -> list[Level]:
 def _parse_enemies(items) -> list[Enemy]:
     if not isinstance(items, list):
         raise LevelError("enemies must be a list, e.g. [{kind: patrol, route: [b4, e4]}]")
+    if len(items) > LIMITS["enemies"]:
+        raise LevelError(f"a board may have at most {LIMITS['enemies']} enemies", at={"field": "enemies"})
     enemies = []
     for number, item in enumerate(items, start=1):
         with _locate(enemy=number):

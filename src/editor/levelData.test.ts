@@ -62,11 +62,12 @@ describe("reading a level file", () => {
     expect(rook).toEqual({ kind: "rook", start: [3, 2] });
   });
 
-  it("keeps the keys it doesn't edit, and the legend, as they were", () => {
-    const { extra } = draft();
+  it("keeps the keys it doesn't edit as they were, and holds the legend and the other boards in the draft itself", () => {
+    const { extra, boards } = draft();
     expect(extra).toMatchObject({ chapter: 99, par: { lines: 3 }, hints: ["a", "b"], lesson: "ch99/ch99-l01.md" });
-    expect(extra.variants).toHaveLength(1);
-    expect(extra.legend).toMatchObject({ O: "pit", Z: { tile: "gate", passphrase: "4" } });
+    expect("variants" in extra || "legend" in extra).toBe(false);
+    expect(boards).toHaveLength(1);
+    expect(boards[0]!.cells[2]![1]).toMatchObject({ tile: "gate", passphrase: "4" });
   });
 
   it("can be given its own id", () => {
@@ -166,17 +167,16 @@ describe("writing a level file", () => {
     expect(draftToLevelData(d).start).toEqual({ facing: "north", planks: 2 });
   });
 
-  it("keeps the symbols the other boards use meaning what they meant", () => {
+  it("gives a symbol one meaning on every board, and a different gate its own symbol", () => {
     const d = draft();
-    // the editor adds a different gate where the file's `Z` gate isn't on the main map
     d.cells[0]![3] = { tile: "gate", passphrase: "new" };
     const data = draftToLevelData(d);
     const legend = data.legend as Record<string, unknown>;
-    expect(legend.Z).toEqual({ tile: "gate", passphrase: "4" }); // still what the variant means
-    const newSymbol = String(data.map).trim().split("\n")[3]!.split(" ")[3]!;
-    expect(newSymbol).not.toBe("Z");
-    expect(legend[newSymbol]).toEqual({ tile: "gate", passphrase: "new" });
-    expect(data.variants).toEqual(d.extra.variants);
+    const main = String(data.map).trim().split("\n")[3]!.split(" ")[3]!;
+    const other = String((data.variants as Array<{ map: string }>)[0]!.map).trim().split("\n")[1]!.split(" ")[1]!;
+    expect(legend[other]).toEqual({ tile: "gate", passphrase: "4" });
+    expect(legend[main]).toEqual({ tile: "gate", passphrase: "new" });
+    expect(main).not.toBe(other);
   });
 
   it("keeps a square's old symbol when it still means the same", () => {
@@ -265,5 +265,78 @@ describe("squares", () => {
 describe("importing parsed data directly", () => {
   it("accepts the parsed object, as the app's level content has it", () => {
     expect(levelDataToDraft(parseYaml(FILE)).title).toBe("The Test");
+  });
+});
+
+
+const BOARDS = `
+id: my-boards
+title: Boards
+map: |
+  . . G
+  . X .
+  P . .
+legend:
+  X: {tile: gate, passphrase: "one"}
+enemies:
+  - {kind: rook, start: c1}
+start: {facing: north}
+api: [move]
+variants:
+  - map: |
+      . . G
+      . X .
+      P . .
+    legend:
+      X: {tile: gate, passphrase: "two"}
+    enemies: []
+  - map: |
+      G .
+      P .
+`;
+
+const PLAIN = "id: a\ntitle: a\nmap: |\n  G\n  P\napi: [move]\n";
+
+describe("other boards", () => {
+  const d = yamlToDraft(BOARDS);
+
+  it("are boards of the draft, each with its own squares, details and enemies", () => {
+    expect(d.boards).toHaveLength(2);
+    expect(d.cells[1]![1]).toMatchObject({ tile: "gate", passphrase: "one" });
+    expect(d.boards[0]!.cells[1]![1]).toMatchObject({ tile: "gate", passphrase: "two" });
+    expect(d.boards[0]!.enemies).toEqual([]); // it said so
+    expect([d.boards[1]!.width, d.boards[1]!.height]).toEqual([2, 2]);
+  });
+
+  it("have the level's enemies when the file gives them none", () => {
+    expect(d.boards[1]!.enemies).toEqual([{ kind: "rook", start: [2, 0] }]);
+    expect(d.boards[1]!.enemies[0]).not.toBe(d.enemies[0]); // a copy: editing one board's enemy leaves the other's
+  });
+
+  it("are written as variants, with a board's enemies spelled out when the level has some", () => {
+    const data = draftToLevelData(d);
+    const variants = data.variants as Array<Record<string, unknown>>;
+    expect(variants).toHaveLength(2);
+    expect(variants[0]!.enemies).toEqual([]);
+    expect(variants[1]!.enemies).toEqual([{ kind: "rook", start: "c1" }]);
+    expect("legend" in variants[0]!).toBe(false); // one legend for every board
+    expect(Object.values(data.legend as object).filter((entry) => (entry as { tile?: string }).tile === "gate")).toHaveLength(2);
+  });
+
+  it("are left out of the file when there are none, and have no enemies key when neither has any", () => {
+    expect("variants" in draftToLevelData(blankDraft())).toBe(false);
+    const plain = yamlToDraft(`${PLAIN}variants:\n  - map: |\n      G\n      P\n`);
+    expect(draftToLevelData(plain).variants).toEqual([{ map: "G\nP\n" }]);
+  });
+
+  it("round-trip through the file text", () => {
+    const again = yamlToDraft(draftToYaml(d));
+    expect(JSON.stringify(draftToLevelData(again)) === JSON.stringify(draftToLevelData(d))).toBe(true);
+  });
+
+  it("are refused when the file can't be held: a ? square, an unknown key, a list that isn't one", () => {
+    expect(() => yamlToDraft(`${PLAIN}variants:\n  - map: |\n      ?\n      P\n`)).toThrow(/Board 2.*\?/);
+    expect(() => yamlToDraft(`${PLAIN}variants:\n  - {map: "G\\nP", colour: red}\n`)).toThrow(/Board 2 has colour/);
+    expect(() => yamlToDraft(`${PLAIN}variants: nope\n`)).toThrow(ImportError);
   });
 });

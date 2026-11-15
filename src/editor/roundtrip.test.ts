@@ -4,6 +4,7 @@
 // It prints counts and field names only: a level's description holds its hints.
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
+import { boardCount, viewOf } from "./boards";
 import { draftToLevelInfo } from "./draft";
 import { parseYaml } from "../content";
 import { draftToLevelData, draftToYaml, levelDataToDraft, yamlToDraft } from "./levelData";
@@ -40,7 +41,8 @@ describe("every level in the game", () => {
     const entries: Record<string, unknown> = {};
     for (const { data } of levels) {
       const draft = levelDataToDraft(data);
-      entries[String(data.id)] = { original: data, exported: draftToLevelData(draft), info: draftToLevelInfo(draft) };
+      const boards = Array.from({ length: boardCount(draft) }, (_, i) => draftToLevelInfo(viewOf(draft, i))); // each board as the editor draws it
+      entries[String(data.id)] = { original: data, exported: draftToLevelData(draft), info: draftToLevelInfo(draft), boards };
     }
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rank-and-file-"));
     try {

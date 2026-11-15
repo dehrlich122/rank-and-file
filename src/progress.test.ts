@@ -70,6 +70,19 @@ describe("ProgressStore", () => {
     expect(new ProgressStore(memoryStorage({ "rank-and-file:progress": JSON.stringify({ a: { hints: 3, failedAfterHints: 3 } }) })).offersSolution("a")).toBe(true);
   });
 
+  it("keeps another kind of level's progress under its own key, and leaves the curriculum's alone", () => {
+    const storage = memoryStorage();
+    const curriculum = new ProgressStore(storage);
+    const shared = new ProgressStore(storage, "rank-and-file:shared-progress");
+    curriculum.markSeen("crown", 1);
+    shared.update("shared-abc", { stars: 2 });
+    expect(new ProgressStore(storage, "rank-and-file:shared-progress").level("shared-abc").stars).toBe(2);
+    expect(new ProgressStore(storage).level("shared-abc").stars).toBe(0);
+    shared.reset(); // clears its own levels, never the ceremonies and crowns the player has seen
+    expect(new ProgressStore(storage).hasSeen("crown", 1)).toBe(true);
+    expect(new ProgressStore(storage, "rank-and-file:shared-progress").level("shared-abc").stars).toBe(0);
+  });
+
   it("ignores corrupted or malformed saved progress", () => {
     expect(new ProgressStore(memoryStorage({ "rank-and-file:progress": "{not json" })).level("a")).toEqual({ stars: 0, hints: 0, failedRuns: 0, helped: false, solutionSeen: false, code: null });
     expect(sanitize([1, 2])).toEqual({});

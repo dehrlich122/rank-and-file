@@ -21,7 +21,9 @@
     "check:contrast": "node scripts/check-contrast.mjs",
     "demo": "node scripts/package-demo.mjs",
     "e2e": "node scripts/e2e/run.mjs",
-    "check": "npm run typecheck && npm run lint && npm run check:contrast && npm run test && npm run test:py && npm run check:bundle"
+    "test:hooks": "node --test .claude/hooks/hooks.test.mjs",
+    "worktree:setup": "node scripts/worktree-setup.mjs",
+    "check": "npm run typecheck && npm run lint && npm run check:contrast && npm run test && npm run test:hooks && npm run test:py && npm run check:bundle"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

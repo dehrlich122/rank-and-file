@@ -1,0 +1,6 @@
+# Gitignored folders copied into every worktree Claude Code creates (workers' checkouts),
+# so `npm run check` runs there at once. About 190 MB; copying takes a few seconds.
+# `npm run worktree:setup` checks them and copies anything missing from the main checkout.
+node_modules/
+.venv/
+public/pyodide/

@@ -35,8 +35,21 @@ The designer is also the target learner.
   `scripts/levelgen.py`. Rerun a generator after changing one of its
   levels. Chapter 5's `scripts/gen_while.py` (M3.5) searches small
   programs with `while` on the real engine and prints only counts.
-- After each milestone, stop, list what the designer should test manually, and
-  wait for feedback (`DESIGN.md` §7).
+- `.claude/hooks/spoiler-guard.mjs` denies reading or printing `solutions/` and
+  `levels/` (and patches carrying them) in every session and worker. Read a
+  level with `node scripts/venv.mjs scripts.show_level <id>` (spoilers hidden).
+- Milestones stop for the designer at three gates only: draft approval, QA1
+  and QA2 (`docs/WORKFLOW.md`, `DESIGN.md` §7). There are no hand-test stops
+  between them.
+
+## Orchestration *(Designer, 2026-10-11)*
+
+`docs/WORKFLOW.md` is the process. The orchestrator (Opus) drafts, commits the
+shared contract first, hands work packages to `implementer` / `implementer-deep`
+workers (Sonnet, `.claude/agents/`) in worktrees branched from the milestone
+HEAD, then merges each with `--no-ff` and validates it again. Level content
+never goes to workers. Sessions restart from `handoff.md` instead of compacting:
+the context guard asks for a handoff at 300k tokens (workers: wrap up at 150k).
 
 ## Commands
 
@@ -44,7 +57,7 @@ The designer is also the target learner.
 npm install          # also runs scripts/copy-pyodide.mjs → public/pyodide/
 npm run dev          # dev server, http://localhost:5173
 npm run play         # production build + preview
-npm run check        # typecheck + lint + vitest + pytest + check:bundle; run before every commit
+npm run check        # typecheck + lint + vitest + hook tests + pytest + check:bundle; run before every commit
 npm run typecheck    # tsc --noEmit (TypeScript 7)
 npm run lint         # all redundant-code checks below
 npm run lint:ts      # knip: unused files, exports and dependencies (TypeScript)
@@ -58,6 +71,9 @@ npx vitest run src/py/client.test.ts -t "hung worker"
 
 npm run e2e                          # headless-Chrome checks; needs `npm run dev` running
 npm run e2e -- http://localhost:4173/ --only=app   # against `npm run play`, one suite
+
+npm run test:hooks      # the workflow hooks' tests (.claude/hooks/)
+npm run worktree:setup  # in a worker's worktree: check or copy node_modules, .venv, public/pyodide
 ```
 
 - Linting is about redundant code, not formatting (no formatter is configured):
@@ -69,20 +85,16 @@ npm run e2e -- http://localhost:4173/ --only=app   # against `npm run play`, one
   - When a tool flags something used by name (worker-loaded engine files,
     `bridge.py`), allowlist it; don't delete it.
   - Python tools run from `.venv` via `node scripts/venv.mjs <module> ...`.
-- **Once per PR, when the milestone is feature-complete** *(Designer,
-  2026-09-27; timing changed 2026-09-30)*: run `/simplify` on the branch,
-  write e2e checks for the user-visible fixes since the last pass, and run
-  the full `npm run e2e`. Don't do these after each QA fix: they cost too
-  many tokens. Between merges, `npm run check` (before every commit) is the
-  safety net.
-  - Start the pass when the designer calls the milestone feature-complete,
-    not when they ask to merge. The pass can change what a player sees, so
-    it shouldn't reach the site untested.
-  - Afterwards, post a retest list: anything the pass changed that a player
-    could notice, with steps, like a QA fix. Merge only after the designer
-    has checked it.
-  - Fixes from that retest follow the usual QA-fix path; they don't trigger
-    another pass.
+- **Heavy passes, twice per milestone** *(Designer, 2026-09-27; timing
+  changed 2026-09-30 and 2026-10-11)*:
+  - At feature-complete, before QA1: e2e checks for everything a player can
+    see, and the full `npm run e2e`.
+  - After the QA1 fixes, before QA2: `/simplify` on the whole milestone diff,
+    then the full `npm run e2e`, then a retest list (the fixes plus anything
+    `/simplify` changed that a player could notice). It has to come before
+    QA2 so nothing reaches the site unplayed.
+  - Fixes from QA2 follow the usual QA-fix path, with no second pass.
+  Between passes, `npm run check` (before every commit) is the safety net.
 - `npm run e2e` (`scripts/e2e/`) drives the real app over the Chrome DevTools
   protocol. The suites are `harness.check.mjs`, `app.check.mjs` and
   `ui.check.mjs`, with shared helpers (`openLevel`, `setCode`, `solution`) in
@@ -90,7 +102,7 @@ npm run e2e -- http://localhost:4173/ --only=app   # against `npm run play`, one
   `expect`. It writes
   `e2e-results/report.json` plus failure screenshots with spoilers blurred
   (editors, opened hints, solution notes: `SPOILERS` in `suite.mjs`).
-  Every user-visible fix gets a check, written in the pre-merge pass
+  Every user-visible change or fix gets a check, written in those passes
   (above). Solutions are read from
   `solutions/`, never written into a check. **Never put editor contents
   into a check's message or return value.** Earlier checks type reference

@@ -1,0 +1,108 @@
+/* M4.3 step 1 (design prototype, dev-only): the editor's rules, check and sharing. Pane framing only; the components' styles are the real ones in src/editor.css. */
+
+body {
+  margin: 0;
+  background: #070414;
+}
+
+#sheet {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 16px;
+  display: grid;
+  gap: 20px;
+}
+
+.sheet-head h1 {
+  margin: 0;
+  font: 700 20px "Orbitron", var(--font-ui);
+  letter-spacing: 0.06em;
+  color: #3be0ff;
+}
+
+.sheet-head p {
+  margin: 4px 0 0;
+  max-width: 120ch;
+  color: #a69ed6;
+  font: 15px/1.5 var(--font-ui);
+}
+
+.pane {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 var(--font-ui);
+  padding: 14px;
+  border: 1px solid var(--border);
+  --side-col: 418px;
+}
+
+.pane[data-scheme="dark"] {
+  color-scheme: dark;
+}
+
+.pane[data-scheme="light"] {
+  color-scheme: light;
+}
+
+.pane-name {
+  margin: 0 0 8px;
+  font: 700 12px var(--font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 13px;
+}
+
+.grow {
+  flex: 1;
+}
+
+
+.pane-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--side-col);
+  gap: 14px;
+  align-items: start;
+}
+
+.pane-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 16px;
+}
+
+.pane-sub {
+  margin: 0 0 6px;
+  font: 600 12px var(--font-ui);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.stack {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.ed-right {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.static-dialog {
+  position: static;
+  display: block;
+}
+
+.hints-note {
+  margin: 0;
+}

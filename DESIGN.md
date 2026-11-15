@@ -156,8 +156,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 - The engine has pytest tests, the UI has vitest tests, and `npm run check` (types, lint, tests, bundle check) must pass before every commit.
 - Every level has a reference solution plus an automated check that (a) it solves every board and earns every star, and (b) each naive attempt fails the way it should.
 - Reference solutions live in `solutions/`. **I'm a learner too:** never show solution code in chat, commit messages or summaries unless I ask. Describe levels by concept and mechanic only. Level generators write references and hints without printing them, and print only counts.
-- At each milestone's feature-complete point, a cleanup pass and the full end-to-end run happen once. Anything a player could notice becomes a retest list, which I check before the merge.
-- After each milestone: stop, list what I should test manually, and wait for feedback.
+- *(Updated 2026-10-11)* Each milestone stops for me three times: to approve its draft, for QA1 when it's feature-complete (after the full end-to-end run), and for QA2 after the QA1 fixes, the cleanup pass and another full run. Anything a player could notice becomes a retest list, which I check before the merge. There are no hand-test stops in between (`docs/WORKFLOW.md`).
 
 ---
 
@@ -177,6 +176,8 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 *(Designer, 2026-10-02)* The design pass comes **before** the editor. By then the Pawn tier holds every tile, enemy and ability the editor's palette must show, and an editor built on the old look would be restyled straight away.
 
 *(Designer, 2026-10-07)* Sound comes into M4, music and effects together. The editor is for players as well as the designer, and its levels can be exported and shared, carrying their author's solution. Free play, planned as M4.x, comes into M4 too, because it holds the editor's levels, shared levels and the Pawn tier's set. Every free-play level is tagged with its tier and a difficulty: `pass`, `try`, `raise`, `assert` or `while True:`, colour-coded green, yellow, orange, red and a flashing warning.
+
+*(Designer, 2026-10-11)* Milestones now run in three phases (draft, build, QA) with three gates for me, built by a Claude orchestrator that hands work packages to worker agents in parallel. The process is `docs/WORKFLOW.md`; the first run is M4.3's last step.
 
 **Out of scope for now:** accounts, multiplayer, mobile layout, and a server (so shared levels travel as links, codes and files).
 

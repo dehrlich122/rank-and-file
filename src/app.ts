@@ -8,17 +8,22 @@
 //   #/editor           My levels: the levels made in the editor (M4.2)
 //   #/editor/<id>      the level editor
 //   #/editor/<id>/play test-play: the level opened in the real level screen
+//   #/play/<code>      a level someone shared, opened from its link (M4.3)
+//   #/shared/<id>      a shared level already kept in this browser ("Shared with me")
 //   #/harness          the raw Python harness from Milestone 0
 //   #/styleguide       the look at every size, in both themes (M3.7)
 import { chapterName, chapters, findLevel } from "./content";
 import { drafts } from "./editor/drafts";
+import { readSolution, setSolution } from "./editor/rules";
 import { testPlaySource } from "./editor/starts";
 import { mountHarness } from "./harness";
 import { unlockedPieces } from "./promotion";
 import { progress } from "./progress";
 import { PyClient, startPythonWorker, type ClientStatus } from "./py/client";
 import { applyToDocument, settings } from "./settings";
+import { openRemix, sharedLevels, sharedProgress } from "./share/shared";
 import { sound } from "./sound";
+import { authorSolution } from "./ui/compare";
 import { h } from "./ui/dom";
 import { icon } from "./ui/icons";
 import { mountEditor } from "./ui/editorScreen";
@@ -28,6 +33,7 @@ import { mountLevel, type LevelContext } from "./ui/levelView";
 import { mountPromotion } from "./ui/promotionScreen";
 import { ReplPanel } from "./ui/repl";
 import { SettingsDialog } from "./ui/settingsDialog";
+import { authorSolution as sharedSolution, openShared, sharedProblem, sharedSource } from "./ui/sharedLevel";
 import { mountTitle } from "./ui/titleScreen";
 import { mountStyleguide } from "./ui/styleguide";
 
@@ -39,6 +45,7 @@ export function startApp(root: HTMLElement): void {
     settings,
     () => {
       progress.reset();
+      sharedProgress.reset(); // shared levels' stars, hints and code; the levels themselves stay (M4.3)
       context.knownCalls.clear();
       route(); // redraw the screen from the cleared progress
     },
@@ -105,12 +112,55 @@ export function startApp(root: HTMLElement): void {
     heading.focus({ preventScroll: true });
   }
 
+  /** A level someone else made, on the level screen: kept in this browser, with progress of its own. */
+  function showShared(data: Record<string, unknown>): () => void {
+    const source = sharedSource(data);
+    crumbs.replaceChildren(h("span", {}, "Shared level"), h("span", { class: "crumb-sep" }, "/"), h("span", {}, source.title));
+    document.title = `${source.title} · Shared level · Rank & File`;
+    return mountLevel(main, context, source, { shared: { remix: () => openRemix(data) },progress: sharedProgress, solution: sharedSolution(data) });
+  }
+
+  /** A level that can't be opened: a plain page that says why, with the way back. */
+  function showSharedProblem(reason: string): void {
+    crumbs.replaceChildren(h("span", {}, "Shared level"));
+    main.replaceChildren(sharedProblem(reason));
+    focusHeading();
+    document.title = "This level can't be opened · Rank & File";
+  }
+
+  /** A link's code: decoded, checked by the engine, kept, and only then opened. A level that fails any of that never opens. */
+  function openSharedCode(code: string): () => void {
+    crumbs.replaceChildren(h("span", {}, "Shared level"));
+    main.replaceChildren(h("div", { class: "editor-missing" }, h("p", { class: "muted", role: "status" }, "Opening the level…")));
+    document.title = "Opening a level · Rank & File";
+    let cancelled = false; // the player went elsewhere while the code was being checked
+    let unmountLevel = () => {};
+    const check = async (data: Record<string, unknown>) => {
+      await client.ready();
+      return client.call("loadLevel", { level: data });
+    };
+    const keep = (data: Record<string, unknown>) => {
+      if (!cancelled) sharedLevels.keep(data);
+    };
+    void openShared(code, { check, keep }).then((opening) => {
+      if (cancelled) return;
+      if (opening.ok) unmountLevel = showShared(opening.data);
+      else showSharedProblem(opening.reason);
+    });
+    return () => {
+      cancelled = true;
+      unmountLevel();
+    };
+  }
+
   function route(): void {
     unmount();
     unmount = () => {};
     const hash = location.hash || "#/";
     const levelMatch = /^#\/level\/([\w-]+)$/.exec(hash);
     const source = levelMatch ? findLevel(levelMatch[1]!) : undefined;
+    const playMatch = /^#\/play\/(.+)$/.exec(hash);
+    const sharedMatch = /^#\/shared\/([\w-]+)$/.exec(hash);
     if (source) {
       const chapter = chapters.find((c) => c.chapter === source.chapter);
       const number = (chapter?.levels.indexOf(source) ?? -1) + 1;
@@ -123,6 +173,14 @@ export function startApp(root: HTMLElement): void {
       );
       unmount = mountLevel(main, context, source);
       document.title = `${source.title} · Rank & File`;
+    } else if (playMatch) {
+      unmount = openSharedCode(playMatch[1]!);
+    } else if (sharedMatch) {
+      const data = sharedLevels.get(sharedMatch[1]!);
+      if (data) {
+        sharedLevels.keep(data); // opening it again moves it to the top of "Shared with me"
+        unmount = showShared(data);
+      } else showSharedProblem("This shared level isn't in this browser any more.");
     } else if (hash === "#/editor") {
       crumbs.replaceChildren(h("span", {}, "My levels"));
       unmount = mountEditorList(main, client);
@@ -133,7 +191,17 @@ export function startApp(root: HTMLElement): void {
       const draft = drafts.load(id);
       if (!draft) return void (location.hash = "#/editor");
       crumbs.replaceChildren(h("a", { href: "#/editor" }, "My levels"), h("span", { class: "crumb-sep" }, "/"), h("a", { href: `#/editor/${id}` }, draft.title), h("span", { class: "crumb-sep" }, "/"), h("span", {}, "Test-play"));
-      unmount = mountLevel(main, context, testPlaySource(draft), { testPlay: { back: `#/editor/${id}` } });
+      const kept = () => {
+        const saved = drafts.load(id);
+        return saved ? readSolution(saved) : "";
+      };
+      const keep = (code: string) => {
+        const saved = drafts.load(id);
+        if (saved) drafts.save(setSolution(saved, code));
+      };
+      // as a player of the shared level will see it: the offer exists only if a solution was kept before this screen opened
+      const solution = kept() ? authorSolution(kept) : null;
+      unmount = mountLevel(main, context, testPlaySource(draft), { testPlay: { back: `#/editor/${id}`, keep, kept }, solution });
       document.title = `${draft.title} · Test-play · Rank & File`;
     } else if (/^#\/editor\/[\w-]+$/.test(hash)) {
       const name = h("span", {}, "Editing");

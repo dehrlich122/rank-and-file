@@ -6,12 +6,33 @@
 // when it closes, so nothing of it lingers in the page.
 import type { EditorView } from "@codemirror/view";
 import { marked } from "marked";
-import { loadSolution } from "../content";
+import { loadSolution, type Solution } from "../content";
+import { capitalise } from "../editor/draft";
 import { dialogHead, modal } from "./dialog";
 import { h } from "./dom";
 import { createEditor } from "./editor";
 
-export function openComparison(levelId: string, yourCode: string): void {
+/** Where a level's solution comes from, and what to call it: the curriculum's idiomatic solution, or an author's own (M4.3). */
+export interface SolutionSource {
+  name: string; // "an idiomatic solution", "the author's solution"
+  explained: boolean; // it comes with a note on why it's written that way
+  load(): Promise<Solution | null>;
+}
+
+/** The curriculum's reference solution for a level: a lazy file, fetched only when the comparison opens. */
+export const idiomaticSolution = (levelId: string): SolutionSource => ({ name: "an idiomatic solution", explained: true, load: () => loadSolution(levelId) });
+
+/** An author's own solution, offered as text: `code` is read when the comparison opens, and blank code means there is none. */
+export const authorSolution = (code: () => string): SolutionSource => ({
+  name: "the author's solution",
+  explained: false,
+  load: async () => {
+    const text = code();
+    return text.trim() ? { code: text, note: "" } : null;
+  },
+});
+
+export function openComparison(source: SolutionSource, yourCode: string): void {
   const editors: EditorView[] = [];
   const codePane = (title: string, code: string, className: string) => {
     const host = h("div", { class: "editor compare-code" });
@@ -22,7 +43,7 @@ export function openComparison(levelId: string, yourCode: string): void {
   const dialog: HTMLDialogElement = h(
     "dialog",
     { class: "compare-dialog", "aria-labelledby": "compare-title" },
-    dialogHead("compare-title", "Compare with an idiomatic solution", "Close", () => dialog.close()),
+    dialogHead("compare-title", `Compare with ${source.name}`, "Close", () => dialog.close()),
     body,
   );
   const open = modal(dialog);
@@ -33,24 +54,25 @@ export function openComparison(levelId: string, yourCode: string): void {
   document.body.append(dialog);
   open();
 
-  void loadSolution(levelId).then(
+  void source.load().then(
     (solution) => {
       if (!dialog.open) return;
       if (!solution) {
-        body.replaceChildren(h("p", {}, "This level doesn't have an idiomatic solution yet."));
+        body.replaceChildren(h("p", {}, `This level doesn't have ${source.name} yet.`));
         return;
       }
-      const note = h("div", { class: "compare-note" });
-      // The notes are our own trusted content, like lessons.
-      note.insertAdjacentHTML("beforeend", marked.parse(solution.note, { async: false }));
+      // The curriculum's notes are our own trusted content, like lessons. An author's solution has no note, and nothing
+      // that arrives in a shared level ever reaches insertAdjacentHTML.
+      const note = solution.note ? h("div", { class: "compare-note" }) : null;
+      note?.insertAdjacentHTML("beforeend", marked.parse(solution.note, { async: false }));
       body.replaceChildren(
         h(
           "div",
           { class: "compare-columns" },
           codePane("Your code", yourCode, "compare-yours"),
-          codePane("An idiomatic solution", solution.code, "compare-idiomatic"),
+          codePane(capitalise(source.name), solution.code, "compare-idiomatic"),
         ),
-        note,
+        ...(note ? [note] : []),
       );
     },
     (error: unknown) => body.replaceChildren(h("p", {}, `The solution couldn't be loaded: ${String(error)}`)),

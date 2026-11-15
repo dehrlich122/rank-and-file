@@ -1,5 +1,6 @@
 // End-to-end checks for the level editor (M4.2): painting, undo, the engine's problems on the board, the
-// properties, test-play, files and My levels. Every level here is hand-made on a blank board; no curriculum level's
+// properties, test-play, files and My levels (M4.2); then the rules and hints, other boards, the solvability check,
+// the kept solution and the Share dialog (M4.3). Every level here is hand-made on a blank board; no curriculum level's
 // hints or solution is ever read or typed. Never put a level's contents into a check's message.
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -304,14 +305,15 @@ export default async function editorChecks({ browser: b, base, check }) {
     expect((await wallCount()) === 1, "the wall is still there");
   });
 
-  await check("M4.2: Test-play opens the real level screen on the Challenge tab, with no lesson, hints, solution offer or stars, and saves no progress", async () => {
+  await check("M4.2: Test-play opens the real level screen on the Challenge tab, with no lesson, hints or solution offer, its star goals, and saves no progress", async () => {
     await newLevel();
     await clickButton("Test-play", ".ed-toolbar");
     await b.waitFor(`document.querySelector('.level[data-level-id]') && !document.querySelector('.level-right .btn-primary').disabled`, 60_000, "the level screen");
     const tabs = await b.evaluate(`[...document.querySelectorAll('.level-left .tab')].filter((t) => !t.hidden).map((t) => t.textContent + (t.classList.contains('active') ? '*' : '')).join(' ')`);
     expect(tabs === "Challenge* Codex", `tabs: ${tabs}`);
-    expect(!(await b.evaluate(`!!document.querySelector('.level-left .help')`)), "no hints or solution offer");
-    expect(!(await text(".level-left")).includes("Stars"), "no star goals");
+    // (a level with no hints and no kept solution has an empty help panel: M4.3 gave test-play the real one)
+    expect((await text(".level-left .help")).trim() === "", "no hints or solution offer");
+    expect((await text(".level-left")).includes("Stars"), "test-play shows the star goals, as a player sees them (M4.3)");
     // a hand-made level on a blank board: north to the top, turn right, east to the goal
     await b.evaluate(`document.querySelector('.level-right .cm-content').focus()`);
     await b.key("a", { code: "KeyA", modifiers: CTRL });
@@ -320,7 +322,6 @@ export default async function editorChecks({ browser: b, base, check }) {
     await b.waitFor(`document.querySelector('.outcome')`, 30_000, "the result");
     await sleep(300);
     expect((await text(".outcome")).includes("Solved"), "solved");
-    expect(!(await b.evaluate(`!!document.querySelector('.outcome .stars')`)), "no stars on the outcome");
     const progress = await b.evaluate(`localStorage.getItem('rank-and-file:progress') ?? ''`);
     expect(!progress.includes("my-"), "test-play must not write progress");
     await b.evaluate(`[...document.querySelectorAll('.outcome a')].find((a) => a.textContent.includes('Back to the editor')).click()`);
@@ -417,6 +418,429 @@ export default async function editorChecks({ browser: b, base, check }) {
     await clickButton("Yes, delete it", ".ed-confirm");
     await sleep(200);
     expect((await b.evaluate(`document.querySelectorAll('.my-level').length`)) === 1, "one level left");
+  });
+
+  // -- M4.3: the rules, hints, boards, the check, the kept solution and the Share dialog ----------------------------
+  // Every level here is hand-made on a blank board, and the programs typed are two-line ones written for it.
+  const openTab = (name) => b.evaluate(`[...document.querySelectorAll('.props .tab')].find((t) => t.textContent === ${JSON.stringify(name)}).click()`);
+  const fieldBox = (label) => `[...document.querySelectorAll('.props .field')].find((f) => f.querySelector(':scope > .field-label')?.textContent === ${JSON.stringify(label)})`;
+  /** Type into a properties-panel field (by its label), as the browser would: focus, new value, an input event. */
+  const setValue = (label, value) =>
+    b.evaluate(`(() => { const t = ${fieldBox(label)}.querySelector('input, textarea'); t.focus(); t.value = ${JSON.stringify(String(value))}; t.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  const getValue = (label) => b.evaluate(`${fieldBox(label)}.querySelector('input, textarea, select').value`);
+  const chooseOption = (label, index) =>
+    b.evaluate(`(() => { const s = ${fieldBox(label)}.querySelector('select'); s.selectedIndex = ${index}; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  const readAloudText = () => text(".rules-read");
+  const waitText = (selector, condition, what, ms = 30_000) => b.waitFor(`(() => { const t = document.querySelector(${JSON.stringify(selector)})?.textContent ?? ''; return ${condition}; })()`, ms, what);
+  const afterEdit = async () => {
+    // the change has reached the engine and its answer is back
+    await sleep(150);
+    await settled();
+  };
+
+  /** A program for the blank 8 x 8 board: north to the top, turn right, east to the goal (written for this board). */
+  const SOLVES = "for _ in range(7):\n    pawn.move()\npawn.turn_right()\nfor _ in range(7):\n    pawn.move()\n";
+  const FAILS = "pawn.move()\n";
+
+  async function testPlay() {
+    await clickButton("Test-play", ".ed-toolbar");
+    await b.waitFor(`document.querySelector('.level[data-level-id]') && !document.querySelector('.level-right .btn-primary').disabled`, 60_000, "the level screen");
+  }
+  async function runProgram(code) {
+    await b.evaluate(`document.querySelector('.level-right .cm-content').focus()`);
+    await b.key("a", { code: "KeyA", modifiers: CTRL });
+    await b.send("Input.insertText", { text: code });
+    await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
+    await b.waitFor(`document.querySelector('.outcome')`, 30_000, "the result");
+    await sleep(300);
+  }
+  async function backToEditor() {
+    await b.evaluate(`document.querySelector('.level-right a[href^="#/editor/"]').click()`);
+    await b.waitFor(`document.querySelector('.ed-board .board') && document.querySelector('.props')`, 60_000, "back in the editor");
+    await settled();
+  }
+  /** A new level whose solution has been kept, and the editor on screen again. */
+  async function levelWithKeptSolution() {
+    await newLevel();
+    await testPlay();
+    await runProgram(SOLVES);
+    expect((await text(".outcome")).includes("Solved"), "the program should solve the blank board");
+    await clickButton("Keep this as the level's solution", ".keep-solution");
+    await backToEditor();
+  }
+  const solutionBlock = () => text('[data-field="solution"]');
+  const keptLines = async () => {
+    await waitText('[data-field="solution"]', `/Kept: \\d+ lines?/.test(t)`, "the kept solution's length");
+    return Number(((await solutionBlock()).match(/Kept: (\d+)/) ?? [])[1]);
+  };
+
+  await check("M4.3: the Rules tab: Most lines of code and a phrase change what the player will read, and a Must-use box counts", async () => {
+    await newLevel();
+    await openTab("Rules");
+    await waitText(".rules-read", `t.length > 0 && !t.includes('Once the engine accepts')`, "what the player will read");
+    const plain = await readAloudText();
+    await setValue("Most lines of code", 3);
+    await waitText(".rules-read", `t !== ${JSON.stringify(plain)} && !t.includes('Checking')`, "the rules to change");
+    const limited = await readAloudText();
+    expect(limited.includes("3"), "the rules should name the limit of 3 lines");
+    expect((await saved())[0].constraints?.max_lines === 3, "the limit is saved");
+    // a phrase objective: added (the panel is rebuilt), worded by the engine, edited, removed
+    await clickButton("+ Say a phrase", ".props");
+    await waitText(".rules-read", `t !== ${JSON.stringify(limited)} && !t.includes('Checking')`, "the goal to change");
+    await b.evaluate(`(() => { const i = document.querySelector('input[aria-label="Phrase 1 to say"]'); i.focus(); i.value = 'Open sesame'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await waitText(".rules-read", `t.includes('Open sesame')`, "the phrase in the goal");
+    expect(JSON.stringify((await saved())[0].objectives).includes("Open sesame"), "the phrase is saved");
+    await b.evaluate(`document.querySelector('button[aria-label="Remove phrase 1"]').click()`);
+    await waitText(".rules-read", `t === ${JSON.stringify(limited)}`, "the goal to go back");
+    expect((await saved())[0].objectives === undefined, "the default goal writes no key");
+    // Must use: a checklist whose heading counts what is ticked
+    await b.evaluate(`(() => { const d = [...document.querySelectorAll('.props details')].find((x) => x.querySelector('summary').textContent.startsWith('Must use')); d.open = true; [...d.querySelectorAll('label.check')].find((l) => /while/i.test(l.textContent)).querySelector('input').click(); })()`);
+    await sleep(150);
+    expect((await text('.props details summary')).includes("(1)"), "the heading counts one ticked");
+    expect(((await saved())[0].constraints?.require_nodes ?? []).length === 1, "one construct is required in the saved level");
+    return "limit, phrase and Must use";
+  });
+
+  await check("M4.3: Collect gems = all on a board with no gem is the engine's problem and greys out Test-play; a gem clears it", async () => {
+    await newLevel();
+    await openTab("Rules");
+    await b.evaluate(`[...document.querySelectorAll('[data-field="objectives"] .choice-row')].find((r) => r.querySelector('.field-label').textContent === 'Collect gems').querySelectorAll('input[type=radio]')[1].click()`);
+    await b.waitFor(`document.querySelector('.problem-link')`, 30_000, "the problem");
+    expect(await b.evaluate(`document.querySelector('.ed-toolbar .btn-primary').disabled`), "Test-play should be disabled");
+    await tool("Gem");
+    await click(3, 3);
+    await settled();
+    expect((await problemsText()).includes("None"), "a gem on the board clears it");
+    expect(!(await b.evaluate(`document.querySelector('.ed-toolbar .btn-primary').disabled`)), "Test-play is back");
+  });
+
+  await check("QA-043: two fields typed in a row both keep their change: the Level tab, the Rules tab, a gate's words, a patrol's clock", async () => {
+    await newLevel();
+    await setValue("Title", "Two Fields");
+    await setValue("Brief", "Reach the far corner.");
+    await setValue("What it trains", "Walking");
+    let level = (await saved())[0];
+    expect(level.title === "Two Fields" && level.brief === "Reach the far corner." && level.trains === "Walking", "title, brief and what-it-trains all saved");
+    await openTab("Rules");
+    await setValue("Most lines of code", 7);
+    await setValue("Par (lines of code)", 4);
+    await setValue("Starter code", "# begin here");
+    level = (await saved())[0];
+    expect(level.constraints?.max_lines === 7 && level.par?.lines === 4 && String(level.starter).includes("begin here"), "limit, par and starter all saved");
+    await tool("Gate");
+    await click(3, 3);
+    await setValue("The answer that opens it", "alpha");
+    await setValue("What the guard asks (optional)", "Who goes?");
+    const legend = JSON.stringify((await saved())[0].legend);
+    expect(legend.includes("alpha") && legend.includes("Who goes?"), "the gate's passphrase and question both saved");
+    await tool("Patrol");
+    await click(5, 5);
+    await chooseOption("Ticks with", 1);
+    await b.evaluate(`[...document.querySelectorAll('.props .check')].find((l) => l.textContent.includes('Loops round')).querySelector('input').click()`);
+    await sleep(150);
+    const patrol = (await saved())[0].enemies[0];
+    expect(patrol.clock !== undefined && patrol.loop === true, "the patrol's clock and Loops round both saved");
+    // leaving and coming back: the three Level-tab fields are still there
+    await b.send("Page.navigate", { url: `${base}#/editor` });
+    await b.waitFor(`document.querySelector('.my-level-open')`, 30_000, "the list");
+    await b.evaluate(`document.querySelector('.my-level-open').click()`);
+    await b.waitFor(`document.querySelector('.ed-board .board') && document.querySelector('.props')`, 60_000, "the editor");
+    expect((await getValue("Title")) === "Two Fields" && (await getValue("Brief")) === "Reach the far corner." && (await getValue("What it trains")) === "Walking", "the Level tab fields survived a trip to My levels");
+  });
+
+  await check("M4.3: the Hints tab: a tier waits for the one above and keeps its words; test-play offers the hints one at a time", async () => {
+    await newLevel();
+    await openTab("Hints");
+    const areas = (n) => b.evaluate(`document.querySelectorAll('[data-field="hints"] textarea')[${n}].disabled`);
+    expect(!(await areas(0)) && (await areas(1)) && (await areas(2)), "only the first hint is open to write at first");
+    const write = (n, words) => b.evaluate(`(() => { const t = document.querySelectorAll('[data-field="hints"] textarea')[${n}]; t.focus(); t.value = ${JSON.stringify(words)}; t.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await write(0, "Look at the edges.");
+    expect(!(await areas(1)), "writing the first wakes the second");
+    await write(1, "Moves go the way you face.");
+    await write(0, "");
+    expect(await areas(1), "emptying the first puts the second back to waiting");
+    expect((await b.evaluate(`document.querySelectorAll('[data-field="hints"] textarea')[1].value`)) === "Moves go the way you face.", "the second keeps its words");
+    await write(0, "Look at the edges.");
+    expect((await saved())[0].hints?.length === 2, "two hints are saved");
+    await settled();
+    await testPlay();
+    expect((await text(".help .hints")).includes("Show a hint (1 of 2)"), "the first hint is offered");
+    await runProgram(FAILS);
+    expect(await hasButton("Need a hint?", ".outcome"), "a failed run offers a hint");
+    await b.evaluate(`document.querySelector('.hint-button').click()`);
+    expect((await b.evaluate(`document.querySelectorAll('.hint-list li').length`)) === 1, "one hint is open");
+    expect((await text(".help .hints")).includes("Show the next hint (2 of 2)"), "the next one is offered");
+    await b.evaluate(`document.querySelector('.hint-button').click()`);
+    expect((await b.evaluate(`document.querySelectorAll('.hint-list li').length`)) === 2 && !(await b.evaluate(`!!document.querySelector('.hint-button')`)), "both open, and nothing more to offer");
+    await runProgram(SOLVES);
+    expect((await text(".outcome")).includes("Solved"), "the level can still be solved after hints");
+  });
+
+  await check("M4.3: boards: a second board is a copy; paint and a gate's words stay on the board they were made on", async () => {
+    await newLevel();
+    await tool("Gate");
+    await click(3, 3);
+    await setValue("The answer that opens it", "alpha");
+    await clickButton("+ Add a board", ".board-row");
+    await b.waitFor(`document.querySelectorAll('.board-tab').length === 2 && document.querySelectorAll('.board-tab')[1].getAttribute('aria-pressed') === 'true'`, 15_000, "board 2");
+    expect((await text("#ed-status")).includes("Board 2"), "the status line names the board");
+    await tool("Select");
+    await click(3, 3);
+    expect((await getValue("The answer that opens it")) === "alpha", "board 2 starts as a copy, gate included");
+    await setValue("The answer that opens it", "beta");
+    await tool("Wall");
+    await click(1, 5);
+    let [level] = await saved();
+    const walls = (map) => (map.match(/#/g) ?? []).length;
+    expect(walls(level.map) === 0 && walls(level.variants[0].map) === 1, "the wall is on board 2 only");
+    const board2 = level.variants[0].map;
+    // back on board 1: no wall there, the gate keeps its own words
+    await b.evaluate(`document.querySelectorAll('.board-tab')[0].click()`);
+    await tool("Select");
+    await click(3, 3);
+    expect((await getValue("The answer that opens it")) === "alpha", "board 1's gate still has its own passphrase");
+    await tool("Wall");
+    await click(5, 1);
+    level = (await saved())[0];
+    expect(walls(level.map) === 1 && level.variants[0].map === board2, "a wall on board 1 leaves board 2 as it was");
+    await b.evaluate(`document.querySelectorAll('.board-tab')[1].click()`);
+    await tool("Select");
+    await click(3, 3);
+    expect((await getValue("The answer that opens it")) === "beta", "board 2's gate keeps its own passphrase");
+    // hidden-goal squares belong to board 1
+    await tool("Hidden goal");
+    await click(2, 6);
+    expect((await text("#ed-status")).includes("only on Board 1"), "a ? square on board 2 is refused, with the reason");
+    return "walls and gate words per board";
+  });
+
+  await check("M4.3: a problem on board 2 puts a mark on its tab, and clicking the problem switches to that board; Remove asks and Undo restores", async () => {
+    await newLevel();
+    await clickButton("+ Add a board", ".board-row");
+    await b.waitFor(`document.querySelectorAll('.board-tab')[1]?.getAttribute('aria-pressed') === 'true'`, 15_000, "board 2");
+    await tool("Erase");
+    await click(7, 7); // board 2's goal
+    await b.waitFor(`document.querySelector('.problem-link')`, 30_000, "the problem");
+    expect(await b.evaluate(`!!document.querySelectorAll('.board-tab')[1].querySelector('.problem-badge')`), "board 2's tab is marked");
+    expect(!(await b.evaluate(`!!document.querySelectorAll('.board-tab')[0].querySelector('.problem-badge')`)), "board 1's tab is not");
+    expect(await b.evaluate(`document.querySelector('.ed-toolbar .btn-primary').disabled`), "Test-play is greyed");
+    await b.evaluate(`document.querySelectorAll('.board-tab')[0].click()`);
+    await b.evaluate(`document.querySelector('.problem-link').click()`);
+    expect(await b.evaluate(`document.querySelectorAll('.board-tab')[1].getAttribute('aria-pressed') === 'true'`), "the problem took us to board 2");
+    // Remove this board asks first; Undo brings it back
+    await clickButton("Remove this board", ".board-row");
+    expect(await b.evaluate(`!!document.querySelector('.ed-confirm .confirm-step')`), "removing asks first");
+    await clickButton("Keep it", ".ed-confirm");
+    expect((await b.evaluate(`document.querySelectorAll('.board-tab').length`)) === 2, "Keep it keeps the board");
+    await clickButton("Remove this board", ".board-row");
+    await clickButton("Yes, remove it", ".ed-confirm");
+    await settled();
+    expect((await b.evaluate(`document.querySelectorAll('.board-tab').length`)) === 1, "one board left");
+    expect((await problemsText()).includes("None"), "the board with the problem is gone");
+    await clickButton("Undo", ".ed-toolbar");
+    await sleep(200);
+    expect((await b.evaluate(`document.querySelectorAll('.board-tab').length`)) === 2, "Undo brings board 2 back");
+  });
+
+  await check("M4.3: test-play of a two-board level says the code has to work on all of them", async () => {
+    await newLevel();
+    await clickButton("+ Add a board", ".board-row");
+    await settled();
+    await testPlay();
+    expect((await text(".level-left")).includes("all 2 boards"), "the Challenge tab says so");
+    await runProgram(SOLVES);
+    expect((await text(".outcome")).includes("Solved"), "the same program solves both blank boards");
+  });
+
+  // -- the check: can it be solved? ----------------------------------------------------------------------------
+  const solveText = () => text(".solve-box");
+  const pressCheck = async (label = "Check") => {
+    await settled();
+    await clickButton(label, ".solve-box");
+  };
+
+  await check("M4.3: Check on a trivial level reports a route and how many lines of plain calls, never a route", async () => {
+    await newLevel();
+    await pressCheck();
+    await waitText(".solve-box", `t.includes('A route exists')`, "the answer", 60_000);
+    const said = await solveText();
+    expect(/plain calls do it in \d+ lines?/.test(said), `the answer should count lines: ${said.slice(0, 100)}`);
+    expect(!/pawn\.|move\(\)/.test(said), "the check must not show code");
+    expect(await b.evaluate(`!!document.querySelector('.solve-mark')`), "the answer carries a mark");
+  });
+
+  await check("M4.3: Check on a walled-in goal says no route was found; opening the wall finds one again", async () => {
+    await newLevel();
+    await tool("Wall");
+    await click(6, 7);
+    await click(7, 6);
+    await pressCheck();
+    await waitText(".solve-box", `t.includes('No route found')`, "the no-route answer", 60_000);
+    await tool("Erase");
+    await click(7, 6);
+    expect((await b.evaluate(`!!document.querySelector('.stale-note')`)), "the answer is marked as older");
+    await pressCheck("Check again");
+    await waitText(".solve-box", `t.includes('A route exists')`, "a route once the wall is open", 60_000);
+  });
+
+  await check("M4.3: editing after an answer marks it as for an older version; Check again clears the mark", async () => {
+    await newLevel();
+    await pressCheck();
+    await waitText(".solve-box", `t.includes('A route exists')`, "the answer", 60_000);
+    expect(!(await b.evaluate(`!!document.querySelector('.stale-note')`)), "a fresh answer isn't marked");
+    await tool("Wall");
+    await click(4, 4);
+    await waitText(".solve-box", `t.includes('older version of the level')`, "the older-version note");
+    expect(await b.evaluate(`!!document.querySelector('.solve-results.stale')`), "the answer fades");
+    await pressCheck("Check again");
+    await waitText(".solve-box", `t.includes('A route exists') && !t.includes('older version')`, "a fresh answer", 60_000);
+  });
+
+  await check("M4.3: Cancel stops a long search and returns to idle; painting during one stops it, with a note", async () => {
+    await newLevel();
+    const size = (n) => b.evaluate(`(() => { for (const i of document.querySelectorAll('.ed-size input')) { i.value = '${n}'; i.dispatchEvent(new Event('change', { bubbles: true })); } })()`);
+    await size(12);
+    await sleep(200);
+    await tool("Gem");
+    for (const [x, y] of [[1, 1], [10, 2], [2, 10], [9, 9], [5, 5], [0, 6], [11, 6], [6, 0], [6, 11], [3, 8]]) await click(x, y);
+    await openTab("Rules");
+    await b.evaluate(`[...document.querySelectorAll('[data-field="objectives"] .choice-row')].find((r) => r.querySelector('.field-label').textContent === 'Collect gems').querySelectorAll('input[type=radio]')[1].click()`);
+    await afterEdit();
+    expect((await problemsText()).includes("None"), `the engine should accept the level: ${(await problemsText()).slice(0, 120)}`);
+    await pressCheck();
+    await waitText(".solve-box", `t.includes('Searching')`, "the search to begin");
+    expect(await hasButton("Cancel", ".solve-box"), "a search offers Cancel");
+    await clickButton("Cancel", ".solve-box");
+    await sleep(300);
+    expect(!(await solveText()).includes("Searching"), "Cancel stops the search");
+    expect(await hasButton("Check", ".solve-box"), "back to idle: Check is offered again");
+    // a change while it searches stops it, and says so
+    await pressCheck();
+    await waitText(".solve-box", `t.includes('Searching')`, "the second search to begin");
+    await tool("Wall");
+    await click(8, 8);
+    await waitText(".solve-box", `t.includes('The level changed, so the search stopped.')`, "the note");
+    expect(!(await solveText()).includes("Searching"), "the search is stopped");
+  });
+
+  // -- keeping a solution --------------------------------------------------------------------------------------
+  await check("M4.3: a solved test-play offers to keep the program, says Kept, and the Rules tab then shows its length", async () => {
+    await newLevel();
+    await openTab("Rules");
+    expect((await solutionBlock()).includes("Solve the level in test-play"), "before keeping, the Rules tab says how");
+    await settled();
+    await testPlay();
+    await runProgram(FAILS);
+    expect(!(await b.evaluate(`!!document.querySelector('.keep-solution')`)), "a failed run offers nothing to keep");
+    await runProgram(SOLVES);
+    expect(await hasButton("Keep this as the level's solution", ".keep-solution"), "a solved run offers to keep it");
+    await clickButton("Keep this as the level's solution", ".keep-solution");
+    expect((await text(".keep-solution")).includes("Kept as the level's solution"), "it says Kept");
+    expect(typeof (await saved())[0].solution === "string", "the solution is saved with the level");
+    await backToEditor();
+    await openTab("Rules");
+    const lines = await keptLines();
+    expect(lines >= 1, "the length is a number of lines");
+    expect(await hasButton("Remove", '[data-field="solution"]'), "and it can be removed");
+    return `${lines} lines`;
+  });
+
+  await check("M4.3: Use my solution's n lines sets par, Undo undoes it, and Remove takes the solution away", async () => {
+    await levelWithKeptSolution();
+    await openTab("Rules");
+    const lines = await keptLines();
+    await setValue("Par (lines of code)", lines + 5);
+    await sleep(150);
+    const button = `Use my solution's ${lines} lines`;
+    expect(await hasButton(button, ".props"), "the button names the solution's length");
+    await clickButton(button, ".props");
+    await sleep(200);
+    expect(Number(await getValue("Par (lines of code)")) === lines && (await saved())[0].par?.lines === lines, "par is now the solution's length");
+    expect(!(await hasButton(button, ".props")), "the button goes once par matches");
+    await clickButton("Undo", ".ed-toolbar");
+    await sleep(200);
+    expect(Number(await getValue("Par (lines of code)")) === lines + 5, "Undo puts the old par back");
+    await clickButton("Remove", '[data-field="solution"]');
+    await sleep(200);
+    expect(!(await solutionBlock()).includes("Kept:") && (await solutionBlock()).includes("Solve the level in test-play"), "Remove takes the kept solution away");
+    expect((await saved())[0].solution === undefined, "and from the saved level");
+  });
+
+  await check("M4.3: a level with a kept solution offers it in test-play after three failed runs", async () => {
+    await levelWithKeptSolution();
+    await testPlay();
+    await runProgram(FAILS);
+    expect(!(await hasButton("Show me a solution…", ".outcome")), "not offered after one failed run");
+    await runProgram(FAILS);
+    await runProgram(FAILS);
+    expect(await hasButton("Show me a solution…", ".outcome"), "offered after three");
+  });
+
+  // -- sharing -------------------------------------------------------------------------------------------------
+  const shareChecks = () => b.evaluate(`[...document.querySelectorAll('.share-checks li')].map((li) => li.children[0].textContent)`);
+  const openShare = async () => {
+    await clickButton("Share…", ".ed-toolbar");
+    await b.waitFor(`document.querySelector('.share-dialog')?.open && document.querySelectorAll('.share-checks li').length > 0 && !document.querySelector('.share-checks').textContent.includes('Checking…')`, 60_000, "the share checks");
+  };
+  const closeShare = () => b.evaluate(`document.querySelector('.share-dialog')?.close()`);
+
+  await check("M4.3: Share with no kept solution is blocked: a clear reason, and the link, code and file are disabled", async () => {
+    await newLevel();
+    await openShare();
+    const marks = await shareChecks();
+    expect(marks[0] === "✓" && marks.includes("✗"), `the marks: ${marks.join(" ")}`);
+    expect((await text(".share-checks")).includes("No solution kept yet"), "it says why");
+    expect(await b.evaluate(`!!document.querySelector('.share-out.blocked')`), "the output is marked blocked");
+    const enabled = await b.evaluate(`[...document.querySelectorAll('.share-out input, .share-out textarea, .share-out button')].filter((e) => !e.disabled).length`);
+    expect(enabled === 0, `${enabled} controls are enabled`);
+    await closeShare();
+  });
+
+  await check("M4.3: Share after keeping a solution: every check passes, the link has #/play/rf1. and the code starts rf1.; Copy answers", async () => {
+    await levelWithKeptSolution();
+    await openShare();
+    const marks = await shareChecks();
+    expect(marks.length === 3 && marks.every((m) => m === "✓"), `the marks: ${marks.join(" ")}`);
+    expect(await b.evaluate(`!document.querySelector('.share-out.blocked')`), "the output is open");
+    const link = await b.evaluate(`document.querySelector('.share-out input[aria-label="Link"]').value`);
+    const code = await b.evaluate(`document.querySelector('.share-out textarea').value`);
+    expect(link.includes("#/play/rf1."), "the link carries the code");
+    expect(code.startsWith("rf1."), "the code starts rf1.");
+    expect(link.endsWith(code), "the link is the code after #/play/");
+    await b.evaluate(`document.querySelector('.share-out button[aria-label="Copy the link"]').click()`);
+    await waitText(".share-copy .small[role=status]", `t.length > 0`, "an answer to Copy", 5000);
+    await closeShare();
+    return "rf1 link and code";
+  });
+
+  await check("M4.3: Share with a par below the solution's lines shows a cross and Set par to n fixes it", async () => {
+    await levelWithKeptSolution();
+    await openTab("Rules");
+    const lines = await keptLines();
+    await setValue("Par (lines of code)", 1);
+    await afterEdit();
+    await openShare();
+    let marks = await shareChecks();
+    expect(marks.includes("✗") && marks[1] === "✓", `the marks: ${marks.join(" ")}`);
+    expect(await b.evaluate(`document.querySelector('.share-out.blocked') !== null`), "a failing check blocks the output");
+    expect(await hasButton(`Set par to ${lines}`, ".share-checks"), `Set par to ${lines} is offered`);
+    await clickButton(`Set par to ${lines}`, ".share-checks");
+    await b.waitFor(`document.querySelectorAll('.share-checks li').length > 0 && !document.querySelector('.share-checks').textContent.includes('Checking…')`, 30_000, "the checks again");
+    marks = await shareChecks();
+    expect(marks.every((m) => m === "✓"), `the marks after Set par: ${marks.join(" ")}`);
+    await closeShare();
+    expect(Number(await getValue("Par (lines of code)")) === lines, "the editor's par is now the solution's length");
+  });
+
+  await check("M4.3: the Share dialog's Download a .yaml file saves the level under its title", async () => {
+    await levelWithKeptSolution();
+    await b.evaluate(`(() => { window.__saved = []; const make = URL.createObjectURL.bind(URL); URL.createObjectURL = (blob) => { window.__blob = blob; return make(blob); }; HTMLAnchorElement.prototype.click = function () { window.__saved.push(this.download); }; })()`);
+    await openShare();
+    await clickButton("Download a .yaml file", ".share-out");
+    expect((await b.evaluate(`window.__saved[0]`)) === "untitled-level.yaml", "the file is named after the title");
+    const file = await b.evaluate(`window.__blob.text()`);
+    expect(/^title: Untitled level$/m.test(file) && /^map: \|$/m.test(file), "the file is a level");
+    await closeShare();
   });
 
   // -- looks --------------------------------------------------------------------------------------------------

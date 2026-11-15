@@ -4,6 +4,9 @@
 //   npm run e2e                       all suites against http://localhost:5173/
 //   npm run e2e -- http://localhost:4173/ --only=app
 //
+// Suites: harness, app, ui, editor, share. `share` needs the dev server (npm run dev): it makes share codes in the
+// page by importing src/share/codec.ts.
+//
 // Writes e2e-results/report.json (every check, its timing and console output)
 // and a screenshot per failure, with code editors blurred.
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -13,6 +16,7 @@ import appChecks from "./app.check.mjs";
 import { launch } from "./cdp.mjs";
 import editorChecks from "./editor.check.mjs";
 import harnessChecks from "./harness.check.mjs";
+import shareChecks from "./share.check.mjs";
 import uiChecks from "./ui.check.mjs";
 import { createSuite } from "./suite.mjs";
 
@@ -22,7 +26,7 @@ const base = (args.find((arg) => /^https?:\/\//.test(arg)) ?? "http://localhost:
 const only = args.find((arg) => arg.startsWith("--only="))?.slice("--only=".length);
 const outDir = join(root, "e2e-results");
 
-const suites = { harness: harnessChecks, app: appChecks, ui: uiChecks, editor: editorChecks };
+const suites = { harness: harnessChecks, app: appChecks, ui: uiChecks, editor: editorChecks, share: shareChecks };
 
 try {
   await fetch(base);

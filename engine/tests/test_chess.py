@@ -173,7 +173,7 @@ def test_each_board_can_have_its_own_enemies():
     )
     kinds = [[enemy.kind for enemy in case.level.enemies] for case in level.cases()]
     assert kinds == [["rook"], ["bishop"], ["rook"]]  # a board without its own keeps the level's
-    with pytest.raises(LevelError, match="variant 1: the pawn starts on b1, which the rook on b4 attacks"):
+    with pytest.raises(LevelError, match="board 2: the pawn starts on b1, which the rook on b4 attacks"):
         make_level(FIELD, api=API, variants=[{"map": FIELD, "enemies": [{"kind": "rook", "start": "b4"}]}])
 
 

@@ -96,6 +96,7 @@ export interface ProblemAt {
   enemy?: number; // its number from 1, as in the message
   field?: string; // a key of the level: "title", "goal", "start", "api", "size", ...
   squares?: string[]; // several squares, e.g. every square using a legend entry that is wrong
+  board?: number; // a problem on one of a level's other boards: its number from 1 (absent: the first)
 }
 
 type LoadLevelResult = { ok: true; level: LevelInfo } | { ok: false; error: string; at: ProblemAt | null };
@@ -109,6 +110,22 @@ export interface EditorOptions {
   clocks: Clock[];
   facings: Facing[];
   timed_gate: { open: number; clock: Clock }; // a timed gate's defaults
+  constructs: Array<{ node: string; label: string }>; // what a level may require or ban: an `ast` node's name and how to say it (M4.3)
+  limits: Record<string, number> & { starter: number; hint: number }; // how long each text may be, and how many hints and enemies (LIMITS)
+  max_boards: number; // a level and its other boards
+}
+
+/** How the solvability check (M4.3) got on with one board: a route of plain calls, none, a cap reached, or clockwork it can't judge. */
+type SolveStatus = "route" | "no_route" | "gave_up" | "clocks";
+
+/** Where the check has got to. Counts and words only: the route is never sent (engine/rankfile/search.py). */
+export interface SolveProgress {
+  done: boolean;
+  case: number; // the board (or hidden-goal place) it is on, from 1
+  cases: number;
+  unit: "board" | "place"; // what a case is: another board, or another square the hidden goal might be on
+  positions: number; // positions reached on that board so far
+  results: Array<{ label: string; where: string; status: SolveStatus; lines: number | null; positions: number }>; // the boards finished
 }
 
 export interface GameEvent {
@@ -209,6 +226,10 @@ export interface Requests {
   runSnippet: { args: { code: string }; result: SnippetResult };
   loadLevel: { args: { level: unknown }; result: LoadLevelResult };
   editorOptions: { args: Record<string, never>; result: EditorOptions };
+  // The solvability check, in slices (M4.3): start it, then ask again until `done`; not asking again cancels it.
+  solveStart: { args: { level: unknown }; result: { ok: true; cases: number } | { ok: false; error: string } };
+  solveStep: { args: { seconds: number }; result: SolveProgress };
+  codeLines: { args: { code: string }; result: number }; // lines as par counts them (M4.3: the author's kept solution)
   loadSandbox: { args: { api: string[]; board?: unknown }; result: LevelInfo }; // board: a level's lesson_board (QA-019)
   runLevel: { args: { level: unknown; code: string; hintsUsed: number; solutionSeen: boolean }; result: LevelResult };
   runSandbox: { args: { code: string; api: string[]; board?: unknown }; result: LevelResult };
