@@ -813,6 +813,9 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     await setCode("pawn.move()\n");
     await b.evaluate(`window.__trails = 0; setInterval(() => { window.__trails = Math.max(window.__trails, document.querySelectorAll('.board .trail-hero').length); }, 20); document.querySelector('.level-right .btn-primary').click()`);
     await b.waitFor(`document.querySelector('.outcome')`, 30_000, "the run's result");
+    // the outcome card is drawn as the last step starts, and the trail follows a moment later (the board's own timers):
+    // give the sampler time to see it rather than reading the instant the card appears
+    await b.waitFor(`window.__trails > 0`, 3000, "a trail element").catch(() => {});
     const trails = await b.evaluate(`window.__trails`);
     // a gate's closed art lifts away over time when it opens, and a rook that takes the piece slides in rather than jumping
     await b.send("Page.navigate", { url: `${base}#/styleguide` });
