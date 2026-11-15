@@ -6,7 +6,7 @@
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { sleep } from "./cdp.mjs";
-import { buttonHelpers, levelHelpers } from "./helpers.mjs";
+import { buttonHelpers, hoverHelpers, levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const SETTINGS = "rank-and-file:settings";
@@ -28,6 +28,7 @@ const corridor = (title) => ({
 export default async function freeChecks({ browser: b, base, root, check }) {
   const { setCode } = levelHelpers(b, base, root);
   const { clickButton, hasButton } = buttonHelpers(b);
+  const { wordAt, hover, hoverAway } = hoverHelpers(b);
   const text = (selector) => b.evaluate(`document.querySelector(${JSON.stringify(selector)})?.textContent ?? ''`);
   const exists = (selector) => b.evaluate(`!!document.querySelector(${JSON.stringify(selector)})`);
   const goto = (hash) => b.evaluate(`location.hash = ${JSON.stringify(hash)}`);
@@ -260,26 +261,36 @@ export default async function freeChecks({ browser: b, base, root, check }) {
   });
 
   // -- Skins ------------------------------------------------------------------------------------------------------
+  /** One skin card's state: its classes, its Wear it button's label (null when it has none), and the status or "how" text. */
+  const card = (piece) =>
+    b.evaluate(`(() => {
+      const c = document.querySelector('.skin-card[data-piece="${piece}"]');
+      return {
+        worn: c.classList.contains('worn'), locked: c.classList.contains('locked'), name: c.querySelector('strong').textContent,
+        button: c.querySelector('button')?.textContent ?? null, status: c.querySelector('.skin-status')?.textContent ?? '',
+        how: c.querySelector('.skin-how')?.textContent ?? '', focused: document.activeElement === c,
+      };
+    })()`);
   await check("M4.4: Skins: 'Wear it' on the Charger sets Settings → Piece to the knight, the card says Worn and keeps keyboard focus", async () => {
     await load("#/free/skins", { fresh: true });
     await b.waitFor(`document.querySelector('.skin-card')`, 30_000, "the gallery");
-    const locked = await b.evaluate(`({ knight: document.querySelector('.skin-card[data-piece="knight"]').classList.contains('locked'), disabled: document.querySelector('.skin-card[data-piece="knight"] button').disabled })`);
-    expect(locked.knight && locked.disabled, "the Charger is locked before the tier is cleared");
+    const before = await card("knight");
+    expect(before.locked && !before.worn && !before.button && before.how.startsWith("Locked: "), `the Charger is locked before the tier is cleared: ${JSON.stringify(before)}`);
     await setStorage("rank-and-file:progress", SOLVED_CHAPTER_6);
     await load("#/free/skins");
     await b.waitFor(`document.querySelector('.skin-card[data-piece="knight"]')`, 30_000, "the gallery again");
-    const card = (piece) =>
-      b.evaluate(`(() => { const c = document.querySelector('.skin-card[data-piece="${piece}"]'); return { worn: c.classList.contains('worn'), label: c.querySelector('button').textContent, disabled: c.querySelector('button').disabled, name: c.querySelector('strong').textContent, focused: document.activeElement === c }; })()`);
     const piece = () => b.evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS)}) ?? '{}').piece ?? 'pawn'`);
     try {
-      expect((await card("knight")).name === "Charger", "the knight skin is the Charger");
-      expect((await card("knight")).label === "Wear it" && !(await card("knight")).disabled, "the Charger can be worn");
-      expect((await card("pawn")).worn && (await card("pawn")).label === "Worn", "the pawn is worn at first");
+      const unlocked = await card("knight");
+      expect(unlocked.name === "Charger", "the knight skin is the Charger");
+      expect(!unlocked.locked && !unlocked.worn && unlocked.button === "Wear it", `the Charger can be worn: ${JSON.stringify(unlocked)}`);
+      const pawn = await card("pawn");
+      expect(pawn.worn && !pawn.button && pawn.status.endsWith("Worn"), `the pawn is worn at first, with no button: ${JSON.stringify(pawn)}`);
       // press the button from the keyboard's position (focus on it), as a keyboard player would
       await b.evaluate(`document.querySelector('.skin-card[data-piece="knight"] button').focus(); document.querySelector('.skin-card[data-piece="knight"] button').click()`);
       await b.waitFor(`document.querySelector('.skin-card[data-piece="knight"]').classList.contains('worn')`, 10_000, "the Charger worn");
       const now = await card("knight");
-      expect(now.worn && now.label === "Worn" && now.disabled, `the card after: ${JSON.stringify(now)}`);
+      expect(now.worn && !now.locked && !now.button && now.status.endsWith("Worn"), `the card after: ${JSON.stringify(now)}`);
       expect(now.focused, "keyboard focus is on the worn card");
       expect((await piece()) === "knight", `Settings → Piece is ${await piece()}`);
       // Settings shows the same choice
@@ -292,7 +303,8 @@ export default async function freeChecks({ browser: b, base, root, check }) {
       await b.evaluate(`document.querySelector('.skin-card[data-piece="pawn"] button')?.click()`);
       await sleep(100);
     }
-    expect((await piece()) === "pawn" && (await card("pawn")).worn, "the pawn is back");
+    const back = await card("pawn");
+    expect((await piece()) === "pawn" && back.worn, `the pawn is back: ${JSON.stringify(back)}`);
     return "Charger worn with focus kept; pawn back";
   });
 
@@ -549,5 +561,113 @@ export default async function freeChecks({ browser: b, base, root, check }) {
       await b.send("Emulation.setDeviceMetricsOverride", { width: 1400, height: 860, deviceScaleFactor: 1, mobile: false });
     }
     return `aligned at ${seen.join(" and ")}`;
+  });
+
+  await check("QA-054: hovering a function in the Sandbox's editor shows its Codex entry; other words show nothing", async () => {
+    await load("#/free/sandbox", { fresh: true });
+    const editor = ".sandbox .cm-content";
+    await b.waitFor(`document.querySelector('.sandbox .snippet-board .board') && !!document.querySelector(${JSON.stringify(editor)})`, 90_000, "the Sandbox board");
+    const tooltip = () => b.evaluate(`document.querySelector('.cm-tooltip .codex-card .codex-call')?.textContent ?? null`);
+    // the Codex request follows Python's start, so the tooltips arrive a moment after the board: try again for a while
+    let shown = null;
+    for (const started = Date.now(); shown === null && Date.now() - started < 10_000; ) {
+      await hover(await wordAt("move", editor));
+      await sleep(900); // longer than the hover delay
+      shown = await tooltip();
+      await hoverAway();
+    }
+    expect(shown === "pawn.move(squares=1)", `hovering move shows ${JSON.stringify(shown)}`);
+    // a word of the starter's comment is no function
+    await hover(await wordAt("learned", editor));
+    await sleep(900);
+    const none = await tooltip();
+    await hoverAway();
+    expect(none === null, `hovering a word of the comment shows ${JSON.stringify(none)}`);
+    return "move shows its entry; a comment word shows nothing";
+  });
+
+  await check("QA-058: the Sandbox says it is loading and keeps Run off until the board is there, names its abilities, and fits above the fold", async () => {
+    await b.evaluate(`window.__oldPage = true`); // so the poll below never reads the previous check's page
+    await load("#/free/sandbox", { fresh: true });
+    // read the state at the first moment Run exists, polling inside the page (Python takes over a second to start)
+    const first = await b.waitFor(
+      `new Promise((resolve) => {
+        const look = () => {
+          const run = document.querySelector('.sandbox .snippet-bar .btn-primary');
+          if (window.__oldPage || !run) return setTimeout(look, 5);
+          resolve({ note: document.querySelector('.sandbox .snippet-board .board-loading')?.textContent ?? null, disabled: run.disabled, board: !!document.querySelector('.sandbox .snippet-board .board') });
+        };
+        look();
+      })`,
+      60_000,
+      "the Sandbox's Run button",
+    );
+    expect(first.note === "Loading the board…" && first.disabled && !first.board, `before the board: ${JSON.stringify(first)}`);
+    await b.waitFor(`document.querySelector('.sandbox .snippet-board .board')`, 90_000, "the Sandbox board");
+    await sleep(200);
+    const after = await b.evaluate(`({ note: !!document.querySelector('.sandbox .snippet-board .board-loading'), disabled: document.querySelector('.sandbox .snippet-bar .btn-primary').disabled })`);
+    expect(!after.note && !after.disabled, `with the board: ${JSON.stringify(after)}`);
+    // the abilities line: a fresh profile has met only move
+    const line = await b.evaluate(`({ text: document.querySelector('p.sandbox-abilities')?.textContent ?? '', codes: [...document.querySelectorAll('p.sandbox-abilities code')].map((c) => c.textContent) })`);
+    expect(line.text.startsWith("You can use: ") && line.codes.length === 1 && line.codes[0] === "move", `the abilities line: ${JSON.stringify(line)}`);
+    // the layout: the board beside the editor at 1440x900, and the board and Run above the fold at 1440x900 and 1000x800
+    const seen = [];
+    try {
+      for (const [width, height] of [[1440, 900], [1000, 800]]) {
+        await b.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+        await sleep(400);
+        const at = await b.evaluate(`(() => {
+          const rect = (selector) => document.querySelector(selector).getBoundingClientRect();
+          const board = rect('.sandbox .snippet-board .board');
+          return { boardLeft: board.left, boardBottom: board.bottom, editorRight: rect('.sandbox .cm-editor').right, runBottom: rect('.sandbox .snippet-bar .btn-primary').bottom, height: innerHeight, scrollY };
+        })()`);
+        expect(at.scrollY === 0 && at.boardBottom <= at.height && at.runBottom <= at.height, `at ${width}x${height}, the board and Run are not above the fold: ${JSON.stringify(at)}`);
+        if (width === 1440) expect(at.boardLeft >= at.editorRight - 1, `at 1440x900 the board is not right of the editor: ${JSON.stringify(at)}`);
+        seen.push(`${width}x${height}`);
+      }
+    } finally {
+      await b.send("Emulation.setDeviceMetricsOverride", { width: 1400, height: 860, deviceScaleFactor: 1, mobile: false });
+    }
+    // on a board with no level, an ability the piece doesn't have is named with "Here it knows", not "In this level"
+    await setCode("pawn.turn_left()\n", ".sandbox .cm-content");
+    await b.evaluate(`document.querySelector('.sandbox .snippet-bar .btn-primary').click()`);
+    await b.waitFor(`document.querySelector('.sandbox .error-detail')`, 30_000, "the error");
+    const message = await text(".sandbox .error-detail");
+    expect(message.includes("Here it knows") && !message.includes("In this level"), "the error says Here it knows, not In this level");
+    return `loading note, abilities, fold at ${seen.join(" and ")}, "Here it knows"`;
+  });
+
+  await check("QA-059: the Skins page says what it is, its cards are keyboard stops with names, and the Charger is labelled in Settings", async () => {
+    await load("#/free/skins", { fresh: true });
+    await b.waitFor(`document.querySelector('.skin-card[data-piece="knight"]')`, 30_000, "the gallery");
+    expect((await text(".skins-intro")) === "Skins change how your piece looks. Promotions unlock them.", "the intro line");
+    const cards = await b.evaluate(`[...document.querySelectorAll('.skin-card')].map((c) => ({ piece: c.dataset.piece, tab: c.getAttribute('tabindex'), label: c.getAttribute('aria-label') ?? '' }))`);
+    expect(cards.length >= 2 && cards.every((c) => c.tab === "0" && c.label !== ""), `every card is a tab stop with a label: ${JSON.stringify(cards)}`);
+    expect(cards.find((c) => c.piece === "knight")?.label.startsWith("Charger, locked: "), "the locked knight's label");
+    const stray = await b.evaluate(`({ inCards: document.querySelectorAll('.skin-card.worn button, .skin-card.locked button').length, disabled: document.querySelectorAll('.skins button:disabled').length })`);
+    expect(stray.inCards === 0 && stray.disabled === 0, `no button on a worn or locked card, none disabled: ${JSON.stringify(stray)}`);
+    // the real Tab key from the top of the page reaches the locked card, which has no button to stop on
+    await b.evaluate(`document.activeElement?.blur()`);
+    let presses = 0;
+    while (presses < 60 && !(await b.evaluate(`document.activeElement === document.querySelector('.skin-card[data-piece="knight"]')`))) {
+      await b.key("Tab", { code: "Tab" });
+      presses++;
+    }
+    expect(await b.evaluate(`document.activeElement === document.querySelector('.skin-card[data-piece="knight"]')`), `Tab did not reach the locked Charger in ${presses} presses`);
+    // Settings → Piece names the knight's skin
+    await b.evaluate(`document.querySelector('.topbar .settings-button').click()`);
+    let label = "";
+    try {
+      // (the label's own words: a locked option also carries a separate "locked until..." note)
+      label = await b.evaluate(`(() => {
+        const copy = document.querySelector('input[name="setting-piece"][value="knight"]')?.closest('label')?.cloneNode(true);
+        copy?.querySelector('.lock-note')?.remove();
+        return copy?.textContent.trim() ?? '';
+      })()`);
+    } finally {
+      await b.evaluate(`document.querySelector('.settings-dialog')?.close()`);
+    }
+    expect(label === "Knight · Charger", `Settings → Piece labels the knight ${JSON.stringify(label)}`);
+    return `Tab reaches the locked Charger in ${presses} presses; Settings says "${label}"`;
   });
 }
