@@ -1,9 +1,9 @@
 // Context guard (docs/WORKFLOW.md, "Context management"). Sessions restart from handoff.md
 // instead of compacting, so each one is told when its context gets big:
-//   PostToolUse, orchestrator: from 300k tokens, finish the current unit, write the handoff and
-//                              end with HANDOFF READY; from 340k, stop now (ceiling 350k).
+//   PostToolUse, orchestrator: from 150k tokens, finish the current unit, then run the `handoff`
+//                              skill (ends with HANDOFF READY); from 190k, stop now (ceiling 200k).
 //   PostToolUse, subagent:     from 150k, commit the work in progress and return a partial report.
-//   Stop, orchestrator:        above 300k, refuse to stop once until handoff.md has been rewritten.
+//   Stop, orchestrator:        above 150k, refuse to stop once until handoff.md has been rewritten.
 // The size is the last API call's input (fresh + cache write + cache read), read from the
 // transcript, the same figure the status line shows.
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "node:fs";
@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-export const LIMITS = { handoff: 300_000, stop: 340_000, worker: 150_000, step: 10_000 };
+export const LIMITS = { handoff: 150_000, stop: 190_000, worker: 150_000, step: 10_000 };
 const TAIL = 2 * 1024 * 1024; // the last usage line is near the end; read at most this much
 
 /** Context tokens from the last main-thread (or subagent) API response in a transcript, or null. */
@@ -68,21 +68,21 @@ function loadState(file) {
 const k = (tokens) => `${Math.round(tokens / 1000)}k`;
 
 function workerMessage(tokens) {
-  return `[context-guard] Your context is at ${k(tokens)} tokens; the worker limit is ${k(LIMITS.worker)}. ` +
+  return `[context-guard] Your context is at ${k(tokens)} tokens; the limit is ${k(LIMITS.worker)}. ` +
     "Wrap up now: get npm run check to exit 0 if you can within a few steps, commit your work in progress on your " +
     "branch, and return your report with Status: partial, saying exactly what is done and what remains, so a fresh " +
-    "worker can carry on from your branch.";
+    "agent can carry on from your branch. A lead starts no further worker.";
 }
 
 function orchestratorMessage(tokens) {
   if (tokens >= LIMITS.stop) {
-    return `[context-guard] Context is at ${k(tokens)}, close to the 350k ceiling. Stop the current work now: ` +
-      "commit or note the work in progress, rewrite handoff.md's Resume card, and end the turn with HANDOFF READY.";
+    return `[context-guard] Context is at ${k(tokens)}, close to the 200k ceiling. Stop the current work now: ` +
+      "commit or note the work in progress, then run the `handoff` skill (rewrites the Resume card, ends with HANDOFF READY).";
   }
-  return `[context-guard] Context is at ${k(tokens)} (handoff at ${k(LIMITS.handoff)}, ceiling 350k). ` +
-    "Finish the unit of work you are in, but don't start another. Then commit what's finished (npm run check " +
-    "first), rewrite handoff.md's Resume card (phase, work packages, next action, open questions), and end your turn " +
-    "with the line HANDOFF READY so the designer can /clear and type go.";
+  return `[context-guard] Context is at ${k(tokens)} (handoff at ${k(LIMITS.handoff)}, ceiling 200k). ` +
+    "Finish the unit of work you are in, but don't start another. Then run the `handoff` skill: it checks the tree, " +
+    "commits what is finished, rewrites handoff.md's Resume card and ends with HANDOFF READY, so the designer can " +
+    "/clear and type go.";
 }
 
 /** PostToolUse: a message to inject, or null. Remembers the last 10k step it warned at. */
@@ -102,8 +102,8 @@ export function onStop(input, tokens, state, handoffChangedAt) {
   state.crossedAt ??= Date.now();
   if (handoffChangedAt != null && handoffChangedAt >= state.crossedAt) return null;
   return `[context-guard] Context is at ${k(tokens)}, past the ${k(LIMITS.handoff)} handoff point, and handoff.md ` +
-    "hasn't been rewritten since. Before stopping: commit finished work, rewrite handoff.md's Resume card, then end " +
-    "with HANDOFF READY.";
+    "hasn't been rewritten since. Before stopping, run the `handoff` skill: it commits finished work, rewrites the " +
+    "Resume card and ends with HANDOFF READY.";
 }
 
 function main() {

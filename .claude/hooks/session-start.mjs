@@ -1,6 +1,6 @@
 // SessionStart hook (startup, clear): a fresh context starts from handoff.md (docs/WORKFLOW.md).
-// It injects the Resume card so the session knows the phase and the next action before the
-// designer types "go". handoff.md is spoiler-free by rule, so its card is safe to show.
+// It injects the Resume card and points to the `start-session` skill, which checks the card
+// against the repo before the designer types "go". handoff.md is spoiler-free by rule, so its card is safe to show.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -18,9 +18,8 @@ export function resumeCard(text) {
 }
 
 export function startContext(handoffText) {
-  const lead = "[session-start] Rank & File. Before acting, read handoff.md (repo root) in full, then check it " +
-    "against `git status`, `git log --oneline -5` and `git worktree list`. When the designer says go, carry on from " +
-    "the Resume card's next action under docs/WORKFLOW.md.";
+  const lead = "[session-start] Rank & File. Before acting, run the `start-session` skill: it checks the Resume " +
+    "card below against the repo and says what is waiting on the designer.";
   if (handoffText == null) return `${lead} (handoff.md is missing: ask the designer where things stand.)`;
   const card = resumeCard(handoffText);
   return card ? `${lead}\n\n${card}` : lead;
