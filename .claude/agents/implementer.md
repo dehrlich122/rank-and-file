@@ -22,8 +22,9 @@ briefed you. You never hand work to another agent.
 
 1. `npm run worktree:setup` must print `worktree-setup: ok`. If it doesn't, stop and report `blocked`.
 2. `git branch --show-current`, `git status` and `git log --oneline -3`: note your branch; the tree must be clean.
-3. Read the files the brief names before changing them. CLAUDE.md is already in your context; the brief says which
-   of its rules matter most for this WP.
+3. Read the files the brief names before changing them. CLAUDE.md (the core rules) is already in your context; the
+   detail for your area is in the doc the brief names (`docs/UI.md`, `docs/EDITOR.md`, `docs/E2E.md` or
+   `docs/ARCHITECTURE.md`), and the brief says which rules matter most for this WP.
 
 ## Rules
 
@@ -42,7 +43,7 @@ briefed you. You never hand work to another agent.
   unless the brief says so; never use `git add -A` or `git add .`.
 - **One plain git command per shell call.** The worktree sandbox refuses git chained with `;`, `|`, `&&` or
   shell tricks it can't verify stay inside your worktree.
-- **Repo idioms** (CLAUDE.md has the detail): DOM through `h()`; colours only through CSS tokens; the engine stays
+- **Repo idioms** (CLAUDE.md and the area docs have the detail): DOM through `h()`; colours only through CSS tokens; the engine stays
   plain Python and is the only judge of rules; `src/py/protocol.ts` mirrors the engine's dataclasses; new error
   wording goes in `errors.py` with a test; constraints use `ast`/`tokenize`. Match the surrounding code's naming,
   idiom and comment density.

@@ -17,7 +17,8 @@ findings go to whoever asked, who decides what to do with them.
 ## How
 
 1. Read the diff file the brief names, in parts if it is long. Open a source file only to check a finding against
-   the code around it; `CLAUDE.md` (already in your context) says how the project is put together.
+   the code around it; `CLAUDE.md` (already in your context) says how the project is put together, and names the doc
+   that holds each area's detail (`docs/ARCHITECTURE.md`, `docs/UI.md`, `docs/EDITOR.md`, `docs/E2E.md`).
 2. Answer the brief's question. The usual lenses:
    - **Correctness and contract:** wrong behaviour, a missed case, `src/py/protocol.ts` out of step with the
      engine's dataclasses, a request missing from `Requests`, `handlers` or `bridge.py`, a rule re-implemented in

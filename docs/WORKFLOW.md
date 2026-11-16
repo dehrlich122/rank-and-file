@@ -39,6 +39,11 @@ full `npm run e2e`, and a retest list (the fixes plus anything `/simplify` chang
 → **Gate 3: designer QA2.** Fixes from QA2 follow the usual QA-fix path, with no second pass. Then the merge commit
 and the "status rows" commit on `main`.
 
+**Heavy passes, twice per milestone** *(Designer, 2026-09-27; timing
+changed 2026-09-30 and 2026-10-11)*: the feature-complete pass before QA1 and the `/simplify` pass before QA2,
+both above. The second has to come before
+QA2 so nothing reaches the site unplayed. Between passes, `npm run check` (before every commit) is the safety net.
+
 ## Who does what
 
 | | Fable (orchestrator) | Opus `lead` | Opus `reviewer` | Sonnet `implementer` / `implementer-deep` |
@@ -104,7 +109,7 @@ Milestone branch: <branch> at <sha>   (your worktree starts here)
 Goal: <one paragraph: what the player or the code gains>
 Already known / ruled out: <facts, so nothing is rediscovered>
 Contract you build on: <types, requests, classes, routes already committed; file:line pointers>
-Read only: <the files worth reading>
+Read only: <the files worth reading, and the area's doc: docs/UI.md | docs/EDITOR.md | docs/E2E.md | docs/ARCHITECTURE.md>
 You own: <files you may edit>          You may create: <new files>
 Append-only: scripts/vulture_allowlist.py, knip.json
 Don't touch: everything else (list the near misses explicitly)
@@ -112,7 +117,7 @@ Don't touch: everything else (list the near misses explicitly)
 Acceptance criteria:
 1. <observable behaviour, each one testable>
 Tests to write: <which files, which cases>
-Rules that bite here: <the CLAUDE.md rules this WP is most likely to break>
+Rules that bite here: <the rules, from CLAUDE.md or the area's doc, this WP is most likely to break>
 Validation: npm run worktree:setup; targeted tests; npm run check (exit code 0)
 Budget: stop and report `partial` at about 150k tokens
 Commit attribution line: <the line for the agent's model>
