@@ -22,8 +22,8 @@ import { authorSolution, sharedBanner, sharedFrame } from "./sharedLevel";
  * level, no crown or promotion, the Codex counts the curriculum and then its own abilities), but it is played for real: its
  * stars, hints and code are saved, in the shared levels' own store, and a banner offers a remix.
  *
- * The Sandbox's scratch level (QA-061) is the player's own board: no lesson, no tier, no hints or solution, no stars kept
- * (a progress store of its own that is gone with the screen), its code kept in the scratch store, and "Change the board" as
+ * The Sandbox's scratch level (QA-061) is the player's own board: no lesson, no tier, no hints or solution, no stars drawn
+ * or kept (a progress store of its own that is gone with the screen), its code kept in the scratch store, and "Change the board" as
  * the way on.
  */
 export interface LevelHost {
@@ -32,6 +32,7 @@ export interface LevelHost {
   solution: SolutionSource | null | undefined; // undefined: the curriculum's reference by id (HelpPanel's default); null: none offered
   learn: boolean; // the Learn tab (a lesson); without it the screen opens on the Challenge tab
   tier: "set" | "engine" | null; // where the Challenge panel gets the level's tier tag: its Free Play set, the engine (levelTags), or nowhere (a lesson level, the Sandbox)
+  stars: boolean; // the outcome card and the Challenge tab show the level's stars (not the Sandbox: it keeps none)
   curriculum: boolean; // counts toward crowns and promotions; its Codex is the curriculum's own
   frame?: (layout: HTMLElement) => HTMLElement; // wraps the screen (a shared level's banner)
   back?: { href: string; label: string }; // a toolbar link before Run (test-play's "← Editor")
@@ -48,6 +49,7 @@ export function lessonHost(): LevelHost {
     solution: undefined,
     learn: true,
     tier: null,
+    stars: true,
     curriculum: true,
     onward: (id) => {
       const next = nextLevel(id);
@@ -70,6 +72,7 @@ export function testPlayHost(options: { back: string; keep: (code: string) => vo
     solution: options.solution,
     learn: false,
     tier: "engine",
+    stars: true,
     curriculum: false,
     back: { href: options.back, label: "← Editor" },
     codes: { get: (id) => testCodes.get(id), set: (id, code) => void testCodes.set(id, code) },
@@ -90,6 +93,7 @@ export function challengeHost(): LevelHost {
     solution: undefined,
     learn: false,
     tier: "set",
+    stars: true,
     curriculum: false,
     onward: (id) => {
       const next = nextChallenge(id);
@@ -106,6 +110,7 @@ export function sharedHost(data: Record<string, unknown>): LevelHost {
     solution: authorSolution(data),
     learn: false,
     tier: "engine",
+    stars: true,
     curriculum: false,
     frame: (layout) => sharedFrame(sharedBanner(() => openRemix(data)), layout),
     onward: () => ({ href: "#/free/shared", label: "← Shared with me" }),
@@ -121,6 +126,7 @@ export function sandboxHost(store: Pick<ScratchStore, "code" | "setCode">): Leve
     solution: null,
     learn: false,
     tier: null,
+    stars: false,
     curriculum: false,
     back: board,
     codes: { get: () => store.code(), set: (_id, code) => store.setCode(code) },
