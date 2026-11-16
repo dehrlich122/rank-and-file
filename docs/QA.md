@@ -1882,14 +1882,18 @@ solution or the comparison. Nobody has played the five yet: this round looked at
 puzzles are good. **Not reached** (the worker ran out of room): the light theme at 1000×700 was measured but not
 looked at; a wrong attempt at 1000×700; Animations full during a run.
 
-- **QA-063 · A solved challenge's card is wider than the board's column, and its way on is cut off** *(automated)* · Open
+- **QA-063 · A solved challenge's card is wider than the board's column, and its way on is cut off** *(automated)* · Fixed, to retest
   - **Observed:** at 1440×900, after a correct run on any of the five, the "Run complete" banner and the card are
     about 460px wide in a column of about 410px. The middle panel gets a sideways scrollbar and "Next challenge →"
     (or "Back to Free Play") is cut until the player scrolls. Every time, both themes. At 1000×700 it fits.
   - **Likely why:** the card's head holds "Solved!", "Compare with an idiomatic solution" and the way on in one row
     that doesn't wrap; "Next challenge →" is longer than a lesson level's way on. Whether a lesson level with
     several boards does it too was not checked; the fix's check covers one.
-- **QA-064 · Wide boards are drawn small beside the other boards** *(automated)* · Open
+  - **Fixed** in `f763d9a` (2026-11-17): the card's head row wraps (headline, compare, way on, in that order), so
+    the card is never wider than its column. A lesson level with several boards never overflowed; it has a guard
+    check all the same. Checks: the card and its way on lie inside the panel, with no sideways scroll, on
+    challenges 1 and 5 and on a lesson level.
+- **QA-064 · Wide boards are drawn small beside the other boards** *(automated)* · Fixed, to retest
   - **Observed:** at 1440×900 the finale's boards (9 and 12 squares wide) share the column with the three small
     boards beside them, so the board on show is about 280px wide: squares of about 23px, rank and file labels of
     about 6px, and half the stage's height empty under it. Whole and unclipped, but hard to read. At 1000×700 it is fine.
@@ -1898,9 +1902,29 @@ looked at; a wrong attempt at 1000×700; Animations full during a run.
     every board of that level, so the layout doesn't change as the player switches boards. Every other level keeps
     QA-032's layout, small boards beside. To widen it to every board that is wider than tall (a bigger board on
     show for boards like 7 × 5 too), say so: it is one condition.
-- **QA-065 · Backticks show in the plank's line under Obstacles** *(automated; older than M4.5, since M3.1)* · Open
+  - **Fixed** in `1ebe2e3` and `22257c9` (2026-11-17). The finale's board on show is now the column's full width
+    (about 425px, from 282). **Seven levels change** (every level with several boards was measured): challenges
+    2 and 5, and five lesson levels with a board of 9 to 12 columns: `ch02-l06` (9 wide), `ch03-l02` (10 × 8) and
+    Chapter 6's last three, `ch06-l04` to `-l06` (9 × 9, 12 × 12, 11 × 11), whose squares were as small as the
+    finale's. The other twenty levels with several boards are as before. With Settings → Code panel at the bottom
+    the board on show is held by the panel's height, so it is whole but no bigger than before. **To look at:** a
+    big square board is now taller on screen as well as wider, with the small boards under it, so the playback
+    bar and the card sit about 150px lower; on a short window (768 high) that means more scrolling in the panel.
+    Checks: under and at least 380px wide on every board of the finale, at 1440×900, 1000×700 and with the code
+    at the bottom; beside on a challenge with tall boards, a tall lesson level and a 7 × 5 lesson level.
+- **QA-065 · Backticks show in the plank's line under Obstacles** *(automated; older than M4.5, since M3.1)* · Fixed, to retest
   - **Observed:** "A plank laid over a pit (\`bridge()\`) makes it safe to cross." shows its backticks. Any level
     with a plank has it. The Challenge panel's lists print the engine's sentences as plain text.
+  - **Fixed** in `568f4d3` (2026-11-17): the Goal, Obstacles, Rules and Stars lists show a code span as code. The
+    engine's sentence is unchanged. Check: the plank's line has `bridge()` as code and no list shows a backtick.
+- **Retest (QA-063 to QA-065), at a window about 1440 wide:**
+  1. Solve challenge 1: the card under the board fits, with no sideways scrollbar, and "Next challenge →" is whole.
+  2. Open challenge 5 (and 2): the three small boards are in a row under the board on show, which fills the
+     column; click through the four boards and the arrangement stays. Challenge 1 (tall boards) still has them beside.
+  3. Lessons → Chapter 2, level 6, Chapter 3, level 2 and Chapter 6, levels 4 to 6 (a board 9 to 12 squares
+     wide): small boards under, the board on show bigger than it was. Is the playback bar still where you want
+     it under Chapter 6, level 5's board? Chapter 2, level 2: small boards beside, as before.
+  4. Challenge 5 → Challenge tab → Obstacles: the plank's line shows `bridge()` as code, no backticks.
 - **For the designer (no change made):**
   - **A narrow window plays the run out of sight** (older than M4.5; every level). At 1000×700 the code sits under
     the board and the page scrolls. After typing and pressing Run, the board is above the window for the whole

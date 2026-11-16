@@ -92,6 +92,10 @@ worker are in `docs/ARCHITECTURE.md`; the Codex's entries are in `docs/Codex.md`
     playback bar and outcome card beside the editor (QA-012). They're moved,
     never rebuilt.
   - The board fills its column up to `--board-max-height`.
+  - A level with several boards shows one large and the others small (`.boards`, QA-032): beside it, or in a row
+    under it in a window up to 700px wide and in any level with a board wider than 8 columns (`.boards-wide`,
+    set in `mountLevel` from the sizes the engine reports; QA-064). The arrangement is the level's, never the
+    board on show's, so it doesn't change as the player switches boards.
   - Keep layout changes in CSS wherever possible, and never rebuild the
     editor, board or lesson.
 - What kind of level the screen is showing is a `LevelHost` (`ui/levelHost.ts`): a lesson level, a test-play
