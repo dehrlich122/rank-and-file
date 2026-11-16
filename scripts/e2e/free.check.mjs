@@ -980,6 +980,71 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     });
   });
 
+  /** A level with several boards, before a run: the board on show against the small ones, and whether it all sits inside the middle panel. */
+  const boardsShape = () =>
+    b.evaluate(`(() => {
+      const box = (e) => e.getBoundingClientRect();
+      const panel = document.querySelector('.level-middle');
+      const left = box(panel).left + panel.clientLeft;
+      const main = document.querySelector('.boards-main');
+      const side = document.querySelector('.boards-side');
+      const parts = [main.querySelector('.board'), ...side.querySelectorAll('.board-thumb')].map(box);
+      return {
+        width: Math.round(box(main.querySelector('.board')).width),
+        under: box(side).top >= box(main).bottom - 1,
+        beside: box(side).left >= box(main).right - 1,
+        thumbs: side.children.length,
+        over: panel.scrollWidth - panel.clientWidth,
+        whole: parts.every((r) => r.left >= left - 0.5 && r.right <= left + panel.clientWidth + 0.5),
+      };
+    })()`);
+  /** Put board `n` on show by its small board (if it is not on show already), and wait for its caption. */
+  const showBoard = async (n) => {
+    await b.evaluate(`document.querySelector('.board-thumb[aria-label="Look at board ${n}"]')?.click()`);
+    await b.waitFor(`document.querySelector('.boards-caption')?.textContent.startsWith('Board ${n} of')`, 10_000, `board ${n} on show`);
+  };
+  const codePanel = (where) => b.evaluate(`document.querySelector('input[name="setting-codePanel"][value="${where}"]').click()`);
+
+  await check("QA-064: wide boards: the small boards sit in a row under the board on show (at least 380px wide, whichever board is on show), at 1440x900, 1000x700 and with Code panel = bottom", async () => {
+    await openChallenge(CHALLENGES[4], { fresh: true });
+    const seen = [];
+    await atSize(1440, 900, async () => {
+      for (const n of [1, 2, 3, 4]) {
+        await showBoard(n);
+        const shape = await boardsShape();
+        seen.push(shape);
+        expect(shape.thumbs === 3 && shape.under && !shape.beside && shape.width >= 380 && shape.whole && shape.over <= 0, `board ${n}: ${JSON.stringify(shape)}`);
+      }
+    });
+    await showBoard(1);
+    await atSize(1000, 700, async () => {
+      const shape = await boardsShape();
+      expect(shape.under && shape.whole && shape.over <= 0, `at 1000x700: ${JSON.stringify(shape)}`);
+    });
+    try {
+      await codePanel("bottom");
+      await atSize(1440, 900, async () => {
+        const shape = await boardsShape();
+        expect(shape.under && shape.whole && shape.over <= 0, `Code panel = bottom: ${JSON.stringify(shape)}`);
+      });
+    } finally {
+      await codePanel("right");
+    }
+    return `widths ${seen.map((s) => s.width)}`;
+  });
+
+  await check("QA-064: boards that are all as tall as wide or taller keep the small boards beside the one on show (a challenge and a lesson level, 1440x900)", async () => {
+    await atSize(1440, 900, async () => {
+      await openChallenge(CHALLENGES[0], { fresh: true });
+      const challenge = await boardsShape();
+      await openLevel("ch02-l05", { fresh: true }); // four boards, all taller than wide
+      const lesson = await boardsShape();
+      for (const [name, shape] of [["challenge", challenge], ["lesson level", lesson]]) {
+        expect(shape.beside && !shape.under && shape.whole && shape.over <= 0, `${name}: ${JSON.stringify(shape)}`);
+      }
+    });
+  });
+
   await check("QA-065: the Challenge panel's lists show `code` spans as code, with no backtick left (the plank's line shows bridge() in a code element)", async () => {
     await openChallenge(CHALLENGES[4], { fresh: true });
     const lists = await b.evaluate(`(() => {
