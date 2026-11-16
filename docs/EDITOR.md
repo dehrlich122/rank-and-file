@@ -17,7 +17,19 @@ the rest of the app are in `docs/UI.md`.
     the sprite registry.
   - The board draws from the engine's own description when it accepted the current draft (that has the
     squares a rook attacks), and from the draft otherwise.
-  - Test-play is `mountLevel(…, { testPlay })`: no lesson, hints, solution offer, stars or progress.
+  - Test-play is `mountLevel(…, testPlaySource(draft), testPlayHost(…))` (`src/ui/levelHost.ts`): no lesson and
+    no progress kept; the level's own hints, its stars, and the offer of a solution once one is kept.
+- **The Sandbox's scratch level** (QA-061, `docs/M4/M4.4-QA-061.md`; routes `#/free/sandbox` and
+  `#/free/sandbox/board`) is the editor and the level screen opened on one level of the player's own:
+  - `src/editor/scratch.ts` keeps that level and the code typed against it under the Sandbox's own key, apart
+    from My levels, so it is never listed, named or shared. Reset progress leaves it alone; Start over (in the
+    editor) puts back the starting 8 × 8 with every ability on, and the starting code.
+  - `#/free/sandbox` is `mountLevel(…, testPlaySource(draft), sandboxHost(scratch))`: no lesson, tier, hints,
+    solution or stars. A scratch level the engine refuses opens the editor instead, where Problems says why.
+  - `#/free/sandbox/board` is `mountEditor(…, scratch)`. `PropsContext.scratch` hides what is about naming and
+    publishing (title, brief, "what it trains", difficulty, the Hints tab, Par, "Your solution", Share, Export,
+    Save to the repo, the solvability check, "← My levels"); what changes how the level plays stays.
+    **A new control about publishing or scoring is hidden for the scratch level too.**
   - `engine/tests/test_editor_levels.py` and `src/editor/roundtrip.test.ts` (every level through a
     draft and the real engine, `scripts/compare_levels.py`) guard it. Keep new `LevelInfo` fields in
     step with `draftToLevelInfo`.

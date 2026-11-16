@@ -94,6 +94,11 @@ worker are in `docs/ARCHITECTURE.md`; the Codex's entries are in `docs/Codex.md`
   - The board fills its column up to `--board-max-height`.
   - Keep layout changes in CSS wherever possible, and never rebuild the
     editor, board or lesson.
+- What kind of level the screen is showing is a `LevelHost` (`ui/levelHost.ts`): a lesson level, a test-play
+  from the editor, a shared level, a Free Play challenge, or the Sandbox's scratch level (QA-061,
+  `docs/EDITOR.md`). The host says where progress and code are kept, whether there is a Learn tab, a tier tag,
+  a solution to offer and stars to show, and where the solved card leads. **A new difference between kinds of
+  level is a field on the host; the view never tests `host.kind`.**
 - The Learn panel pages one step per runnable snippet (`splitIntoSteps` in
   `ui/lesson.ts`, QA-010).
 - Playback buttons follow `controlStates()` in `ui/playback.ts`. Editing code

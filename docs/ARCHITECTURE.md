@@ -204,7 +204,7 @@ bridge function takes strings and returns a JSON string.
 | `editorOptions` | What the level editor offers (M4.2), read from the checker's own tables: each piece's abilities, the details each tile takes, enemy keys, clocks, facings, the board size limit |
 | `solveStart` / `solveStep` | The level editor's solvability check (M4.3, `search.py`): start it, then ask again until `done`. Each step works about 150 ms and reports counts and words per board (a route of plain calls and its lines, no route, gave up, or can't judge code clocks), never the route. Not asking again cancels it |
 | `runLevel` | Run code against a level (with the number of hints opened, for scoring); returns the full recording |
-| `loadSandbox` / `runSandbox` | The small open board lesson snippets run on |
+| `loadSandbox` / `runSandbox` | The small open board lesson snippets run on. (Free Play's Sandbox is not this: since QA-061 it is a level like any other, sent through `loadLevel` and `runLevel`; `docs/EDITOR.md`) |
 | `codex` | A level's Codex entries: its abilities and the built-ins taught so far ([Codex.md](Codex.md)) |
 | `replPush` / `replReset` | The scratch REPL (a session that lives in the worker). Each line carries the level's piece and abilities, for the session's stand-in piece |
 | `runSnippet` | Plain Python with no board (the `#/harness` page) |
