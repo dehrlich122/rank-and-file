@@ -1893,9 +1893,11 @@ looked at; a wrong attempt at 1000×700; Animations full during a run.
   - **Observed:** at 1440×900 the finale's boards (9 and 12 squares wide) share the column with the three small
     boards beside them, so the board on show is about 280px wide: squares of about 23px, rank and file labels of
     about 6px, and half the stage's height empty under it. Whole and unclipped, but hard to read. At 1000×700 it is fine.
-  - **Decided without the designer:** in a level where any board has more columns than rows, the small boards go in
-    a row under the board on show (as they already do in a narrow window), for every board of that level, so the
-    layout doesn't change as the player switches boards. Levels whose boards are all square or tall stay as they are.
+  - **Decided without the designer:** in a level where any board has more than 8 columns (wider than a
+    chessboard), the small boards go in a row under the board on show (as they already do in a narrow window), for
+    every board of that level, so the layout doesn't change as the player switches boards. Every other level keeps
+    QA-032's layout, small boards beside. To widen it to every board that is wider than tall (a bigger board on
+    show for boards like 7 × 5 too), say so: it is one condition.
 - **QA-065 · Backticks show in the plank's line under Obstacles** *(automated; older than M4.5, since M3.1)* · Open
   - **Observed:** "A plank laid over a pit (\`bridge()\`) makes it safe to cross." shows its backticks. Any level
     with a plank has it. The Challenge panel's lists print the engine's sentences as plain text.
