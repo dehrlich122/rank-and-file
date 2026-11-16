@@ -2,6 +2,7 @@
 // that differs between kinds, so the screen reads the host and has no branch of its own per kind. A new kind of level is
 // one more builder here.
 import { nextChallenge, nextLevel } from "../content";
+import type { ScratchStore } from "../editor/scratch";
 import { progress as curriculumProgress, ProgressStore } from "../progress";
 import { openRemix, sharedProgress } from "../share/shared";
 import type { SolutionSource } from "./compare";
@@ -20,17 +21,21 @@ import { authorSolution, sharedBanner, sharedFrame } from "./sharedLevel";
  * A shared level (M4.3, someone else's level opened from a link) is outside the curriculum like test-play (no lesson, no next
  * level, no crown or promotion, the Codex counts the curriculum and then its own abilities), but it is played for real: its
  * stars, hints and code are saved, in the shared levels' own store, and a banner offers a remix.
+ *
+ * The Sandbox's scratch level (QA-061) is the player's own board: no lesson, no tier, no hints or solution, no stars kept
+ * (a progress store of its own that is gone with the screen), its code kept in the scratch store, and "Change the board" as
+ * the way on.
  */
 export interface LevelHost {
-  kind: "lesson" | "testPlay" | "shared" | "challenge";
+  kind: "lesson" | "testPlay" | "shared" | "challenge" | "sandbox";
   progress: ProgressStore; // where stars, hints and code are kept
   solution: SolutionSource | null | undefined; // undefined: the curriculum's reference by id (HelpPanel's default); null: none offered
   learn: boolean; // the Learn tab (a lesson); without it the screen opens on the Challenge tab
-  tier: "set" | "engine" | null; // where the Challenge panel gets the level's tier tag: its Free Play set, the engine (levelTags), or nowhere (a lesson level)
+  tier: "set" | "engine" | null; // where the Challenge panel gets the level's tier tag: its Free Play set, the engine (levelTags), or nowhere (a lesson level, the Sandbox)
   curriculum: boolean; // counts toward crowns and promotions; its Codex is the curriculum's own
   frame?: (layout: HTMLElement) => HTMLElement; // wraps the screen (a shared level's banner)
   back?: { href: string; label: string }; // a toolbar link before Run (test-play's "← Editor")
-  codes?: { get(id: string): string | undefined; set(id: string, code: string): void }; // code kept outside progress (test-play: this session only)
+  codes?: { get(id: string): string | undefined; set(id: string, code: string): void }; // code kept outside progress (test-play: this session only; the Sandbox: the scratch store)
   solvedActions?: (code: string) => HTMLElement[]; // offered on a solved card before the help's (test-play's Keep)
   onward(id: string): { href: string; label: string }; // the solved card's primary link
 }
@@ -104,6 +109,22 @@ export function sharedHost(data: Record<string, unknown>): LevelHost {
     curriculum: false,
     frame: (layout) => sharedFrame(sharedBanner(() => openRemix(data)), layout),
     onward: () => ({ href: "#/free/shared", label: "← Shared with me" }),
+  };
+}
+
+/** The Sandbox's scratch level: its board is changed in the editor (#/free/sandbox/board), and `store` keeps the code typed. */
+export function sandboxHost(store: Pick<ScratchStore, "code" | "setCode">): LevelHost {
+  const board = { href: "#/free/sandbox/board", label: "Change the board" };
+  return {
+    kind: "sandbox",
+    progress: new ProgressStore(null),
+    solution: null,
+    learn: false,
+    tier: null,
+    curriculum: false,
+    back: board,
+    codes: { get: () => store.code(), set: (_id, code) => store.setCode(code) },
+    onward: () => board,
   };
 }
 

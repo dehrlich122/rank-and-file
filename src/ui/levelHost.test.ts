@@ -5,7 +5,9 @@ import { challengeSets, chapters } from "../content";
 import { progress, ProgressStore } from "../progress";
 import { sharedProgress } from "../share/shared";
 import type { SolutionSource } from "./compare";
-import { challengeHost, lessonHost, sharedHost, testPlayHost } from "./levelHost";
+import { ScratchStore } from "../editor/scratch";
+import { memoryStorage } from "../storage.fake";
+import { challengeHost, lessonHost, sandboxHost, sharedHost, testPlayHost } from "./levelHost";
 
 const curriculum = chapters.filter((chapter) => chapter.curriculum).flatMap((chapter) => chapter.levels);
 
@@ -102,9 +104,36 @@ describe("sharedHost", () => {
   });
 });
 
+describe("sandboxHost", () => {
+  const sandbox = (storage = memoryStorage()) => sandboxHost(new ScratchStore(storage));
+
+  it("is the player's own board: no lesson, no solution, no crown, and a progress store that nothing else sees", () => {
+    const host = sandbox();
+    expect([host.kind, host.learn, host.curriculum, host.solution, host.tier]).toEqual(["sandbox", false, false, null, null]);
+    expect(host.progress).toBeInstanceOf(ProgressStore);
+    for (const other of [progress, sharedProgress]) expect(host.progress).not.toBe(other);
+    expect(host.frame).toBeUndefined();
+    expect(host.solvedActions).toBeUndefined(); // no Keep: it has no solution to keep
+  });
+
+  it("goes to the board editor, in the toolbar and on a solved card", () => {
+    const host = sandbox();
+    expect(host.back).toEqual({ href: "#/free/sandbox/board", label: "Change the board" });
+    expect(host.onward("sandbox")).toEqual({ href: "#/free/sandbox/board", label: "Change the board" });
+  });
+
+  it("keeps the code in the scratch store, so a new screen finds it", () => {
+    const storage = memoryStorage();
+    expect(sandbox(storage).codes!.get("sandbox")).toBeUndefined();
+    sandbox(storage).codes!.set("sandbox", "typed");
+    expect(sandbox(storage).codes!.get("sandbox")).toBe("typed");
+    expect(new ScratchStore(storage).code()).toBe("typed");
+  });
+});
+
 describe("where each kind gets its tier tag", () => {
-  it("lessons have none, challenges take their set's, the rest ask the engine", () => {
-    expect([lessonHost().tier, challengeHost().tier, testPlay().tier, sharedHost({ id: "shared-x" }).tier]).toEqual([null, "set", "engine", "engine"]);
+  it("lessons and the Sandbox have none, challenges take their set's, the rest ask the engine", () => {
+    expect([lessonHost().tier, challengeHost().tier, testPlay().tier, sharedHost({ id: "shared-x" }).tier, sandboxHost(new ScratchStore(null)).tier]).toEqual([null, "set", "engine", "engine", null]);
   });
 });
 
