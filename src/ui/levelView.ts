@@ -8,7 +8,7 @@ import { BoardView, squareName } from "./board";
 import { levelTagsRow } from "./challengeTags";
 import { askTier } from "./tierTags";
 import { ChipTooltip, codexHover, renderCodex, type CodexLookup, type CodexView } from "./codex";
-import { h } from "./dom";
+import { h, withCode } from "./dom";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
 import { masteryTag } from "./lessonsMenu";
@@ -466,6 +466,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     caseBoard?.dispose();
     for (const thumb of thumbs) thumb.dispose();
     const boards = level.boards; // the same boards a run's cases come back with
+    const wide = boards.some((info) => info.width > info.height); // a wide board needs the column's width: the small boards go under it (QA-064)
     caseBoard = shown > 0 ? new BoardView(boards[shown]!) : null; // board 1 is the level's own
     const mark = (i: number) => (run ? ` ${verdict(run.cases[i]!)}` : "");
     thumbs = [];
@@ -488,7 +489,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     boardHost.replaceChildren(
       h(
         "div",
-        { class: "boards" },
+        { class: wide ? "boards boards-wide" : "boards" },
         h("div", { class: "boards-main" }, h("p", { class: "boards-caption" }, caption), (caseBoard ?? board).element),
         h("div", { class: "boards-side", role: "group", "aria-label": "The other boards" }, ...others),
       ),
@@ -587,7 +588,7 @@ function describeChallenge(level: LevelInfo, tags: HTMLElement, openEntry: (name
 
   // The goals and rules come worded from the engine (Level.describe), which owns
   // every player-facing description of the game's rules.
-  const list = (className: string, items: string[]) => h("ul", { class: className }, ...items.map((item) => h("li", {}, item)));
+  const list = (className: string, items: string[]) => h("ul", { class: className }, ...items.map((item) => h("li", {}, ...withCode(item)))); // `code` spans in a sentence show as code (QA-065)
   if (level.goals.length) parts.push(h("h3", {}, "Goal"), list("objectives", level.goals));
   for (const [label, writings] of [["Signpost", level.signs], ["Rune", level.runes]] as const) {
     for (const writing of writings) {

@@ -954,17 +954,20 @@ pre {
   gap: 6px 8px;
 }
 
-/* A level with other maps (QA-032): the board on show large, the others small beside it */
+/* A level with other maps (QA-032): the board on show large, the others small. They sit in a row under it (below), or
+   beside it in a column (the @media block further down) unless a board is wider than tall (QA-064: beside it, a wide
+   board would be drawn about 280px across, so a level with any such board keeps the row under it, `.boards-wide`) */
 .boards {
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   gap: 14px;
   width: 100%;
 }
 
 .boards-main {
   flex: 1 1 0;
+  width: 100%;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -985,9 +988,9 @@ pre {
 .boards-side {
   flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
-  padding-top: 28px; /* level with the main board, below its caption */
 }
 
 /* a .btn laid out around its small board */
@@ -1013,21 +1016,18 @@ pre {
   height: 112px;
 }
 
-@media (max-width: 700px) {
-  .boards {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .boards-main {
-    width: 100%;
-  }
-
-  .boards-side {
+@media (min-width: 701px) {
+  .boards:not(.boards-wide) {
     flex-direction: row;
-    flex-wrap: wrap;
+    align-items: flex-start;
     justify-content: center;
-    padding-top: 0;
+  }
+
+  .boards:not(.boards-wide) .boards-side {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    padding-top: 28px; /* level with the main board, below its caption */
   }
 }
 
@@ -1141,11 +1141,14 @@ pre {
   color: var(--text);
 }
 
+/* wraps (QA-063): in a solved card's grid (.complete-wrap) a row that can't wrap sets the column's minimum width, so
+   "Compare with an idiomatic solution" and "Next challenge →" side by side pushed the card wider than the board's column */
 .outcome-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px 10px;
   font-size: 16px;
 }
 

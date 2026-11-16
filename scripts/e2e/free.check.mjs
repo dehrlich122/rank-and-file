@@ -27,7 +27,7 @@ const corridor = (title) => ({
 });
 
 export default async function freeChecks({ browser: b, base, root, check }) {
-  const { setCode, editorText, solution, withoutExpectLine } = levelHelpers(b, base, root);
+  const { setCode, editorText, solution, withoutExpectLine, openLevel } = levelHelpers(b, base, root);
   const { clickButton, hasButton } = buttonHelpers(b);
   const { wordAt, hover, hoverAway } = hoverHelpers(b);
   const text = (selector) => b.evaluate(`document.querySelector(${JSON.stringify(selector)})?.textContent ?? ''`);
@@ -870,6 +870,27 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     return `no Learn tab, ${chips.length} chips, lands at ${chips[0].href}`;
   });
 
+  /** Run `fn` with the window at width x height, and put the suite's own size back after. */
+  const atSize = async (width, height, fn) => {
+    await b.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+    try {
+      await sleep(400);
+      return await fn();
+    } finally {
+      await b.send("Emulation.setDeviceMetricsOverride", { width: 1400, height: 860, deviceScaleFactor: 1, mobile: false });
+    }
+  };
+  /** After a run: how far the middle panel scrolls sideways, and whether the card and each link lie inside its visible width. */
+  const outcomeFit = () =>
+    b.evaluate(`(() => {
+      const host = document.querySelector('.outcome-host');
+      const panel = host.closest('.level-middle, .level-right');
+      const left = panel.getBoundingClientRect().left + panel.clientLeft;
+      const inside = (e) => { const r = e.getBoundingClientRect(); return r.left >= left - 0.5 && r.right <= left + panel.clientWidth + 0.5; };
+      return { over: panel.scrollWidth - panel.clientWidth, card: inside(host.firstElementChild), links: [...host.querySelectorAll('a')].map(inside) };
+    })()`);
+  const fitsColumn = (fit) => fit.over <= 0 && fit.card && fit.links.length > 0 && fit.links.every(Boolean);
+
   await check("M4.5: solving The Toll Road with its reference earns three stars and offers 'Next challenge →'; Challenges and the hub then say '1 of 5 solved', kept over a reload; the last challenge offers 'Back to Free Play'", async () => {
     await openChallenge(CHALLENGES[0], { fresh: true });
     const r = await runChallenge(solution(CHALLENGES[0]));
@@ -897,6 +918,8 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     await openChallenge(CHALLENGES[4]);
     const last = await runChallenge(solution(CHALLENGES[4]));
     expect(last.head === "Solved!" && last.stars >= 1, `${last.head}, ${last.stars} stars`);
+    const lastFit = await atSize(1440, 900, outcomeFit);
+    expect(fitsColumn(lastFit), `QA-063 on the last challenge: ${JSON.stringify(lastFit)}`);
     const back = last.links.find((l) => l.text === "Back to Free Play");
     expect(back?.href === "#/free/challenges" && !last.links.some((l) => l.text === "Next challenge →"), `links: ${JSON.stringify(last.links)}`);
     await b.evaluate(`document.querySelector('.outcome-host a[href="#/free/challenges"]').click()`);
@@ -934,5 +957,102 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     await b.key("Escape");
     expect(shown, "the solution shown is not the reference on disk");
     return `three hints (text lengths ${lengths}), solution offered on the third failed run and equal to the file`;
+  });
+
+  // -- QA-063 to QA-065 (docs/QA.md, Session 18): the level screen with real challenges on it ----------------------------
+  await check("QA-063: at 1440x900 a solved challenge's card and its way on fit the board's column, with no sideways scroll", async () => {
+    await atSize(1440, 900, async () => {
+      await openChallenge(CHALLENGES[0], { fresh: true });
+      const r = await runChallenge(solution(CHALLENGES[0]));
+      expect(r.head === "Solved!" && r.links.some((l) => l.text === "Next challenge →"), `${r.head}: ${JSON.stringify(r.links)}`);
+      const fit = await outcomeFit();
+      expect(fitsColumn(fit), JSON.stringify(fit));
+    });
+  });
+
+  await check("QA-063: the same holds for a lesson level with several boards", async () => {
+    await atSize(1440, 900, async () => {
+      await openLevel("ch02-l02", { fresh: true });
+      const r = await runChallenge(solution("ch02-l02"));
+      expect(r.head === "Solved!" && r.links.length > 0, `${r.head}: ${JSON.stringify(r.links)}`);
+      const fit = await outcomeFit();
+      expect(fitsColumn(fit), JSON.stringify(fit));
+    });
+  });
+
+  /** A level with several boards, before a run: the board on show against the small ones, and whether it all sits inside the middle panel. */
+  const boardsShape = () =>
+    b.evaluate(`(() => {
+      const box = (e) => e.getBoundingClientRect();
+      const panel = document.querySelector('.level-middle');
+      const left = box(panel).left + panel.clientLeft;
+      const main = document.querySelector('.boards-main');
+      const side = document.querySelector('.boards-side');
+      const parts = [main.querySelector('.board'), ...side.querySelectorAll('.board-thumb')].map(box);
+      return {
+        width: Math.round(box(main.querySelector('.board')).width),
+        under: box(side).top >= box(main).bottom - 1,
+        beside: box(side).left >= box(main).right - 1,
+        thumbs: side.children.length,
+        over: panel.scrollWidth - panel.clientWidth,
+        whole: parts.every((r) => r.left >= left - 0.5 && r.right <= left + panel.clientWidth + 0.5),
+      };
+    })()`);
+  /** Put board `n` on show by its small board (if it is not on show already), and wait for its caption. */
+  const showBoard = async (n) => {
+    await b.evaluate(`document.querySelector('.board-thumb[aria-label="Look at board ${n}"]')?.click()`);
+    await b.waitFor(`document.querySelector('.boards-caption')?.textContent.startsWith('Board ${n} of')`, 10_000, `board ${n} on show`);
+  };
+  const codePanel = (where) => b.evaluate(`document.querySelector('input[name="setting-codePanel"][value="${where}"]').click()`);
+
+  await check("QA-064: wide boards: the small boards sit in a row under the board on show (at least 380px wide, whichever board is on show), at 1440x900, 1000x700 and with Code panel = bottom", async () => {
+    await openChallenge(CHALLENGES[4], { fresh: true });
+    const seen = [];
+    await atSize(1440, 900, async () => {
+      for (const n of [1, 2, 3, 4]) {
+        await showBoard(n);
+        const shape = await boardsShape();
+        seen.push(shape);
+        expect(shape.thumbs === 3 && shape.under && !shape.beside && shape.width >= 380 && shape.whole && shape.over <= 0, `board ${n}: ${JSON.stringify(shape)}`);
+      }
+    });
+    await showBoard(1);
+    await atSize(1000, 700, async () => {
+      const shape = await boardsShape();
+      expect(shape.under && shape.whole && shape.over <= 0, `at 1000x700: ${JSON.stringify(shape)}`);
+    });
+    try {
+      await codePanel("bottom");
+      await atSize(1440, 900, async () => {
+        const shape = await boardsShape();
+        expect(shape.under && shape.whole && shape.over <= 0, `Code panel = bottom: ${JSON.stringify(shape)}`);
+      });
+    } finally {
+      await codePanel("right");
+    }
+    return `widths ${seen.map((s) => s.width)}`;
+  });
+
+  await check("QA-064: boards that are all as tall as wide or taller keep the small boards beside the one on show (a challenge and a lesson level, 1440x900)", async () => {
+    await atSize(1440, 900, async () => {
+      await openChallenge(CHALLENGES[0], { fresh: true });
+      const challenge = await boardsShape();
+      await openLevel("ch02-l05", { fresh: true }); // four boards, all taller than wide
+      const lesson = await boardsShape();
+      for (const [name, shape] of [["challenge", challenge], ["lesson level", lesson]]) {
+        expect(shape.beside && !shape.under && shape.whole && shape.over <= 0, `${name}: ${JSON.stringify(shape)}`);
+      }
+    });
+  });
+
+  await check("QA-065: the Challenge panel's lists show `code` spans as code, with no backtick left (the plank's line shows bridge() in a code element)", async () => {
+    await openChallenge(CHALLENGES[4], { fresh: true });
+    const lists = await b.evaluate(`(() => {
+      const items = [...document.querySelectorAll('.level-left :is(.objectives, .obstacles, .rules, .star-goals) li')];
+      const plank = items.find((li) => li.textContent.includes('bridge()'));
+      return { items: items.length, backticks: items.filter((li) => li.textContent.includes('\`')).length, plankCode: [...(plank?.querySelectorAll('code') ?? [])].map((c) => c.textContent) };
+    })()`);
+    expect(lists.items >= 4 && lists.backticks === 0, JSON.stringify(lists));
+    expect(lists.plankCode.includes("bridge()"), JSON.stringify(lists));
   });
 }
