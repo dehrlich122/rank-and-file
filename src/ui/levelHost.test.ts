@@ -21,6 +21,7 @@ describe("lessonHost", () => {
     expect(host.progress).toBe(progress);
     expect(host.solution).toBeUndefined(); // the reference solution, by id
     expect(host.learn).toBe(true);
+    expect(host.stars).toBe(true);
     expect(host.curriculum).toBe(true);
     expect(host.frame).toBeUndefined();
     expect(host.back).toBeUndefined();
@@ -48,6 +49,7 @@ describe("testPlayHost", () => {
     expect(host.progress).not.toBe(sharedProgress);
     expect(testPlay().progress).not.toBe(host.progress); // one per screen
     expect(host.learn).toBe(false);
+    expect(host.stars).toBe(true);
     expect(host.curriculum).toBe(false);
     expect(host.frame).toBeUndefined();
   });
@@ -84,6 +86,7 @@ describe("sharedHost", () => {
     expect(host.kind).toBe("shared");
     expect(host.progress).toBe(sharedProgress);
     expect(host.learn).toBe(false);
+    expect(host.stars).toBe(true);
     expect(host.curriculum).toBe(false);
     expect(host.frame).toBeTypeOf("function"); // the banner
     expect(host.back).toBeUndefined();
@@ -110,6 +113,7 @@ describe("sandboxHost", () => {
   it("is the player's own board: no lesson, no solution, no crown, and a progress store that nothing else sees", () => {
     const host = sandbox();
     expect([host.kind, host.learn, host.curriculum, host.solution, host.tier]).toEqual(["sandbox", false, false, null, null]);
+    expect(host.stars).toBe(false); // no stars kept, so none are drawn
     expect(host.progress).toBeInstanceOf(ProgressStore);
     for (const other of [progress, sharedProgress]) expect(host.progress).not.toBe(other);
     expect(host.frame).toBeUndefined();
@@ -141,6 +145,7 @@ describe("challengeHost", () => {
   it("is a challenge: no lesson, no crown, the curriculum's progress and its references", () => {
     const host = challengeHost();
     expect([host.kind, host.learn, host.curriculum, host.progress === progress, host.solution]).toEqual(["challenge", false, false, true, undefined]);
+    expect(host.stars).toBe(true);
   });
 
   it("goes on to the next challenge in its set, then back to Free Play", () => {
