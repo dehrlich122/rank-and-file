@@ -1,0 +1,59 @@
+id: last-rank-02
+set: last-rank
+difficulty: 3
+draws_on: [3, 5, 6]
+title: "Leg by Leg"
+trains: "A loop inside a loop: runes read until the goal, each one's text cut into legs"
+brief: "A trail of runes leads to the goal. Each rune gives the next stretch of the route: which way to turn, then how many squares to walk. Some give more than one leg. Every board has its own trail."
+piece: pawn
+map: |
+  . . . . . . . G
+  . . . . . . . .
+  . . . . . . . .
+  . . . . . . . .
+  . . . . . . . .
+  . . . . . . . C
+  . . . . . . . .
+  A . . B . . . .
+  P . . . . . . .
+legend: {"A": {"tile": "rune", "text": "right 3"}, "B": {"tile": "rune", "text": "left 2, right 4"}, "C": {"tile": "rune", "text": "left 5"}}
+start: {"facing": "north"}
+api: ["move", "turn_left", "turn_right", "at_goal", "read"]
+par: {"lines": 8}
+hints:
+- "The route is written in pieces, one rune at a time, and some runes hold more than one leg. Every board has a different number of runes."
+- "Repeat until the pawn stands on the goal: read the rune under the pawn and cut its text into legs. For each leg, the first word says which way to turn, and the number after the space says how far to walk. It is still text, so turn it into a number first."
+- "One way to start:\npawn.move()\nwhile not pawn.at_goal():\n    for leg in pawn.read().split(\", \"):"
+variants:
+- map: |
+    B . . . . . . . . . G
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . . . . . . . .
+    . . . . A . . . . . .
+    . . . . P . . . . . .
+  legend: {"A": {"tile": "rune", "text": "left 4, right 6"}, "B": {"tile": "rune", "text": "right 10"}}
+- map: |
+    . G . . . .
+    . . . . . .
+    . E . . . .
+    . . . . . .
+    . . . . . .
+    . . . . . .
+    D . . . . C
+    . . . . . .
+    . . . . . .
+    . . . A . B
+    . . . P . .
+  legend: {"A": {"tile": "rune", "text": "right 2"}, "B": {"tile": "rune", "text": "left 3"}, "C": {"tile": "rune", "text": "left 5"}, "D": {"tile": "rune", "text": "right 4, right 1"}, "E": {"tile": "rune", "text": "left 2"}}
+- map: |
+    C . . . . . D
+    . . . . . . G
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    . B . A . . .
+    . . . P . . .
+  legend: {"A": {"tile": "rune", "text": "left 2"}, "B": {"tile": "rune", "text": "right 3, left 1, right 2"}, "C": {"tile": "rune", "text": "right 6"}, "D": {"tile": "rune", "text": "right 1"}}

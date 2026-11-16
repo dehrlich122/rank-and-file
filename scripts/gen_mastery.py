@@ -24,9 +24,10 @@ import re
 
 import yaml
 from gen_while import pick, plain_routes, route_code, shortest_programs
-from levelgen import ROOT, build, main, said, save, yaml_text
+from levelgen import BUDGET, ROOT, build, main, said, save, yaml_text
 
-from rankfile.levels import Level, parse_level
+from rankfile.levels import MAX_SIDE, Level, parse_level
+from rankfile.runner import run_level
 
 SET = {
     "set": "last-rank",
@@ -34,7 +35,7 @@ SET = {
     "tier": "pawn",
     "summary": "Puzzles that mix the Pawn tier's chapters. No lessons; the Codex has everything.",
 }
-PAWN = ["move", "turn_left", "turn_right", "squares_ahead", "wait", "at_goal", "look"]  # what every challenge may call
+PAWN = ["move", "turn_left", "turn_right", "squares_ahead", "wait", "at_goal", "look"]  # what a challenge may call, unless it says
 WORD = re.compile(r"[a-z]+")
 
 
@@ -61,8 +62,37 @@ def toll_road(length: int, pits: list[int]) -> dict:
     return {"map": "\n".join(rows) + "\n", "legend": {"O": "pit", "X": guard(WALKED, length + 2 * len(pits))}}
 
 
+HEADINGS = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # north, east, south, west: a right turn is the next one
+
+
+def rune_trail(*runes: str) -> dict:
+    """An open board with a trail of runes. The pawn faces north with the first rune on the square
+    ahead. A rune's text is its legs, like "left 3, right 10": turn, then walk that far. They lead
+    to the next rune, and the last rune's to the goal. The board is as big as the trail, no bigger,
+    so no two boards have the same size or the same start."""
+    x, y, heading = 0, 1, 0
+    path, marks, legend = [(0, 0), (0, 1)], {(0, 0): "P"}, {}
+    for symbol, text in zip("ABCDEF", runes, strict=False):
+        marks[(x, y)] = symbol
+        legend[symbol] = {"tile": "rune", "text": text}
+        for leg in text.split(", "):
+            word, squares = leg.split(" ")
+            heading = (heading + {"right": 1, "left": -1}[word]) % 4
+            for _ in range(int(squares)):
+                x, y = x + HEADINGS[heading][0], y + HEADINGS[heading][1]
+                path.append((x, y))
+    marks[(x, y)] = "G"
+    xs, ys = [px for px, _ in path], [py for _, py in path]
+    assert len(set(path)) == len(path), "a trail never crosses itself"
+    assert max(xs) - min(xs) < MAX_SIDE and max(ys) - min(ys) < MAX_SIDE, "a trail has to fit the largest board"
+    rows = [" ".join(marks.get((px, py), ".") for px in range(min(xs), max(xs) + 1)) for py in range(max(ys), min(ys) - 1, -1)]
+    return {"map": "\n".join(rows) + "\n", "legend": legend}
+
+
 # -- the challenges --------------------------------------------------------------------------------
 # kind "toll": a road with pits to walk round and a guard who asks how far the walk was.
+# kind "trail": runes that each give the next legs of the route. `unseen` are boards the level doesn't
+# have, which its reference must solve too.
 # `hints` (hints 1 and 2) and `note` are ROT13, with {yvarf} for the line count; `hint3` is how hint 3
 # is cut from the reference (levelgen.third_hint). `wrong` names the attempts to write.
 
@@ -85,6 +115,31 @@ LEVELS: list[dict] = [
         ],
         "hint3": ["start", 3],
         "note": "Gur ybbc ybbxf orsber rirel fgrc, fb vg jbexf ba nal ebnq. N cvg nurnq zrnaf gur jnl ebhaq naq sbhe zber fdhnerf; nalguvat ryfr zrnaf bar fgrc naq bar zber. Gur pbhagre vf frg orsber gur ybbc, punatrq vafvqr vg naq cevagrq nsgre vg. {yvarf} yvarf.",
+    },
+    {
+        "id": "last-rank-02",
+        "title": "Leg by Leg",
+        "difficulty": 3,
+        "draws_on": [3, 5, 6],
+        "trains": "A loop inside a loop: runes read until the goal, each one's text cut into legs",
+        "brief": "A trail of runes leads to the goal. Each rune gives the next stretch of the route: which way to turn, then how many squares to walk. Some give more than one leg. Every board has its own trail.",
+        "api": ["move", "turn_left", "turn_right", "at_goal", "read"],
+        "kind": "trail",
+        "par": 8,
+        "boards": [
+            rune_trail("right 3", "left 2, right 4", "left 5"),
+            rune_trail("left 4, right 6", "right 10"),
+            rune_trail("right 2", "left 3", "left 5", "right 4, right 1", "left 2"),
+            rune_trail("left 2", "right 3, left 1, right 2", "right 6", "right 1"),
+        ],
+        "unseen": [rune_trail("right 11", "left 10, left 2"), rune_trail("left 1", "left 1", "right 1, right 1, left 1")],
+        "wrong": ["typed", "once", "single"],
+        "hints": [
+            "Gur ebhgr vf jevggra va cvrprf, bar ehar ng n gvzr, naq fbzr eharf ubyq zber guna bar yrt. Rirel obneq unf n qvssrerag ahzore bs eharf.",
+            "Ercrng hagvy gur cnja fgnaqf ba gur tbny: ernq gur ehar haqre gur cnja naq phg vgf grkg vagb yrtf. Sbe rnpu yrt, gur svefg jbeq fnlf juvpu jnl gb ghea, naq gur ahzore nsgre gur fcnpr fnlf ubj sne gb jnyx. Vg vf fgvyy grkg, fb ghea vg vagb n ahzore svefg.",
+        ],
+        "hint3": ["loops", 1],
+        "note": "Gjb ybbcf funer gur jbex. Gur bhgre bar tbrf ba hagvy gur tbny, ubjrire znal eharf gurer ner; gur vaare bar gnxrf gur yrtf bs bar ehar va ghea. Phggvat rnpu yrt ng gur fcnpr tvirf vgf ahzore, jungrire vgf yratgu. {yvarf} yvarf.",
     },
 ]
 
@@ -118,6 +173,10 @@ def lines_of(key: str) -> list[str]:
     return [said(line) for line in TOLL[key]]
 
 
+def solves(level: Level, code: str) -> bool:
+    return run_level(level, code, line_budget=BUDGET, enforce_constraints=False).status == "solved"
+
+
 def toll_search() -> dict:
     """What gen_while's search over one loop and a chain of branches needs: the way round a pit is
     tried with each count from 1 to 6, and the engine's guards say which one is right."""
@@ -134,7 +193,7 @@ def toll_search() -> dict:
     }
 
 
-def write_toll(draft_level: Level):
+def write_toll(_spec: dict, draft_level: Level):
     found = shortest_programs(draft_level, toll_search())
     if found is None:
         return None
@@ -152,7 +211,58 @@ def write_toll(draft_level: Level):
     return reference, f"{lines} lines searched, {len(codes)} like it", wrong_code
 
 
-WRITERS = {"toll": write_toll}
+# A trail's fixed lines, in ROT13, and what the search may put in each hole, in the order the lessons teach them.
+TRAIL = {
+    "first": "cnja.zbir()",
+    "outer": "juvyr {pbaq}:",
+    "inner": "sbe yrt va cnja.ernq().fcyvg({frc}):",
+    "bind": "yrt = cnja.ernq()",
+    "turn": ["vs {grfg}:", "    cnja.ghea_yrsg()", "ryfr:", "    cnja.ghea_evtug()"],
+    "walk": "cnja.zbir(vag({ahz}))",
+}
+TRAIL_HOLES = {
+    "cond": ["abg cnja.ng_tbny()", "cnja.ernq() != Abar", "cnja.ernq()"],
+    "sep": ['", "', '","'],
+    "test": ['yrt.fgnegfjvgu("yrsg")', '"yrsg" va yrt', 'yrt[0] == "y"'],
+    "num": ['yrt.fcyvg(" ")[1]', 'yrt.fcyvg(" ")[-1]', "yrt[5:]", "yrt[-1]"],
+}
+
+
+def trail_code(cond: str, sep: str, test: str, num: str, *, nested: bool = True) -> str:
+    """A trail's program with its holes filled. Not `nested`: each rune taken as a single leg."""
+    body = [said(line).format(test=test) for line in TRAIL["turn"]] + [said(TRAIL["walk"]).format(num=num)]
+    if nested:
+        body = [said(TRAIL["inner"]).format(sep=sep), *(f"    {line}" for line in body)]
+    else:
+        body = [said(TRAIL["bind"]), *body]
+    return "\n".join([said(TRAIL["first"]), said(TRAIL["outer"]).format(cond=cond), *(f"    {line}" for line in body)]) + "\n"
+
+
+def write_trail(spec: dict, draft_level: Level):
+    unseen = draft({**spec, "boards": spec["unseen"]})
+    fillings = [
+        (cond, sep, test, num)
+        for cond in map(said, TRAIL_HOLES["cond"])
+        for sep in TRAIL_HOLES["sep"]
+        for test in map(said, TRAIL_HOLES["test"])
+        for num in map(said, TRAIL_HOLES["num"])
+    ]
+    works = [filling for filling in fillings if all(solves(level, trail_code(*filling)) for level in (draft_level, unseen))]
+    if not works:
+        return None
+    reference = trail_code(*works[0])
+
+    def wrong_code(kind: str, level: Level) -> str:
+        if kind == "typed":
+            return route_code(level.cases()[0].level)
+        if kind == "once":
+            return reference.replace("while ", "if ", 1)
+        return trail_code(*works[0], nested=False)  # "single"
+
+    return reference, f"{len(works)} of {len(fillings)} fillings solve every board, and two boards the level doesn't have", wrong_code
+
+
+WRITERS = {"toll": write_toll, "trail": write_trail}
 
 
 # -- the words no one reads ------------------------------------------------------------------------------
@@ -191,7 +301,7 @@ def build_one(spec: dict) -> list[str]:
     problems = strangers(spec)
     list_set()
     words = {**drawn(spec), "hints": [said(hint) for hint in spec["hints"]], "note": said(spec["note"])}
-    return problems + build(words, 0, spec["api"], WRITERS[spec["kind"]])
+    return problems + build(words, 0, spec["api"], lambda draft_level: WRITERS[spec["kind"]](spec, draft_level))
 
 
 # -- probe ---------------------------------------------------------------------------------------------
@@ -201,8 +311,10 @@ def probe(spec: dict) -> None:
     level = draft(spec)
     answers = [board["legend"]["X"]["passphrase"] for board in spec["boards"] if "X" in board.get("legend", {})]
     print(f"{spec['id']} ({spec['title']}): {len(level.cases())} boards; {plain_routes(level)}")
-    print(f"  the guards' answers differ on every board: {len(set(answers)) == len(spec['boards'])}; words that aren't the repo's: {len(strangers(spec))}")
-    found = WRITERS[spec["kind"]](level)
+    if answers:
+        print(f"  the guards' answers differ on every board: {len(set(answers)) == len(spec['boards'])}")
+    print(f"  words in the hints and the note that aren't the repo's: {len(strangers(spec))}")
+    found = WRITERS[spec["kind"]](spec, level)
     print("  the search: " + (found[1] if found else "no program solves every board"))
 
 
