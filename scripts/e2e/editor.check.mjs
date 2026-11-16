@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sleep } from "./cdp.mjs";
-import { buttonHelpers } from "./helpers.mjs";
+import { buttonHelpers, levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const KEY_CODES = { ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, Enter: 13, Escape: 27, Delete: 46 };
@@ -15,6 +15,7 @@ const CTRL = 2;
 
 export default async function editorChecks({ browser: b, base, root, check }) {
   const { clickButton, hasButton } = buttonHelpers(b);
+  const { setCode, editorText } = levelHelpers(b, base, root);
   const text = (selector) => b.evaluate(`document.querySelector(${JSON.stringify(selector)})?.textContent ?? ''`);
   const saved = () => b.evaluate(`(() => { const s = JSON.parse(localStorage.getItem('rank-and-file:editor') ?? '{"levels":{}}'); return Object.values(s.levels).map((e) => e.data); })()`);
   const wallCount = async () => (((await saved())[0]?.map ?? "").match(/#/g) ?? []).length;
@@ -968,5 +969,159 @@ export default async function editorChecks({ browser: b, base, root, check }) {
       await b.evaluate(`localStorage.clear()`);
     }
     return `link bottom ${seen.join(", ")}`;
+  });
+
+  // -- QA-061: the Sandbox's scratch level in the editor (#/free/sandbox/board) --------------------------------------
+  const SCRATCH_LEVEL = '.level[data-level-id="sandbox"]';
+  const scratchLoad = (hash, { fresh = false } = {}) => b.send("Page.navigate", { url: `${base}?${fresh ? "fresh" : "reload"}=${Date.now()}${hash}` });
+  /** A fresh page on the Sandbox's board editor, the engine's answer in, the board focused. */
+  async function scratchEditor() {
+    await scratchLoad("#/free/sandbox/board", { fresh: true });
+    await b.waitFor(`document.querySelector('.ed-board .board') && document.querySelector('.tool') && document.querySelector('[data-field="api"]')`, 90_000, "the Sandbox's board editor");
+    await settled();
+    await focusBoard();
+  }
+  const scratchScreenReady = () =>
+    b.waitFor(`document.querySelector('${SCRATCH_LEVEL} .board-host .board .piece') && !document.querySelector('${SCRATCH_LEVEL} .level-right .btn-primary').disabled`, 90_000, "the Sandbox's level screen");
+  /** What the scratch level keeps in this browser (its own key): the board's map as text, and the code typed against it, if any. */
+  const scratchKept = () =>
+    b.evaluate(`(() => { const s = JSON.parse(localStorage.getItem('rank-and-file:sandbox') ?? '{}'); return { map: s.level?.map ?? null, code: typeof s.code === 'string' ? s.code : null }; })()`);
+  const scratchWalls = async () => (((await scratchKept()).map ?? "").match(/#/g) ?? []).length;
+  const wallsDrawn = (scope) => b.evaluate(`document.querySelectorAll(${JSON.stringify(`${scope} .board .wall`)}).length`);
+  const hashNow = () => b.evaluate(`location.hash`);
+  const levelScreenUp = () => b.evaluate(`!!document.querySelector('.level[data-level-id]')`);
+
+  await check("QA-061: the scratch editor has no title, brief, trains or difficulty, no Share, Export or Save to the repo, no solvability check, no My levels link, no Hints tab, and its Rules tab has a 'Starter code' section with no Par field or solution block", async () => {
+    await scratchEditor();
+    const labels = () => b.evaluate(`[...document.querySelectorAll('.props .field-label')].map((l) => l.textContent.trim())`);
+    const levelLabels = await labels();
+    for (const gone of ["Title", "Brief", "What it trains", "Difficulty"]) expect(!levelLabels.includes(gone), `the Level tab still has a ${gone} field`);
+    const buttons = await b.evaluate(`[...document.querySelectorAll('main button, main a')].map((e) => e.textContent.trim())`);
+    for (const gone of [/^Share/, /^Export/, /Save to the repo/, /^Check/, /^Try again/, /My levels/]) expect(!buttons.some((t) => gone.test(t)), `a ${gone} control is on the page`);
+    expect(!(await b.evaluate(`!!document.querySelector('.solve-box') || !!document.querySelector('a[href="#/editor"]')`)), "a solvability box or a link to My levels is on the page");
+    const tabs = await b.evaluate(`[...document.querySelectorAll('.props .tab')].map((t) => t.textContent.trim())`);
+    expect(tabs.includes("Level") && tabs.includes("Rules") && !tabs.includes("Hints"), `tabs: ${tabs}`);
+    await openTab("Rules");
+    await sleep(150);
+    // the section that holds the starter code is headed "Starter code" (not "Par and starter code"); "What the player will read" follows it
+    const headings = await b.evaluate(`[...document.querySelectorAll('.props .rules-section > h3')].map((h) => h.textContent.trim())`);
+    expect(headings.includes("Starter code") && !headings.some((t) => /par/i.test(t)), `the Rules tab's sections: ${headings}`);
+    const rulesLabels = await labels();
+    expect(!rulesLabels.some((l) => /^Par/.test(l) || l === "Your solution") && !(await b.evaluate(`!!document.querySelector('[data-field="par"], [data-field="solution"]')`)), "a Par field or a solution block is in the Rules tab");
+    expect(rulesLabels.includes("Starter code"), "the starter code field is missing");
+    return `tabs ${tabs.join("/")}; sections ${headings.join(", ")}`;
+  });
+
+  await check("QA-061: the scratch editor keeps the palette, size, facing, every ability ticked, Problems, Undo, Redo, Clear board, Start over and Write code; paint, undo and redo work", async () => {
+    await scratchEditor();
+    const tools = await b.evaluate(`[...document.querySelectorAll('.tool-name')].map((t) => t.textContent)`);
+    for (const wanted of ["Select", "Erase", "Wall", "Pit", "Sign", "Gate", "Timed gate", "Start", "Goal", "Hidden goal", "Patrol", "Rook", "Bishop", "Route"]) expect(tools.includes(wanted), `no ${wanted} in the palette`);
+    const size = await b.evaluate(`[...document.querySelectorAll('.ed-size input')].map((i) => i.value).join('x')`);
+    expect(size === "8x8", `size ${size}`);
+    expect((await getValue("Starts facing")) !== "", "no facing choice");
+    const boxes = await b.evaluate(`[...document.querySelectorAll('[data-field="api"] label.check input')].map((i) => i.checked)`);
+    expect(boxes.length > 0 && boxes.every(Boolean), `abilities ticked: ${boxes.filter(Boolean).length} of ${boxes.length}`);
+    expect((await problemsText()).includes("None"), "Problems does not say None");
+    for (const label of ["Undo", "Redo", "Clear board", "Start over", "Write code"]) expect(await hasButton(label, ".ed-toolbar"), `no ${label} button`);
+    await tool("Wall");
+    await click(2, 3);
+    await settled(); // the toolbar's Undo is enabled once the change has gone through
+    expect((await scratchWalls()) === 1, "the wall is not kept");
+    await clickButton("Undo", ".ed-toolbar");
+    await sleep(150);
+    expect((await scratchWalls()) === 0, "undo does not take the wall away");
+    await clickButton("Redo", ".ed-toolbar");
+    await sleep(150);
+    expect((await scratchWalls()) === 1, "redo does not put the wall back");
+    return `${tools.length} tools, ${size}, ${boxes.length} abilities all ticked; wall painted, undone, redone`;
+  });
+
+  await check("QA-061: the scratch board is kept across a reload, shows on the level screen after Write code, and is not one of My levels", async () => {
+    await scratchEditor();
+    await tool("Wall");
+    await click(2, 3);
+    expect((await wallsDrawn(".ed-board")) === 1, "the wall is not on the editor's board");
+    await scratchLoad("#/free/sandbox/board");
+    await b.waitFor(`document.querySelector('.ed-board .board') && document.querySelector('.tool')`, 90_000, "the editor after the reload");
+    await settled();
+    expect((await wallsDrawn(".ed-board")) === 1, "the wall is gone after a reload");
+    await clickButton("Write code", ".ed-toolbar");
+    await scratchScreenReady();
+    expect((await hashNow()) === "#/free/sandbox", `hash ${await hashNow()}`);
+    expect((await wallsDrawn(".board-host")) === 1, "the level screen's board does not show the wall");
+    await b.evaluate(`location.hash = '#/editor'`);
+    await b.waitFor(`document.querySelector('.editor-list h1')`, 30_000, "My levels");
+    expect((await b.evaluate(`document.querySelectorAll('.my-level').length`)) === 0, "My levels lists a level");
+    const mine = await b.evaluate(`Object.keys(JSON.parse(localStorage.getItem('rank-and-file:editor') ?? '{}').levels ?? {}).length`);
+    expect(mine === 0, `the editor's own key holds ${mine} entries`);
+    return "kept after reload, on the level screen, not in My levels";
+  });
+
+  await check("QA-061: Start over asks in the page (and says the code goes too); Keep it changes nothing; Yes gives back the starting board and code", async () => {
+    await scratchLoad("#/free/sandbox", { fresh: true });
+    await scratchScreenReady();
+    const starting = await editorText();
+    const program = "pawn.move()\npawn.move()\n# typed by the check\n";
+    await setCode(program);
+    await sleep(700);
+    expect((await scratchKept()).code === program, "the typed code is not kept");
+    await b.evaluate(`document.querySelector('.level-right a[href="#/free/sandbox/board"]').click()`);
+    await b.waitFor(`document.querySelector('.ed-board .board') && document.querySelector('.tool')`, 90_000, "the board editor");
+    await settled();
+    await tool("Wall");
+    await click(2, 3);
+    expect((await wallsDrawn(".ed-board")) === 1, "the wall is not painted");
+    await clickButton("Start over", ".ed-toolbar");
+    const question = await text(".ed-confirm");
+    expect(/code goes too/i.test(question) && (await hasButton("Yes, start over", ".ed-confirm")) && (await hasButton("Keep it", ".ed-confirm")), `the question: ${question}`);
+    await clickButton("Keep it", ".ed-confirm");
+    await sleep(200);
+    expect((await wallsDrawn(".ed-board")) === 1 && (await scratchWalls()) === 1, "Keep it changed the board");
+    expect((await scratchKept()).code === program, "Keep it changed the code");
+    await clickButton("Start over", ".ed-toolbar");
+    await clickButton("Yes, start over", ".ed-confirm");
+    await settled();
+    expect((await wallsDrawn(".ed-board")) === 0 && (await scratchWalls()) === 0, "the wall is still there after Start over");
+    const size = await b.evaluate(`[...document.querySelectorAll('.ed-size input')].map((i) => i.value).join('x')`);
+    expect(size === "8x8", `size ${size}`);
+    await clickButton("Write code", ".ed-toolbar");
+    await scratchScreenReady();
+    const facts = await b.evaluate(`(() => {
+      const area = document.querySelector('.board-host .board .squares').getBoundingClientRect();
+      const at = (s) => { const r = document.querySelector('.board-host .board ' + s).getBoundingClientRect(); return { x: (r.x + r.width / 2 - area.x) / area.width, y: (r.y + r.height / 2 - area.y) / area.height }; };
+      return { squares: document.querySelectorAll('.board-host .board .squares rect.sq-light, .board-host .board .squares rect.sq-dark').length, piece: at('.piece'), goal: at('.goal') };
+    })()`);
+    expect(facts.squares === 64 && facts.piece.x < 0.25 && facts.piece.y > 0.75 && facts.goal.x > 0.75 && facts.goal.y < 0.25, `board after Start over: ${JSON.stringify(facts)}`);
+    const now = await editorText();
+    expect(now.trimEnd() === starting.trimEnd(), "the editor does not show the starting code again");
+    expect(now.trimEnd() !== program.trimEnd(), "the typed code is still in the editor");
+    return "asked in the page, Keep it kept, Yes reset the board and the code";
+  });
+
+  await check("QA-061: a scratch level the engine refuses opens the board editor with Problems, Write code does not lead on, and a goal put back opens the level screen again", async () => {
+    await scratchEditor();
+    await tool("Erase");
+    await click(7, 7); // the goal
+    await b.waitFor(`document.querySelector('.problem-link')`, 30_000, "the problem");
+    const problems = await problemsText();
+    expect(/Problems \(1\)/.test(problems) && /goal/i.test(problems), `Problems: ${problems}`);
+    const write = await b.evaluate(`(() => { const e = document.querySelector('.ed-toolbar .btn-primary'); return { label: e.textContent, disabled: e.disabled, title: e.title }; })()`);
+    expect(write.label === "Write code" && write.disabled && write.title.includes("Fix the problem"), `the main button: ${JSON.stringify(write)}`);
+    await b.evaluate(`document.querySelector('.ed-toolbar .btn-primary').click()`);
+    await sleep(300);
+    expect((await hashNow()) === "#/free/sandbox/board" && !(await levelScreenUp()), "Write code led on");
+    await scratchLoad("#/free/sandbox");
+    await b.waitFor(`document.querySelector('.ed-board .board') || document.querySelector('.level[data-level-id]')`, 90_000, "the refused level's screen");
+    await settled();
+    expect((await hashNow()) === "#/free/sandbox/board", `hash ${await hashNow()}`);
+    expect(!(await levelScreenUp()) && (await b.evaluate(`!!document.querySelector('.problem-link')`)), "the editor does not show the problem");
+    await tool("Goal");
+    await click(7, 7);
+    await settled();
+    expect((await problemsText()).includes("None"), "putting the goal back leaves a problem");
+    await scratchLoad("#/free/sandbox");
+    await scratchScreenReady();
+    expect((await hashNow()) === "#/free/sandbox", "the level screen did not open for a goal put back");
+    return "refused: editor with Problems, Write code disabled; accepted again: level screen";
   });
 }
