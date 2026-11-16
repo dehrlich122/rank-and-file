@@ -154,12 +154,8 @@ so any frame can be drawn directly: step back, scrub and rewind never
 re-run code. The UI never re-implements game rules; it draws what the engine
 reports.
 
-The UI replays the recording (`src/ui/playback.ts`). Frame 0 is the moment
-before the program starts; frame *k* is the moment after step *k*. Every event
-carries the whole world's state after it (`{pos, facing, opened}`: the piece,
-and which gates are open), so any frame can be drawn directly, which makes
-stepping back and scrubbing free. Moving obstacles would add their positions to
-that same state. Stepping forward animates the frame's events.
+Frame 0 is the moment
+before the program starts; frame *k* is the moment after step *k*. Stepping forward animates the frame's events.
 The outcome card appears when playback reaches the last frame. A recording belongs
 to the code it was made from: the first edit afterwards drops it (the outcome
 card is dimmed as out of date). Play and the right arrows then run the current
