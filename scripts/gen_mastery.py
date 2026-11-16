@@ -100,13 +100,14 @@ def written_hour(every: int, walk: int) -> dict:
     return {"map": "\n".join(f"# {row} #" for row in rows) + "\n", "legend": legend}
 
 
-def square(lane: int, rank: int) -> str:
-    """A gallery square's chess name: its three lanes are files b, c and d, between two walls."""
-    return f"{'bcd'[lane]}{rank + 1}"
+def square(x: int, rank: int) -> str:
+    """A square's chess name, from its column (0 is file a) and its rank (0 is rank 1)."""
+    return f"{'abcdefghijkl'[x]}{rank + 1}"
 
 
-def sentry(rank: int, wanted: dict[int, int]) -> dict:
-    """A patrol pacing `rank` from wall to wall, set off so that at each tick in `wanted` it is in that lane."""
+def sentry(rank: int, wanted: dict[int, int], west: int) -> dict:
+    """A patrol pacing `rank` of a gallery from wall to wall, set off so that at each tick in `wanted` it
+    is in that lane. `west` is the column of the gallery's first lane."""
     for path in ([0, 1, 2], [2, 1, 0]):
         for first in (0, 1):
             at, heading, seen = first, 1, {}
@@ -116,16 +117,17 @@ def sentry(rank: int, wanted: dict[int, int]) -> dict:
                     heading = -heading
                 at += heading
             if all(seen[tick] == lane for tick, lane in wanted.items()):
-                return {"kind": "patrol", "start": square(path[first], rank), "route": [square(path[0], rank), square(path[-1], rank)]}
+                return {"kind": "patrol", "start": square(west + path[first], rank), "route": [square(west + path[0], rank), square(west + path[-1], rank)]}
     raise AssertionError("no patrol is in those lanes at those ticks")
 
 
-def gallery(*events: tuple[str, object]) -> dict:
-    """A gallery three lanes wide, as long as its events, with the goal where they end. The pawn starts
-    in the middle lane. ("walk", n) is n empty ranks. ("rook", side) is a rook diagonally ahead on that
-    side, with a wall under it so its file is closed below. ("sentry", meeting) is a patrol pacing the
-    next rank: on the pawn's arrival it is diagonally ahead ("left", "right"), or straight ahead and a
-    tick later to one side ("ahead-left", "ahead-right"). Each rook or sentry moves the pawn one lane over."""
+def climb(events: tuple, west: int) -> tuple[int, int, set, list[dict]]:
+    """A pawn's way up a gallery three lanes wide, from the middle lane: the lane and the rank it ends on,
+    the walls (as lane and rank) and the enemies. `west` is the column of the gallery's first lane.
+    ("walk", n) is n empty ranks. ("rook", side) is a rook diagonally ahead on that side, with a wall
+    under it so its file is closed below. ("sentry", meeting) is a patrol pacing the next rank: on the
+    pawn's arrival it is diagonally ahead ("left", "right"), or straight ahead and a tick later to one
+    side ("ahead-left", "ahead-right"). Each rook or sentry moves the pawn one lane over."""
     lane, rank, tick = 1, 0, 0
     walls, paced, enemies = set(), set(), []
     for kind, how in events:
@@ -136,21 +138,55 @@ def gallery(*events: tuple[str, object]) -> dict:
         assert 0 <= side <= 2, "the gallery has three lanes"
         if kind == "rook":
             walls.add((side, rank))
-            enemies.append({"kind": "rook", "start": square(side, rank + 1)})
+            enemies.append({"kind": "rook", "start": square(west + side, rank + 1)})
         else:
             waits = how.startswith("ahead")
             paced.add(rank + 1)
-            enemies.append(sentry(rank + 1, {tick: lane, tick + 1: side} if waits else {tick: side}))
+            enemies.append(sentry(rank + 1, {tick: lane, tick + 1: side} if waits else {tick: side}, west))
             tick += waits
         lane, rank, tick = side, rank + 1, tick + 1
-    assert rank < MAX_SIDE and not any(y in paced for _, y in walls), "too long, or a wall on a sentry's rank"
+    assert not any(y in paced for _, y in walls), "a wall on a sentry's rank"
+    return lane, rank, walls, enemies
+
+
+def gallery(*events: tuple[str, object]) -> dict:
+    """A gallery between two walls, as long as its events (see `climb`), with the goal where they end."""
+    lane, rank, walls, enemies = climb(events, 1)
+    assert rank < MAX_SIDE, "a gallery has to fit the largest board"
     marks = {(1, 0): "P", (lane, rank): "G", **dict.fromkeys(walls, "#")}
     rows = ["# " + " ".join(marks.get((x, y), ".") for x in range(3)) + " #" for y in range(rank, -1, -1)]
     return {"map": "\n".join(rows) + "\n", "enemies": enemies}
 
 
+TAKEN = "Halt! How many rooks did you take? Answer with the number."
+
+
+def last_rank(events: tuple, way: str, far: int, pits: list[int], over: int) -> dict:
+    """The finale's board. A gallery of rooks (see `climb`) ends under a guard's gate, who asks how many
+    rooks were taken. Behind the gate is a rune on the last rank, which runs both ways. The rune says where
+    the goal is: `far` squares to the `way` ("west" or "east"). `pits` are how many squares from the rune
+    each pit on the way is, and the rank goes on `over` squares past the goal, so nothing but the rune
+    says where to stop. The other way it runs two squares."""
+    reach = {"west": 2, "east": 2, way: far + over}
+    lane = climb(events, 0)[0]
+    west = max(reach["west"] - lane, 1)  # the column of the gallery's first lane: a wall stands west of it
+    lane, rank, walls, enemies = climb(events, west)
+    rune, top, step = west + lane, rank + 2, -1 if way == "west" else 1
+    width = max(rune + reach["east"] + 1, west + 4)
+    assert width <= MAX_SIDE and top < MAX_SIDE and all(0 < pit < far for pit in pits), "the finale has to fit the largest board"
+    marks = {(x, y): "." for x in range(west, west + 3) for y in range(rank + 1)}
+    marks |= {(x, top): "." for x in range(rune - reach["west"], rune + reach["east"] + 1)}
+    marks |= {(west + x, y): "#" for x, y in walls}
+    marks |= {(west + 1, 0): "P", (rune, rank + 1): "X", (rune, top): "R", (rune + step * far, top): "G"}
+    marks |= {(rune + step * pit, top): "O" for pit in pits}
+    rows = [" ".join(marks.get((x, y), "#") for x in range(width)) for y in range(top, -1, -1)]
+    legend = {"O": "pit", "X": guard(TAKEN, len(enemies)), "R": {"tile": "rune", "text": f"The goal is {far} squares to the {way}."}}
+    return {"map": "\n".join(rows) + "\n", "legend": legend, "enemies": enemies}
+
+
 # -- the challenges --------------------------------------------------------------------------------
 # kind "toll": a road with pits to walk round and a guard who asks how far the walk was.
+# kind "finale": a climb past rooks to a guard, then a walk along the last rank that a rune describes.
 # kind "gallery": rooks and pacing sentries along a gallery of unknown length.
 # kind "hour": a timed gate whose time is written on a rune.
 # kind "trail": runes that each give the next legs of the route. `unseen` are boards the level doesn't
@@ -250,6 +286,35 @@ LEVELS: list[dict] = [
         ],
         "hint3": ["block", said("cnja.ybbx() =="), "Waiting for a sentry to step aside looks like this:"],
         "note": "Bar ybbc nfxf gur obneq guerr dhrfgvbaf ba rirel cnff, naq gur beqre znggref: gnxvat pbzrf svefg, jnvgvat frpbaq, jnyxvat ynfg. Jnvgvat vafvqr gur ybbc zrnaf gur cnja ybbxf ntnva nsgre rirel gvpx. {yvarf} yvarf.",
+    },
+    {
+        "id": "last-rank-05",
+        "title": "The Last Rank",
+        "difficulty": 5,
+        "draws_on": [2, 3, 4, 5, 6],
+        "trains": "Everything the Pawn tier taught, in one program: a counted climb, a guard, a rune and a measured walk",
+        "brief": "Climb past the rooks to the guard, who asks how many you took. Behind his gate, a rune on the last rank says where the goal lies. The floor along the last rank has gaps, and you carry two planks. Here your pawn can't tell when it has arrived: only the rune says where to stop.",
+        "api": ["move", "turn_left", "turn_right", "look", "capture_left", "capture_right", "bridge", "read"],
+        "kind": "finale",
+        "planks": 2,
+        "par": 21,
+        "boards": [
+            last_rank((("walk", 1), ("rook", "left"), ("walk", 1), ("rook", "right"), ("walk", 1)), "east", 5, [2, 4], 1),
+            last_rank((("rook", "right"), ("walk", 2), ("rook", "left"), ("rook", "left"), ("walk", 1)), "west", 6, [3], 2),
+            last_rank((("walk", 2), ("rook", "left"), ("walk", 2)), "east", 3, [], 0),
+            last_rank((("rook", "left"), ("rook", "right"), ("walk", 1), ("rook", "right"), ("walk", 1), ("rook", "left"), ("walk", 1)), "west", 4, [1, 3], 3),
+        ],
+        "unseen": [
+            last_rank((("walk", 1), ("rook", "right"), ("walk", 1)), "east", 6, [5], 2),
+            last_rank((("rook", "left"), ("walk", 1), ("rook", "right"), ("rook", "right"), ("walk", 2)), "west", 3, [2], 1),
+        ],
+        "wrong": ["typed", "half", "blind"],
+        "hints": [
+            "Guerr wbof, bar nsgre nabgure: tb hc gb gur thneq, nafjre uvz, gura sbyybj gur ehar nybat gur ynfg enax. Rnpu obneq vf qvssrerag va nyy guerr.",
+            "Tb hc jvgu n ybbc gung tbrf ba hagvy gur tngr vf nurnq, gnxvat ebbxf ba rvgure fvqr naq nqqvat 1 gb n pbhagre sbe rnpu. Cevag gur pbhagre, jnyx guebhtu naq ernq gur ehar. Bar jbeq va vg fnlf juvpu jnl gb ghea, naq nabgure, nf n ahzore, ubj znal fdhnerf gb jnyx. Jnyx gurz jvgu n frpbaq ybbc gung ybbxf sbe n cvg orsber rirel fgrc naq oevqtrf vg.",
+        ],
+        "hint3": ["block", said("sbe _ va"), "The walk along the last rank can look like this:"],
+        "note": "Gur jnl hc unf ab xabja yratgu, fb vg vf n juvyr ybbc; gur jnyx'f yratgu vf ernq sebz gur ehar, fb vg vf n sbe ybbc. Gur pbhagre nafjref gur thneq, n dhrfgvba gb gur grkg cvpxf gur ghea, naq bar cvrpr bs vg, nf n ahzore, frgf gur enatr. {yvarf} yvarf.",
     },
 ]
 
@@ -457,7 +522,61 @@ def write_gallery(spec: dict, draft_level: Level):
     return variants["the reference"], f"{len(works)} of {len(variants)} variants solve every board and two the level doesn't have (the two orders of the sides should)", wrong_code
 
 
-WRITERS = {"toll": write_toll, "trail": write_trail, "hour": write_hour, "gallery": write_gallery}
+# The finale's fixed lines, in ROT13. Its holes: the question that picks the turn, and which piece of the
+# rune's text is the number. `half` leaves out the second line that counts, `blind` the look before each step.
+FINALE = {
+    "climb": [
+        "gnxra = 0",
+        'juvyr cnja.ybbx() != "tngr":',
+        '    vs cnja.ybbx("yrsg") == "ebbx":',
+        "        cnja.pncgher_yrsg()",
+        "        gnxra += 1",
+        '    ryvs cnja.ybbx("evtug") == "ebbx":',
+        "        cnja.pncgher_evtug()",
+        "        gnxra += 1",
+        "    ryfr:",
+        "        cnja.zbir()",
+    ],
+    "answer": ["cevag(gnxra)", "cnja.zbir(2)", "grkg = cnja.ernq()"],
+    "turn": ["vs {grfg}:", "    cnja.ghea_yrsg()", "ryfr:", "    cnja.ghea_evtug()"],
+    "walk": 'sbe _ va enatr(vag(grkg.fcyvg(" ")[{v}])):',
+    "look": ['    vs cnja.ybbx() == "cvg":', "        cnja.oevqtr()"],
+    "step": "    cnja.zbir()",
+    "tests": ['"jrfg" va grkg', 'grkg.raqfjvgu("jrfg.")'],
+}
+
+
+def finale_code(test: str, index: int, *, half: bool = False, blind: bool = False) -> str:
+    climbing = [said(line) for line in FINALE["climb"]]
+    if half:
+        del climbing[7]
+    lines = [
+        *climbing,
+        *map(said, FINALE["answer"]),
+        *(said(line).format(test=said(test)) for line in FINALE["turn"]),
+        said(FINALE["walk"]).format(i=index),
+        *([] if blind else map(said, FINALE["look"])),
+        said(FINALE["step"]),
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def write_finale(spec: dict, draft_level: Level):
+    unseen = draft({**spec, "boards": spec["unseen"]})
+    fillings = [(test, index) for test in FINALE["tests"] for index in (3, -5, 2, 4)]
+    works = [filling for filling in fillings if all(solves(level, finale_code(*filling)) for level in (draft_level, unseen))]
+    if not works:
+        return None
+
+    def wrong_code(kind: str, level: Level) -> str:
+        if kind == "typed":
+            return route_code(level.cases()[0].level)
+        return finale_code(*works[0], half=kind == "half", blind=kind == "blind")
+
+    return finale_code(*works[0]), f"{len(works)} of {len(fillings)} fillings solve every board, and two boards the level doesn't have", wrong_code
+
+
+WRITERS = {"toll": write_toll, "trail": write_trail, "hour": write_hour, "gallery": write_gallery, "finale": write_finale}
 
 
 # -- the words no one reads ------------------------------------------------------------------------------

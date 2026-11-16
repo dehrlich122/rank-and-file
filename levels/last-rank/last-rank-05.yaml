@@ -1,0 +1,65 @@
+id: last-rank-05
+set: last-rank
+difficulty: 5
+draws_on: [2, 3, 4, 5, 6]
+title: "The Last Rank"
+trains: "Everything the Pawn tier taught, in one program: a counted climb, a guard, a rune and a measured walk"
+brief: "Climb past the rooks to the guard, who asks how many you took. Behind his gate, a rune on the last rank says where the goal lies. The floor along the last rank has gaps, and you carry two planks. Here your pawn can't tell when it has arrived: only the rune says where to stop."
+piece: pawn
+map: |
+  . . R . O . O G .
+  # # X # # # # # #
+  # . . . # # # # #
+  # . . . # # # # #
+  # . # . # # # # #
+  # . . . # # # # #
+  # # . . # # # # #
+  # . P . # # # # #
+legend: {"O": "pit", "X": {"tile": "gate", "question": "Halt! How many rooks did you take? Answer with the number.", "passphrase": "2"}, "R": {"tile": "rune", "text": "The goal is 5 squares to the east."}}
+enemies:
+- {"kind": "rook", "start": "b3"}
+- {"kind": "rook", "start": "c5"}
+start: {"facing": "north", "planks": 2}
+api: ["move", "turn_left", "turn_right", "look", "capture_left", "capture_right", "bridge", "read"]
+par: {"lines": 21}
+hints:
+- "Three jobs, one after another: go up to the guard, answer him, then follow the rune along the last rank. Each board is different in all three."
+- "Go up with a loop that goes on until the gate is ahead, taking rooks on either side and adding 1 to a counter for each. Print the counter, walk through and read the rune. One word in it says which way to turn, and another, as a number, how many squares to walk. Walk them with a second loop that looks for a pit before every step and bridges it."
+- "The walk along the last rank can look like this:\nfor _ in range(int(text.split(\" \")[3])):\n    if pawn.look() == \"pit\":\n        pawn.bridge()\n    pawn.move()"
+variants:
+- map: |
+    . . G . . O . . R . . #
+    # # # # # # # # X # # #
+    # # # # # # # # . . . #
+    # # # # # # # # . . . #
+    # # # # # # # # # . . #
+    # # # # # # # # . # . #
+    # # # # # # # # . . . #
+    # # # # # # # # . . . #
+    # # # # # # # # . P # #
+  legend: {"O": "pit", "X": {"tile": "gate", "question": "Halt! How many rooks did you take? Answer with the number.", "passphrase": "3"}, "R": {"tile": "rune", "text": "The goal is 6 squares to the west."}}
+  enemies: [{"kind": "rook", "start": "k2"}, {"kind": "rook", "start": "j5"}, {"kind": "rook", "start": "i6"}]
+- map: |
+    . . R . . G
+    # # X # # #
+    # # . . . #
+    # # . . . #
+    # # . . . #
+    # # # . . #
+    # # . . . #
+    # # . P . #
+  legend: {"O": "pit", "X": {"tile": "gate", "question": "Halt! How many rooks did you take? Answer with the number.", "passphrase": "1"}, "R": {"tile": "rune", "text": "The goal is 3 squares to the east."}}
+  enemies: [{"kind": "rook", "start": "c4"}]
+- map: |
+    . . . G O . O R . .
+    # # # # # # # X # #
+    # # # # # # . . . #
+    # # # # # # . . . #
+    # # # # # # . # . #
+    # # # # # # . . . #
+    # # # # # # . . # #
+    # # # # # # . . . #
+    # # # # # # . # . #
+    # # # # # # # P . #
+  legend: {"O": "pit", "X": {"tile": "gate", "question": "Halt! How many rooks did you take? Answer with the number.", "passphrase": "4"}, "R": {"tile": "rune", "text": "The goal is 4 squares to the west."}}
+  enemies: [{"kind": "rook", "start": "g2"}, {"kind": "rook", "start": "h3"}, {"kind": "rook", "start": "i5"}, {"kind": "rook", "start": "h7"}]
