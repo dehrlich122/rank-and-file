@@ -466,7 +466,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     caseBoard?.dispose();
     for (const thumb of thumbs) thumb.dispose();
     const boards = level.boards; // the same boards a run's cases come back with
-    const wide = boards.some((info) => info.width > info.height); // a wide board needs the column's width: the small boards go under it (QA-064)
+    const wide = boards.some((info) => info.width > 8); // a board wider than a chessboard would be drawn too small beside the others: the small boards go under it (QA-064)
     caseBoard = shown > 0 ? new BoardView(boards[shown]!) : null; // board 1 is the level's own
     const mark = (i: number) => (run ? ` ${verdict(run.cases[i]!)}` : "");
     thumbs = [];

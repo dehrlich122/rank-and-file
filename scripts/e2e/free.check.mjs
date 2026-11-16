@@ -1033,13 +1033,16 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     return `widths ${seen.map((s) => s.width)}`;
   });
 
-  await check("QA-064: boards that are all as tall as wide or taller keep the small boards beside the one on show (a challenge and a lesson level, 1440x900)", async () => {
+  await check("QA-064: levels with no board wider than 8 columns keep the small boards beside the one on show (a challenge, a tall lesson level, a wide-but-not-over-8 lesson level, 1440x900)", async () => {
     await atSize(1440, 900, async () => {
+      const shapes = [];
       await openChallenge(CHALLENGES[0], { fresh: true });
-      const challenge = await boardsShape();
+      shapes.push(["challenge", await boardsShape()]);
       await openLevel("ch02-l05", { fresh: true }); // four boards, all taller than wide
-      const lesson = await boardsShape();
-      for (const [name, shape] of [["challenge", challenge], ["lesson level", lesson]]) {
+      shapes.push(["tall lesson level", await boardsShape()]);
+      await openLevel("ch02-l02", { fresh: true }); // boards wider than tall, none over 8 columns
+      shapes.push(["wide lesson level", await boardsShape()]);
+      for (const [name, shape] of shapes) {
         expect(shape.beside && !shape.under && shape.whole && shape.over <= 0, `${name}: ${JSON.stringify(shape)}`);
       }
     });
