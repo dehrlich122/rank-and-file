@@ -1,7 +1,9 @@
 # Rank & File — Architecture
 
 This document records how the game is built and why. The design brief is
-[`DESIGN.md`](../DESIGN.md); this is the engineering side of it.
+[`DESIGN.md`](../DESIGN.md); this is the engineering side of it. `CLAUDE.md` holds the short core every session
+loads; the UI conventions are in [`UI.md`](UI.md), the level editor in [`EDITOR.md`](EDITOR.md) and the e2e checks
+in [`E2E.md`](E2E.md).
 
 ## Decisions
 
@@ -44,6 +46,21 @@ calls `pawn.move()`, which must be a real Python method. Keeping the whole
 simulation next to it means a run is a single, deterministic Python call that
 returns a complete recording. The UI then *plays back* that recording, which is
 what makes step, pause and rewind easy: nothing is re-executed.
+
+### How the engine reaches the browser
+
+- `worker.ts` pulls in `engine/rankfile/*.py` as raw text via
+  `import.meta.glob` and writes the files into Pyodide's virtual FS at
+  `/engine/rankfile/`.
+- The glob is **flat**, so a new top-level module is picked up automatically,
+  but a subpackage would need the glob changed.
+- The engine must stay plain Python: no third-party or Pyodide-specific
+  imports, so pytest can run it unchanged.
+
+**Pyodide is not bundled.** `worker.ts` loads `pyodide.mjs` at runtime from
+`${BASE_URL}pyodide/`, so the loader always matches the copied runtime files.
+Import `pyodide` for types only (`import type`). A value import pulls Node-only
+code into the bundle.
 
 ## Running player code
 
@@ -91,11 +108,25 @@ what makes step, pause and rewind easy: nothing is re-executed.
 | `timeout` | Hit the line budget |
 | `constraint` | Broke a level rule, so it wasn't run at all |
 
+**The `<player>` filename convention.** Player code is compiled with the
+filename `"<player>"` (`tracer.PLAYER_FILENAME`), and three things depend on it:
+- the tracer traces only frames with that filename, so engine code runs untraced
+- tracebacks are trimmed to those frames
+- `runner.remember_source()` puts the source into `linecache` so tracebacks can
+  quote it
+
 Game errors (`BlockedError`, `LockedAbilityError`, …, in `exceptions.py`) carry
 their own player-facing message. They still subclass the matching built-in type
 (`TypeError`, `AttributeError`) so they behave normally with `try`/`except`
 later, and they report their module as `builtins` so tracebacks read
 `BlockedError: …` rather than exposing the engine's module path.
+
+**Friendly errors.** `errors.explain()` produces `friendly` text (never with line
+numbers; the UI shows the line) and keeps the real traceback trimmed to player
+frames. Game errors in `exceptions.py` carry their own player-facing message
+and set `__module__ = "builtins"` so tracebacks don't show engine paths. New
+error translations belong in `errors.py`, with a case in
+`engine/tests/test_errors.py`.
 
 A loss *(M3.1)* raises `Lost`, which derives from `BaseException` like the
 line budget's `StepBudgetExceeded`, so `except Exception:` can't swallow it.
@@ -116,12 +147,15 @@ the `line` and `new_line` clocks tick. Asking the board (`at_goal()`,
 
 ### Playback
 
-The UI replays the recording (`src/ui/playback.ts`). Frame 0 is the moment
-before the program starts; frame *k* is the moment after step *k*. Every event
-carries the whole world's state after it (`{pos, facing, opened}`: the piece,
-and which gates are open), so any frame can be drawn directly, which makes
-stepping back and scrubbing free. Moving obstacles would add their positions to
-that same state. Stepping forward animates the frame's events.
+**Record, then replay.** A run returns the whole recording at once; the UI
+(`src/ui/playback.ts`) replays it. Every event carries the world's full state
+after it (the piece, open gates, enemies, gems, waypoints, ticks: `World.state`),
+so any frame can be drawn directly: step back, scrub and rewind never
+re-run code. The UI never re-implements game rules; it draws what the engine
+reports.
+
+Frame 0 is the moment
+before the program starts; frame *k* is the moment after step *k*. Stepping forward animates the frame's events.
 The outcome card appears when playback reaches the last frame. A recording belongs
 to the code it was made from: the first edit afterwards drops it (the outcome
 card is dimmed as out of date). Play and the right arrows then run the current
@@ -137,6 +171,16 @@ There are two layers, because an endless program can hang in two different ways:
 |---|---|---|---|
 | Python-level loop | `while True: x += 1` | **Line budget** in the tracer: after N lines it raises `StepBudgetExceeded` (a `BaseException`, so `except Exception:` can't swallow it) | None: the worker stays loaded and the next Run is instant |
 | One huge built-in operation | `sum(range(10**12))` | **Watchdog** in `PyClient`: after 3 s the worker is terminated | None in practice: a spare worker is kept loaded and takes over immediately |
+
+In the code:
+
+1. **Line budget.** `Tracer` counts player lines and raises `StepBudgetExceeded`.
+   It derives from `BaseException` so player `except Exception:` can't swallow
+   it. The worker survives.
+2. **Watchdog.** `PyClient` has a 3 s watchdog for hangs inside C code, where no
+   Python lines run. It terminates the worker and promotes a pre-loaded spare
+   worker. `PyClient` is tested with a fake `WorkerLike`, so its logic needs no
+   browser.
 
 ### Speed
 
@@ -175,6 +219,21 @@ PyYAML, which the level checker uses.
 North is +y. The board is labelled like a chessboard: files a–h, ranks 1–8.
 
 ## Level files
+
+**Levels are data.** YAML in `levels/chNN/`, lesson in `lessons/chNN/`,
+solutions in `solutions/chNN/`. The Testing ground (outside the curriculum:
+`curriculum: false` in `levels/chapters.yaml`) uses `practice/` folders. The format is documented
+below. Adding a level must never require engine changes.
+`engine/tests/test_levels.py` checks every level automatically:
+- the reference solution solves it in every case (each `?` square a hidden
+  goal might be on, each other map) and earns all three stars, so the level's
+  `par` is reachable
+- each `<id>.naive*.py` fails with the outcome named on its first line
+  (`# expect: constraint`)
+- lessons have ≤150 words of prose and 1–3 runnable snippets, and every snippet
+  runs (```` ```python run error ```` marks one that must fail)
+
+Constraints are checked with `ast`/`tokenize`, never with string matching.
 
 ```yaml
 id: ch01-l03                 # unique; must match the file name
@@ -374,6 +433,52 @@ Alongside each level:
 Each file's folder is `ch01`, `ch02`, … or `practice`.
 `engine/tests/test_levels.py` checks all of these automatically for every level.
 
+**Every new obstacle or interaction is shown in its lesson's sample code**
+*(Designer, 2026-09-27)*. When a level brings in something new (a pit, a
+patrol, a gate…), its lesson's snippets run on a `lesson_board` that has it,
+so the player sees it at work, including how it loses a run (```` ```python run lost ````).
+
+### Writing level content blind
+
+The designer is also the learner (`CLAUDE.md`, "no spoilers"), so level content is written by scripts that never
+echo it. Only the orchestrator writes it (`docs/WORKFLOW.md`, "Level content").
+
+- Chapter 1's solutions were generated by a script
+  (a search over the board) that wrote the files without echoing them; prefer
+  that approach for new levels.
+- `scripts/solve.py` searches any level,
+  obstacles included, with the real World, and prints only counts (fewest
+  lines, ticks). Its `fewest_lines`/`write_code` write reference solutions
+  blind. Among the shortest programs it takes the one with the fewest turns,
+  so references pass time with `wait()`, not by spinning (QA-026). A level
+  test enforces this on every level (M4.0); a loop's last lap may end on its
+  own turn.
+- Chapter 3's levels and
+  solutions come from `scripts/gen_loops.py`, which replays solve.py's route
+  with the fewest lines of `for` loops (M3.3). Chapter 4's come from
+  `scripts/gen_conditions.py`, which lines up each board's route and
+  branches on `look()` where they part (M3.4). Both share
+  `scripts/levelgen.py`. Rerun a generator after changing one of its
+  levels.
+- Chapter 5's `scripts/gen_while.py` (M3.5) searches small
+  programs with `while` on the real engine and prints only counts.
+- Hints, solutions and their notes are all spoilers. Write new ones without
+  their text appearing in the conversation. The practice level's generator
+  stored code as character codes and prose as ROT13, and printed only file
+  names.
+
+What bites:
+
+- A level has `?` squares or `variants`, not both.
+- A lesson snippet may be meant to end in `error`, `lost`
+  or `timeout`.
+- A program search over about 5 lines takes minutes.
+- Verify a generator refactor by the sha256 of its
+  `levels/`, `solutions/` and `lessons/` files.
+- `check:bundle` matches substrings, so a lesson snippet must not contain a level's
+  reference.
+- Python: `read_text(encoding="utf-8")` and `write_text(..., newline="\n")` on Windows.
+
 ## Repository layout
 
 ```
@@ -414,6 +519,11 @@ public/pyodide/    Pyodide runtime, copied from node_modules (not committed)
   worker finds Pyodide through `import.meta.env.BASE_URL`. So never write
   root-absolute URLs (`/pyodide/...`) in the app. The e2e suite passes against
   a subpath build (`npm run e2e -- http://localhost:4174/rank-and-file/`).
+  To try a subpath build locally, run
+  `npx vite build --base=/rank-and-file/`, then
+  `npx vite preview --base=/rank-and-file/`. In Git Bash, prefix both with
+  `MSYS_NO_PATHCONV=1`, or Git Bash rewrites `/rank-and-file/` into a Windows
+  path.
 
 ## Open questions for later milestones
 
