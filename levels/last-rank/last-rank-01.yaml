@@ -1,0 +1,64 @@
+id: last-rank-01
+set: last-rank
+difficulty: 2
+draws_on: [2, 4, 5]
+title: "The Toll Road"
+trains: "A counter kept through a loop that looks before every step"
+brief: "The toll road runs straight to a guard, who asks how far you walked. Where the floor has fallen in, there is a way round on the left. Every board is a different road."
+piece: pawn
+map: |
+  # # G #
+  # # X #
+  # . . #
+  # . O #
+  # . . #
+  # # . #
+  # . . #
+  # . O #
+  # . . #
+  # # . #
+  # # P #
+legend: {"O": "pit", "X": {"tile": "gate", "question": "Halt! How many squares did you walk to get here? Answer with the number.", "passphrase": "12"}}
+start: {"facing": "north"}
+api: ["move", "turn_left", "turn_right", "squares_ahead", "wait", "at_goal", "look"]
+par: {"lines": 16}
+hints:
+- "Every road has a different length and its gaps are in different places, so the answer can't be typed in. Count each square as you walk it."
+- "Keep a counter that starts at 0. Repeat until the guard's gate is ahead: look first. If a pit is ahead, walk round it by the side path and add the squares that took. Otherwise step once and add 1. At the gate, print the counter."
+- "One way to start:\nsteps = 0\nwhile pawn.look() != \"gate\":\n    if pawn.look() == \"pit\":"
+variants:
+- map: |
+    # # G #
+    # # X #
+    # # . #
+    # . . #
+    # . O #
+    # . . #
+    # # . #
+    # # . #
+    # # P #
+  legend: {"O": "pit", "X": {"tile": "gate", "question": "Halt! How many squares did you walk to get here? Answer with the number.", "passphrase": "8"}}
+- map: |
+    # # G #
+    # # X #
+    # # . #
+    # # . #
+    # # . #
+    # . . #
+    # . O #
+    # . . #
+    # # . #
+    # . . #
+    # . O #
+    # . P #
+  legend: {"O": "pit", "X": {"tile": "gate", "question": "Halt! How many squares did you walk to get here? Answer with the number.", "passphrase": "13"}}
+- map: |
+    # # G #
+    # # X #
+    # # . #
+    # # . #
+    # # . #
+    # # . #
+    # # . #
+    # # P #
+  legend: {"O": "pit", "X": {"tile": "gate", "question": "Halt! How many squares did you walk to get here? Answer with the number.", "passphrase": "5"}}

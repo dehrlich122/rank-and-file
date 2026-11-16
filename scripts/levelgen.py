@@ -1,4 +1,4 @@
-"""What the blind level generators share (gen_loops.py, gen_conditions.py): writing a
+"""What the blind level generators share (gen_loops.py, gen_conditions.py and the later ones): writing a
 level's YAML and files, and checking how a wrong attempt fails. Nothing here
 prints code: the designer is also the game's learner (see CLAUDE.md)."""
 
@@ -110,6 +110,18 @@ def third_hint(spec: dict, reference: str) -> str:
     return f"{intro}\n" + "\n".join(block)
 
 
+def folder(spec: dict, chapter: int) -> str:
+    """Where a level's files go under levels/ and solutions/: its chapter's folder, or for a challenge its set's."""
+    return spec.get("set") or f"ch{chapter:02d}"
+
+
+def placing(spec: dict, chapter: int) -> list[str]:
+    """Where a level belongs: its chapter, or for a challenge (M4.4) its set, its difficulty and the chapters it draws on."""
+    if "set" not in spec:
+        return [f"chapter: {chapter}"]
+    return [f"set: {spec['set']}", f"difficulty: {spec['difficulty']}", f"draws_on: {json.dumps(spec['draws_on'])}"]
+
+
 def board_text(text: str) -> str:
     """A map written indented in a spec, as the level file holds it."""
     return "\n".join(line.strip() for line in text.strip("\n").splitlines()) + "\n"
@@ -121,7 +133,7 @@ def yaml_text(spec: dict, *, chapter: int, api: list[str], par: int, hints: list
     q = json.dumps
     lines = [
         f"id: {spec['id']}",
-        f"chapter: {chapter}",
+        *placing(spec, chapter),
         f"title: {q(spec['title'])}",
         f"trains: {q(spec['trains'])}",
         f"brief: {q(spec['brief'])}",
@@ -147,7 +159,8 @@ def yaml_text(spec: dict, *, chapter: int, api: list[str], par: int, hints: list
     lines.append(f"par: {q({'lines': par})}")
     lines.append("hints:")
     lines += [f"- {q(hint)}" for hint in hints]
-    lines.append(f"lesson: ch{chapter:02d}/{spec['id']}.md")
+    if "set" not in spec:  # a challenge has no lesson
+        lines.append(f"lesson: {folder(spec, chapter)}/{spec['id']}.md")
     if spec.get("mastery"):
         lines.append("mastery: true")
     if "lesson_board" in spec:
@@ -180,11 +193,11 @@ def save(path: Path, text: str) -> None:
 
 def write_files(spec: dict, chapter: int, level_yaml: str, reference: str, wrong: list[str], note: str) -> None:
     """The level file, its reference, its wrong attempts (replacing any old ones) and its note."""
-    folder = ROOT / "solutions" / f"ch{chapter:02d}"
-    save(ROOT / "levels" / f"ch{chapter:02d}" / f"{spec['id']}.yaml", level_yaml)
-    save(folder / f"{spec['id']}.py", reference)
-    for old in folder.glob(f"{spec['id']}.naive*.py"):
+    solutions = ROOT / "solutions" / folder(spec, chapter)
+    save(ROOT / "levels" / folder(spec, chapter) / f"{spec['id']}.yaml", level_yaml)
+    save(solutions / f"{spec['id']}.py", reference)
+    for old in solutions.glob(f"{spec['id']}.naive*.py"):
         old.unlink()
     for number, code in enumerate(wrong, start=1):
-        save(folder / f"{spec['id']}.naive{'' if number == 1 else number}.py", code)
-    save(folder / f"{spec['id']}.md", note + "\n")
+        save(solutions / f"{spec['id']}.naive{'' if number == 1 else number}.py", code)
+    save(solutions / f"{spec['id']}.md", note + "\n")
