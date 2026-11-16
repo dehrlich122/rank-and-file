@@ -99,13 +99,19 @@ function parSection(ctx: PropsContext): HTMLElement {
   const starter = textArea(readStarter(draft), 3, (code) => ctx.change((d) => setStarter(d, code), "starter"));
   const par = readPar(draft);
   const lines = readSolution(draft) ? ctx.solutionLines : null;
+  // the scratch level has no stars and no players to offer a solution to: only the starter code is left
+  const parParts = ctx.scratch
+    ? []
+    : [
+        field("Par (lines of code)", numberInput(par ?? undefined, 1, (n) => ctx.change((d) => setPar(d, n), "par")), "Meeting it earns the second star.", "par"),
+        lines !== null && lines !== par ? h("button", { class: "btn btn-small", onClick: () => ctx.change((d) => setPar(d, lines), undefined, true) }, `Use my solution's ${lines} lines`) : null,
+        solutionBlock(ctx),
+      ];
   return h(
     "section",
     { class: "rules-section" },
-    h("h3", {}, "Par and starter code"),
-    field("Par (lines of code)", numberInput(par ?? undefined, 1, (n) => ctx.change((d) => setPar(d, n), "par")), "Meeting it earns the second star.", "par"),
-    lines !== null && lines !== par ? h("button", { class: "btn btn-small", onClick: () => ctx.change((d) => setPar(d, lines), undefined, true) }, `Use my solution's ${lines} lines`) : null,
-    solutionBlock(ctx),
+    h("h3", {}, ctx.scratch ? "Starter code" : "Par and starter code"),
+    ...parParts,
     h("div", { class: "field", "data-field": "starter" }, h("span", { class: "field-label" }, "Starter code"), starter, counter(starter, options.limits.starter), h("span", { class: "muted small" }, "What the player's editor begins with. Optional.")),
   );
 }
