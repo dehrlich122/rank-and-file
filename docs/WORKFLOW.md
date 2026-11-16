@@ -193,8 +193,9 @@ A lead reports its workers' rows. A Fable edit (above) gets a row too.
 
 Sessions don't compact (`autoCompactEnabled` is off); they restart from `handoff.md`.
 
-- **Orchestrator:** hands off at 150k tokens of context (ceiling 200k). The context guard
-  (`.claude/hooks/context-guard.mjs`) warns after each tool call from 150k: finish the unit of work and run the
+- **Orchestrator:** hands off at 250k tokens of context, ceiling 300k *(Designer, 2026-11-16: at 150k "the
+  handoffs are coming very early")*. The context guard
+  (`.claude/hooks/context-guard.mjs`) warns after each tool call from 250k: finish the unit of work and run the
   **`handoff` skill** (check the tree, `npm run check`, commit what is finished, rewrite the Resume card to its
   template, print the next action, end with **HANDOFF READY**). Its Stop hook refuses to stop once until
   `handoff.md` has changed. The designer then types `/clear` and `go`.
@@ -214,7 +215,7 @@ Sessions don't compact (`autoCompactEnabled` is off); they restart from `handoff
 | `.claude/skills/` | `handoff` (end of a session) and `start-session` (after `/clear`) |
 | `.claude/settings.json` | worktrees branch from HEAD; the hooks below; a permission allowlist so background agents don't stall |
 | `.claude/hooks/spoiler-guard.mjs` | PreToolUse: denies reading or printing `solutions/` and `levels/` (and, for agents, the generators), and patches that would carry them |
-| `.claude/hooks/context-guard.mjs` | PostToolUse warnings at 150k/190k (agents 150k); the Stop gate |
+| `.claude/hooks/context-guard.mjs` | PostToolUse warnings at 250k/290k (agents 150k); the Stop gate |
 | `.claude/hooks/session-start.mjs` | on startup and `/clear`: the Resume card, and a pointer to `start-session` |
 | `.claude/hooks/hooks.test.mjs` | their tests (`npm run test:hooks`, part of `npm run check`) |
 | `.worktreeinclude` | copies `node_modules/`, `.venv/` and `public/pyodide/` into new worktrees |

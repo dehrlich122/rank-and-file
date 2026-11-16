@@ -64,8 +64,8 @@ tokens, outcome) in the milestone doc.
 
 **Level content never goes to an agent:** the orchestrator writes it through
 the blind generators. Sessions restart from `handoff.md` instead of compacting:
-the context guard asks for a handoff at 150k tokens (leads and workers wrap up
-at 150k). The `handoff` skill ends a session; the SessionStart hook starts the
+the context guard asks for a handoff at 250k tokens, ceiling 300k *(Designer, 2026-11-16)*; leads and
+workers wrap up at 150k. The `handoff` skill ends a session; the SessionStart hook starts the
 next one with `start-session`.
 
 Milestones stop for the designer at three gates only: draft approval, QA1

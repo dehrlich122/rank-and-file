@@ -1,9 +1,9 @@
 // Context guard (docs/WORKFLOW.md, "Context management"). Sessions restart from handoff.md
 // instead of compacting, so each one is told when its context gets big:
-//   PostToolUse, orchestrator: from 150k tokens, finish the current unit, then run the `handoff`
-//                              skill (ends with HANDOFF READY); from 190k, stop now (ceiling 200k).
+//   PostToolUse, orchestrator: from 250k tokens, finish the current unit, then run the `handoff`
+//                              skill (ends with HANDOFF READY); from 290k, stop now (ceiling 300k).
 //   PostToolUse, subagent:     from 150k, commit the work in progress and return a partial report.
-//   Stop, orchestrator:        above 150k, refuse to stop once until handoff.md has been rewritten.
+//   Stop, orchestrator:        above 250k, refuse to stop once until handoff.md has been rewritten.
 // The size is the last API call's input (fresh + cache write + cache read), read from the
 // transcript, the same figure the status line shows.
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "node:fs";
@@ -11,7 +11,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-export const LIMITS = { handoff: 150_000, stop: 190_000, worker: 150_000, step: 10_000 };
+// The orchestrator's limits are the designer's (2026-11-16): 150k "doesn't run very far". Workers stay at 150k.
+export const LIMITS = { handoff: 250_000, stop: 290_000, ceiling: 300_000, worker: 150_000, step: 10_000 };
 const TAIL = 2 * 1024 * 1024; // the last usage line is near the end; read at most this much
 
 /** Context tokens from the last main-thread (or subagent) API response in a transcript, or null. */
@@ -76,10 +77,10 @@ function workerMessage(tokens) {
 
 function orchestratorMessage(tokens) {
   if (tokens >= LIMITS.stop) {
-    return `[context-guard] Context is at ${k(tokens)}, close to the 200k ceiling. Stop the current work now: ` +
+    return `[context-guard] Context is at ${k(tokens)}, close to the ${k(LIMITS.ceiling)} ceiling. Stop the current work now: ` +
       "commit or note the work in progress, then run the `handoff` skill (rewrites the Resume card, ends with HANDOFF READY).";
   }
-  return `[context-guard] Context is at ${k(tokens)} (handoff at ${k(LIMITS.handoff)}, ceiling 200k). ` +
+  return `[context-guard] Context is at ${k(tokens)} (handoff at ${k(LIMITS.handoff)}, ceiling ${k(LIMITS.ceiling)}). ` +
     "Finish the unit of work you are in, but don't start another. Then run the `handoff` skill: it checks the tree, " +
     "commits what is finished, rewrites handoff.md's Resume card and ends with HANDOFF READY, so the designer can " +
     "/clear and type go.";
