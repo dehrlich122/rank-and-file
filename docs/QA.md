@@ -1874,6 +1874,51 @@ Part 2 (Sandbox, Skins, the pointers, Save to the repo, unknown routes). The con
     player can't tell which is easiest from the select alone (the sort's "Easiest first" helps).
   - In greyscale the step-5 tag's text is a little dimmer than the others; it still reads by keyword and pips.
 
+## Session 18 — 2026-11-17 · M4.5 The Last Rank, automated (`m4-5-last-rank`)
+
+The autonomous run: one worker drove the real app in headless Edge over the filled set (the hub, the Challenges
+list, the five challenge screens and a run on each; 1440×900 and 1000×700, both themes). It never opened a hint, a
+solution or the comparison. Nobody has played the five yet: this round looked at the screens, not at whether the
+puzzles are good. **Not reached** (the worker ran out of room): the light theme at 1000×700 was measured but not
+looked at; a wrong attempt at 1000×700; Animations full during a run.
+
+- **QA-063 · A solved challenge's card is wider than the board's column, and its way on is cut off** *(automated)* · Open
+  - **Observed:** at 1440×900, after a correct run on any of the five, the "Run complete" banner and the card are
+    about 460px wide in a column of about 410px. The middle panel gets a sideways scrollbar and "Next challenge →"
+    (or "Back to Free Play") is cut until the player scrolls. Every time, both themes. At 1000×700 it fits.
+  - **Likely why:** the card's head holds "Solved!", "Compare with an idiomatic solution" and the way on in one row
+    that doesn't wrap; "Next challenge →" is longer than a lesson level's way on. Whether a lesson level with
+    several boards does it too was not checked; the fix's check covers one.
+- **QA-064 · Wide boards are drawn small beside the other boards** *(automated)* · Open
+  - **Observed:** at 1440×900 the finale's boards (9 and 12 squares wide) share the column with the three small
+    boards beside them, so the board on show is about 280px wide: squares of about 23px, rank and file labels of
+    about 6px, and half the stage's height empty under it. Whole and unclipped, but hard to read. At 1000×700 it is fine.
+  - **Decided without the designer:** in a level where any board has more columns than rows, the small boards go in
+    a row under the board on show (as they already do in a narrow window), for every board of that level, so the
+    layout doesn't change as the player switches boards. Levels whose boards are all square or tall stay as they are.
+- **QA-065 · Backticks show in the plank's line under Obstacles** *(automated; older than M4.5, since M3.1)* · Open
+  - **Observed:** "A plank laid over a pit (\`bridge()\`) makes it safe to cross." shows its backticks. Any level
+    with a plank has it. The Challenge panel's lists print the engine's sentences as plain text.
+- **For the designer (no change made):**
+  - **A narrow window plays the run out of sight** (older than M4.5; every level). At 1000×700 the code sits under
+    the board and the page scrolls. After typing and pressing Run, the board is above the window for the whole
+    playback and nothing scrolls back to it. Recommended: on Run, scroll the board into view when it is out of it.
+  - **The wait for a verdict.** Run plays board 1 only; the other boards show ✓ or ✗ on their small boards and
+    play when clicked (a failed run jumps to the first board that failed, which reads well). The card comes at the
+    end of playback. At 1× the reference takes, per board: The Toll Road 10 to 19 s, Leg by Leg 13 to 18 s, The
+    Written Hour 2 to 5 s, The Long Gallery 13 to 24 s, The Last Rank 18 to 26 s. Nothing says a small board can
+    be clicked to watch it. This is how every level with several boards works; the challenges only make it longer.
+  - **"The Codex has everything"** (the set's line on Challenges) against a challenge's Codex tab, which lists the
+    abilities that challenge allows (The Written Hour has no turns and no look, on purpose) plus the tier's Python
+    and text entries. It works as designed; the line may promise more than a player then finds.
+  - **Small things on the Challenges list:** with filters that match nothing, the set's head still shows above "No
+    challenges match these filters."; row 5's long "Draws on" line wraps inside a chapter's name; the difficulty
+    tags are right-aligned, so their left edges don't line up.
+- **Looked at and fine:** all 20 boards render whole at both sizes in both themes, and the piece stays in view
+  during playback at 1440×900; the list's rows, head line, pulse on the hardest tag, Tab order, focus ring and
+  Enter; crumbs, tabs, brief and chips on each challenge; no "undefined" or console errors; a wrong attempt's card
+  names the board and gives a cause a learner can act on; ✓, stars and the counts after solving; Lessons' pointer.
+
 ---
 
 ## Queued work
