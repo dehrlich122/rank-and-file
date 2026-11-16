@@ -979,4 +979,15 @@ export default async function freeChecks({ browser: b, base, root, check }) {
       expect(fitsColumn(fit), JSON.stringify(fit));
     });
   });
+
+  await check("QA-065: the Challenge panel's lists show `code` spans as code, with no backtick left (the plank's line shows bridge() in a code element)", async () => {
+    await openChallenge(CHALLENGES[4], { fresh: true });
+    const lists = await b.evaluate(`(() => {
+      const items = [...document.querySelectorAll('.level-left :is(.objectives, .obstacles, .rules, .star-goals) li')];
+      const plank = items.find((li) => li.textContent.includes('bridge()'));
+      return { items: items.length, backticks: items.filter((li) => li.textContent.includes('\`')).length, plankCode: [...(plank?.querySelectorAll('code') ?? [])].map((c) => c.textContent) };
+    })()`);
+    expect(lists.items >= 4 && lists.backticks === 0, JSON.stringify(lists));
+    expect(lists.plankCode.includes("bridge()"), JSON.stringify(lists));
+  });
 }

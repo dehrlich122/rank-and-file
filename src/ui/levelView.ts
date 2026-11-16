@@ -8,7 +8,7 @@ import { BoardView, squareName } from "./board";
 import { levelTagsRow } from "./challengeTags";
 import { askTier } from "./tierTags";
 import { ChipTooltip, codexHover, renderCodex, type CodexLookup, type CodexView } from "./codex";
-import { h } from "./dom";
+import { h, withCode } from "./dom";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
 import { masteryTag } from "./lessonsMenu";
@@ -587,7 +587,7 @@ function describeChallenge(level: LevelInfo, tags: HTMLElement, openEntry: (name
 
   // The goals and rules come worded from the engine (Level.describe), which owns
   // every player-facing description of the game's rules.
-  const list = (className: string, items: string[]) => h("ul", { class: className }, ...items.map((item) => h("li", {}, item)));
+  const list = (className: string, items: string[]) => h("ul", { class: className }, ...items.map((item) => h("li", {}, ...withCode(item)))); // `code` spans in a sentence show as code (QA-065)
   if (level.goals.length) parts.push(h("h3", {}, "Goal"), list("objectives", level.goals));
   for (const [label, writings] of [["Signpost", level.signs], ["Rune", level.runes]] as const) {
     for (const writing of writings) {
