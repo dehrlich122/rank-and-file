@@ -975,6 +975,9 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     await clickButton("Yes, reset", ".settings-dialog");
     await b.waitFor(`document.querySelector('.settings-dialog .reset-progress')?.textContent.includes('Progress reset.')`, 10_000, "the reset");
   };
+  const SANDBOX = '.level[data-level-id="sandbox"]';
+  const sandboxReady = (timeout = 90_000) =>
+    b.waitFor(`document.querySelector('${SANDBOX} .board-host .board .piece') && !document.querySelector('${SANDBOX} .level-right .btn-primary').disabled`, timeout, "the Sandbox's level screen");
   const pieceRadio = (value) =>
     b.evaluate(`(() => { const r = document.querySelector('input[name="setting-piece"][value="${value}"]'); return { checked: r.checked, disabled: r.disabled }; })()`);
 
@@ -1001,47 +1004,53 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     }
   });
 
-  await check("QA-057: Reset progress clears the Sandbox's saved code, so it shows its default code again", async () => {
+  await check("QA-061: Reset progress leaves the Sandbox's board and code alone, and says so", async () => {
+    // the code alone: painting the board needs the editor suite's helpers; the saved scratch store (board and code) is compared whole instead
     await startFresh("#/free/sandbox");
-    await b.waitFor(`document.querySelector('.sandbox .cm-content') && document.querySelector('.sandbox .snippet-board .piece')`, 90_000, "the Sandbox");
-    const text = () => editorText(".sandbox");
-    const starter = await text();
-    await setCode("answer = 42", ".sandbox .cm-content");
-    await sleep(200);
-    expect((await text()) === "answer = 42", "the typed code is in the Sandbox");
-    expect((await b.evaluate(`localStorage.getItem('rank-and-file:sandbox')`)) !== null, "the code is saved");
-    await resetProgressViaDialog();
+    await sandboxReady();
+    await b.evaluate(`localStorage.setItem('rank-and-file:progress', ${JSON.stringify(JSON.stringify(SOLVED_CHAPTER_6))}); true`);
+    await setCode("answer = 42");
+    await b.waitFor(`localStorage.getItem('rank-and-file:sandbox')?.includes('answer = 42')`, 10_000, "the code to be saved");
+    expect((await editorText()) === "answer = 42", "the typed code is in the Sandbox");
+    const stored = await b.evaluate(`localStorage.getItem('rank-and-file:sandbox')`);
+    await b.evaluate(`document.querySelector('.topbar .settings-button').click()`);
+    await clickButton("Reset progress…", ".settings-dialog");
+    const question = await b.evaluate(`document.querySelector('.settings-dialog .reset-progress')?.textContent ?? ''`);
+    expect(question.includes("Your own levels and the Sandbox stay."), `the confirm question names the Sandbox as staying (${question})`);
+    await clickButton("Yes, reset", ".settings-dialog");
+    await b.waitFor(`document.querySelector('.settings-dialog .reset-progress')?.textContent.includes('Progress reset.')`, 10_000, "the reset");
     await b.evaluate(`document.querySelector('.settings-dialog').close()`);
-    await b.waitFor(`!!document.querySelector('.sandbox .cm-content')`, 10_000, "the Sandbox redrawn");
-    expect((await text()) === starter, "after the reset the Sandbox shows its default code");
+    const progress = await b.evaluate(`localStorage.getItem('rank-and-file:progress') ?? '{}'`);
+    expect(!progress.includes("ch06-l01"), "the curriculum progress set up before the reset is gone");
+    expect((await editorText()) === "answer = 42", "the Sandbox still shows the typed code after the reset");
+    expect((await b.evaluate(`localStorage.getItem('rank-and-file:sandbox')`)) === stored, "the saved Sandbox (board and code) is unchanged");
     await reloadAt("#/free/sandbox");
-    await b.waitFor(`!!document.querySelector('.sandbox .cm-content')`, 60_000, "the Sandbox after a reload");
-    expect((await text()) === starter, "and it still does after a reload");
-    return "default code after the reset and after a reload";
+    await sandboxReady(60_000);
+    expect((await editorText()) === "answer = 42", "and it still does after a reload");
+    return "reset wiped the solved levels; the Sandbox's code and saved board stayed, also after a reload; the question says it stays";
   });
 
-  await check("QA-053: running empty or comment-only code finishes quietly: no exception, no line marked, status Finished", async () => {
+  await check("QA-053: running empty or comment-only code finishes quietly on the Sandbox's level screen: no exception, no line marked, no error card", async () => {
     await startFresh("#/free/sandbox");
-    await b.waitFor(`document.querySelector('.sandbox .snippet-board .piece') && document.querySelector('.sandbox .btn-primary')`, 90_000, "the Sandbox");
+    await sandboxReady();
     const exceptions = (since) => b.logs.slice(since).filter((line) => line.startsWith("[exception]"));
-    const runWith = async (label, type) => {
-      await b.evaluate(`document.querySelector('.sandbox .cm-content').focus()`);
-      await b.key("a", { code: "KeyA", modifiers: 2 }); // Ctrl+A
-      await b.key("Backspace", { code: "Backspace" });
-      if (type) await b.send("Input.insertText", { text: type });
-      await b.evaluate(`document.querySelector('.sandbox .snippet-status').textContent = ''`);
+    const runWith = async (label, type, { endsOnALine = false } = {}) => {
+      await setCode(type); // Ctrl+A, then the text; an empty text needs the Backspace to clear the selection
+      if (!type) await b.key("Backspace", { code: "Backspace" });
+      await b.evaluate(`window.__outcomeBefore = document.querySelector('.outcome-host .outcome')`);
       const since = b.logs.length;
-      await b.evaluate(`document.querySelector('.sandbox .btn-primary').click()`);
-      await b.waitFor(`document.querySelector('.sandbox .snippet-status')?.textContent.includes('Finished')`, 15_000, `${label}: the status to say it finished`);
+      await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
+      await b.waitFor(`(() => { const o = document.querySelector('.outcome-host .outcome'); return !!o && o !== window.__outcomeBefore; })()`, 30_000, `${label}: the outcome card at the end of the run`);
       await sleep(400);
       expect(exceptions(since).length === 0, `${label}: no exception in the page`);
-      expect((await b.evaluate(`document.querySelectorAll('.sandbox .cm-step-line').length`)) === 0, `${label}: no line is marked`);
-      expect(!(await b.evaluate(`!!document.querySelector('.sandbox .error-detail')`)), `${label}: no error card`);
+      // a finished run that had steps leaves its last step's line marked, as the level screen always does; one with none marks nothing
+      if (!endsOnALine) expect((await b.evaluate(`document.querySelectorAll('.level-right .cm-step-line').length`)) === 0, `${label}: no line is marked`);
+      expect(!(await b.evaluate(`!!document.querySelector('.outcome-host .error-detail')`)), `${label}: no error card`);
     };
     await runWith("empty code", "");
     await runWith("a comment only", "# nothing to run");
-    await runWith("one real line", "pawn.move()"); // a run that has lines still works
-    // the level screen, with its code emptied (read-only look: levelView.ts is not part of this fix)
+    await runWith("one real line", "pawn.move()", { endsOnALine: true }); // a run that has lines still works
+    // the ordinary level screen, with its code emptied (read-only look: levelView.ts is not part of this fix)
     await openLevel("ch01-l01", { fresh: true });
     await b.evaluate(`document.querySelector('.level-right .cm-content').focus()`);
     await b.key("a", { code: "KeyA", modifiers: 2 });
@@ -1050,16 +1059,18 @@ export default async function uiChecks({ browser: b, base, root, check }) {
     await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
     await sleep(2500);
     expect(exceptions(since).length === 0, `the level screen's Run with empty code threw: ${exceptions(since).join(" | ")}`);
-    return "Sandbox: empty, comment-only and normal runs finish; the level screen's empty Run throws nothing";
+    return "Sandbox: empty, comment-only and normal runs finish with an outcome card; the level screen's empty Run throws nothing";
   });
 
   await check("QA-056: an unknown #/free/… shows the hub, extra path after a page shows that page, and the address is corrected", async () => {
     await startFresh("#/");
-    const titleOf = { "#/free": "Free Play · Rank & File", "#/free/sandbox": "Sandbox · Free Play · Rank & File", "#/free/skins": "Skins · Free Play · Rank & File", "#/free/challenges": "Challenges · Free Play · Rank & File", "#/free/shared": "Shared with me · Free Play · Rank & File" };
+    const titleOf = { "#/free": "Free Play · Rank & File", "#/free/sandbox": "Sandbox · Free Play · Rank & File", "#/free/sandbox/board": "Board · Sandbox · Free Play · Rank & File", "#/free/skins": "Skins · Free Play · Rank & File", "#/free/challenges": "Challenges · Free Play · Rank & File", "#/free/shared": "Shared with me · Free Play · Rank & File" };
     const cases = [
       ["#/free/nonsense", "#/free"],
       ["#/free/", "#/free"],
       ["#/free/sandbox/extra", "#/free/sandbox"],
+      ["#/free/sandbox/board", "#/free/sandbox/board"],
+      ["#/free/sandbox/board/extra", "#/free/sandbox"],
       ["#/free/skins/x", "#/free/skins"],
       ["#/free/challenges/x", "#/free/challenges"],
       ["#/free/shared", "#/free/shared"],

@@ -210,7 +210,7 @@ function resetProgress(onReset: () => void): HTMLElement {
   };
   function ask(): void {
     slot.replaceChildren(
-      confirmStep("Delete every solved level, star and hint, and the code you wrote? This can't be undone.", "Yes, reset", "Cancel", (yes) => {
+      confirmStep("Delete every solved level, star and hint, and the code you wrote for them? Your own levels and the Sandbox stay. This can't be undone.", "Yes, reset", "Cancel", (yes) => {
         if (yes) onReset();
         startOver(yes ? "Progress reset." : undefined).focus();
       }),
