@@ -1,6 +1,7 @@
 // End-to-end checks for Free Play (M4.4): the hub and its five pages, the tags and the filters on My levels, the
-// Sandbox, the Skins gallery, Shared with me in its new home, the pointers from the promotion screen and Lessons, and
-// "Save to the repo". Every level here is hand-made on a blank board (a few are shared by a code made in the page by
+// Sandbox (QA-061: a scratch level on the real level screen at #/free/sandbox, its board changed in the real level
+// editor at #/free/sandbox/board; the level-screen side is checked here), the Skins gallery, Shared with me in its new
+// home, the pointers from the promotion screen and Lessons, and "Save to the repo". Every level here is hand-made on a blank board (a few are shared by a code made in the page by
 // the app's own codec, so those checks need the Vite dev server, like share.check.mjs). The programs typed are
 // one-line moves written for these boards. Never put editor contents into a check's message or return value.
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
@@ -26,7 +27,7 @@ const corridor = (title) => ({
 });
 
 export default async function freeChecks({ browser: b, base, root, check }) {
-  const { setCode } = levelHelpers(b, base, root);
+  const { setCode, editorText } = levelHelpers(b, base, root);
   const { clickButton, hasButton } = buttonHelpers(b);
   const { wordAt, hover, hoverAway } = hoverHelpers(b);
   const text = (selector) => b.evaluate(`document.querySelector(${JSON.stringify(selector)})?.textContent ?? ''`);
@@ -91,10 +92,14 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     await b.evaluate(`[...document.querySelectorAll('.ts-item')].find((i) => i.textContent.includes('Free Play')).click()`);
     await b.waitFor(`document.querySelector('.free-play .fp-row')`, 30_000, "the hub");
     expect((await hash()) === "#/free", `hash ${await hash()}`);
-    const found = await b.evaluate(`[...document.querySelectorAll('.fp-row')].map((r) => ({ section: r.dataset.section, name: r.querySelector('strong').textContent, count: r.querySelector('.fp-count').textContent.trim(), href: r.getAttribute('href') }))`);
+    const found = await b.evaluate(`[...document.querySelectorAll('.fp-row')].map((r) => ({ section: r.dataset.section, name: r.querySelector('strong').textContent, count: r.querySelector('.fp-count').textContent.trim(), line: r.querySelector('.fp-text .muted').textContent.trim(), href: r.getAttribute('href') }))`);
     expect(found.map((r) => r.section).join() === "challenges,levels,shared,sandbox,skins", `rows: ${found.map((r) => r.section)}`);
     expect(found.map((r) => r.name).join() === "Challenges,My levels,Shared with me,Sandbox,Skins", `names: ${found.map((r) => r.name)}`);
     expect(found.every((r) => r.count.length > 0), "every row has a count");
+    // QA-061 (decision 9): the Sandbox row says what it is and shows its board's size where a count of abilities used to be
+    const sandbox = found.find((r) => r.section === "sandbox");
+    expect(sandbox.line === "A board of your own to paint and code on", `the Sandbox row's line: ${sandbox.line}`);
+    expect(sandbox.count === "8 × 8", `the Sandbox row's count: ${sandbox.count}`);
     expect((await crumbs()) === "Free Play", `crumbs: ${await crumbs()}`);
     expect(await headingFocused(), "the heading is focused");
     expect((await text(".free-play h1")) === "Free Play", "the heading says Free Play");
@@ -107,7 +112,7 @@ export default async function freeChecks({ browser: b, base, root, check }) {
       { section: "challenges", hash: "#/free/challenges", heading: "Challenges" },
       { section: "levels", hash: "#/editor", heading: "My levels" },
       { section: "shared", hash: "#/free/shared", heading: "Shared with me" },
-      { section: "sandbox", hash: "#/free/sandbox", heading: "Sandbox" },
+      { section: "sandbox", hash: "#/free/sandbox", heading: "Sandbox", level: true }, // QA-061: the level screen, which has no page heading
       { section: "skins", hash: "#/free/skins", heading: "Skins" },
     ];
     await load("#/free", { fresh: true });
@@ -115,10 +120,14 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     for (const page of pages) {
       await b.waitFor(`document.querySelector('.fp-row[data-section="${page.section}"]')`, 60_000, "the hub");
       await b.evaluate(`document.querySelector('.fp-row[data-section="${page.section}"]').click()`);
-      await b.waitFor(`location.hash === ${JSON.stringify(page.hash)} && document.querySelector('main h1')?.textContent === ${JSON.stringify(page.heading)}`, 30_000, `the ${page.heading} page`);
+      await b.waitFor(
+        `location.hash === ${JSON.stringify(page.hash)} && ${page.level ? `document.querySelector('.level[data-level-id="sandbox"]')` : `document.querySelector('main h1')?.textContent === ${JSON.stringify(page.heading)}`}`,
+        30_000,
+        `the ${page.heading} page`,
+      );
       const trail = await crumbs();
       expect(trail === `Free Play/${page.heading}`, `${page.heading}: crumbs "${trail}"`);
-      expect(await headingFocused(), `${page.heading}: the heading is focused`);
+      if (!page.level) expect(await headingFocused(), `${page.heading}: the heading is focused`);
       // the first crumb is a way back to the hub
       expect(await exists('.crumbs a[href="#/free"]'), `${page.heading}: Free Play crumb links to the hub`);
       seen.push(page.heading);
@@ -237,27 +246,160 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     return `tags in the panel only; crumbs ${trail}`;
   });
 
-  // -- Sandbox --------------------------------------------------------------------------------------------------
-  await check("M4.4: the Sandbox runs code on its board, moves the piece, and keeps the code over a reload", async () => {
+  // -- Sandbox (QA-061): the scratch level on the real level screen -----------------------------------------------
+  const SANDBOX = '.level[data-level-id="sandbox"]';
+  const SOLVE_SANDBOX = "for _ in range(7):\n    pawn.move()\npawn.turn_right()\nfor _ in range(7):\n    pawn.move()\n"; // the fresh board's goal, top-right
+  const sandboxReady = () =>
+    b.waitFor(`document.querySelector('${SANDBOX} .board-host .board .piece') && !document.querySelector('${SANDBOX} .level-right .btn-primary').disabled`, 90_000, "the Sandbox's level screen");
+  const openSandbox = async () => {
     await load("#/free/sandbox", { fresh: true });
-    await b.waitFor(`document.querySelector('.sandbox .snippet-board .board .piece') && document.querySelector('.sandbox .btn-primary')`, 90_000, "the Sandbox board");
-    const piece = () => b.evaluate(`document.querySelector('.sandbox .snippet-board .piece').style.transform`);
+    await sandboxReady();
+  };
+  /** Type `code` into the Sandbox's editor, Run it, and wait for the outcome card at the end of playback. */
+  const runSandbox = async (code) => {
+    await setCode(code);
+    await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
+    await b.waitFor(`!!document.querySelector('.outcome-host .outcome')`, 60_000, "the outcome card");
+    await sleep(150);
+  };
+  /** The piece's and the goal's centres as fractions of the board (0 to 1, from its top-left), and how many squares it has. */
+  const boardFacts = () =>
+    b.evaluate(`(() => {
+      const squares = document.querySelector('.board-host .board .squares');
+      const area = squares.getBoundingClientRect();
+      const centre = (selector) => {
+        const r = document.querySelector(selector).getBoundingClientRect();
+        return { x: (r.x + r.width / 2 - area.x) / area.width, y: (r.y + r.height / 2 - area.y) / area.height };
+      };
+      return { squares: squares.querySelectorAll('rect.sq-light, rect.sq-dark').length, piece: centre('.board-host .board .piece'), goal: centre('.board-host .board .goal') };
+    })()`);
+  const editorBoardReady = () => b.waitFor(`document.querySelector('.ed-board .board') && document.querySelector('.tool') && document.querySelector('[data-field="api"]')`, 90_000, "the Sandbox's board editor");
+  /** The Sandbox's editor, with the ability `name` switched off in its Level tab, then back on the level screen. */
+  async function sandboxWithout(name) {
+    await load("#/free/sandbox/board", { fresh: true });
+    await editorBoardReady();
+    await settled();
+    await b.evaluate(`(() => {
+      const box = [...document.querySelectorAll('[data-field="api"] label.check')].find((l) => l.textContent.trim() === ${JSON.stringify(name)})?.querySelector('input');
+      if (!box || !box.checked) throw new Error(${JSON.stringify(`no ticked ${name} box`)});
+      box.click();
+    })()`);
+    await sleep(300);
+    await clickButton("Write code", ".ed-toolbar");
+    await sandboxReady();
+  }
+
+  await check("QA-061: #/free/sandbox is the level screen with crumbs Free Play / Sandbox; Change the board opens the editor on it, and Write code comes back (crumbs Free Play / Sandbox / Board)", async () => {
+    await openSandbox();
+    expect(!(await exists(".ed-board")), "the editor opened instead of the level screen");
+    expect((await crumbs()) === "Free Play/Sandbox", `crumbs: ${await crumbs()}`);
+    expect(await exists(".level-right .cm-content"), "no code editor");
+    expect((await text(".level-right .btn-primary")).startsWith("Run"), "no Run button");
+    const link = '.level-right .toolbar a[href="#/free/sandbox/board"]';
+    expect((await text(link)) === "Change the board", `the toolbar's link to the board editor: "${await text(link)}"`);
+    await b.evaluate(`document.querySelector(${JSON.stringify(link)}).click()`);
+    await editorBoardReady();
+    await settled(); // Write code is enabled once the engine has answered for the board
+    expect((await hash()) === "#/free/sandbox/board", `hash ${await hash()}`);
+    expect((await crumbs()) === "Free Play/Sandbox/Board", `crumbs in the editor: ${await crumbs()}`);
+    expect((await text(".ed-toolbar .btn-primary")) === "Write code", `the editor's main button: ${await text(".ed-toolbar .btn-primary")}`);
+    await clickButton("Write code", ".ed-toolbar");
+    await sandboxReady();
+    expect((await hash()) === "#/free/sandbox", `hash after Write code: ${await hash()}`);
+    expect((await crumbs()) === "Free Play/Sandbox", `crumbs after coming back: ${await crumbs()}`);
+    return "level screen, editor, and back";
+  });
+
+  await check("QA-061: a fresh Sandbox is an 8 x 8 board with the piece bottom-left and the goal top-right, and every ability is on (turn_left runs without an error)", async () => {
+    await openSandbox();
+    const facts = await boardFacts();
+    expect(facts.squares === 64, `${facts.squares} squares`);
+    expect(facts.piece.x < 0.25 && facts.piece.y > 0.75, `the piece is at ${JSON.stringify(facts.piece)}`);
+    expect(facts.goal.x > 0.75 && facts.goal.y < 0.25, `the goal is at ${JSON.stringify(facts.goal)}`);
+    await runSandbox("pawn.turn_left()\npawn.turn_right()\npawn.move()\n");
+    expect(!(await exists(".outcome-host .error-detail")), "an ability the Sandbox should have on raised an error");
+    return "8 x 8, piece bottom-left, goal top-right, turn_left allowed";
+  });
+
+  await check("QA-061: code typed in the Sandbox runs, the piece moves, playback ends with no error, and the code is still there after a reload", async () => {
+    await openSandbox();
+    const piece = () => b.evaluate(`document.querySelector('.board-host .board .piece').style.transform`);
     const start = await piece();
     const program = "# my try\npawn.move()\npawn.move()\npawn.move()\n";
-    await setCode(program, ".sandbox .cm-content");
-    await b.evaluate(`document.querySelector('.sandbox .btn-primary').click()`);
-    await b.waitFor(`document.querySelector('.sandbox .snippet-status')?.textContent.includes('Finished') || document.querySelector('.sandbox .error-detail')`, 30_000, "the run");
-    await sleep(200);
-    expect(!(await exists(".sandbox .error-detail")), "no error");
-    const end = await piece();
-    expect(start !== end, "the piece moved");
+    await runSandbox(program);
+    expect(!(await exists(".outcome-host .error-detail")), "an error card");
+    expect(start !== (await piece()), "the piece did not move");
     // what was typed is kept in the browser, and is there after a reload
     await load("#/free/sandbox");
-    // (`!!`: a CodeMirror node can't be returned by value, so a bare element would read as "not there")
-    await b.waitFor(`!!document.querySelector('.sandbox .cm-content')`, 60_000, "the Sandbox again");
-    const kept = await b.evaluate(`[...document.querySelectorAll('.sandbox .cm-line')].map((l) => l.textContent).join('\\n')`);
-    expect(kept.trimEnd() === program.trimEnd(), "the code is still there after a reload");
+    await sandboxReady();
+    expect((await editorText()).trimEnd() === program.trimEnd(), "the code is not there after a reload");
     return "ran, moved, kept";
+  });
+
+  await check("QA-061: the Sandbox's level screen has no Learn tab, tier tag, hints or solution offer; the Challenge tab says what it is; a failed run offers no hint, solution or compare", async () => {
+    await openSandbox();
+    const tabs = await b.evaluate(`[...document.querySelectorAll('.level-left .tabs button')].filter((t) => t.getClientRects().length > 0).map((t) => t.textContent.trim())`);
+    expect(!tabs.includes("Learn") && tabs.includes("Challenge"), `tabs: ${tabs}`);
+    const panel = await text(".level-left .tab-scroll .tab-panel:not([hidden])");
+    expect(panel.includes("A board of your own"), "the Challenge tab does not say what the Sandbox is");
+    const bare = () =>
+      b.evaluate(`({
+        tier: !!document.querySelector('.level-left .tier-tag'),
+        // the hints and solution sections (their headings and buttons), not the Stars list, which has its own words
+        help: [...document.querySelectorAll('.level-left .tab-panel:not([hidden]) h3, .level-left .tab-panel:not([hidden]) button')].some((e) => /hint|solution/i.test(e.textContent.trim())),
+        keep: !!document.querySelector('.keep-solution'),
+        actions: [...document.querySelectorAll('.outcome-host button, .outcome-host a')].map((e) => e.textContent.trim()).filter((t) => /hint|solution|compare/i.test(t)),
+      })`);
+    const before = await bare();
+    expect(!before.tier && !before.help && !before.keep, `before a run: ${JSON.stringify(before)}`);
+    const seen = [];
+    // the third failed run is where another level would start offering a solution
+    for (const code of ["pawn.move()\n", "pawn.fly()\n", "pawn.turn_left()\npawn.move()\npawn.fly()\n"]) {
+      await runSandbox(code);
+      seen.push((await text(".outcome-host .outcome-head strong")).trim());
+      const now = await bare();
+      expect(!now.tier && !now.help && !now.keep && now.actions.length === 0, `after "${seen.at(-1)}": ${JSON.stringify(now)}`);
+    }
+    return `none offered after: ${seen.join(", ")}`;
+  });
+
+  await check("QA-061: reaching the goal in the Sandbox says so, offers Change the board, and has no Compare button or 'undefined' in the card", async () => {
+    await openSandbox();
+    await runSandbox(SOLVE_SANDBOX);
+    const card = await b.evaluate(`(() => {
+      const outcome = document.querySelector('.outcome-host');
+      return {
+        head: outcome.querySelector('.outcome-head strong')?.textContent ?? '',
+        undefinedText: /undefined/i.test(outcome.textContent),
+        buttons: [...outcome.querySelectorAll('button')].map((e) => e.textContent.trim()),
+        onward: [...outcome.querySelectorAll('a')].map((e) => ({ text: e.textContent.trim(), href: e.getAttribute('href') })),
+        keep: !!outcome.querySelector('.keep-solution'),
+      };
+    })()`);
+    expect(card.head === "Solved!", `the card says "${card.head}"`);
+    expect(!card.undefinedText, "the card has 'undefined' in it");
+    expect(card.onward.some((a) => a.text === "Change the board" && a.href === "#/free/sandbox/board"), `links: ${JSON.stringify(card.onward)}`);
+    expect(!card.buttons.some((t) => /compare|solution/i.test(t)) && !card.keep, `buttons: ${JSON.stringify(card.buttons)}`);
+    return "solved, Change the board offered, nothing else";
+  });
+
+  // Decision 4 says no stars are kept. The card draws the engine's stars, so this fails while the app lists them.
+  await check("QA-061: the Sandbox's solved card lists no stars", async () => {
+    await openSandbox();
+    await runSandbox(SOLVE_SANDBOX);
+    const stars = await b.evaluate(`document.querySelectorAll('.outcome-host .stars li').length`);
+    expect(stars === 0, `the solved card lists ${stars} stars`);
+    return "no stars listed";
+  });
+
+  await check("QA-061: with an ability switched off in the scratch level, calling it says 'In this level it knows', never 'Here it knows'", async () => {
+    await sandboxWithout("turn_left"); // unticked in the editor's Level tab
+    await runSandbox("pawn.turn_left()\n");
+    await b.waitFor(`document.querySelector('.outcome-host .error-detail')`, 30_000, "the error");
+    const message = await text(".outcome-host .error-detail");
+    expect(message.includes("In this level it knows"), "the error does not say 'In this level it knows'");
+    expect(!message.includes("Here it knows"), "the error says 'Here it knows'");
+    return "In this level it knows";
   });
 
   // -- Skins ------------------------------------------------------------------------------------------------------
@@ -454,6 +596,11 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     const bad = [];
     for (const page of ["#/free", "#/free/challenges", "#/editor", "#/free/shared", "#/free/sandbox", "#/free/skins"]) {
       await load(page);
+      if (page === "#/free/sandbox") {
+        // QA-061: the Sandbox is the level screen, which has no page heading to measure
+        await b.waitFor(`location.hash === ${JSON.stringify(page)} && document.querySelector('.level[data-level-id="sandbox"]')`, 60_000, `the page ${page}`);
+        continue;
+      }
       await b.waitFor(`location.hash === ${JSON.stringify(page)} && document.querySelector('main h1')`, 60_000, `the page ${page}`);
       await sleep(300);
       const now = await look();
@@ -462,7 +609,7 @@ export default async function freeChecks({ browser: b, base, root, check }) {
       }
     }
     expect(bad.length === 0, `headings differ from Lessons': ${bad.join("; ")}`);
-    return `7 headings at gap ${Math.round(lessons.gap)}px, ${lessons.transform}`;
+    return `6 headings at gap ${Math.round(lessons.gap)}px, ${lessons.transform}`;
   });
 
   await check("QA-048: Open a link or code: its note sits right under the box, an empty try and a junk try each say so, and Esc closes the form with focus back on the button", async () => {
@@ -564,77 +711,24 @@ export default async function freeChecks({ browser: b, base, root, check }) {
   });
 
   await check("QA-054: hovering a function in the Sandbox's editor shows its Codex entry; other words show nothing", async () => {
-    await load("#/free/sandbox", { fresh: true });
-    const editor = ".sandbox .cm-content";
-    await b.waitFor(`document.querySelector('.sandbox .snippet-board .board') && !!document.querySelector(${JSON.stringify(editor)})`, 90_000, "the Sandbox board");
+    await openSandbox();
     const tooltip = () => b.evaluate(`document.querySelector('.cm-tooltip .codex-card .codex-call')?.textContent ?? null`);
     // the Codex request follows Python's start, so the tooltips arrive a moment after the board: try again for a while
     let shown = null;
     for (const started = Date.now(); shown === null && Date.now() - started < 10_000; ) {
-      await hover(await wordAt("move", editor));
+      await hover(await wordAt("move"));
       await sleep(900); // longer than the hover delay
       shown = await tooltip();
       await hoverAway();
     }
     expect(shown === "pawn.move(squares=1)", `hovering move shows ${JSON.stringify(shown)}`);
     // a word of the starter's comment is no function
-    await hover(await wordAt("learned", editor));
+    await hover(await wordAt("anything"));
     await sleep(900);
     const none = await tooltip();
     await hoverAway();
     expect(none === null, `hovering a word of the comment shows ${JSON.stringify(none)}`);
     return "move shows its entry; a comment word shows nothing";
-  });
-
-  await check("QA-058: the Sandbox says it is loading and keeps Run off until the board is there, names its abilities, and fits above the fold", async () => {
-    await b.evaluate(`window.__oldPage = true`); // so the poll below never reads the previous check's page
-    await load("#/free/sandbox", { fresh: true });
-    // read the state at the first moment Run exists, polling inside the page (Python takes over a second to start)
-    const first = await b.waitFor(
-      `new Promise((resolve) => {
-        const look = () => {
-          const run = document.querySelector('.sandbox .snippet-bar .btn-primary');
-          if (window.__oldPage || !run) return setTimeout(look, 5);
-          resolve({ note: document.querySelector('.sandbox .snippet-board .board-loading')?.textContent ?? null, disabled: run.disabled, board: !!document.querySelector('.sandbox .snippet-board .board') });
-        };
-        look();
-      })`,
-      60_000,
-      "the Sandbox's Run button",
-    );
-    expect(first.note === "Loading the board…" && first.disabled && !first.board, `before the board: ${JSON.stringify(first)}`);
-    await b.waitFor(`document.querySelector('.sandbox .snippet-board .board')`, 90_000, "the Sandbox board");
-    await sleep(200);
-    const after = await b.evaluate(`({ note: !!document.querySelector('.sandbox .snippet-board .board-loading'), disabled: document.querySelector('.sandbox .snippet-bar .btn-primary').disabled })`);
-    expect(!after.note && !after.disabled, `with the board: ${JSON.stringify(after)}`);
-    // the abilities line: a fresh profile has met only move
-    const line = await b.evaluate(`({ text: document.querySelector('p.sandbox-abilities')?.textContent ?? '', codes: [...document.querySelectorAll('p.sandbox-abilities code')].map((c) => c.textContent) })`);
-    expect(line.text.startsWith("You can use: ") && line.codes.length === 1 && line.codes[0] === "move", `the abilities line: ${JSON.stringify(line)}`);
-    // the layout: the board beside the editor at 1440x900, and the board and Run above the fold at 1440x900 and 1000x800
-    const seen = [];
-    try {
-      for (const [width, height] of [[1440, 900], [1000, 800]]) {
-        await b.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
-        await sleep(400);
-        const at = await b.evaluate(`(() => {
-          const rect = (selector) => document.querySelector(selector).getBoundingClientRect();
-          const board = rect('.sandbox .snippet-board .board');
-          return { boardLeft: board.left, boardBottom: board.bottom, editorRight: rect('.sandbox .cm-editor').right, runBottom: rect('.sandbox .snippet-bar .btn-primary').bottom, height: innerHeight, scrollY };
-        })()`);
-        expect(at.scrollY === 0 && at.boardBottom <= at.height && at.runBottom <= at.height, `at ${width}x${height}, the board and Run are not above the fold: ${JSON.stringify(at)}`);
-        if (width === 1440) expect(at.boardLeft >= at.editorRight - 1, `at 1440x900 the board is not right of the editor: ${JSON.stringify(at)}`);
-        seen.push(`${width}x${height}`);
-      }
-    } finally {
-      await b.send("Emulation.setDeviceMetricsOverride", { width: 1400, height: 860, deviceScaleFactor: 1, mobile: false });
-    }
-    // on a board with no level, an ability the piece doesn't have is named with "Here it knows", not "In this level"
-    await setCode("pawn.turn_left()\n", ".sandbox .cm-content");
-    await b.evaluate(`document.querySelector('.sandbox .snippet-bar .btn-primary').click()`);
-    await b.waitFor(`document.querySelector('.sandbox .error-detail')`, 30_000, "the error");
-    const message = await text(".sandbox .error-detail");
-    expect(message.includes("Here it knows") && !message.includes("In this level"), "the error says Here it knows, not In this level");
-    return `loading note, abilities, fold at ${seen.join(" and ")}, "Here it knows"`;
   });
 
   await check("QA-059: the Skins page says what it is, its cards are keyboard stops with names, and the Charger is labelled in Settings", async () => {
