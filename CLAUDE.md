@@ -42,14 +42,33 @@ The designer is also the target learner.
   and QA2 (`docs/WORKFLOW.md`, `DESIGN.md` §7). There are no hand-test stops
   between them.
 
-## Orchestration *(Designer, 2026-10-11)*
+## Orchestration *(Designer, 2026-10-11; three levels from 2026-11-15)*
 
-`docs/WORKFLOW.md` is the process. The orchestrator (Opus) drafts, commits the
-shared contract first, hands work packages to `implementer` / `implementer-deep`
-workers (Sonnet, `.claude/agents/`) in worktrees branched from the milestone
-HEAD, then merges each with `--no-ff` and validates it again. Level content
-never goes to workers. Sessions restart from `handoff.md` instead of compacting:
-the context guard asks for a handoff at 300k tokens (workers: wrap up at 150k).
+`docs/WORKFLOW.md` is the process. Three levels, each in its own worktree:
+
+- **Fable (the orchestrator) coordinates only:** design with the designer,
+  specs, the work breakdown, briefs, choosing the level for each job, merges,
+  the free checks, the gates. It does no development and no review. Its own
+  edits are docs, `handoff.md`, merge conflicts, level content, and code only
+  under the limits in WORKFLOW.md "Fable's own edits".
+- **Opus 5.5** (`lead`, `reviewer` in `.claude/agents/`) does the development
+  that needs judgment and every review. A lead may hand packages to Sonnet
+  workers branched from its own branch; it merges and validates them, and the
+  orchestrator merges only the lead's branch.
+- **Sonnet 5.5** (`implementer`, `implementer-deep`) builds scoped packages and
+  never delegates.
+
+Each job starts at the cheapest level that plausibly fits and moves up only
+when a report comes back partial or wrong. Usage matters more than speed: one
+package at a time unless they share no files. Free checks (`npm run check`,
+e2e) come before any model review. Every package gets a ledger row (agent,
+tokens, outcome) in the milestone doc.
+
+**Level content never goes to an agent:** the orchestrator writes it through
+the blind generators. Sessions restart from `handoff.md` instead of compacting:
+the context guard asks for a handoff at 150k tokens (leads and workers wrap up
+at 150k). The `handoff` skill ends a session; the SessionStart hook starts the
+next one with `start-session`.
 
 ## Commands
 
