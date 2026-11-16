@@ -100,8 +100,58 @@ def written_hour(every: int, walk: int) -> dict:
     return {"map": "\n".join(f"# {row} #" for row in rows) + "\n", "legend": legend}
 
 
+def square(lane: int, rank: int) -> str:
+    """A gallery square's chess name: its three lanes are files b, c and d, between two walls."""
+    return f"{'bcd'[lane]}{rank + 1}"
+
+
+def sentry(rank: int, wanted: dict[int, int]) -> dict:
+    """A patrol pacing `rank` from wall to wall, set off so that at each tick in `wanted` it is in that lane."""
+    for path in ([0, 1, 2], [2, 1, 0]):
+        for first in (0, 1):
+            at, heading, seen = first, 1, {}
+            for tick in range(max(wanted) + 1):
+                seen[tick] = path[at]
+                if not 0 <= at + heading < len(path):
+                    heading = -heading
+                at += heading
+            if all(seen[tick] == lane for tick, lane in wanted.items()):
+                return {"kind": "patrol", "start": square(path[first], rank), "route": [square(path[0], rank), square(path[-1], rank)]}
+    raise AssertionError("no patrol is in those lanes at those ticks")
+
+
+def gallery(*events: tuple[str, object]) -> dict:
+    """A gallery three lanes wide, as long as its events, with the goal where they end. The pawn starts
+    in the middle lane. ("walk", n) is n empty ranks. ("rook", side) is a rook diagonally ahead on that
+    side, with a wall under it so its file is closed below. ("sentry", meeting) is a patrol pacing the
+    next rank: on the pawn's arrival it is diagonally ahead ("left", "right"), or straight ahead and a
+    tick later to one side ("ahead-left", "ahead-right"). Each rook or sentry moves the pawn one lane over."""
+    lane, rank, tick = 1, 0, 0
+    walls, paced, enemies = set(), set(), []
+    for kind, how in events:
+        if kind == "walk":
+            rank, tick = rank + how, tick + how
+            continue
+        side = lane + (1 if how.endswith("right") else -1)
+        assert 0 <= side <= 2, "the gallery has three lanes"
+        if kind == "rook":
+            walls.add((side, rank))
+            enemies.append({"kind": "rook", "start": square(side, rank + 1)})
+        else:
+            waits = how.startswith("ahead")
+            paced.add(rank + 1)
+            enemies.append(sentry(rank + 1, {tick: lane, tick + 1: side} if waits else {tick: side}))
+            tick += waits
+        lane, rank, tick = side, rank + 1, tick + 1
+    assert rank < MAX_SIDE and not any(y in paced for _, y in walls), "too long, or a wall on a sentry's rank"
+    marks = {(1, 0): "P", (lane, rank): "G", **dict.fromkeys(walls, "#")}
+    rows = ["# " + " ".join(marks.get((x, y), ".") for x in range(3)) + " #" for y in range(rank, -1, -1)]
+    return {"map": "\n".join(rows) + "\n", "enemies": enemies}
+
+
 # -- the challenges --------------------------------------------------------------------------------
 # kind "toll": a road with pits to walk round and a guard who asks how far the walk was.
+# kind "gallery": rooks and pacing sentries along a gallery of unknown length.
 # kind "hour": a timed gate whose time is written on a rune.
 # kind "trail": runes that each give the next legs of the route. `unseen` are boards the level doesn't
 # have, which its reference must solve too.
@@ -172,6 +222,34 @@ LEVELS: list[dict] = [
         ],
         "hint3": ["key", "wait", "Wait for the missing ticks with a line like:"],
         "note": "Gur ehar'f grkg vf phg ng gur fcnprf, naq bar cvrpr orpbzrf n ahzore. Gur erznvaqre fnlf ubj znal gvpxf vagb n plpyr gur jnyx jbhyq raq, naq gur plpyr yrff gung vf gur jnvg. Nfxvat ubj znal fdhnerf ner nurnq zrnfherf gur jnyx, fb gur fnzr yvarf svg rirel obneq. {yvarf} yvarf.",
+    },
+    {
+        "id": "last-rank-04",
+        "title": "The Long Gallery",
+        "difficulty": 4,
+        "draws_on": [4, 5],
+        "trains": "One loop that asks the board several questions on every pass, and waits for what moves",
+        "brief": 'Rooks stand guard along the gallery, and sentries pace it from wall to wall. Your pawn\'s look() calls a sentry "patrol". The gallery is a different length on every board, and no two are guarded the same way.',
+        "api": ["move", "wait", "at_goal", "look", "capture_left", "capture_right"],
+        "kind": "gallery",
+        "par": 9,
+        "boards": [
+            gallery(("walk", 1), ("rook", "left"), ("walk", 1), ("sentry", "ahead-right"), ("walk", 1), ("rook", "right"), ("walk", 2)),
+            gallery(("walk", 2), ("sentry", "left"), ("walk", 1), ("rook", "right"), ("rook", "right"), ("walk", 1), ("sentry", "ahead-left"), ("walk", 2)),
+            gallery(("rook", "right"), ("walk", 1), ("rook", "left"), ("walk", 1), ("sentry", "right"), ("walk", 1)),
+            gallery(("walk", 1), ("sentry", "ahead-left"), ("walk", 2), ("sentry", "right"), ("walk", 1), ("rook", "left"), ("walk", 1), ("rook", "right"), ("walk", 1)),
+        ],
+        "unseen": [
+            gallery(("sentry", "ahead-right"), ("walk", 1), ("rook", "left"), ("walk", 1), ("sentry", "left"), ("walk", 1)),
+            gallery(("walk", 3), ("rook", "right"), ("walk", 1), ("sentry", "ahead-left"), ("walk", 1), ("rook", "left"), ("walk", 1)),
+        ],
+        "wrong": ["typed", "nowait", "rooks"],
+        "hints": [
+            "N ebbx pna bayl or gnxra, arire cnffrq. N fragel xrrcf zbivat, fb jung lbhe cnja frrf punatrf sebz bar gvpx gb gur arkg.",
+            "Ercrng hagvy gur tbny. Rnpu gvzr, ybbx guerr jnlf. Vs n ebbx be n fragel fgnaqf qvntbanyyl nurnq, gnxr vg. Vs n fragel fgnaqf fgenvtug nurnq, jnvg n gvpx naq ybbx ntnva. Bgurejvfr fgrc sbejneq.",
+        ],
+        "hint3": ["block", said("cnja.ybbx() =="), "Waiting for a sentry to step aside looks like this:"],
+        "note": "Bar ybbc nfxf gur obneq guerr dhrfgvbaf ba rirel cnff, naq gur beqre znggref: gnxvat pbzrf svefg, jnvgvat frpbaq, jnyxvat ynfg. Jnvgvat vafvqr gur ybbc zrnaf gur cnja ybbxf ntnva nsgre rirel gvpx. {yvarf} yvarf.",
     },
 ]
 
@@ -338,7 +416,48 @@ def write_hour(spec: dict, draft_level: Level):
     return reference, f"{len(works)} of {len(fillings)} fillings solve every board, and four boards the level doesn't have", wrong_code
 
 
-WRITERS = {"toll": write_toll, "trail": write_trail, "hour": write_hour}
+# The gallery's fixed lines, in ROT13: once decoded, {side} is left or right and {kind} what look() calls a piece.
+GALLERY = {
+    "loop": "juvyr abg cnja.ng_tbny():",
+    "sees": 'cnja.ybbx("{fvqr}") == "{xvaq}"',
+    "take": "cnja.pncgher_{fvqr}()",
+    "ahead": 'cnja.ybbx() == "cngeby"',
+    "wait": "cnja.jnvg()",
+    "step": "cnja.zbir()",
+}
+
+
+def gallery_code(sides: tuple[str, ...] = ("left", "right"), kinds: tuple[str, ...] = ("rook", "patrol"), *, waits: bool = True) -> str:
+    """The gallery's loop: a branch for each side, one for what's straight ahead (unless not `waits`), and the step."""
+    lines, word = [said(GALLERY["loop"])], "if"
+    for side in sides:
+        sees = " or ".join(said(GALLERY["sees"]).format(side=side, kind=kind) for kind in kinds)
+        lines += [f"    {word} {sees}:", "        " + said(GALLERY["take"]).format(side=side)]
+        word = "elif"
+    if waits:
+        lines += [f"    elif {said(GALLERY['ahead'])}:", "        " + said(GALLERY["wait"])]
+    return "\n".join([*lines, "    else:", "        " + said(GALLERY["step"])]) + "\n"
+
+
+def write_gallery(spec: dict, draft_level: Level):
+    unseen = draft({**spec, "boards": spec["unseen"]})
+    variants = {
+        "the reference": gallery_code(),
+        "the sides the other way round": gallery_code(("right", "left")),
+        "nowait": gallery_code(waits=False),
+        "rooks": gallery_code(kinds=("rook",)),
+    }
+    works = [name for name, code in variants.items() if all(solves(level, code) for level in (draft_level, unseen))]
+    if "the reference" not in works:
+        return None
+
+    def wrong_code(kind: str, level: Level) -> str:
+        return route_code(level.cases()[0].level) if kind == "typed" else variants[kind]
+
+    return variants["the reference"], f"{len(works)} of {len(variants)} variants solve every board and two the level doesn't have (the two orders of the sides should)", wrong_code
+
+
+WRITERS = {"toll": write_toll, "trail": write_trail, "hour": write_hour, "gallery": write_gallery}
 
 
 # -- the words no one reads ------------------------------------------------------------------------------

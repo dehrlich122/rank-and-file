@@ -1,0 +1,1 @@
+One loop asks the board three questions on every pass, and the order matters: taking comes first, waiting second, walking last. Waiting inside the loop means the pawn looks again after every tick. 9 lines.
