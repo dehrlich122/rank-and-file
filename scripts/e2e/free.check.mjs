@@ -27,7 +27,7 @@ const corridor = (title) => ({
 });
 
 export default async function freeChecks({ browser: b, base, root, check }) {
-  const { setCode, editorText, solution, withoutExpectLine } = levelHelpers(b, base, root);
+  const { setCode, editorText, solution, withoutExpectLine, openLevel } = levelHelpers(b, base, root);
   const { clickButton, hasButton } = buttonHelpers(b);
   const { wordAt, hover, hoverAway } = hoverHelpers(b);
   const text = (selector) => b.evaluate(`document.querySelector(${JSON.stringify(selector)})?.textContent ?? ''`);
@@ -870,6 +870,27 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     return `no Learn tab, ${chips.length} chips, lands at ${chips[0].href}`;
   });
 
+  /** Run `fn` with the window at width x height, and put the suite's own size back after. */
+  const atSize = async (width, height, fn) => {
+    await b.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+    try {
+      await sleep(400);
+      return await fn();
+    } finally {
+      await b.send("Emulation.setDeviceMetricsOverride", { width: 1400, height: 860, deviceScaleFactor: 1, mobile: false });
+    }
+  };
+  /** After a run: how far the middle panel scrolls sideways, and whether the card and each link lie inside its visible width. */
+  const outcomeFit = () =>
+    b.evaluate(`(() => {
+      const host = document.querySelector('.outcome-host');
+      const panel = host.closest('.level-middle, .level-right');
+      const left = panel.getBoundingClientRect().left + panel.clientLeft;
+      const inside = (e) => { const r = e.getBoundingClientRect(); return r.left >= left - 0.5 && r.right <= left + panel.clientWidth + 0.5; };
+      return { over: panel.scrollWidth - panel.clientWidth, card: inside(host.firstElementChild), links: [...host.querySelectorAll('a')].map(inside) };
+    })()`);
+  const fitsColumn = (fit) => fit.over <= 0 && fit.card && fit.links.length > 0 && fit.links.every(Boolean);
+
   await check("M4.5: solving The Toll Road with its reference earns three stars and offers 'Next challenge →'; Challenges and the hub then say '1 of 5 solved', kept over a reload; the last challenge offers 'Back to Free Play'", async () => {
     await openChallenge(CHALLENGES[0], { fresh: true });
     const r = await runChallenge(solution(CHALLENGES[0]));
@@ -897,6 +918,8 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     await openChallenge(CHALLENGES[4]);
     const last = await runChallenge(solution(CHALLENGES[4]));
     expect(last.head === "Solved!" && last.stars >= 1, `${last.head}, ${last.stars} stars`);
+    const lastFit = await atSize(1440, 900, outcomeFit);
+    expect(fitsColumn(lastFit), `QA-063 on the last challenge: ${JSON.stringify(lastFit)}`);
     const back = last.links.find((l) => l.text === "Back to Free Play");
     expect(back?.href === "#/free/challenges" && !last.links.some((l) => l.text === "Next challenge →"), `links: ${JSON.stringify(last.links)}`);
     await b.evaluate(`document.querySelector('.outcome-host a[href="#/free/challenges"]').click()`);
@@ -934,5 +957,26 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     await b.key("Escape");
     expect(shown, "the solution shown is not the reference on disk");
     return `three hints (text lengths ${lengths}), solution offered on the third failed run and equal to the file`;
+  });
+
+  // -- QA-063 to QA-065 (docs/QA.md, Session 18): the level screen with real challenges on it ----------------------------
+  await check("QA-063: at 1440x900 a solved challenge's card and its way on fit the board's column, with no sideways scroll", async () => {
+    await atSize(1440, 900, async () => {
+      await openChallenge(CHALLENGES[0], { fresh: true });
+      const r = await runChallenge(solution(CHALLENGES[0]));
+      expect(r.head === "Solved!" && r.links.some((l) => l.text === "Next challenge →"), `${r.head}: ${JSON.stringify(r.links)}`);
+      const fit = await outcomeFit();
+      expect(fitsColumn(fit), JSON.stringify(fit));
+    });
+  });
+
+  await check("QA-063: the same holds for a lesson level with several boards", async () => {
+    await atSize(1440, 900, async () => {
+      await openLevel("ch02-l02", { fresh: true });
+      const r = await runChallenge(solution("ch02-l02"));
+      expect(r.head === "Solved!" && r.links.length > 0, `${r.head}: ${JSON.stringify(r.links)}`);
+      const fit = await outcomeFit();
+      expect(fitsColumn(fit), JSON.stringify(fit));
+    });
   });
 }

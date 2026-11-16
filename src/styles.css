@@ -1141,11 +1141,14 @@ pre {
   color: var(--text);
 }
 
+/* wraps (QA-063): in a solved card's grid (.complete-wrap) a row that can't wrap sets the column's minimum width, so
+   "Compare with an idiomatic solution" and "Next challenge →" side by side pushed the card wider than the board's column */
 .outcome-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px 10px;
   font-size: 16px;
 }
 
