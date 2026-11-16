@@ -112,6 +112,9 @@ npm run worktree:setup  # in a worker's worktree: check or copy node_modules, .v
   every `rank-and-file:` key except settings). `{ reload: true }` reloads and
   keeps progress. Find buttons by label with `clickButton`/`hasButton`
   (`helpers.mjs`), and read editors with `editorText` (compare in Node).
+- Headless Chrome's renderer sometimes dies on this machine (a crash inside Chrome, not the game: `docs/M4/M4.4.md`
+  "The e2e crash"). The runner starts a new Chrome and reruns that suite, at most three attempts, and names the
+  restarts in its last line: judge a run by that line and the exit code. `CHROME_PATH` picks another browser (Edge).
 - After a hash navigation, wait for `.level[data-level-id="<id>"]`; the old view
   lingers for a moment. Inside `evaluate` strings, which are JS template
   literals, write regex escapes as `\\s`.
