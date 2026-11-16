@@ -1841,6 +1841,7 @@ Part 2 (Sandbox, Skins, the pointers, Save to the repo, unknown routes). The con
     level in the editor's test-play: paint what you like, write code against it, nothing to name or save. It replaces
     the separate Sandbox screen. To be built in a later QA package, not in this pass; until then the Sandbox stays as
     polished by QA-054 and QA-058.
+  - **Spec** *(2026-11-16)*: `docs/M4/M4.4-QA-061.md`, on the branch `qa-061-sandbox-editor`.
 - **For the designer (no change made):**
   - Facing north, the worn Charger on a board is a narrow spire that looks little like the horse head on its card
     (which faces east). M3.7's approved design; say if it should change.
