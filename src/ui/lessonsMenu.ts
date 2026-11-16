@@ -1,7 +1,7 @@
 // Lessons (M3.7): a directory, not a long page. Chapter folders under tier headings, inside a HUD frame, with a
 // detail pane for the selected level. Nothing is locked. On load the folder holding the next unsolved level is
 // the only one open (and that level is selected); folders the player opens by hand are remembered.
-import type { Chapter } from "../content";
+import { tierHasChallenges, type Chapter } from "../content";
 import type { PyClient } from "../py/client";
 import type { LevelInfo } from "../py/protocol";
 import type { ProgressStore } from "../progress";
@@ -13,6 +13,7 @@ import { h } from "./dom";
 import { icon } from "./icons";
 import { crown } from "./sprites";
 import { svg } from "./svg";
+import { tierLabel } from "./tags";
 import { folderName, tierName, VOICE } from "./voice";
 
 /** The tag on a chapter's optional mastery challenge (M3.2): on its row, and in its Challenge panel. */
@@ -189,7 +190,12 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
   const explorer = h(
     "div",
     { class: "hud-frame" },
-    ...tiers.flatMap((tier, i) => [h("h2", { class: "tier-head" }, tierName(tier, i + 1)), ...chapters.filter((c) => c.curriculum && c.tier === tier).map(folder)]),
+    ...tiers.flatMap((tier, i) => [
+      h("h2", { class: "tier-head" }, tierName(tier, i + 1)),
+      ...chapters.filter((c) => c.curriculum && c.tier === tier).map(folder),
+      // outside the arrow-key list (it walks folder heads and rows); Tab reaches it
+      ...(tierHasChallenges(tier) ? [h("a", { class: "tier-next", href: "#/free/challenges" }, `Next: the ${tierLabel(tier)} tier's challenges, in Free Play →`)] : []),
+    ]),
     ...(outside.length ? [h("h2", { class: "tier-head" }, VOICE.outside), ...outside.map(folder)] : []),
   );
   // arrow keys move through the folder heads and the rows of open folders; Right and Left open and close a folder

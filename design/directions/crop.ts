@@ -47,6 +47,9 @@ function level(facing: Facing): LevelInfo {
     stars: [],
     hints: [],
     mastery: false,
+    set: "",
+    difficulty: null,
+    draws_on: [],
     boards: [],
   };
 }

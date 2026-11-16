@@ -2,6 +2,7 @@ import { python } from "@codemirror/lang-python";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 import { chapters, codexChapters, levelLabel } from "../content";
+import type { CodexChapter } from "../py/protocol";
 import { codexNameAt } from "./codex";
 
 describe("codexNameAt: what a hover over code looks up", () => {
@@ -42,7 +43,9 @@ describe("what the Codex is told about levels", () => {
   });
 
   it("sends every chapter in play order, with each level's file and lesson", () => {
-    const sent = codexChapters();
+    // challenge sets (M4.4) are sent too, as chapter 0 outside the curriculum after their tier: content.test.ts checks them
+    const isSet = (chapter: CodexChapter) => !chapter.curriculum && chapter.levels.every((level) => (level.data as { set?: string }).set);
+    const sent = codexChapters().filter((chapter) => !isSet(chapter));
     expect(sent.map((chapter) => chapter.levels.map((level) => level.id))).toEqual(chapters.map((chapter) => chapter.levels.map((level) => level.id)));
     expect(sent.every((chapter) => chapter.levels.every((level) => level.lesson.length > 0 && level.data))).toBe(true);
   });

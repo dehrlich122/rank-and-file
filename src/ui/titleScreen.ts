@@ -18,10 +18,10 @@ interface Entry {
 }
 
 /** Mount the title in `main`. Returns what to call to leave it. */
-export function mountTitle(main: HTMLElement, options: { lessons: () => void; editor: () => void; settings: () => void }): () => void {
+export function mountTitle(main: HTMLElement, options: { lessons: () => void; freePlay: () => void; editor: () => void; settings: () => void }): () => void {
   const entries: Entry[] = [
     { label: VOICE.menu.lessons, open: options.lessons },
-    { label: VOICE.menu.freePlay }, // (M4.x)
+    { label: VOICE.menu.freePlay, open: options.freePlay }, // (M4.4)
     { label: VOICE.menu.levelEditor, open: options.editor },
     { label: VOICE.menu.settings, open: options.settings },
   ];

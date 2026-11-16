@@ -4,7 +4,7 @@
 // them; these functions read them into something a form can show, and write a change back as the file would say it
 // (a default is left out, so a level with no rules still exports without the keys). Nothing here judges a rule: whether
 // "collect all" makes sense on a board with no gems is the engine's to say. Items the form doesn't know stay where they were.
-import { asRecord } from "../storage";
+import { asDifficulty, asRecord } from "../storage";
 import type { Draft } from "./draft";
 
 /** How many of something an objective asks for: nothing, every one, or at least this many. */
@@ -129,6 +129,18 @@ export const readStarter = (draft: Draft): string => (typeof draft.extra.starter
 
 export function setStarter(draft: Draft, code: string): Draft {
   return withExtra(draft, "starter", code.trim() ? code : undefined);
+}
+
+// -- difficulty --------------------------------------------------------------------------------------------------------
+
+/** How hard the level is, 1 to 5, for Free Play's lists; null when the file doesn't say. */
+export function readDifficulty(draft: Draft): number | null {
+  return asDifficulty(draft.extra.difficulty);
+}
+
+/** The draft with this difficulty (1 to 5); null takes it away. */
+export function setDifficulty(draft: Draft, step: number | null): Draft {
+  return withExtra(draft, "difficulty", step ?? undefined);
 }
 
 // -- the author's solution ---------------------------------------------------------------------------------------------

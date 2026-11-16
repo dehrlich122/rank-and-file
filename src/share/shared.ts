@@ -7,7 +7,7 @@ import { newId, type Draft } from "../editor/draft";
 import { drafts } from "../editor/drafts";
 import { levelDataToDraft } from "../editor/levelData";
 import { ProgressStore } from "../progress";
-import { asRecord, browserStorage, readJson, writeJson, type StorageLike } from "../storage";
+import { asDifficulty, asRecord, browserStorage, readJson, writeJson, type StorageLike } from "../storage";
 
 const STORAGE_KEY = "rank-and-file:shared";
 const PROGRESS_KEY = "rank-and-file:shared-progress";
@@ -18,6 +18,7 @@ export interface SharedSummary {
   title: string;
   boards: number; // the level's own board and its other boards
   opened: number; // when it was last opened, in ms since 1970
+  difficulty: number | null; // 1 to 5, when the author set one (M4.4)
 }
 
 interface Kept {
@@ -47,6 +48,7 @@ export class SharedStore {
         title: typeof data.title === "string" ? data.title : "Untitled",
         boards: 1 + (Array.isArray(data.variants) ? data.variants.length : 0),
         opened,
+        difficulty: asDifficulty(data.difficulty),
       }))
       .sort((a, b) => b.opened - a.opened);
   }

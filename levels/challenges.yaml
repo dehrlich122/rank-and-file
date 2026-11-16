@@ -1,0 +1,8 @@
+# Free Play's challenge sets (M4.4, docs/M4/M4.4.md), in the order the Challenges page lists them.
+# A set's levels live in levels/<set>/ (references in solutions/<set>/), each with `set: <set>` and a difficulty,
+# and no chapter or lesson. Ids are <set>-NN. A set's tier is checked against what its levels need (test_levels.py).
+# Like chapters.yaml, this file only lists: no level content, so the spoiler guard lets it be read and written.
+- set: last-rank
+  title: The Last Rank
+  tier: pawn
+  summary: Puzzles that mix the Pawn tier's chapters. No lessons; the Codex has everything.

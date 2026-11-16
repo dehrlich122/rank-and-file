@@ -10,9 +10,12 @@
 //   #/editor/<id>/play test-play: the level opened in the real level screen
 //   #/play/<code>      a level someone shared, opened from its link (M4.3)
 //   #/shared/<id>      a shared level already kept in this browser ("Shared with me")
+//   #/free             Free Play's hub (M4.4)
+//   #/free/<section>   one of its pages: challenges, shared, sandbox, skins (My levels stays at #/editor)
+//   #/challenge/<id>   a challenge from a Free Play set (M4.4)
 //   #/harness          the raw Python harness from Milestone 0
 //   #/styleguide       the look at every size, in both themes (M3.7)
-import { chapterName, chapters, findLevel } from "./content";
+import { challengeSetOf, chapterName, chapters, findLevel } from "./content";
 import { drafts } from "./editor/drafts";
 import { readSolution, setSolution } from "./editor/rules";
 import { testPlaySource } from "./editor/starts";
@@ -21,7 +24,7 @@ import { unlockedPieces } from "./promotion";
 import { progress } from "./progress";
 import { PyClient, startPythonWorker, type ClientStatus } from "./py/client";
 import { applyToDocument, settings } from "./settings";
-import { openRemix, sharedLevels, sharedProgress } from "./share/shared";
+import { sharedLevels, sharedProgress } from "./share/shared";
 import { sound } from "./sound";
 import { authorSolution } from "./ui/compare";
 import { h } from "./ui/dom";
@@ -29,11 +32,15 @@ import { icon } from "./ui/icons";
 import { mountEditor } from "./ui/editorScreen";
 import { mountEditorList } from "./ui/editorList";
 import { mountLessons } from "./ui/lessonsMenu";
+import { freePage, freeSectionName, mountFreePlay } from "./ui/freePlay";
+import { mountSandbox, resetSandbox } from "./ui/sandboxScreen";
+import { mountSkins } from "./ui/skinsScreen";
+import { challengeHost, sharedHost, testPlayHost } from "./ui/levelHost";
 import { mountLevel, type LevelContext } from "./ui/levelView";
 import { mountPromotion } from "./ui/promotionScreen";
 import { ReplPanel } from "./ui/repl";
 import { SettingsDialog } from "./ui/settingsDialog";
-import { authorSolution as sharedSolution, openShared, sharedProblem, sharedSource } from "./ui/sharedLevel";
+import { openShared, sharedProblem, sharedSource } from "./ui/sharedLevel";
 import { mountTitle } from "./ui/titleScreen";
 import { mountStyleguide } from "./ui/styleguide";
 
@@ -46,6 +53,8 @@ export function startApp(root: HTMLElement): void {
     () => {
       progress.reset();
       sharedProgress.reset(); // shared levels' stars, hints and code; the levels themselves stay (M4.3)
+      settings.set({ piece: "pawn" }); // the skins are locked again (QA-052)
+      resetSandbox(); // the Sandbox starts from its default code again (QA-057)
       context.knownCalls.clear();
       route(); // redraw the screen from the cleared progress
     },
@@ -112,17 +121,27 @@ export function startApp(root: HTMLElement): void {
     heading.focus({ preventScroll: true });
   }
 
+  /** The crumbs of a page under Free Play: Free Play (a link unless it is the page), the section it is in (a link), then the page's own parts. */
+  function freeCrumbs(section: { name: string; href: string } | null, ...rest: Array<string | HTMLElement>): void {
+    const sep = () => h("span", { class: "crumb-sep" }, "/");
+    const home = section || rest.length ? h("a", { href: "#/free" }, "Free Play") : h("span", {}, "Free Play");
+    const trail = [home, ...(section ? [h("a", { href: section.href }, section.name)] : []), ...rest.map((part) => (typeof part === "string" ? h("span", {}, part) : part))];
+    crumbs.replaceChildren(...trail.flatMap((part, i) => (i ? [sep(), part] : [part])));
+  }
+  const MY_LEVELS = { name: freeSectionName("levels"), href: "#/editor" };
+  const SHARED = { name: freeSectionName("shared"), href: "#/free/shared" };
+
   /** A level someone else made, on the level screen: kept in this browser, with progress of its own. */
   function showShared(data: Record<string, unknown>): () => void {
     const source = sharedSource(data);
-    crumbs.replaceChildren(h("span", {}, "Shared level"), h("span", { class: "crumb-sep" }, "/"), h("span", {}, source.title));
+    freeCrumbs(SHARED, source.title);
     document.title = `${source.title} · Shared level · Rank & File`;
-    return mountLevel(main, context, source, { shared: { remix: () => openRemix(data) },progress: sharedProgress, solution: sharedSolution(data) });
+    return mountLevel(main, context, source, sharedHost(data));
   }
 
   /** A level that can't be opened: a plain page that says why, with the way back. */
   function showSharedProblem(reason: string): void {
-    crumbs.replaceChildren(h("span", {}, "Shared level"));
+    freeCrumbs(SHARED);
     main.replaceChildren(sharedProblem(reason));
     focusHeading();
     document.title = "This level can't be opened · Rank & File";
@@ -130,7 +149,7 @@ export function startApp(root: HTMLElement): void {
 
   /** A link's code: decoded, checked by the engine, kept, and only then opened. A level that fails any of that never opens. */
   function openSharedCode(code: string): () => void {
-    crumbs.replaceChildren(h("span", {}, "Shared level"));
+    freeCrumbs(SHARED);
     main.replaceChildren(h("div", { class: "editor-missing" }, h("p", { class: "muted", role: "status" }, "Opening the level…")));
     document.title = "Opening a level · Rank & File";
     let cancelled = false; // the player went elsewhere while the code was being checked
@@ -159,6 +178,16 @@ export function startApp(root: HTMLElement): void {
     const hash = location.hash || "#/";
     const levelMatch = /^#\/level\/([\w-]+)$/.exec(hash);
     const source = levelMatch ? findLevel(levelMatch[1]!) : undefined;
+    if (source?.set) return void location.replace(`#/challenge/${source.id}`); // a challenge has its own screen (M4.4)
+    const challengeMatch = /^#\/challenge\/([\w-]+)$/.exec(hash);
+    const challenge = challengeMatch ? findLevel(challengeMatch[1]!) : undefined;
+    const freeMatch = /^#\/free(?:\/(.*))?$/.exec(hash);
+    const section = freeMatch?.[1] === undefined ? null : freePage(freeMatch[1]);
+    if (freeMatch?.[1] !== undefined) {
+      // an unknown page goes to the hub, and extra path after a page to that page (QA-056); Back still works
+      const canonical = section ? `#/free/${section}` : "#/free";
+      if (hash !== canonical) return void location.replace(canonical);
+    }
     const playMatch = /^#\/play\/(.+)$/.exec(hash);
     const sharedMatch = /^#\/shared\/([\w-]+)$/.exec(hash);
     if (source) {
@@ -173,6 +202,18 @@ export function startApp(root: HTMLElement): void {
       );
       unmount = mountLevel(main, context, source);
       document.title = `${source.title} · Rank & File`;
+    } else if (challenge?.set) {
+      const set = challengeSetOf(challenge);
+      const number = (set?.levels.indexOf(challenge) ?? -1) + 1;
+      freeCrumbs({ name: set?.title ?? "Challenges", href: "#/free/challenges" }, `${number}. ${challenge.title}`);
+      unmount = mountLevel(main, context, challenge, challengeHost());
+      document.title = `${challenge.title} · Free Play · Rank & File`;
+    } else if (freeMatch) {
+      const name = section && freeSectionName(section);
+      freeCrumbs(null, ...(name ? [name] : []));
+      unmount = section === "sandbox" ? mountSandbox(main, client) : section === "skins" ? mountSkins(main) : mountFreePlay(main, section, client);
+      focusHeading();
+      document.title = `${name ? `${name} · ` : ""}Free Play · Rank & File`;
     } else if (playMatch) {
       unmount = openSharedCode(playMatch[1]!);
     } else if (sharedMatch) {
@@ -182,7 +223,7 @@ export function startApp(root: HTMLElement): void {
         unmount = showShared(data);
       } else showSharedProblem("This shared level isn't in this browser any more.");
     } else if (hash === "#/editor") {
-      crumbs.replaceChildren(h("span", {}, "My levels"));
+      freeCrumbs(null, "My levels");
       unmount = mountEditorList(main, client);
       focusHeading();
       document.title = "My levels · Rank & File";
@@ -190,7 +231,7 @@ export function startApp(root: HTMLElement): void {
       const id = hash.split("/")[2]!;
       const draft = drafts.load(id);
       if (!draft) return void (location.hash = "#/editor");
-      crumbs.replaceChildren(h("a", { href: "#/editor" }, "My levels"), h("span", { class: "crumb-sep" }, "/"), h("a", { href: `#/editor/${id}` }, draft.title), h("span", { class: "crumb-sep" }, "/"), h("span", {}, "Test-play"));
+      freeCrumbs(MY_LEVELS, h("a", { href: `#/editor/${id}` }, draft.title), "Test-play");
       const kept = () => {
         const saved = drafts.load(id);
         return saved ? readSolution(saved) : "";
@@ -201,11 +242,11 @@ export function startApp(root: HTMLElement): void {
       };
       // as a player of the shared level will see it: the offer exists only if a solution was kept before this screen opened
       const solution = kept() ? authorSolution(kept) : null;
-      unmount = mountLevel(main, context, testPlaySource(draft), { testPlay: { back: `#/editor/${id}`, keep, kept }, solution });
+      unmount = mountLevel(main, context, testPlaySource(draft), testPlayHost({ back: `#/editor/${id}`, keep, kept, solution }));
       document.title = `${draft.title} · Test-play · Rank & File`;
     } else if (/^#\/editor\/[\w-]+$/.test(hash)) {
       const name = h("span", {}, "Editing");
-      crumbs.replaceChildren(h("a", { href: "#/editor" }, "My levels"), h("span", { class: "crumb-sep" }, "/"), name);
+      freeCrumbs(MY_LEVELS, name);
       unmount = mountEditor(main, client, hash.slice("#/editor/".length), (title) => {
         name.textContent = title;
         document.title = `${title} · Editor · Rank & File`;
@@ -232,7 +273,7 @@ export function startApp(root: HTMLElement): void {
       document.title = "Promotion · Rank & File";
     } else {
       crumbs.replaceChildren();
-      unmount = mountTitle(main, { lessons: () => (location.hash = "#/lessons"), editor: () => (location.hash = "#/editor"), settings: () => dialog.open() });
+      unmount = mountTitle(main, { lessons: () => (location.hash = "#/lessons"), freePlay: () => (location.hash = "#/free"), editor: () => (location.hash = "#/editor"), settings: () => dialog.open() });
       document.title = "Rank & File";
     }
     // every screen eases in (the CSS skips it with reduced motion)

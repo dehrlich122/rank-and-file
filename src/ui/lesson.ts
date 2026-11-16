@@ -57,12 +57,24 @@ export function splitIntoSteps(tokens: Token[]): Token[][] {
   return steps;
 }
 
+/** The board the snippets run on, asked for once and shared; a failed try is forgotten, so the next Run asks again. */
+function sandboxLoader(context: LessonContext): () => Promise<LevelInfo> {
+  let sandbox: Promise<LevelInfo> | null = null;
+  const ask = () =>
+    context.client
+      .ready()
+      .then(() => context.client.call("loadSandbox", { api: context.api, board: context.board }))
+      .catch((error: unknown) => {
+        sandbox = null;
+        throw error;
+      });
+  return () => (sandbox ??= ask());
+}
+
 export function renderLesson(markdown: string, context: LessonContext): Lesson {
   const element = h("div", { class: "lesson" });
   const snippets: Snippet[] = [];
-  let sandbox: Promise<LevelInfo> | null = null;
-  const loadSandbox = () =>
-    (sandbox ??= context.client.ready().then(() => context.client.call("loadSandbox", { api: context.api, board: context.board })));
+  const loadSandbox = sandboxLoader(context);
 
   const tokens = marked.lexer(markdown);
   const stepElements = splitIntoSteps(tokens).map((stepTokens) => {
@@ -108,6 +120,16 @@ export function renderLesson(markdown: string, context: LessonContext): Lesson {
   };
 }
 
+export interface SnippetOptions {
+  onChange?: (code: string) => void;
+  compact?: boolean; // default true, the lesson's small editor
+}
+
+/** One runnable snippet outside a lesson (the Free Play Sandbox): its own editor, Run, board and console. */
+export function renderSnippet(code: string, context: LessonContext, options: SnippetOptions = {}): { element: HTMLElement; dispose(): void } {
+  return new Snippet(code, context, sandboxLoader(context), options);
+}
+
 class Snippet {
   readonly element: HTMLElement;
   private readonly editor: EditorView;
@@ -123,6 +145,7 @@ class Snippet {
     code: string,
     private readonly context: LessonContext,
     private readonly loadSandbox: () => Promise<LevelInfo>,
+    options: SnippetOptions = {},
   ) {
     const editorHost = h("div", { class: "snippet-editor" });
     this.runButton = h("button", { class: "btn btn-small btn-primary", onClick: () => void this.run() }, "Run ▶");
@@ -140,7 +163,8 @@ class Snippet {
     this.editor = createEditor({
       parent: editorHost,
       code: code.trimEnd(),
-      compact: true,
+      compact: options.compact ?? true,
+      onChange: options.onChange,
       onRun: () => void this.run(),
       extensions: [codexHover(context.codex)],
     });

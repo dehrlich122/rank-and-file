@@ -85,6 +85,11 @@ for (const theme of ["dark", "light"]) {
   atLeast("accent (links, headings) on a panel", ratio(colour("accent"), panel), 4.5);
   atLeast("body text on the selected Lessons row", ratio(colour("text"), over(colour("step-line"), panel)), 4.5);
   atLeast("stars on a panel", ratio(colour("star"), panel), 3);
+  // difficulty tags (M4.4): the keyword is text in the tag's colour, on a panel or the page
+  for (const step of [1, 2, 3, 4, 5]) {
+    atLeast(`difficulty ${step} tag on a panel`, ratio(colour(`diff-${step}`), panel), 4.5);
+    atLeast(`difficulty ${step} tag on the page`, ratio(colour(`diff-${step}`), bg), 4.5);
+  }
 
   // the focus ring is the accent colour, on whatever surface the focused thing sits on
   for (const [surface, under] of [["page", bg], ["panel", panel], ["editor", colour("code-bg")]]) {

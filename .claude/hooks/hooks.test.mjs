@@ -22,11 +22,13 @@ describe("spoiler guard: files", () => {
     assert.ok(denied("Read", { file_path: "solutions/ch02/ch02-l03.naive.py" }));
     assert.ok(denied("Write", { file_path: `${ROOT}\\solutions\\ch09\\new.py`, content: "" }));
   });
-  test("level files are denied, except chapters.yaml", () => {
+  test("level files are denied, except the chapter and challenge listings", () => {
     assert.ok(denied("Read", { file_path: `${ROOT}\\levels\\ch01\\ch01-l01.yaml` }));
     assert.ok(denied("Edit", { file_path: `${ROOT}\\levels\\ch03\\ch03-l02.yaml` }));
     assert.ok(denied("Read", { file_path: `${ROOT}\\levels\\practice\\p01.yaml` }));
     assert.equal(run("Read", { file_path: `${ROOT}\\levels\\chapters.yaml` }), null);
+    assert.equal(run("Write", { file_path: `${ROOT}\\levels\\challenges.yaml`, content: "" }), null);
+    assert.ok(denied("Read", { file_path: `${ROOT}\\levels\\last-rank\\last-rank-01.yaml` }));
   });
   test("the generators are closed to subagents only", () => {
     assert.ok(denied("Read", { file_path: `${WT}\\scripts\\gen_runes.py` }, worker));
@@ -98,6 +100,7 @@ describe("spoiler guard: shell", () => {
       "git show --stat HEAD",
       "git show HEAD:src/app.ts",
       "git show HEAD:levels/chapters.yaml",
+      "cat levels/challenges.yaml",
       "git log --oneline -5",
       "gh pr diff 21 --name-only",
       "ls solutions/ch01",

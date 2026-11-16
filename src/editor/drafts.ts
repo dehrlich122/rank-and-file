@@ -5,6 +5,7 @@
 import { asRecord, browserStorage, readJson, writeJson, type StorageLike } from "../storage";
 import type { Draft } from "./draft";
 import { draftToLevelData, levelDataToDraft } from "./levelData";
+import { readDifficulty } from "./rules";
 
 const STORAGE_KEY = "rank-and-file:editor";
 
@@ -14,6 +15,7 @@ export interface DraftSummary {
   width: number;
   height: number;
   edited: number; // when it was last saved, in ms since 1970
+  difficulty: number | null; // 1 to 5, when the author set one (M4.4)
 }
 
 interface Saved {
@@ -40,7 +42,7 @@ export class DraftStore {
     return Object.entries(this.saved)
       .flatMap(([id, { edited }]) => {
         const draft = this.load(id);
-        return draft ? [{ id, title: draft.title, width: draft.width, height: draft.height, edited }] : [];
+        return draft ? [{ id, title: draft.title, width: draft.width, height: draft.height, edited, difficulty: readDifficulty(draft) }] : [];
       })
       .sort((a, b) => b.edited - a.edited);
   }

@@ -2,7 +2,7 @@
 // properties, test-play, files and My levels (M4.2); then the rules and hints, other boards, the solvability check,
 // the kept solution and the Share dialog (M4.3). Every level here is hand-made on a blank board; no curriculum level's
 // hints or solution is ever read or typed. Never put a level's contents into a check's message.
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sleep } from "./cdp.mjs";
@@ -13,7 +13,7 @@ const KEY_CODES = { ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, E
 const SHIFT = 8;
 const CTRL = 2;
 
-export default async function editorChecks({ browser: b, base, check }) {
+export default async function editorChecks({ browser: b, base, root, check }) {
   const { clickButton, hasButton } = buttonHelpers(b);
   const text = (selector) => b.evaluate(`document.querySelector(${JSON.stringify(selector)})?.textContent ?? ''`);
   const saved = () => b.evaluate(`(() => { const s = JSON.parse(localStorage.getItem('rank-and-file:editor') ?? '{"levels":{}}'); return Object.values(s.levels).map((e) => e.data); })()`);
@@ -874,5 +874,99 @@ export default async function editorChecks({ browser: b, base, check }) {
 
   await check("editor checks leave nothing behind", async () => {
     await b.evaluate(`localStorage.clear()`);
+  });
+
+  // -- M4.4 QA3: Save to the repo (QA-055) and the promotion screen's link (QA-060) ----------------------------
+  await check("QA-055: Save to the repo removes a stale solution file, notes a refused level, answers Esc with Keep it and logs no error", async () => {
+    await levelWithKeptSolution();
+    if (!(await hasButton("Save to the repo", ".ed-toolbar"))) return "skipped: not the dev server (the button exists only in `vite dev`)";
+    const id = (await b.evaluate(`location.hash`)).split("/")[2];
+    expect(/^[a-z0-9-]+$/.test(id), `draft id ${id}`);
+    const drafts = join(root, "drafts");
+    const made = !existsSync(drafts);
+    const level = join(drafts, `${id}.yaml`);
+    const solution = join(drafts, `${id}.py`);
+    const status = () => text("#ed-status");
+    const post = (body) =>
+      b.evaluate(`(async () => { const r = await fetch('/__rank-and-file/save-level', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(${JSON.stringify(body)}) }); return { status: r.status, body: await r.json() }; })()`);
+    const logStart = b.logs.length;
+    try {
+      // a save with a kept solution writes both files
+      await clickButton("Save to the repo", ".ed-toolbar");
+      await b.waitFor(`document.querySelector('#ed-status')?.textContent.includes('Saved')`, 15_000, "the save");
+      expect(existsSync(level) && existsSync(solution), "the level and its solution are written");
+      expect((await status()).includes(`drafts/${id}.py`) && !(await status()).includes("Removed"), "the status names both files and removes nothing");
+      // 1d: the "does it exist?" answer is a 200, not an error
+      const exists = await post({ id, yaml: "x: 1" });
+      expect(exists.status === 200 && exists.body.exists === true, `an existing file answers ${exists.status}`);
+      // 1a: take the solution away and save again
+      await openTab("Rules");
+      await clickButton("Remove", '[data-field="solution"]');
+      await sleep(200);
+      await clickButton("Save to the repo", ".ed-toolbar");
+      await b.waitFor(`document.querySelector('.ed-confirm .confirm-step')`, 15_000, "the confirm step");
+      // 1c: Esc answers "Keep it" and does not open Settings
+      await b.evaluate(`document.querySelector('.ed-confirm .btn-danger').focus()`);
+      await press("Escape");
+      await b.waitFor(`document.querySelector('#ed-status')?.textContent.includes('Not saved')`, 10_000, "Not saved after Esc");
+      expect(!(await b.evaluate(`!!document.querySelector('.ed-confirm .confirm-step')`)), "Esc closes the question");
+      expect(!(await b.evaluate(`!!document.querySelector('dialog[open]')`)), "and does not open Settings");
+      expect(existsSync(solution), "nothing changed on disk");
+      await clickButton("Save to the repo", ".ed-toolbar");
+      await b.waitFor(`document.querySelector('.ed-confirm .confirm-step')`, 15_000, "the confirm step again");
+      await clickButton("Yes, replace it", ".ed-confirm");
+      await b.waitFor(`document.querySelector('#ed-status')?.textContent.includes('Saved')`, 15_000, "the replacing save");
+      expect(!existsSync(solution) && existsSync(level), "the old .py is gone and the level stays");
+      expect((await status()).includes(`Removed the old drafts/${id}.py`), "the status says so");
+      expect(!(await status()).includes("refuses"), "a level the engine accepts gets no warning");
+      // 1b: a level the engine refuses is still saved, with a word about it
+      await tool("Rook");
+      await click(0, 6);
+      await b.waitFor(`document.querySelector('.problem-link')`, 30_000, "the problem");
+      await settled();
+      await clickButton("Save to the repo", ".ed-toolbar");
+      await b.waitFor(`document.querySelector('.ed-confirm .confirm-step')`, 15_000, "the confirm step for the refused level");
+      await clickButton("Yes, replace it", ".ed-confirm");
+      await b.waitFor(`document.querySelector('#ed-status')?.textContent.includes('Saved')`, 15_000, "the save of the refused level");
+      expect((await status()).includes("The engine refuses this level as it stands"), "the status says the engine refuses it");
+      expect(existsSync(level), "and the draft is saved anyway");
+      // 1d: none of that logged a console error
+      const noisy = b.logs.slice(logStart).filter((line) => /Failed to load resource|\[exception\]|\[console\.error\]|\[log\.error\]/.test(line));
+      expect(noisy.length === 0, `console errors: ${noisy.join(" | ")}`);
+      // and a bad id is still refused with a 4xx (this one is meant to be logged by the browser, so it comes last)
+      const bad = await post({ id: "../escape", yaml: "x: 1" });
+      expect(bad.status >= 400 && bad.status < 500, `a bad id answers ${bad.status}`);
+      expect(!existsSync(join(root, "escape.yaml")), "and writes nothing");
+    } finally {
+      rmSync(level, { force: true });
+      rmSync(solution, { force: true });
+      if (made && existsSync(drafts) && readdirSync(drafts).length === 0) rmSync(drafts, { recursive: true, force: true });
+    }
+    return `saved, stale .py removed, refused level noted, Esc keeps${made ? " (drafts/ made and removed)" : ""}`;
+  });
+
+  await check("QA-060: the promotion screen's Free Play link and buttons are in view at 1440 x 900 and 1000 x 800", async () => {
+    const solvedTier = Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`ch06-l0${n}`, { stars: 3, hints: 0, failedRuns: 0, helped: false, solutionSeen: false, code: null }]));
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/lessons` });
+    await b.waitFor(`document.querySelector('main')`, 60_000, "the app");
+    await b.evaluate(`localStorage.setItem('rank-and-file:progress', ${JSON.stringify(JSON.stringify(solvedTier))}); true`);
+    const seen = [];
+    try {
+      for (const [width, height] of [[1440, 900], [1000, 800]]) {
+        await b.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+        await b.send("Page.navigate", { url: `${base}?reload=${Date.now()}#/promotion/pawn` });
+        await b.waitFor(`document.querySelector('.promotion .pr-to') && document.querySelector('.pr-free')`, 60_000, "the ceremony and its link");
+        await sleep(300);
+        const box = await b.evaluate(`(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); return { height: innerHeight, link: r('.pr-free').bottom, buttons: r('.pr-actions').bottom, linkTop: r('.pr-free').top, headline: r('.pr-headline').top }; })()`);
+        expect(box.link <= box.height && box.buttons <= box.height, `${width}x${height}: link bottom ${Math.round(box.link)}, buttons bottom ${Math.round(box.buttons)}, window ${box.height}`);
+        expect(box.linkTop > box.buttons, `${width}x${height}: the link still follows the buttons`);
+        expect(box.headline > 0, "the headline is on screen");
+        seen.push(`${width}x${height}: ${Math.round(box.link)}`);
+      }
+    } finally {
+      await b.send("Emulation.setDeviceMetricsOverride", { width: 1400, height: 860, deviceScaleFactor: 1, mobile: false });
+      await b.evaluate(`localStorage.clear()`);
+    }
+    return `link bottom ${seen.join(", ")}`;
   });
 }

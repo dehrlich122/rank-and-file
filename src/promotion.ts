@@ -25,6 +25,9 @@ export const PROMOTIONS: Promotion[] = [
   },
 ];
 
+/** What each skin is called (the Skins page and Settings → Piece). */
+export const SKIN_NAMES: Record<Piece, string> = { pawn: "Pawn", knight: "Charger" };
+
 /** The chapter that closes `tier`: clearing it earns the promotion. */
 export const lastChapterOf = (tier: string) => chapters.filter((chapter) => chapter.curriculum && chapter.tier === tier).at(-1);
 

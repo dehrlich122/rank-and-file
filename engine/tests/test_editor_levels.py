@@ -46,6 +46,8 @@ def test_a_level_needs_no_chapter_lesson_or_trains():
 def test_the_levels_in_the_repo_still_have_a_chapter_a_lesson_and_trains():
     for path in LEVEL_FILES:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if "set" in data:
+            continue  # a challenge (M4.4) has a set and a difficulty instead (test_challenges.py, test_levels.py)
         assert isinstance(data.get("chapter"), int), path.name
         assert data.get("lesson"), path.name
         assert str(data.get("trains", "")).strip(), path.name

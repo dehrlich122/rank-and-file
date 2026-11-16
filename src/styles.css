@@ -40,6 +40,12 @@
   --good: light-dark(#157a3c, #4cf27a);
   --good-bg: light-dark(#e1f6e8, #0a2a1a);
   --star: light-dark(#935500, #ffb02e);
+  /* difficulty tags (M4.4): pass, try, raise, assert, while True:. Never the only cue: each tag has its keyword and pips */
+  --diff-1: light-dark(#157a3c, #4cf27a);
+  --diff-2: light-dark(#6c5d00, #f2e14b);
+  --diff-3: light-dark(#a04500, #ff9a3c);
+  --diff-4: light-dark(#b8102f, #ff6170);
+  --diff-5: light-dark(#a3003a, #ff2a55);
   --game-message: light-dark(#8a5300, #ffb02e);
 
   /* syntax colours */

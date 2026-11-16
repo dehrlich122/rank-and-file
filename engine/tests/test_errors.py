@@ -2,7 +2,7 @@
 
 import pytest
 
-from rankfile.runner import run_level
+from rankfile.runner import run_level, run_sandbox
 
 
 @pytest.mark.parametrize(
@@ -69,6 +69,26 @@ def test_text_friendly_messages(rune_corridor, code, friendly, line):
     assert result.status == "error"
     assert friendly in result.error.friendly
     assert result.error.line == line
+
+
+@pytest.mark.parametrize(
+    ("code", "friendly"),
+    [
+        ("pawn.jump()", "The pawn doesn't have an ability called `jump`. Here it knows: move, turn_left."),
+        ("pawn.wait()", "Your pawn hasn't learned `wait` yet. Here it knows: move, turn_left."),
+    ],
+)
+def test_the_sandbox_has_no_level_so_it_says_here(code, friendly):
+    # The Sandbox and lesson snippets run on sandbox_level: no level, so "Here", not "In this level" (QA-058).
+    result = run_sandbox(code, ["move", "turn_left"])
+    assert result.status == "error"
+    assert friendly in result.error.friendly
+    assert "In this level" not in result.error.friendly
+
+
+def test_a_real_level_keeps_in_this_level(corridor):
+    result = run_level(corridor, "pawn.wait()")
+    assert "Your pawn hasn't learned `wait` yet. In this level it knows: move" in result.error.friendly
 
 
 def test_real_traceback_is_kept_and_trimmed(corridor):

@@ -3,7 +3,8 @@
 // print a reference solution, a hint or a guard's passphrase. This is a backstop for the rules
 // in CLAUDE.md, not a replacement: it denies the common ways of reading those files.
 //   - solutions/**                   references and their notes
-//   - levels/** but chapters.yaml    the level files hold hints and passphrases
+//   - levels/** but the listings     the level files hold hints and passphrases (chapters.yaml and
+//                                     challenges.yaml only list chapters and sets: titles, tiers, summaries)
 //   - scripts/gen_*.py, levelgen.py  encoded hints and code (subagents only; the orchestrator writes them)
 // Tests and generators still read these files; they just never print them.
 import { readFileSync } from "node:fs";
@@ -37,11 +38,13 @@ function locate(path, cwd, projectDir) {
   return { rel, covers };
 }
 
+const LISTINGS = ["levels/chapters.yaml", "levels/challenges.yaml"];
+
 /** The protected area a repo-relative path falls in, or null. */
 function area(rel, isSubagent) {
   if (rel == null) return null;
   if (rel === "solutions" || rel.startsWith("solutions/")) return "solutions/";
-  if ((rel === "levels" || rel.startsWith("levels/")) && rel !== "levels/chapters.yaml") return "levels/";
+  if ((rel === "levels" || rel.startsWith("levels/")) && !LISTINGS.includes(rel)) return "levels/";
   if (isSubagent && /^scripts\/(gen_[^/]*|levelgen)\.py$/.test(rel)) return "the level generators";
   return null;
 }
@@ -53,7 +56,7 @@ const GIT_READERS = /\bgit\b[^;|&]*\s(?:show|blame|cat-file|grep)\b/i;
 const INLINE_CODE = /(?:^|[\s;|&(])(?:python3?|py|node|deno|perl|ruby|pwsh|powershell)(?:\.exe)?\s+(?:-c|-e|--eval|-command)\b/i;
 const MENTIONS = {
   "solutions/": /(?:^|[\s"'=:/\\(])solutions(?:[/\\\s"')]|$)/i,
-  "levels/": /(?:^|[\s"'=:/\\(])levels[/\\](?!chapters\.yaml)/i,
+  "levels/": /(?:^|[\s"'=:/\\(])levels[/\\](?!(?:chapters|challenges)\.yaml)/i,
   "the level generators": /(?:^|[\s"'=:/\\(])scripts[/\\](?:gen_\w+|levelgen)\.py/i,
 };
 // Commands that print patches: a diff can carry a reference or a hint.

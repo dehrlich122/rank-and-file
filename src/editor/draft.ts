@@ -133,6 +133,9 @@ export const NO_RULES = {
   stars: [],
   hints: [],
   mastery: false,
+  set: "",
+  difficulty: null,
+  draws_on: [],
   boards: [],
 } satisfies Partial<LevelInfo>;
 

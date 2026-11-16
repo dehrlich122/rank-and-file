@@ -55,12 +55,13 @@ export default async function shareChecks({ browser: b, base, root, check }) {
     await goto(`#/play/${code}`, options);
     return sharedReady();
   }
-  const myLevels = async () => {
-    await goto("#/editor");
-    await b.waitFor(`document.querySelector('.editor-list .my-levels-title')`, 30_000, "My levels");
+  // Shared with me lives in Free Play (M4.4): `#/free/shared`, where its list is the page's only `.my-levels`
+  const sharedPage = async () => {
+    await goto("#/free/shared");
+    await b.waitFor(`location.hash === '#/free/shared' && document.querySelector('.editor-list h1')?.textContent === 'Shared with me'`, 30_000, "Shared with me");
   };
   /** The rows of "Shared with me": their text. */
-  const sharedRows = () => b.evaluate(`[...document.querySelectorAll('.my-levels')[1].querySelectorAll('.my-level')].map((li) => li.textContent)`);
+  const sharedRows = () => b.evaluate(`[...document.querySelectorAll('.my-levels')[0].querySelectorAll('.my-level')].map((li) => li.textContent)`);
 
   async function run() {
     await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
@@ -96,17 +97,17 @@ export default async function shareChecks({ browser: b, base, root, check }) {
     const banner = await text(".shared-banner");
     expect(banner.includes("Shared level") && (await hasButton("Open in the editor", ".shared-banner")), "the banner and its remix button");
     const crumbs = await text(".crumbs");
-    expect(crumbs === "Shared level/Corridor Walk", `crumbs: ${crumbs}`);
+    expect(crumbs === "Free Play/Shared with me/Corridor Walk", `crumbs: ${crumbs}`);
     const tabs = await b.evaluate(`[...document.querySelectorAll('.level .tabs .tab')].map((t) => ({ label: t.textContent, shown: t.offsetParent !== null, active: t.classList.contains('active') }))`);
     const learn = tabs.find((t) => t.label === "Learn");
     const challenge = tabs.find((t) => t.label === "Challenge");
     expect(!learn?.shown, "no Learn tab for a shared level");
     expect(challenge?.shown && challenge.active, "the Challenge tab is open");
     expect((await text(".level-left")).includes("Walk east to the goal."), "the author's brief is on the Challenge tab");
-    await myLevels();
+    await sharedPage();
     const rows = await sharedRows();
     expect(rows.length === 1 && rows[0].includes("Corridor Walk"), "kept in Shared with me");
-    await b.evaluate(`document.querySelectorAll('.my-levels')[1].querySelector('.my-level-open').click()`);
+    await b.evaluate(`document.querySelectorAll('.my-levels')[0].querySelector('.my-level-open').click()`);
     expect(await sharedReady() === id, "opening it from the list reaches the same level");
     expect((await b.evaluate(`location.hash`)) === `#/shared/${id}`, "the list links to #/shared/<id>");
     expect(await hasButton("Open in the editor", ".shared-banner"), "the banner again");
@@ -121,7 +122,7 @@ export default async function shareChecks({ browser: b, base, root, check }) {
     const before = await stored("rank-and-file:progress");
     const id = await openCode(await codeFor(claim));
     expect(id !== "ch01-l01" && id.startsWith("shared-"), `opened as ${id}`);
-    expect((await text(".crumbs")) === "Shared level/Not Chapter One", "its own title, not Chapter 1's");
+    expect((await text(".crumbs")) === "Free Play/Shared with me/Not Chapter One", "its own title, not Chapter 1's");
     expect((await b.evaluate(`document.title`)).startsWith("Not Chapter One"), "the page title is its own");
     const r = await solve();
     expect(r.head === "Solved!", `outcome ${r.head}`);
@@ -148,14 +149,14 @@ export default async function shareChecks({ browser: b, base, root, check }) {
     };
     const reasons = [];
     for (const [name, code] of Object.entries(cases)) {
-      await myLevels(); // away first, so a page left over from the last case is never mistaken for this one
+      await sharedPage(); // away first, so a page left over from the last case is never mistaken for this one
       await goto(`#/play/${code}`);
       await b.waitFor(`document.querySelector('.editor-missing h1')`, 30_000, `the page for: ${name}`);
       const h1 = await text(".editor-missing h1");
       const reason = (await text(".editor-missing p")).trim();
       expect(h1 === "This level can't be opened", `${name}: heading "${h1}"`);
       expect(reason.length > 10, `${name}: a reason is given`);
-      expect(await b.evaluate(`!!document.querySelector('.editor-missing a[href="#/editor"]')`), `${name}: a way back`);
+      expect(await b.evaluate(`!!document.querySelector('.editor-missing a[href="#/free/shared"]')`), `${name}: a way back to Shared with me`);
       expect(!(await b.evaluate(`document.querySelector('.level')`)), `${name}: no level screen`);
       reasons.push(`${name}: ${reason.slice(0, 40)}`);
     }
@@ -203,8 +204,8 @@ export default async function shareChecks({ browser: b, base, root, check }) {
     const progress = await storedJson("rank-and-file:shared-progress");
     expect(progress?.[id]?.stars === r.stars, "the stars are in shared progress");
     expect(!(await storedJson("rank-and-file:progress"))?.[id], "and not in the curriculum's");
-    await b.evaluate(`document.querySelector('.outcome-host a[href="#/editor"]').click()`);
-    await b.waitFor(`document.querySelector('.editor-list .my-levels-title')`, 30_000, "My levels");
+    await b.evaluate(`document.querySelector('.outcome-host a[href="#/free/shared"]').click()`);
+    await b.waitFor(`location.hash === '#/free/shared' && document.querySelector('.editor-list h1')?.textContent === 'Shared with me'`, 30_000, "Shared with me");
     const rows = await sharedRows();
     expect(rows.length === 1 && rows[0].includes("★") && !rows[0].includes("not solved yet"), `list row: ${rows[0]}`);
     return `${r.stars} stars, list shows ★`;
@@ -226,10 +227,10 @@ export default async function shareChecks({ browser: b, base, root, check }) {
     return "remix without a solution";
   });
 
-  // -- 7: My levels: opening, junk, removing -------------------------------------------------------------------
-  await check("M4.3: My levels opens a pasted link or a bare code, rejects junk, and Remove asks first and removes only the entry", async () => {
-    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/editor` });
-    await b.waitFor(`document.querySelector('.editor-list h1')`, 60_000, "My levels");
+  // -- 7: Shared with me: opening, junk, removing --------------------------------------------------------------
+  await check("M4.3: Shared with me opens a pasted link or a bare code, rejects junk, and Remove asks first and removes only the entry", async () => {
+    await b.send("Page.navigate", { url: `${base}?fresh=${Date.now()}#/free/shared` });
+    await b.waitFor(`document.querySelector('.editor-list h1')?.textContent === 'Shared with me'`, 60_000, "Shared with me");
     const open = async (value) => {
       await clickButton("Open a link or code", ".editor-list");
       await b.evaluate(`(() => { const i = document.querySelector('#link-or-code'); i.value = ${JSON.stringify(value)}; })()`);
@@ -237,23 +238,23 @@ export default async function shareChecks({ browser: b, base, root, check }) {
     };
     await open(`${base}#/play/${await codeFor(withSolution)}`);
     await sharedReady();
-    await myLevels();
+    await sharedPage();
     const bare = await codeFor(withoutSolution);
     await open(bare);
     const id = await sharedReady();
     const r = await solve();
     expect(r.head === "Solved!", "the second level can be solved");
-    await myLevels();
+    await sharedPage();
     await clickButton("Open a link or code", ".editor-list");
     await b.evaluate(`document.querySelector('#link-or-code').value = 'just some words'`);
     await clickButton("Open", ".editor-list form");
     const notice = await text(".editor-list [role=status]");
-    expect(notice.includes("isn't a link or code") && (await b.evaluate(`location.hash`)) === "#/editor", `notice: ${notice}`);
+    expect(notice.includes("isn't a link or code") && (await b.evaluate(`location.hash`)) === "#/free/shared", `notice: ${notice}`);
     expect((await sharedRows()).length === 2, "both opened levels are listed");
 
     const progressBefore = await stored("rank-and-file:shared-progress");
     const draftsBefore = await stored("rank-and-file:editor");
-    const removeQuiet = `[...document.querySelectorAll('.my-levels')[1].querySelectorAll('.my-level')].find((li) => li.textContent.includes('Quiet Corridor')).querySelector('[aria-label^="Remove"]').click()`;
+    const removeQuiet = `[...document.querySelectorAll('.my-levels')[0].querySelectorAll('.my-level')].find((li) => li.textContent.includes('Quiet Corridor')).querySelector('[aria-label^="Remove"]').click()`;
     await b.evaluate(removeQuiet);
     expect(await b.evaluate(`!!document.querySelector('.ed-confirm .confirm-step')`), "Remove asks first");
     await clickButton("Keep it", ".ed-confirm");
@@ -274,7 +275,7 @@ export default async function shareChecks({ browser: b, base, root, check }) {
     const id = await openCode(await codeFor(withSolution), { fresh: true });
     const r = await solve();
     expect(r.head === "Solved!", "solved first");
-    await myLevels();
+    await sharedPage();
     expect((await sharedRows())[0].includes("★"), "stars before the reset");
     await b.evaluate(`document.querySelector('.settings-button').click()`);
     await clickButton("Reset progress…", ".reset-progress");
@@ -283,7 +284,7 @@ export default async function shareChecks({ browser: b, base, root, check }) {
     await b.evaluate(`document.querySelector('.settings-dialog').close()`);
     expect(!(await storedJson("rank-and-file:shared-progress"))?.[id]?.stars, "the stars are cleared");
     await goto("#/");
-    await myLevels();
+    await sharedPage();
     const rows = await sharedRows();
     expect(rows.length === 1 && rows[0].includes("Corridor Walk"), "the level is still listed");
     expect(rows[0].includes("not solved yet"), `list row: ${rows[0]}`);
@@ -358,9 +359,9 @@ export default async function shareChecks({ browser: b, base, root, check }) {
     await b.waitFor(`!!document.querySelector('.compare-dialog .compare-idiomatic .cm-line')`, 10_000, "the comparison");
     await noMarkup("the comparison");
     await b.key("Escape");
-    await myLevels();
+    await sharedPage();
     expect((await sharedRows())[0].includes(EVIL), "the list shows the title as text");
-    await noMarkup("My levels");
+    await noMarkup("Shared with me");
     return "no img, no script";
   });
 }

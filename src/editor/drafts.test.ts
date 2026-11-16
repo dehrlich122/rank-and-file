@@ -14,10 +14,17 @@ describe("DraftStore", () => {
     draft.cells[1]![2] = { tile: "sign", text: "Hello" };
     new DraftStore(storage, () => 1000).save(draft);
     const again = new DraftStore(storage);
-    expect(again.list()).toEqual([{ id: "my-a", title: "Mine", width: 5, height: 4, edited: 1000 }]);
+    expect(again.list()).toEqual([{ id: "my-a", title: "Mine", width: 5, height: 4, edited: 1000, difficulty: null }]);
     const back = again.load("my-a")!;
     expect(back.cells[1]![2]).toMatchObject({ tile: "sign", text: "Hello" });
     expect([back.width, back.height, back.start, back.goal]).toEqual([5, 4, [0, 0], [4, 3]]);
+  });
+
+  it("lists a level's difficulty when the author set one", () => {
+    const store = new DraftStore(memoryStorage());
+    store.save({ ...blankDraft(3, 3, "my-a"), extra: { difficulty: 4 } });
+    store.save({ ...blankDraft(3, 3, "my-b"), extra: { difficulty: 9 } });
+    expect(Object.fromEntries(store.list().map((s) => [s.id, s.difficulty]))).toEqual({ "my-a": 4, "my-b": null });
   });
 
   it("lists the level edited last first, and saving again moves it up", () => {

@@ -9,9 +9,10 @@ import { addBoard, boardCount, boardName, commitBoard, removeBoard, viewOf, type
 import { clearBoard, enemyAt, erase, extendRoute, fill, moveEnemy, occupantOf, paint, placeEnemy, placeGoal, placeStart, resize, rotateStart, toggleSpot, type Edit } from "../editor/edit";
 import { History } from "../editor/history";
 import { startSolve, type SolveRun } from "../editor/solve";
-import { draftToLevelData } from "../editor/levelData";
+import { draftToLevelData, draftToYaml } from "../editor/levelData";
 import { editorOptions } from "../editor/options";
 import { readSolution, setPar } from "../editor/rules";
+import { SAVE_PATH } from "../editor/saveRequest";
 import type { Problem } from "../editor/problems";
 import type { PyClient } from "../py/client";
 import type { EditorOptions, Enemy, LevelInfo, Pos, TileKind } from "../py/protocol";
@@ -147,6 +148,8 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   const redoButton = h("button", { class: "btn btn-small", onClick: () => redo() }, "Redo");
   const clearButton = h("button", { class: "btn btn-small", onClick: () => askToClear() }, "Clear board");
   const exportButton = h("button", { class: "btn btn-small", onClick: () => downloadLevel(whole()) }, "Export");
+  // dev only (`vite dev` serves the endpoint; a build has neither the button nor the path)
+  const saveButton = import.meta.env.DEV ? h("button", { class: "btn btn-small", onClick: () => void saveToRepo(false) }, "Save to the repo") : null;
   const shareButton = h(
     "button",
     { class: "btn btn-small", "aria-haspopup": "dialog", onClick: () => openShareDialog(client, whole, (lines) => commit(setPar(draft(), lines), `Par is ${lines} lines.`)) },
@@ -169,6 +172,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     h("span", { class: "grow" }),
     h("span", { class: "muted small" }, "Saved in this browser"),
     exportButton,
+    saveButton,
     shareButton,
     testButton,
   );
@@ -317,15 +321,47 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   const redo = () => step(() => history.redo(), "Redone.");
 
   /** A question in the page with a yes and a no; the board gets the focus back once it's answered. */
-  function ask(question: string, yes: string, no: string, onYes: () => void, onNo?: () => void): void {
-    confirmHost.replaceChildren(
-      confirmStep(question, yes, no, (confirmed) => {
-        confirmHost.replaceChildren();
-        if (confirmed) onYes();
-        else onNo?.();
-        host.focus();
-      }),
-    );
+  function ask(question: string, yes: string, no: string, onYes: () => void, onNo?: () => void, escKeeps = false): void {
+    const step = confirmStep(question, yes, no, (confirmed) => {
+      confirmHost.replaceChildren();
+      if (confirmed) onYes();
+      else onNo?.();
+      host.focus();
+    });
+    // Esc answers the "no" (and is not left for the app's Esc, which opens Settings)
+    if (escKeeps) step.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      step.querySelectorAll("button")[1]?.click();
+    });
+    confirmHost.replaceChildren(step);
+  }
+
+  /** Save the whole level (and its kept solution) as drafts/<id>.yaml, asking before it replaces one. Dev only. */
+  async function saveToRepo(overwrite: boolean): Promise<void> {
+    if (!import.meta.env.DEV) return;
+    const solution = readSolution(whole());
+    try {
+      const response = await fetch(SAVE_PATH, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id, yaml: draftToYaml(whole()), ...(solution ? { solution } : {}), overwrite }),
+      });
+      const result = (await response.json().catch(() => ({}))) as { saved?: string[]; removed?: string[]; exists?: boolean; reason?: string };
+      if (response.ok && result.exists) return ask(`drafts/${id}.yaml exists. Replace it?`, "Yes, replace it", "Keep it", () => void saveToRepo(true), () => say("Not saved."), true);
+      if (response.ok && result.saved) {
+        // a draft is work in progress, so a level the engine refuses is saved too, with a word about it
+        const refused = verdict?.problem && verdict.revision === revision;
+        return say(
+          `Saved ${result.saved.join(" and ")}.` +
+            (result.removed?.length ? ` Removed the old ${result.removed.join(" and ")}.` : "") +
+            (refused ? " The engine refuses this level as it stands (see Problems)." : ""),
+        );
+      }
+      say(`Not saved: ${result.reason ?? `the server said ${response.status}`}`);
+    } catch {
+      say("Not saved: the dev server didn't answer.");
+    }
   }
 
   const askToClear = () => ask("Clear every tile, enemy and ? square? The start and the goal stay. You can undo it.", "Yes, clear the board", "Keep it", () => commit(clearBoard(draft()), "Cleared the board."));

@@ -66,7 +66,7 @@ export function sharedProblem(reason: string): HTMLElement {
     { class: "editor-missing" },
     h("h1", {}, "This level can't be opened"),
     h("p", {}, reason),
-    h("a", { class: "btn", href: "#/editor" }, "← My levels"),
+    h("a", { class: "btn", href: "#/free/shared" }, "← Shared with me"),
   );
 }
 

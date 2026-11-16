@@ -7,7 +7,7 @@ import pytest
 from rankfile import codex
 from rankfile.pieces import PIECES, Pawn
 from rankfile.repl import Repl
-from rankfile.runner import run_sandbox
+from rankfile.runner import run_level, run_sandbox
 
 FENCE = "```"
 
@@ -147,6 +147,11 @@ def test_help_on_the_piece_lists_what_it_knows_here():
     assert listed == ["pawn.move(squares=1)", "pawn.turn_left()", "pawn.wait(ticks=1)"]  # the pawn's own order
 
 
+def test_help_on_the_piece_says_here_in_the_sandbox_and_in_this_level_in_a_level(corridor):
+    assert "your piece. Here it knows:" in run_sandbox("help(pawn)", ["move"]).output
+    assert "your piece. In this level it knows:" in run_level(corridor, "help(pawn)").output
+
+
 def test_help_on_a_locked_ability_says_it_isnt_learned_yet():
     result = run_sandbox("help(pawn.wait)", ["move"])
     assert result.status == "error" and "hasn't learned `wait` yet" in result.error.friendly
@@ -189,3 +194,94 @@ def test_the_stand_in_follows_the_level_and_survives_a_reset():
     repl.reset()
     assert repl.push("dir(pawn)", "pawn", ["move"])["output"].strip() == "['move']"
     assert "Help on print:" in repl.push("help(print)")["output"]
+
+
+# -- a level's tier (M4.4) -------------------------------------------------------------
+
+
+def tier_chapter(number: int, tier: str, *levels: dict, curriculum: bool = True) -> dict:
+    return {"curriculum": curriculum, "chapter": number, "tier": tier, "levels": list(levels)}
+
+
+def taught_level(api: list[str], *snippets: str, piece: str = "pawn") -> dict:
+    item = level("t", api, *snippets)
+    item["data"]["piece"] = piece
+    return item
+
+
+def needs(api: list[str], require_nodes: list[str] | None = None) -> dict:
+    """The level file of a level that needs these, for `level_tags`."""
+    data = {"id": "q", "title": "q", "map": "P . G", "api": api}
+    if require_nodes:
+        data["constraints"] = {"require_nodes": require_nodes}
+    return data
+
+
+def tags(chapters: list[dict], api: list[str], require_nodes: list[str] | None = None) -> tuple:
+    answer = codex.level_tags(needs(api, require_nodes), chapters)
+    return answer["tier"], answer["chapter"]
+
+
+TIERED = [
+    tier_chapter(1, "pawn", taught_level(["move"], "pawn.move()")),
+    tier_chapter(2, "knight", taught_level(["move", "turn_left"], "pawn.turn_left()")),
+    tier_chapter(3, "bishop", taught_level(["move", "wait"], "while True:\n    break")),
+]
+
+
+def test_an_ability_brought_in_by_a_later_chapter_raises_the_tier():
+    assert tags(TIERED, ["move"]) == ("pawn", 1)
+    assert tags(TIERED, ["move", "turn_left"]) == ("knight", 2)
+    assert tags(TIERED, ["turn_left", "wait"]) == ("bishop", 3)
+
+
+def test_a_required_construct_is_found_through_a_lessons_snippets():
+    assert tags(TIERED, ["move"], ["While"]) == ("bishop", 3)
+    # The words "While" in a title or in prose teach nothing, and nor does a snippet that isn't a runnable one.
+    prose = taught_level(["move"], "pawn.move()")
+    prose["data"]["title"] = "While"
+    prose["lesson"] += "A While loop repeats.\n```python\nwhile True:\n    break\n```\n"
+    assert tags([tier_chapter(1, "pawn", prose)], ["move"], ["While"]) == ("pawn", 1)
+    assert tags([tier_chapter(1, "pawn", prose), *TIERED[2:]], ["move"], ["While"]) == ("bishop", 3)
+
+
+def test_a_snippet_that_is_not_python_teaches_nothing_and_does_not_stop_the_search():
+    chapters = [
+        tier_chapter(1, "pawn", taught_level(["move"], "this is not Python", "pawn.move()")),
+        tier_chapter(2, "knight", taught_level(["move"], "for i in range(2):\n    pass")),
+    ]
+    assert tags(chapters, ["move"], ["For"]) == ("knight", 2)
+
+
+def test_the_piece_counts():
+    chapters = [
+        tier_chapter(1, "pawn", taught_level(["move"], piece="knight")),
+        tier_chapter(2, "knight", taught_level(["move"])),
+    ]
+    assert tags(chapters, []) == ("knight", 2)
+    assert tags(chapters, ["move"]) == ("knight", 2)
+
+
+def test_non_curriculum_chapters_never_count():
+    chapters = [
+        tier_chapter(0, "practice", taught_level(["move", "wait"], "while True:\n    break"), curriculum=False),
+        tier_chapter(1, "pawn", taught_level(["move"])),
+    ]
+    assert tags(chapters, ["move"]) == ("pawn", 1)
+    assert tags(chapters, ["wait"]) == ("pawn", 1)  # only the piece is taught by the curriculum
+    assert tags(chapters, ["move"], ["While"]) == ("pawn", 1)
+    assert tags(chapters[:1], ["move"]) == (None, None)
+
+
+def test_nothing_known_gives_no_tier():
+    assert tags([], ["move"]) == (None, None)
+    assert tags([tier_chapter(1, "pawn", taught_level(["move"], piece="knight"))], ["wait"], ["While"]) == (None, None)
+
+
+def test_something_taught_by_nobody_is_ignored_and_the_rest_decides():
+    assert tags(TIERED[:2], ["move", "wait"], ["Lambda"]) == ("pawn", 1)
+
+
+def test_the_latest_of_several_needs_wins():
+    assert tags(TIERED, ["turn_left"], ["While"]) == ("bishop", 3)
+    assert tags(TIERED, ["wait"], ["For"]) == ("bishop", 3)  # nobody teaches For: only the ability counts

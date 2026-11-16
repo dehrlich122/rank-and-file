@@ -6,6 +6,7 @@
 // no saved progress, or `{ reload: true }` for a reload that keeps it.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { sleep } from "./cdp.mjs";
 
 export const BUTTONS = ".playback-buttons button"; // back to start, step back, play, step forward, jump to end
 
@@ -48,6 +49,34 @@ export function levelHelpers(browser, base, root) {
 
     /** Show the level's Challenge tab. */
     challengeTab: () => buttonHelpers(browser).clickButton("Challenge", ".tabs"),
+  };
+}
+
+/** Hovering words in a CodeMirror editor, for the Codex tooltips. */
+export function hoverHelpers(browser) {
+  const hover = ({ x, y }) => browser.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+  return {
+    /** The centre of the first `word` in an editor's text (the editor's `.cm-content` selector), for hovering. */
+    wordAt: (word, editor = ".level-right .cm-content") =>
+      browser.evaluate(`(() => {
+        const walker = document.createTreeWalker(document.querySelector(${JSON.stringify(editor)}), NodeFilter.SHOW_TEXT);
+        for (let node; (node = walker.nextNode()); ) {
+          const i = node.textContent.indexOf(${JSON.stringify(word)});
+          if (i < 0) continue;
+          const range = document.createRange();
+          range.setStart(node, i + 1);
+          range.setEnd(node, i + 2);
+          const r = range.getBoundingClientRect();
+          return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        }
+        return null;
+      })()`),
+    hover,
+    /** Move the mouse off the editor and let a tooltip close. */
+    hoverAway: async () => {
+      await hover({ x: 5, y: 5 });
+      await sleep(400);
+    },
   };
 }
 

@@ -4,6 +4,7 @@ import "@fontsource/orbitron/900.css";
 import "./styles.css";
 import "./chrome.css";
 import "./editor.css";
+import "./free.css";
 import { startApp } from "./app";
 
 startApp(document.querySelector<HTMLElement>("#app")!);

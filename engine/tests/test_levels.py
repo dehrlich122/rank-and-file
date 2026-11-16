@@ -67,7 +67,25 @@ def test_level_ids_are_unique():
 
 def test_every_chapter_is_listed():
     chapters = {entry["chapter"] for entry in yaml.safe_load((ROOT / "levels" / "chapters.yaml").read_text("utf-8"))}
-    assert {load(path).chapter for path in LEVEL_FILES} <= chapters
+    assert {load(path).chapter for path in LEVEL_FILES if not load(path).challenge_set} <= chapters
+
+
+def listed_sets() -> list[dict]:
+    """levels/challenges.yaml: Free Play's challenge sets, in order (M4.4)."""
+    return yaml.safe_load((ROOT / "levels" / "challenges.yaml").read_text("utf-8")) or []
+
+
+def test_every_challenge_set_is_listed_with_its_own_folder():
+    sets = {entry["set"]: entry for entry in listed_sets()}
+    tiers = {entry["tier"] for entry in yaml.safe_load((ROOT / "levels" / "chapters.yaml").read_text("utf-8"))}
+    assert all(entry["tier"] in tiers and entry["title"] and entry["summary"] for entry in sets.values())
+    for path in LEVEL_FILES:
+        level = load(path)
+        if level.challenge_set:
+            assert level.challenge_set in sets, f"{path.stem}: its set isn't in challenges.yaml"
+            assert path.parent.name == level.challenge_set, f"{path.stem} belongs in the folder named after its set"
+            assert re.fullmatch(rf"{level.challenge_set}-\d\d", level.id), f"{path.stem}: a challenge's id is <set>-NN"
+            assert level.draws_on, f"{path.stem}: a challenge names the chapters it draws on"
 
 
 def test_level_file_is_valid(level_file):
@@ -142,6 +160,8 @@ def test_idiomatic_note_exists(level_file):
 
 def test_lesson_is_short_and_runnable(level_file):
     level = load(level_file)
+    if level.challenge_set:
+        return  # a challenge has no lesson (M4.4)
     text = (ROOT / "lessons" / level.lesson).read_text(encoding="utf-8")
 
     prose = FENCED.sub("", text)
@@ -164,23 +184,61 @@ def test_lesson_is_short_and_runnable(level_file):
 @functools.cache
 def chapters_in_play_order() -> list[dict]:
     """Every chapter's levels and lessons, as the UI sends them for a level's Codex:
-    chapters.yaml's order, then each chapter's levels by id (content.ts)."""
+    chapters.yaml's order, then each chapter's levels by id (content.ts). A tier's challenge sets come straight after
+    its last curriculum chapter (M4.4), as content.codexChapters() puts them."""
     data = {path: yaml.safe_load(path.read_text(encoding="utf-8")) for path in LEVEL_FILES}
-    return [
-        {
-            "curriculum": entry.get("curriculum", True),
-            "levels": [
-                {"id": path.stem, "data": data[path], "lesson": (ROOT / "lessons" / data[path]["lesson"]).read_text(encoding="utf-8")}
-                for path in LEVEL_FILES
-                if data[path]["chapter"] == entry["chapter"]
-            ],
-        }
-        for entry in yaml.safe_load((ROOT / "levels" / "chapters.yaml").read_text("utf-8"))
-    ]
+    listed = yaml.safe_load((ROOT / "levels" / "chapters.yaml").read_text("utf-8"))
+
+    def item(path: Path) -> dict:
+        lesson = data[path].get("lesson")
+        return {"id": path.stem, "data": data[path], "lesson": (ROOT / "lessons" / lesson).read_text(encoding="utf-8") if lesson else ""}
+
+    order = []
+    for i, entry in enumerate(listed):
+        curriculum = entry.get("curriculum", True)
+        levels = [item(path) for path in LEVEL_FILES if "set" not in data[path] and data[path]["chapter"] == entry["chapter"]]
+        order.append({"curriculum": curriculum, "chapter": entry["chapter"], "tier": entry["tier"], "levels": levels})
+        later = [other for other in listed[i + 1 :] if other.get("curriculum", True) and other["tier"] == entry["tier"]]
+        if curriculum and not later:
+            for challenge_set in (s for s in listed_sets() if s["tier"] == entry["tier"]):
+                levels = [item(path) for path in LEVEL_FILES if data[path].get("set") == challenge_set["set"]]
+                order.append({"curriculum": False, "chapter": 0, "tier": challenge_set["tier"], "levels": levels})
+    return order
+
+
+def test_a_level_is_tiered_by_the_latest_chapter_that_teaches_what_it_needs():
+    """On the real curriculum: a made-up level with a move and a required `while` is as late as the chapter that teaches while."""
+    made_up = {"id": "q", "title": "q", "map": "P . G", "api": ["move"], "constraints": {"require_nodes": ["While"]}}
+    answer = codex.level_tags(made_up, chapters_in_play_order())
+    assert answer["chapter"] == 5 and answer["tier"] == "pawn"
+    assert codex.level_tags({**made_up, "constraints": {}}, chapters_in_play_order())["chapter"] == 1
+
+
+def test_every_curriculum_level_is_tiered_by_its_own_chapter():
+    """The rule against the real curriculum: nothing a level needs comes from a later chapter than its own."""
+    for chapter in chapters_in_play_order():
+        if not chapter["curriculum"]:
+            continue
+        for item in chapter["levels"]:
+            answer = codex.level_tags(item["data"], chapters_in_play_order())
+            assert answer["tier"] == chapter["tier"], f"{item['id']}: tiered {answer['tier']} (chapter {answer['chapter']}), not by its own chapter {chapter['chapter']}"
+            assert answer["chapter"] <= chapter["chapter"], f"{item['id']}: needs something chapter {answer['chapter']} teaches, after its own"
+
+
+def test_every_challenge_is_tiered_as_its_set_says():
+    """A challenge's tier is worked out from what it needs, and must be its set's (levels/challenges.yaml)."""
+    tiers = {entry["set"]: entry["tier"] for entry in listed_sets()}
+    for path in LEVEL_FILES:
+        level = load(path)
+        if level.challenge_set:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            assert codex.level_tags(data, chapters_in_play_order())["tier"] == tiers[level.challenge_set], f"{level.id}: needs more than the {tiers[level.challenge_set]} tier teaches"
 
 
 def test_lesson_builtins_have_codex_entries(level_file):
     """Every built-in a lesson calls is documented, so the Codex can list it."""
+    if load(level_file).challenge_set:
+        return  # a challenge has no lesson (M4.4)
     lesson = (ROOT / "lessons" / load(level_file).lesson).read_text(encoding="utf-8")
     called = set().union(*map(codex.python_called, codex.lesson_snippets(lesson)))
     missing = called - set(codex.PYTHON)

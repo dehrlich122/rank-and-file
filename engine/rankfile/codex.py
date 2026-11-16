@@ -31,12 +31,14 @@ level checker uses the same rule.
 import ast
 import builtins
 import contextlib
+import functools
 import inspect
 import io
 import re
 import textwrap
 from dataclasses import asdict, dataclass, field
 
+from .exceptions import it_knows
 from .levels import parse_level
 from .pieces import PIECES, Piece
 
@@ -400,6 +402,50 @@ def history(level_id: str, chapters: list[dict]) -> list[dict]:
     return []
 
 
+def level_tags(data: dict, chapters: list[dict]) -> dict:
+    """A level's tier, worked out from what it needs (M4.4, docs/M4/M4.4.md decision 4): the latest curriculum chapter
+    that brings in one of its abilities, a construct its rules require, or its piece; that chapter's tier.
+
+    An ability or a piece is brought in by the first curriculum level that has it, a construct by the first whose
+    lesson snippets use it. What no curriculum chapter teaches is ignored.
+
+    `chapters` is every chapter in play order, as for `history`, each also with its "chapter" number and "tier".
+    Returns {"tier": str | None, "chapter": int | None}.
+    """
+    level = parse_level(data)
+    abilities, nodes, pieces = set(level.api), set(level.constraints.require_nodes), {level.piece}
+    latest: dict | None = None
+    for chapter in chapters:
+        if not chapter["curriculum"] or not (abilities or nodes or pieces):
+            continue
+        found = False
+        for item in chapter["levels"]:
+            seen = item["data"]
+            brought = abilities & set(seen.get("api", []))
+            abilities -= brought
+            found = found or bool(brought) or seen.get("piece", "pawn") in pieces
+            pieces.discard(seen.get("piece", "pawn"))
+            if nodes:
+                used = _nodes_used(item["lesson"]) & nodes
+                nodes -= used
+                found = found or bool(used)
+        if found:
+            latest = chapter  # later chapters come later in play order, so the last one found is the latest
+    return {"tier": latest["tier"], "chapter": latest["chapter"]} if latest else {"tier": None, "chapter": None}
+
+
+@functools.lru_cache(maxsize=256)  # a list asks about every level in it, and the lessons are the same each time
+def _nodes_used(lesson: str) -> frozenset[str]:
+    """The names of the syntax a lesson's snippets use ("For", "While"...). A snippet that isn't Python adds none."""
+    used: set[str] = set()
+    for code in lesson_snippets(lesson):
+        try:
+            used |= {type(node).__name__ for node in ast.walk(ast.parse(code))}
+        except SyntaxError:
+            continue
+    return frozenset(used)
+
+
 def entries(level_id: str, chapters: list[dict]) -> list[Entry]:
     """A level's Codex: its piece's abilities, then every built-in and text method taught so far.
 
@@ -521,7 +567,7 @@ def _overview(piece: Piece) -> str:
     known = [ability_entry(type(piece), ability) for ability in piece._unlocked]  # in the piece's own order
     if not known:
         return f"Help on {name}: your piece. It doesn't know anything yet."
-    lines = [f"Help on {name}: your piece. In this level it knows:", ""]
+    lines = [f"Help on {name}: your piece. {it_knows(piece._sandbox)}:", ""]
     for entry in known:
         lines += [f"    {entry.calls[0]}", *_fill(entry.paragraphs[0], 8), ""]
     lines.append(f"help({known[0].name}) tells you more about one of them.")

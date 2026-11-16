@@ -2,13 +2,14 @@
 // Solutions are read from solutions/ and typed into the editor; this file never
 // contains solution code, and nothing here prints it.
 import { sleep } from "./cdp.mjs";
-import { BUTTONS, levelHelpers } from "./helpers.mjs";
+import { BUTTONS, hoverHelpers, levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const LEVELS = ["ch01-l01", "ch01-l02", "ch01-l03", "ch01-l04", "ch01-l05"];
 
 export default async function appChecks({ browser: b, base, root, check }) {
   const { solution, withoutExpectLine, openLevel, setCode, editorText, clickButton, hasButton, challengeTab } = levelHelpers(b, base, root);
+  const { wordAt, hover, hoverAway } = hoverHelpers(b);
 
   const button = (index) => `document.querySelectorAll('${BUTTONS}')[${index}]`;
 
@@ -804,26 +805,6 @@ export default async function appChecks({ browser: b, base, root, check }) {
     return b.evaluate(`[...document.querySelectorAll('.codex-entry')].map((e) => ({
       name: e.dataset.codex, open: e.open, isNew: !!e.querySelector('.codex-new'),
       introduced: e.querySelector('.codex-body > p.muted')?.textContent ?? '' }))`);
-  };
-  /** The centre of the first `word` in an editor's text, for hovering. */
-  const wordAt = (word, editor = ".level-right .cm-content") =>
-    b.evaluate(`(() => {
-      const walker = document.createTreeWalker(document.querySelector(${JSON.stringify(editor)}), NodeFilter.SHOW_TEXT);
-      for (let node; (node = walker.nextNode()); ) {
-        const i = node.textContent.indexOf(${JSON.stringify(word)});
-        if (i < 0) continue;
-        const range = document.createRange();
-        range.setStart(node, i + 1);
-        range.setEnd(node, i + 2);
-        const r = range.getBoundingClientRect();
-        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-      }
-      return null;
-    })()`);
-  const hover = ({ x, y }) => b.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
-  const hoverAway = async () => {
-    await hover({ x: 5, y: 5 });
-    await sleep(400);
   };
 
   await check("Codex: the tab lists the level's abilities, then the built-ins taught so far, and marks what's new", async () => {

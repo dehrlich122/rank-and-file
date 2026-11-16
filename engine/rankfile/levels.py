@@ -8,6 +8,7 @@ checker instead of confusing a player.
 """
 
 import ast
+import re
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, replace
 
@@ -100,11 +101,14 @@ CLOCK_TICKS = {
 ALLOWED_KEYS = {
     "id", "chapter", "title", "trains", "brief", "piece", "map", "legend", "start",
     "objectives", "api", "constraints", "par", "hints", "lesson", "starter", "variants",
-    "enemies", "lesson_board", "mastery", "solution",
+    "enemies", "lesson_board", "mastery", "solution", "set", "difficulty", "draws_on",
 }  # fmt: skip
 # A level made in the editor (M4.2) has no chapter, lesson or "trains" line, so only these are required here;
 # the level checker (engine/tests/test_levels.py) still asks the repo's levels for all of them.
 REQUIRED_KEYS = {"id", "title", "map", "api"}
+# A challenge (M4.4) belongs to a set in Free Play, not to a chapter: its set id is lower-case words joined by dashes.
+SET_ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+DIFFICULTIES = 5  # pass, try, raise, assert, while True: (the UI's words; the file says 1 to 5)
 MAX_SIDE = 12  # squares along a board's edge (M4.2): the editor's limit, and a shared level's
 MAX_BOARDS = 6  # a level and its other maps (M4.3); the repo's most is 4
 # How long each free-text field may be, and how many hints and enemies a level may have (M4.3). They guard what
@@ -213,6 +217,10 @@ class Level:
     lesson_board: dict | None = None  # the board the lesson's snippets run on, as the level file gives it (QA-019)
     mastery: bool = False  # a chapter's optional mastery challenge (M3.2)
     solution: str = ""  # the author's solution, in a level made in the editor (M4.3); never in describe(), never run by the engine on its own
+    challenge_set: str = ""  # the Free Play set a challenge belongs to (M4.4; the file's `set`); "" for any other level
+    difficulty: int | None = None  # 1 to 5, set by the author (M4.4); required in a challenge, optional elsewhere
+    draws_on: list[int] = field(default_factory=list)  # the chapters a challenge mixes, for its "Draws on" chips (M4.4)
+    sandbox: bool = False  # the board of a lesson snippet or the Sandbox (sandbox_level), which has no level: only the piece's messages read it
 
     def cases(self) -> list[Case]:
         """Every situation a solution must handle: one per square a hidden goal
@@ -360,6 +368,10 @@ class Level:
             # reveals them one at a time, and only when asked.
             "hints": self.hints,
             "mastery": self.mastery,
+            # Free play (M4.4): a challenge's set, and the tags and chips the lists and the Challenge panel show.
+            "set": self.challenge_set,
+            "difficulty": self.difficulty,
+            "draws_on": self.draws_on,
             # With other maps (M3.2): every board, first to last, shown beside the one on show (QA-032).
             "boards": [case.level.describe() for case in self.cases()] if self.variants else [],
         }
@@ -410,6 +422,7 @@ def parse_level(data: dict) -> Level:
         mastery=data.get("mastery", False),
         solution=_parse_solution(data.get("solution")),
     )
+    level.challenge_set, level.difficulty, level.draws_on = _parse_free_play(data)
     if not isinstance(level.mastery, bool):
         raise LevelError("mastery is true or false", at={"field": "mastery"})
     if "lesson_board" in data:
@@ -549,6 +562,7 @@ def sandbox_level(api: list[str], piece: str = "pawn", lesson_board: dict | None
         objectives=Objectives(reach_goal=False),
         api=list(api),
         constraints=Constraints(),
+        sandbox=True,
     )
     if lesson_board is None:
         return level
@@ -606,6 +620,29 @@ def _parse_solution(value) -> str:
     if len(value) > LIMITS["solution"]:
         raise LevelError(f"a solution may be at most {LIMITS['solution']} characters")
     return value
+
+
+def _parse_free_play(data: dict) -> tuple[str, int | None, list[int]]:
+    """A challenge's set, and any level's difficulty and "Draws on" chapters (M4.4)."""
+    challenge_set = ""
+    if "set" in data:
+        challenge_set = data["set"]
+        if not isinstance(challenge_set, str) or not SET_ID.fullmatch(challenge_set):
+            raise LevelError("set must be a set id: lower-case letters and digits, words joined by dashes", at={"field": "set"})
+    difficulty = None
+    if "difficulty" in data:
+        difficulty = data["difficulty"]
+        if not isinstance(difficulty, int) or isinstance(difficulty, bool) or not 1 <= difficulty <= DIFFICULTIES:
+            raise LevelError(f"difficulty must be a whole number from 1 to {DIFFICULTIES}", at={"field": "difficulty"})
+    draws_on = data.get("draws_on", [])
+    if not isinstance(draws_on, list) or not all(isinstance(n, int) and not isinstance(n, bool) and n >= 1 for n in draws_on):
+        raise LevelError("draws_on must be a list of chapter numbers", at={"field": "draws_on"})
+    if challenge_set:
+        if difficulty is None:
+            raise LevelError(f"a challenge needs a difficulty from 1 to {DIFFICULTIES}", at={"field": "difficulty"})
+        if "chapter" in data or "lesson" in data:
+            raise LevelError("a challenge belongs to a set, not a chapter: it has no chapter or lesson", at={"field": "set"})
+    return challenge_set, difficulty, list(draws_on)
 
 
 def _text(data: dict, key: str) -> str:

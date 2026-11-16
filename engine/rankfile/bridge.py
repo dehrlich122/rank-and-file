@@ -10,6 +10,7 @@ import json
 
 from . import runner
 from .codex import entries as codex_entries
+from .codex import level_tags as codex_level_tags
 from .constraints import code_lines as count_code_lines
 from .levels import LevelError, parse_level, sandbox_level
 from .levels import editor_options as level_editor_options
@@ -82,6 +83,18 @@ def run_sandbox(code: str, api_json: str, board_json: str = "null") -> str:
 def codex(level_id: str, chapters_json: str) -> str:
     """A level's Codex entries (docs/Codex.md). `chapters`: every chapter's levels and lessons, in play order."""
     return json.dumps([entry.to_dict() for entry in codex_entries(level_id, json.loads(chapters_json))])
+
+
+def level_tags(level_json: str, chapters_json: str) -> str:
+    """A level's tier, worked out by the engine (M4.4): {"tier", "chapter", "refused"}. `chapters` as for `codex`.
+
+    A level the engine refuses has no tier, and `refused` says so (My levels marks its row, QA-046).
+    """
+    try:
+        tags = codex_level_tags(json.loads(level_json), json.loads(chapters_json))
+    except LevelError:
+        return json.dumps({"tier": None, "chapter": None, "refused": True})
+    return json.dumps({**tags, "refused": False})
 
 
 def repl_push(line: str, level_json: str) -> str:
