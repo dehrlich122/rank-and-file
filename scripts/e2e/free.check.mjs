@@ -336,12 +336,14 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     return "ran, moved, kept";
   });
 
-  await check("QA-061: the Sandbox's level screen has no Learn tab, tier tag, hints or solution offer; the Challenge tab says what it is; a failed run offers no hint, solution or compare", async () => {
+  await check("QA-061: the Sandbox's level screen has no Learn tab, tier tag, hints or solution offer; the Challenge tab says what it is and lists no Stars; a failed run offers no hint, solution or compare", async () => {
     await openSandbox();
     const tabs = await b.evaluate(`[...document.querySelectorAll('.level-left .tabs button')].filter((t) => t.getClientRects().length > 0).map((t) => t.textContent.trim())`);
     expect(!tabs.includes("Learn") && tabs.includes("Challenge"), `tabs: ${tabs}`);
     const panel = await text(".level-left .tab-scroll .tab-panel:not([hidden])");
     expect(panel.includes("A board of your own"), "the Challenge tab does not say what the Sandbox is");
+    const starList = await b.evaluate(`[...document.querySelectorAll('.level-left h3')].some((e) => e.textContent.trim() === 'Stars') || !!document.querySelector('.level-left .star-goals')`);
+    expect(!starList, "the Challenge tab has a Stars heading or list");
     const bare = () =>
       b.evaluate(`({
         tier: !!document.querySelector('.level-left .tier-tag'),
