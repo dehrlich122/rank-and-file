@@ -89,8 +89,20 @@ def rune_trail(*runes: str) -> dict:
     return {"map": "\n".join(rows) + "\n", "legend": legend}
 
 
+def written_hour(every: int, walk: int) -> dict:
+    """A corridor: the pawn, a rune on the square ahead, `walk` squares of floor, a timed gate that is
+    open for the first two ticks of every `every`, and the goal straight behind it. The rune says the gate's time."""
+    rows = ["G", "T", *["."] * walk, "R", "P"]
+    legend = {
+        "R": {"tile": "rune", "text": f"The gate opens once every {every} ticks."},
+        "T": {"tile": "timed_gate", "every": every, "open": 2},
+    }
+    return {"map": "\n".join(f"# {row} #" for row in rows) + "\n", "legend": legend}
+
+
 # -- the challenges --------------------------------------------------------------------------------
 # kind "toll": a road with pits to walk round and a guard who asks how far the walk was.
+# kind "hour": a timed gate whose time is written on a rune.
 # kind "trail": runes that each give the next legs of the route. `unseen` are boards the level doesn't
 # have, which its reference must solve too.
 # `hints` (hints 1 and 2) and `note` are ROT13, with {yvarf} for the line count; `hint3` is how hint 3
@@ -140,6 +152,26 @@ LEVELS: list[dict] = [
         ],
         "hint3": ["loops", 1],
         "note": "Gjb ybbcf funer gur jbex. Gur bhgre bar tbrf ba hagvy gur tbny, ubjrire znal eharf gurer ner; gur vaare bar gnxrf gur yrtf bs bar ehar va ghea. Phggvat rnpu yrt ng gur fcnpr tvirf vgf ahzore, jungrire vgf yratgu. {yvarf} yvarf.",
+    },
+    {
+        "id": "last-rank-03",
+        "title": "The Written Hour",
+        "difficulty": 3,
+        "draws_on": [2, 6],
+        "trains": "A number cut out of a rune's words, and arithmetic with the remainder to time a gate",
+        "brief": "The gate ahead opens for two ticks, then shuts on anything under it. A rune says how often, and every board's gate keeps its own time. The walk to it is a different length on every board too.",
+        "api": ["move", "squares_ahead", "wait", "read"],
+        "kind": "hour",
+        "par": 5,
+        "boards": [written_hour(7, 3), written_hour(12, 6), written_hour(4, 5), written_hour(5, 8)],
+        "unseen": [written_hour(3, 8), written_hour(11, 1), written_hour(6, 4), written_hour(10, 2)],
+        "wrong": ["typed", "plain", "digit"],
+        "hints": [
+            "Rirel tngr xrrcf vgf bja gvzr, naq bayl gur ehar fnlf jung vg vf. Gur jnyx gb gur tngr gnxrf gvpxf gbb, naq vg vf n qvssrerag yratgu ba rnpu obneq.",
+            "Ernq gur ehar, phg bhg gur ahzore naq ghea vg vagb n jubyr ahzore. Pbhag gur gvpxf lbhe cnja fcraqf sebz gur fgneg hagvy vg fgrcf haqre gur tngr: bar sbe rnpu fdhner. Gur tngr vf bcra jura gung pbhag vf n zhygvcyr bs gur ehar'f ahzore, fb jnvg sbe gur gvpxf gung ner zvffvat. Gur erznvaqre bcrengbe gryyf ubj sne vagb n plpyr n pbhag vf.",
+        ],
+        "hint3": ["key", "wait", "Wait for the missing ticks with a line like:"],
+        "note": "Gur ehar'f grkg vf phg ng gur fcnprf, naq bar cvrpr orpbzrf n ahzore. Gur erznvaqre fnlf ubj znal gvpxf vagb n plpyr gur jnyx jbhyq raq, naq gur plpyr yrff gung vf gur jnvg. Nfxvat ubj znal fdhnerf ner nurnq zrnfherf gur jnyx, fb gur fnzr yvarf svg rirel obneq. {yvarf} yvarf.",
     },
 ]
 
@@ -262,7 +294,51 @@ def write_trail(spec: dict, draft_level: Level):
     return reference, f"{len(works)} of {len(fillings)} fillings solve every board, and two boards the level doesn't have", wrong_code
 
 
-WRITERS = {"toll": write_toll, "trail": write_trail}
+# The written hour's fixed lines, in ROT13. {c} (once decoded) is a small number the engine settles, in
+# the wait and in the last walk. `plain` is the wait with no remainder, `digit` the reading that keeps one character.
+HOUR = {
+    "first": "cnja.zbir()",
+    "read": "plpyr = vag(cnja.ernq().fcyvg({frc})[{v}])",
+    "digit": "plpyr = vag(cnja.ernq().fcyvg({frc})[{v}][0])",
+    "measure": "nurnq = cnja.fdhnerf_nurnq()",
+    "wait": "cnja.jnvg({jnvg})",
+    "walk": "cnja.zbir(nurnq + {p})",
+    "waits": ["plpyr - (nurnq + {p}) % plpyr", "(plpyr - nurnq - {p}) % plpyr"],
+    "plain": "plpyr - nurnq - {p}",
+}
+
+
+def hour_code(index: int, wait: str, c: int, far: int, *, read: str = "read") -> str:
+    lines = [
+        said(HOUR["first"]),
+        said(HOUR[read]).format(sep='" "', i=index),
+        said(HOUR["measure"]),
+        said(HOUR["wait"]).format(wait=said(wait).format(c=c)),
+        said(HOUR["walk"]).format(c=far),
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def write_hour(spec: dict, draft_level: Level):
+    unseen = draft({**spec, "boards": spec["unseen"]})
+    fillings = [(index, wait, c, far) for index in (5, -2) for wait in HOUR["waits"] for c in range(5) for far in range(1, 4)]
+    works = [filling for filling in fillings if all(solves(level, hour_code(*filling)) for level in (draft_level, unseen))]
+    if not works:
+        return None
+    index, _wait, c, far = works[0]
+    reference = hour_code(*works[0])
+
+    def wrong_code(kind: str, level: Level) -> str:
+        if kind == "typed":
+            return route_code(level.cases()[0].level)
+        if kind == "plain":
+            return hour_code(index, HOUR["plain"], c, far)
+        return hour_code(*works[0], read="digit")
+
+    return reference, f"{len(works)} of {len(fillings)} fillings solve every board, and four boards the level doesn't have", wrong_code
+
+
+WRITERS = {"toll": write_toll, "trail": write_trail, "hour": write_hour}
 
 
 # -- the words no one reads ------------------------------------------------------------------------------

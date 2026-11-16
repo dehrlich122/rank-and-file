@@ -1,0 +1,1 @@
+The rune's text is cut at the spaces, and one piece becomes a number. The remainder says how many ticks into a cycle the walk would end, and the cycle less that is the wait. Asking how many squares are ahead measures the walk, so the same lines fit every board. 5 lines.
