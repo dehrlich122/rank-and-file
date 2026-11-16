@@ -220,7 +220,6 @@ class Level:
     challenge_set: str = ""  # the Free Play set a challenge belongs to (M4.4; the file's `set`); "" for any other level
     difficulty: int | None = None  # 1 to 5, set by the author (M4.4); required in a challenge, optional elsewhere
     draws_on: list[int] = field(default_factory=list)  # the chapters a challenge mixes, for its "Draws on" chips (M4.4)
-    sandbox: bool = False  # the board of a lesson snippet or the Sandbox (sandbox_level), which has no level: only the piece's messages read it
 
     def cases(self) -> list[Case]:
         """Every situation a solution must handle: one per square a hidden goal
@@ -562,7 +561,6 @@ def sandbox_level(api: list[str], piece: str = "pawn", lesson_board: dict | None
         objectives=Objectives(reach_goal=False),
         api=list(api),
         constraints=Constraints(),
-        sandbox=True,
     )
     if lesson_board is None:
         return level

@@ -19,21 +19,17 @@ class Piece:
     NAME = "piece"
     ABILITIES: tuple[str, ...] = ()
 
-    def __init__(self, world: World, unlocked: list[str], sandbox: bool = False):
+    def __init__(self, world: World, unlocked: list[str]):
         # Pieces refuse normal attribute assignment (see __setattr__), so the
-        # constructor stores its private fields the low-level way. `sandbox`
-        # is for messages only: the Sandbox and lesson snippets have no level.
+        # constructor stores its private fields the low-level way.
         object.__setattr__(self, "_world", world)
         object.__setattr__(self, "_unlocked", tuple(name for name in self.ABILITIES if name in unlocked))
-        object.__setattr__(self, "_sandbox", sandbox)
 
     def __getattribute__(self, name: str):
         # Called for every `piece.something` lookup, before the normal rules.
         cls = type(self)
         if name in cls.ABILITIES and name not in object.__getattribute__(self, "_unlocked"):
-            raise LockedAbilityError(
-                cls.NAME, name, list(object.__getattribute__(self, "_unlocked")), object.__getattribute__(self, "_sandbox")
-            )
+            raise LockedAbilityError(cls.NAME, name, list(object.__getattribute__(self, "_unlocked")))
         return object.__getattribute__(self, name)
 
     def __setattr__(self, name: str, value) -> None:

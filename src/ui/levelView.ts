@@ -420,7 +420,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     if (afterMs > 0) for (const { sound: name, after } of outcomeSounds(whole)) sound.play(name, afterMs / 1000 + after);
     const actions: HTMLElement[] = [];
     if (whole.status === "solved" && host.solvedActions) actions.push(...host.solvedActions(recordedCode ?? ""));
-    if (help) actions.push(...help.outcomeActions(whole, recordedCode ?? "", showHelp));
+    if (help && host.kind !== "sandbox") actions.push(...help.outcomeActions(whole, recordedCode ?? "", showHelp)); // the Sandbox has no hints or solution to offer
     if (whole.status === "solved") {
       const { href, label } = host.onward(source.id);
       actions.push(h("a", { class: "btn btn-primary btn-small", href }, label));

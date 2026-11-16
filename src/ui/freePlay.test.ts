@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { chapters, tierHasChallenges, type ChallengeSet, type LevelSource } from "../content";
-import { challengeGroups, drawsOnText, freePage, freeSectionName, hubCounts, type HubFacts } from "./freePlay";
+import { challengeGroups, drawsOnText, freeAddress, freePage, freeSectionName, hubCounts, type HubFacts } from "./freePlay";
 import type { ListState } from "./listControls";
 
 const level = (id: string, difficulty?: number, draws_on: number[] = []): LevelSource => ({ id, chapter: 0, title: id, trains: "", mastery: false, lesson: "", data: { draws_on }, set: "s", difficulty });
 const set = (tier: string, levels: LevelSource[], id = tier): ChallengeSet => ({ set: id, title: id, tier, summary: "", levels });
 const any: ListState = { tier: null, difficulty: null, sort: "order" };
-const facts = (over: Partial<HubFacts> = {}): HubFacts => ({ sets: [], solved: () => false, myLevels: 0, shared: 0, abilities: 1, skins: [{ unlocked: true }, { unlocked: false }], ...over });
+const facts = (over: Partial<HubFacts> = {}): HubFacts => ({ sets: [], solved: () => false, myLevels: 0, shared: 0, sandbox: { width: 8, height: 8 }, skins: [{ unlocked: true }, { unlocked: false }], ...over });
 
 describe("hubCounts", () => {
   it("says Coming soon while no set has a level, and counts solved over total once one does", () => {
@@ -16,8 +16,13 @@ describe("hubCounts", () => {
   });
 
   it("uses singular and plural forms", () => {
-    expect(hubCounts(facts({ myLevels: 1, shared: 1, abilities: 1 }))).toMatchObject({ levels: "1 level", shared: "1 level", sandbox: "1 ability" });
-    expect(hubCounts(facts({ myLevels: 0, shared: 3, abilities: 7 }))).toMatchObject({ levels: "0 levels", shared: "3 levels", sandbox: "7 abilities" });
+    expect(hubCounts(facts({ myLevels: 1, shared: 1 }))).toMatchObject({ levels: "1 level", shared: "1 level" });
+    expect(hubCounts(facts({ myLevels: 0, shared: 3 }))).toMatchObject({ levels: "0 levels", shared: "3 levels" });
+  });
+
+  it("gives the Sandbox's board as its size", () => {
+    expect(hubCounts(facts()).sandbox).toBe("8 × 8");
+    expect(hubCounts(facts({ sandbox: { width: 12, height: 5 } })).sandbox).toBe("12 × 5");
   });
 
   it("counts the unlocked skins", () => {
@@ -65,6 +70,23 @@ describe("drawsOnText", () => {
     expect(drawsOnText(level("a", 1, [first.chapter]))).toBe(`Draws on Chapter ${first.chapter} · ${first.title}`);
     expect(drawsOnText(level("a", 1))).toBe("");
     expect(drawsOnText(level("a", 1, [9999]))).toBe("");
+  });
+});
+
+describe("freeAddress", () => {
+  it("is the Sandbox's board editor for exactly that path", () => {
+    expect(freeAddress("sandbox/board")).toBe("#/free/sandbox/board");
+  });
+  it("is the page for a known page, whatever follows it", () => {
+    expect(freeAddress("sandbox")).toBe("#/free/sandbox");
+    expect(freeAddress("skins")).toBe("#/free/skins");
+    expect(freeAddress("sandbox/anything-else")).toBe("#/free/sandbox");
+    expect(freeAddress("sandbox/board/more")).toBe("#/free/sandbox");
+    expect(freeAddress("challenges/board")).toBe("#/free/challenges");
+    expect(freeAddress("skins/board")).toBe("#/free/skins");
+  });
+  it("is the hub for anything else, My levels included", () => {
+    for (const path of ["", "nonsense", "levels", "board", "sandboxes"]) expect(freeAddress(path)).toBe("#/free");
   });
 });
 
