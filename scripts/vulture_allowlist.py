@@ -43,3 +43,6 @@ tracer.Step.vars
 # Read by Python's traceback module when it names an exception.
 exceptions.GameError.__module__
 tracer.StepBudgetExceeded.__module__
+
+# Read by Python's error messages when they name the player's help().
+codex.player_namespace.help.__qualname__
