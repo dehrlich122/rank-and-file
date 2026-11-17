@@ -8,7 +8,7 @@ moment of a run by drawing that state. That's what makes step-back and rewind
 cheap.
 
 **Ticks** (M3.1). Obstacles keep time with a clock. The `action` clock ticks
-once for every square the piece moves, every turn and every wait: the piece
+once for every square the piece moves, every jump, turn and wait: the piece
 acts, then everything on that clock takes its turn, like chess.
 
 The `line` and `new_line` clocks tick as the player's code runs: the tracer
@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from .board import Direction, Pos, Tile, sign, square_name, step
-from .exceptions import BlockedError, BridgeError, CaptureError, GateLockedError, Lost
+from .exceptions import BlockedError, BridgeError, CaptureError, GameError, GateLockedError, Lost
 from .words import count
 
 if TYPE_CHECKING:
@@ -55,6 +55,9 @@ CHESS_LINES: dict[str, tuple[Pos, ...]] = {
     "rook": ((0, 1), (1, 0), (0, -1), (-1, 0)),
     "bishop": ((1, 1), (1, -1), (-1, 1), (-1, -1)),
 }
+
+# Where a knight's jump can go (M5.1): (dx, dy), squares right and up. Two one way, one the other.
+KNIGHT_JUMPS: tuple[Pos, ...] = ((1, 2), (2, 1), (2, -1), (1, -2), (-1, -2), (-2, -1), (-2, 1), (-1, 2))
 
 # What look() calls each tile that's always there; the others depend on the run (M3.4).
 LOOK_WORDS = {Tile.WALL: "wall", Tile.SIGN: "signpost", Tile.TIMED_GATE: "portcullis", Tile.RUNE: "rune"}
@@ -111,6 +114,7 @@ class World:
         self.clocked = {timer.clock for timer in self.board.timers.values()} | {enemy.clock for enemy in level.enemies}
         self.code_clocked = sorted(self.clocked & CODE_CLOCKS)  # clocks the code winds, whose counts the board shows (QA-021)
         self.chess = any(enemy.kind in CHESS_LINES for enemy in level.enemies)  # M3.4
+        self.jumps = level.piece == "knight"  # the piece jumps, so the state carries its landing squares (M5.1)
         self.lost: Lost | None = None
         self.listeners: list[Callable[[Event], None]] = []
 
@@ -142,6 +146,8 @@ class World:
             state["clock_ticks"] = {clock: self.ticks[clock] for clock in self.code_clocked}
         if self.chess:  # the squares enemy chess pieces attack, which change as pieces are taken (M3.4)
             state["attacked"] = [list(pos) for pos in sorted(self.attacked())]
+        if self.jumps:  # only on knight levels, so pawn recordings don't grow (M5.1)
+            state["landings"] = [] if self.lost else [list(pos) for pos in self.landings()]
         return state
 
     @_acts
@@ -155,6 +161,56 @@ class World:
             raise GateLockedError(self._gate_locked_message(target), at=target)
         self._arrive(target, "move")
 
+    @_acts
+    def jump(self, dx: int, dy: int) -> None:
+        """A knight's jump (M5.1): (dx, dy) is one of KNIGHT_JUMPS (the piece checked it).
+
+        It flies over anything: only the landing square matters, so a waypoint,
+        gem or plank counts only where it lands. Landing off the board, on a
+        wall, a signpost or a shut gate is a "bump" and a BlockedError; on a
+        guard's locked gate a GateLockedError; on an armoured enemy the
+        capture's own CaptureError. Any other enemy there is taken. A pit or an
+        attacked square loses the run, as for a step (`_arrive`). One jump is
+        one action, so one tick of the `action` clock.
+
+        It is ONE event, {"kind": "jump", "state": ..., "from": [x, y], "via":
+        [x, y], "took": i}: `from` is where it started; `via` the corner after
+        the LONG leg, which the board plays first; `took` (only when it took
+        one) the enemy's place in the level's list. The state after it faces
+        along the SHORT leg: jump(1, 2) from c2 goes via c4, lands on d4 and
+        faces east; jump(-2, 1) goes two left, then one up, and faces north.
+        """
+        start = self.pos
+        target = (start[0] + dx, start[1] + dy)
+        if refused := self._landing_error(target):
+            self._emit("bump", at=list(target))
+            raise refused
+        if abs(dx) == 2:  # the long leg runs along x, the short leg along y
+            via, self.facing = (target[0], start[1]), Direction.NORTH if dy > 0 else Direction.SOUTH
+        else:
+            via, self.facing = (start[0], target[1]), Direction.EAST if dx > 0 else Direction.WEST
+        details = {"from": list(start), "via": list(via)}
+        if foe := self._foe_at(target):
+            foe.captured = foe.gone = True
+            details["took"] = self.foes.index(foe)
+        self._arrive(target, "jump", **details)
+
+    def landings(self) -> list[Pos]:
+        """The squares a jump from here could land on without an error (M5.1), in order.
+
+        Not off the board, a wall, a signpost, a shut gate, a locked gate or an
+        armoured enemy. A pit, an attacked square and an enemy that can be
+        taken are landings: allowed, and the board's own marks say what
+        happens there. The state carries them as "landings" on knight levels
+        (none once the run is lost), so the board draws them without knowing
+        a knight's rules."""
+        here = self.pos
+        return sorted(
+            target
+            for target in ((here[0] + dx, here[1] + dy) for dx, dy in KNIGHT_JUMPS)
+            if self._landing_error(target) is None
+        )
+
     def at_goal(self) -> bool:
         return self.level.goal is not None and self.pos == self.level.goal
 
@@ -166,6 +222,14 @@ class World:
         target = step(self.pos, self.facing)
         if side is not None:
             target = step(target, self._across(side))
+        return self._what_is_on(target)
+
+    def look_at(self, dx: int, dy: int) -> str | None:
+        """A knight's look (M5.1): what's on the square jump(dx, dy) would land on, in look()'s words. No tick."""
+        return self._what_is_on((self.pos[0] + dx, self.pos[1] + dy))
+
+    def _what_is_on(self, target: Pos) -> str | None:
+        """look()'s word for `target`, or None if it's empty."""
         if not self.board.contains(target):
             return "edge"
         if foe := self._foe_at(target):
@@ -471,19 +535,34 @@ class World:
         for listener in self.listeners:
             listener(event)
 
-    def _bump_message(self, target) -> str:
+    def _landing_error(self, target: Pos) -> GameError | None:
+        """Why a jump can't land on `target`, as the error to raise (M5.1); None if it can."""
+        if self.board.blocked(target) or self._shut(target):
+            return BlockedError(self._bump_message(target, jumped=True), at=target)
+        if self._locked_gate(target):
+            return GateLockedError(self._gate_locked_message(target), at=target)
+        foe = self._foe_at(target)
+        if foe is not None and foe.enemy.armoured:
+            return CaptureError(self._capture_message(target, foe))
+        return None
+
+    def _bump_message(self, target, jumped: bool = False) -> str:
+        """Why the piece can't walk onto `target`, or land there from a jump (M5.1)."""
         piece = self.level.piece
         here = square_name(self.pos)
         if not self.board.contains(target):
+            if jumped:
+                return f"That jump would land off the edge of the board. Your {piece} is on {here}."
             return f"Your {piece} can't walk off the edge of the board. It's on {here}, facing {self.facing.value}."
+        hit = "can't land on" if jumped else "bumped into"
         if target in self.board.timers:
             timer = self.board.timers[target]
             return (
-                f"Your {piece} bumped into the gate on {square_name(target)}. It's shut right now: "
+                f"Your {piece} {hit} the gate on {square_name(target)}. It's shut right now: "
                 f"it's open for {count(timer.open, 'tick')} out of every {timer.every}."
             )
         what = "a signpost" if self.board.tile(target) is Tile.SIGN else "a wall"
-        return f"Your {piece} bumped into {what} on {square_name(target)}."
+        return f"Your {piece} {hit} {what} on {square_name(target)}."
 
 
 # How each kind of chaser picks its step (a level's `strategy`). Cleverer ones come later.
