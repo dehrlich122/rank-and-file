@@ -5,7 +5,9 @@ import { challengeSets, chapters } from "../content";
 import { progress, ProgressStore } from "../progress";
 import { sharedProgress } from "../share/shared";
 import type { SolutionSource } from "./compare";
-import { challengeHost, lessonHost, sharedHost, testPlayHost } from "./levelHost";
+import { ScratchStore } from "../editor/scratch";
+import { memoryStorage } from "../storage.fake";
+import { challengeHost, lessonHost, sandboxHost, sharedHost, testPlayHost } from "./levelHost";
 
 const curriculum = chapters.filter((chapter) => chapter.curriculum).flatMap((chapter) => chapter.levels);
 
@@ -19,6 +21,7 @@ describe("lessonHost", () => {
     expect(host.progress).toBe(progress);
     expect(host.solution).toBeUndefined(); // the reference solution, by id
     expect(host.learn).toBe(true);
+    expect(host.stars).toBe(true);
     expect(host.curriculum).toBe(true);
     expect(host.frame).toBeUndefined();
     expect(host.back).toBeUndefined();
@@ -46,6 +49,7 @@ describe("testPlayHost", () => {
     expect(host.progress).not.toBe(sharedProgress);
     expect(testPlay().progress).not.toBe(host.progress); // one per screen
     expect(host.learn).toBe(false);
+    expect(host.stars).toBe(true);
     expect(host.curriculum).toBe(false);
     expect(host.frame).toBeUndefined();
   });
@@ -82,6 +86,7 @@ describe("sharedHost", () => {
     expect(host.kind).toBe("shared");
     expect(host.progress).toBe(sharedProgress);
     expect(host.learn).toBe(false);
+    expect(host.stars).toBe(true);
     expect(host.curriculum).toBe(false);
     expect(host.frame).toBeTypeOf("function"); // the banner
     expect(host.back).toBeUndefined();
@@ -102,9 +107,37 @@ describe("sharedHost", () => {
   });
 });
 
+describe("sandboxHost", () => {
+  const sandbox = (storage = memoryStorage()) => sandboxHost(new ScratchStore(storage));
+
+  it("is the player's own board: no lesson, no solution, no crown, and a progress store that nothing else sees", () => {
+    const host = sandbox();
+    expect([host.kind, host.learn, host.curriculum, host.solution, host.tier]).toEqual(["sandbox", false, false, null, null]);
+    expect(host.stars).toBe(false); // no stars kept, so none are drawn
+    expect(host.progress).toBeInstanceOf(ProgressStore);
+    for (const other of [progress, sharedProgress]) expect(host.progress).not.toBe(other);
+    expect(host.frame).toBeUndefined();
+    expect(host.solvedActions).toBeUndefined(); // no Keep: it has no solution to keep
+  });
+
+  it("goes to the board editor, in the toolbar and on a solved card", () => {
+    const host = sandbox();
+    expect(host.back).toEqual({ href: "#/free/sandbox/board", label: "Change the board" });
+    expect(host.onward("sandbox")).toEqual({ href: "#/free/sandbox/board", label: "Change the board" });
+  });
+
+  it("keeps the code in the scratch store, so a new screen finds it", () => {
+    const storage = memoryStorage();
+    expect(sandbox(storage).codes!.get("sandbox")).toBeUndefined();
+    sandbox(storage).codes!.set("sandbox", "typed");
+    expect(sandbox(storage).codes!.get("sandbox")).toBe("typed");
+    expect(new ScratchStore(storage).code()).toBe("typed");
+  });
+});
+
 describe("where each kind gets its tier tag", () => {
-  it("lessons have none, challenges take their set's, the rest ask the engine", () => {
-    expect([lessonHost().tier, challengeHost().tier, testPlay().tier, sharedHost({ id: "shared-x" }).tier]).toEqual([null, "set", "engine", "engine"]);
+  it("lessons and the Sandbox have none, challenges take their set's, the rest ask the engine", () => {
+    expect([lessonHost().tier, challengeHost().tier, testPlay().tier, sharedHost({ id: "shared-x" }).tier, sandboxHost(new ScratchStore(null)).tier]).toEqual([null, "set", "engine", "engine", null]);
   });
 });
 
@@ -112,6 +145,7 @@ describe("challengeHost", () => {
   it("is a challenge: no lesson, no crown, the curriculum's progress and its references", () => {
     const host = challengeHost();
     expect([host.kind, host.learn, host.curriculum, host.progress === progress, host.solution]).toEqual(["challenge", false, false, true, undefined]);
+    expect(host.stars).toBe(true);
   });
 
   it("goes on to the next challenge in its set, then back to Free Play", () => {

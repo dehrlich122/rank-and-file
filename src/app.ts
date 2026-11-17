@@ -12,12 +12,17 @@
 //   #/shared/<id>      a shared level already kept in this browser ("Shared with me")
 //   #/free             Free Play's hub (M4.4)
 //   #/free/<section>   one of its pages: challenges, shared, sandbox, skins (My levels stays at #/editor)
+//   #/free/sandbox         the Sandbox: the level screen on a scratch level of the player's own (QA-061)
+//   #/free/sandbox/board   the level editor on that scratch level
 //   #/challenge/<id>   a challenge from a Free Play set (M4.4)
 //   #/harness          the raw Python harness from Milestone 0
 //   #/styleguide       the look at every size, in both themes (M3.7)
 import { challengeSetOf, chapterName, chapters, findLevel } from "./content";
 import { drafts } from "./editor/drafts";
+import { draftToLevelData } from "./editor/levelData";
+import { editorOptions } from "./editor/options";
 import { readSolution, setSolution } from "./editor/rules";
+import { scratch } from "./editor/scratch";
 import { testPlaySource } from "./editor/starts";
 import { mountHarness } from "./harness";
 import { unlockedPieces } from "./promotion";
@@ -32,10 +37,9 @@ import { icon } from "./ui/icons";
 import { mountEditor } from "./ui/editorScreen";
 import { mountEditorList } from "./ui/editorList";
 import { mountLessons } from "./ui/lessonsMenu";
-import { freePage, freeSectionName, mountFreePlay } from "./ui/freePlay";
-import { mountSandbox, resetSandbox } from "./ui/sandboxScreen";
+import { freeAddress, freePage, freeSectionName, mountFreePlay } from "./ui/freePlay";
 import { mountSkins } from "./ui/skinsScreen";
-import { challengeHost, sharedHost, testPlayHost } from "./ui/levelHost";
+import { challengeHost, sandboxHost, sharedHost, testPlayHost } from "./ui/levelHost";
 import { mountLevel, type LevelContext } from "./ui/levelView";
 import { mountPromotion } from "./ui/promotionScreen";
 import { ReplPanel } from "./ui/repl";
@@ -54,7 +58,6 @@ export function startApp(root: HTMLElement): void {
       progress.reset();
       sharedProgress.reset(); // shared levels' stars, hints and code; the levels themselves stay (M4.3)
       settings.set({ piece: "pawn" }); // the skins are locked again (QA-052)
-      resetSandbox(); // the Sandbox starts from its default code again (QA-057)
       context.knownCalls.clear();
       route(); // redraw the screen from the cleared progress
     },
@@ -147,29 +150,80 @@ export function startApp(root: HTMLElement): void {
     document.title = "This level can't be opened · Rank & File";
   }
 
+  /**
+   * A screen that needs an answer first (the engine's, or a link's checked): a note while `prepare` is under way, then `show`
+   * with what it found, which returns what to call to leave. If the player has gone elsewhere by then, `show` never runs
+   * (`prepare` is told whether that has happened, so it can stop keeping things).
+   */
+  function openLater<T>(note: string, prepare: (cancelled: () => boolean) => Promise<T>, show: (prepared: T) => () => void): () => void {
+    const saying = h("p", { class: "muted", role: "status" }, note);
+    main.replaceChildren(h("div", { class: "editor-missing" }, saying));
+    let cancelled = false;
+    let leave = () => {};
+    prepare(() => cancelled).then(
+      (prepared) => {
+        if (!cancelled) leave = show(prepared);
+      },
+      (error) => {
+        if (!cancelled) saying.textContent = `Python couldn't start: ${String(error)}`;
+      },
+    );
+    return () => {
+      cancelled = true;
+      leave();
+    };
+  }
+
   /** A link's code: decoded, checked by the engine, kept, and only then opened. A level that fails any of that never opens. */
   function openSharedCode(code: string): () => void {
     freeCrumbs(SHARED);
-    main.replaceChildren(h("div", { class: "editor-missing" }, h("p", { class: "muted", role: "status" }, "Opening the level…")));
     document.title = "Opening a level · Rank & File";
-    let cancelled = false; // the player went elsewhere while the code was being checked
-    let unmountLevel = () => {};
     const check = async (data: Record<string, unknown>) => {
       await client.ready();
       return client.call("loadLevel", { level: data });
     };
-    const keep = (data: Record<string, unknown>) => {
-      if (!cancelled) sharedLevels.keep(data);
-    };
-    void openShared(code, { check, keep }).then((opening) => {
-      if (cancelled) return;
-      if (opening.ok) unmountLevel = showShared(opening.data);
-      else showSharedProblem(opening.reason);
-    });
-    return () => {
-      cancelled = true;
-      unmountLevel();
-    };
+    return openLater(
+      "Opening the level…",
+      (cancelled) =>
+        openShared(code, {
+          check,
+          keep: (data) => {
+            if (!cancelled()) sharedLevels.keep(data);
+          },
+        }),
+      (opening) => {
+        if (opening.ok) return showShared(opening.data);
+        showSharedProblem(opening.reason);
+        return () => {};
+      },
+    );
+  }
+
+  /**
+   * The Sandbox (QA-061): the player's scratch level, on the level screen to write code (`board` false) or in the level editor
+   * to change it. A scratch level the engine refuses opens the editor instead, where Problems says what is wrong.
+   */
+  function openSandbox(board: boolean): () => void {
+    const name = freeSectionName("sandbox");
+    freeCrumbs(board ? { name, href: "#/free/sandbox" } : null, ...(board ? ["Board"] : [name]));
+    document.title = board ? `Board · ${name} · Free Play · Rank & File` : `${name} · Free Play · Rank & File`;
+    return openLater(
+      "Opening the Sandbox…",
+      async () => {
+        const options = await editorOptions(client);
+        const abilities = options.pieces.pawn ?? [];
+        const draft = scratch.load(abilities);
+        return { draft, abilities, accepted: board || (await client.call("loadLevel", { level: draftToLevelData(draft) })).ok };
+      },
+      ({ draft, abilities, accepted }) => {
+        if (!accepted) {
+          location.replace("#/free/sandbox/board");
+          return () => {};
+        }
+        if (board) return mountEditor(main, client, draft.id, () => {}, { first: draft, save: (next) => scratch.save(next), startOver: () => scratch.startOver(abilities) });
+        return mountLevel(main, context, testPlaySource(draft), sandboxHost(scratch));
+      },
+    );
   }
 
   function route(): void {
@@ -185,7 +239,7 @@ export function startApp(root: HTMLElement): void {
     const section = freeMatch?.[1] === undefined ? null : freePage(freeMatch[1]);
     if (freeMatch?.[1] !== undefined) {
       // an unknown page goes to the hub, and extra path after a page to that page (QA-056); Back still works
-      const canonical = section ? `#/free/${section}` : "#/free";
+      const canonical = freeAddress(freeMatch[1]);
       if (hash !== canonical) return void location.replace(canonical);
     }
     const playMatch = /^#\/play\/(.+)$/.exec(hash);
@@ -208,10 +262,12 @@ export function startApp(root: HTMLElement): void {
       freeCrumbs({ name: set?.title ?? "Challenges", href: "#/free/challenges" }, `${number}. ${challenge.title}`);
       unmount = mountLevel(main, context, challenge, challengeHost());
       document.title = `${challenge.title} · Free Play · Rank & File`;
+    } else if (section === "sandbox") {
+      unmount = openSandbox(hash === "#/free/sandbox/board");
     } else if (freeMatch) {
       const name = section && freeSectionName(section);
       freeCrumbs(null, ...(name ? [name] : []));
-      unmount = section === "sandbox" ? mountSandbox(main, client) : section === "skins" ? mountSkins(main) : mountFreePlay(main, section, client);
+      unmount = section === "skins" ? mountSkins(main) : mountFreePlay(main, section, client);
       focusHeading();
       document.title = `${name ? `${name} · ` : ""}Free Play · Rank & File`;
     } else if (playMatch) {

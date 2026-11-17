@@ -1,14 +1,15 @@
 // Free Play (M4.4, docs/M4/M4.4.md): the hub at #/free, a directory like Lessons, and its pages at #/free/<section>.
-// This file draws the hub, the Challenges page and (through sharedList.ts) Shared with me. The Sandbox and Skins have
-// screens of their own (app.ts routes them), and My levels stays at #/editor.
+// This file draws the hub, the Challenges page and (through sharedList.ts) Shared with me. The Sandbox is a level of the
+// player's own on the level screen and in the editor, Skins has a screen of its own (app.ts routes them), and My levels
+// stays at #/editor.
 import { challengeSets, chapterName, drawnChapters, type ChallengeSet, type LevelSource } from "../content";
 import { drafts } from "../editor/drafts";
+import { scratch } from "../editor/scratch";
 import { progress } from "../progress";
 import type { PyClient } from "../py/client";
 import { sharedLevels } from "../share/shared";
 import { h } from "./dom";
 import { applyList, listControls, starsText, type ListState } from "./listControls";
-import { sandboxAbilities } from "./sandboxScreen";
 import { mountSharedList } from "./sharedList";
 import { skinCards } from "./skinsScreen";
 import { difficultyTag, tierTag } from "./tags";
@@ -18,7 +19,7 @@ const FREE_SECTIONS = [
   { id: "challenges", href: "#/free/challenges", glyph: "♟", name: "Challenges", line: "Each tier's mastery set: puzzles that mix its chapters" },
   { id: "levels", href: "#/editor", glyph: "✎", name: "My levels", line: "Levels you made in the editor" },
   { id: "shared", href: "#/free/shared", glyph: "⇄", name: "Shared with me", line: "Levels others sent you, by link or code" },
-  { id: "sandbox", href: "#/free/sandbox", glyph: "▢", name: "Sandbox", line: "An open board with every ability you've met" },
+  { id: "sandbox", href: "#/free/sandbox", glyph: "▢", name: "Sandbox", line: "A board of your own to paint and code on" },
   { id: "skins", href: "#/free/skins", glyph: "◆", name: "Skins", line: "The looks your promotions unlocked" },
 ] as const;
 
@@ -33,6 +34,16 @@ export function freePage(path: string): FreePage | null {
   return section && section.id !== "levels" ? section.id : null;
 }
 
+/**
+ * The one address `#/free/<path>` can have: a page's own, the Sandbox's board editor (the only page with a part below it),
+ * or the hub for anything else. The app moves any other address here, so extra path after a page, or no page, never shows (QA-056).
+ */
+export function freeAddress(path: string): string {
+  if (path === "sandbox/board") return "#/free/sandbox/board";
+  const page = freePage(path);
+  return page ? `#/free/${page}` : "#/free";
+}
+
 /** A section's name, as its row, crumbs and title say it. */
 export const freeSectionName = (id: FreeSection): string => FREE_SECTIONS.find((s) => s.id === id)!.name;
 
@@ -44,7 +55,7 @@ export interface HubFacts {
   solved: (id: string) => boolean;
   myLevels: number;
   shared: number;
-  abilities: number;
+  sandbox: { width: number; height: number }; // the Sandbox's board
   skins: Array<{ unlocked: boolean }>;
 }
 
@@ -55,7 +66,7 @@ export function hubCounts(facts: HubFacts): Record<FreeSection, string> {
     challenges: ids.length ? `${ids.filter(facts.solved).length} of ${ids.length} solved` : "Coming soon",
     levels: countOf(facts.myLevels, "level", "levels"),
     shared: countOf(facts.shared, "level", "levels"),
-    sandbox: countOf(facts.abilities, "ability", "abilities"),
+    sandbox: `${facts.sandbox.width} × ${facts.sandbox.height}`,
     skins: `${facts.skins.filter((skin) => skin.unlocked).length} of ${facts.skins.length} unlocked`,
   };
 }
@@ -91,7 +102,7 @@ function hub(main: HTMLElement): void {
     solved: (id) => progress.solved(id),
     myLevels: drafts.list().length,
     shared: sharedLevels.list().length,
-    abilities: sandboxAbilities().length,
+    sandbox: scratch.load([]), // only its size is read: a board never kept is the starting 8 × 8 whatever the abilities
     skins: skinCards(),
   });
   const row = (s: (typeof FREE_SECTIONS)[number]) =>
@@ -161,7 +172,7 @@ function challengesPage(main: HTMLElement): void {
 
 /**
  * Mount the hub (`section` null) or one of its pages in `main`. Returns what to call to leave it. The Sandbox and Skins
- * pages have their own screens (app.ts); `client` asks the engine for the tiers of levels outside the curriculum.
+ * are opened by app.ts; `client` asks the engine for the tiers of levels outside the curriculum.
  */
 export function mountFreePlay(main: HTMLElement, section: "challenges" | "shared" | null, client: PyClient): () => void {
   if (section === "shared") return mountSharedList(main, client);

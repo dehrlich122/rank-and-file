@@ -20,6 +20,7 @@ export interface PropsContext {
   selection: Selection;
   tab: Tab;
   problem: Problem | null;
+  scratch: boolean; // the Sandbox's scratch level: no title, brief, trains, difficulty, Hints tab or solvability check
   checking: boolean; // the problem shown is for an older draft
   info: LevelInfo | null; // the engine's description of this very draft, when it accepts it: what the player will read
   solutionLines: number | null; // the engine's count of the kept solution's lines; null when none is kept or it hasn't answered
@@ -44,15 +45,16 @@ const TABS: Array<[Tab, string]> = [
 ];
 
 export function renderProps(ctx: PropsContext): HTMLElement {
+  const shown = TABS.filter(([id]) => !(ctx.scratch && id === "hints")); // the Sandbox's scratch level has no hints to write
   const tabs = h(
     "div",
     { class: "tabs", role: "tablist", "aria-label": "Properties" },
-    ...TABS.map(([id, label]) =>
+    ...shown.map(([id, label]) =>
       h("button", { class: `tab${ctx.tab === id ? " active" : ""}`, role: "tab", "aria-selected": String(ctx.tab === id), onClick: () => ctx.setTab(id) }, label),
     ),
   );
   const body = { level: levelFields, rules: rulesFields, hints: hintsFields, square: squareFields, enemy: enemyFields }[ctx.tab](ctx);
-  return h("div", { class: "props" }, tabs, h("div", { class: "props-scroll", role: "tabpanel" }, body, renderProblems(ctx), ctx.solve()));
+  return h("div", { class: "props" }, tabs, h("div", { class: "props-scroll", role: "tabpanel" }, body, renderProblems(ctx), ctx.scratch ? null : ctx.solve())); // no solvability check: nobody is asked to solve it
 }
 
 // -- the Level tab ----------------------------------------------------------------------------------------------
@@ -67,16 +69,21 @@ function levelFields(ctx: PropsContext): HTMLElement {
   return h(
     "div",
     { class: "props-body" },
-    // the title stops where the engine's limit does (QA-046); typing past it isn't possible, so no row of My levels is refused for it
-    field("Title", textInput(draft.title, (title) => ctx.change((d) => ({ ...d, title }), "title"), titleLimit ? { maxlength: String(titleLimit) } : {}), undefined, "title"),
-    field("Brief", textArea(draft.brief, 3, (brief) => ctx.change((d) => ({ ...d, brief }), "brief")), "What the player is asked to do.", "brief"),
-    field("What it trains", textInput(draft.trains, (trains) => ctx.change((d) => ({ ...d, trains }), "trains")), "A few words, shown above the challenge.", "trains"),
-    field(
-      "Difficulty",
-      select(DIFFICULTY_CHOICES[readDifficulty(draft) ?? 0]!, DIFFICULTY_CHOICES, (choice) => ctx.change((d) => setDifficulty(d, DIFFICULTY_CHOICES.indexOf(choice) || null))),
-      "How hard it is, for Free Play's lists. Shown as a tag; never on the board.",
-      "difficulty",
-    ),
+    // the Sandbox's scratch level is never named or listed, so it has none of these four
+    ...(ctx.scratch
+      ? []
+      : [
+          // the title stops where the engine's limit does (QA-046); typing past it isn't possible, so no row of My levels is refused for it
+          field("Title", textInput(draft.title, (title) => ctx.change((d) => ({ ...d, title }), "title"), titleLimit ? { maxlength: String(titleLimit) } : {}), undefined, "title"),
+          field("Brief", textArea(draft.brief, 3, (brief) => ctx.change((d) => ({ ...d, brief }), "brief")), "What the player is asked to do.", "brief"),
+          field("What it trains", textInput(draft.trains, (trains) => ctx.change((d) => ({ ...d, trains }), "trains")), "A few words, shown above the challenge.", "trains"),
+          field(
+            "Difficulty",
+            select(DIFFICULTY_CHOICES[readDifficulty(draft) ?? 0]!, DIFFICULTY_CHOICES, (choice) => ctx.change((d) => setDifficulty(d, DIFFICULTY_CHOICES.indexOf(choice) || null))),
+            "How hard it is, for Free Play's lists. Shown as a tag; never on the board.",
+            "difficulty",
+          ),
+        ]),
     h(
       "fieldset",
       { class: "field", "data-field": "api" },

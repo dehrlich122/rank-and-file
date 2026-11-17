@@ -147,8 +147,8 @@ def test_help_on_the_piece_lists_what_it_knows_here():
     assert listed == ["pawn.move(squares=1)", "pawn.turn_left()", "pawn.wait(ticks=1)"]  # the pawn's own order
 
 
-def test_help_on_the_piece_says_here_in_the_sandbox_and_in_this_level_in_a_level(corridor):
-    assert "your piece. Here it knows:" in run_sandbox("help(pawn)", ["move"]).output
+def test_help_on_the_piece_says_in_this_level_in_a_snippet_and_in_a_level(corridor):
+    assert "your piece. In this level it knows:" in run_sandbox("help(pawn)", ["move"]).output
     assert "your piece. In this level it knows:" in run_level(corridor, "help(pawn)").output
 
 

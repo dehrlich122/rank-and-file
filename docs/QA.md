@@ -1815,6 +1815,8 @@ Part 2 (Sandbox, Skins, the pointers, Save to the repo, unknown routes). The con
     address is corrected and Back still works.
 - **QA-057 · Reset progress says it clears "the code you wrote" but keeps the Sandbox's** *(automated)* · Fixed
   - **Fixed:** Reset progress clears the Sandbox's code too; it shows its starting code again.
+  - **Undone by QA-061** *(2026-11-16)*: the Sandbox now holds a board the player made, so Reset progress leaves
+    it alone, as it leaves My levels, and the confirm step says so. The Sandbox has its own Start over.
 - **QA-058 · The Sandbox's layout** *(automated)* · Fixed
   - **Observed:** at 1440 × 900 the board sits to the right under the editor and runs past the fold (its first rank and
     file letters cut); at 1000 × 800 the pawn's start row is below the fold; the line of abilities has no label and big
@@ -1833,7 +1835,7 @@ Part 2 (Sandbox, Skins, the pointers, Save to the repo, unknown routes). The con
     and the link are in view at 1440 × 900 and 1000 × 800. Taller windows are unchanged.
   - **Retest:** replay the promotion from Lessons in a normal laptop window: the Free Play link shows without scrolling,
     and the ceremony still looks right.
-- **QA-061 · The Sandbox is bare; the level editor is the better sandbox** *(Designer, 2026-11-15, hand test)* · Open, needs a decision
+- **QA-061 · The Sandbox is bare; the level editor is the better sandbox** *(Designer, 2026-11-15, hand test)* · Fixed, to retest
   - **Observed:** "kind of janky… very bare bones, only gives access to some of the features. The level editor
     currently works more effectively as a sandbox." (It is an empty 8 × 8 board, a code box and Run, with only the
     abilities of lesson levels already solved: decision 7 in `docs/M4/M4.4.md`, made without the designer.)
@@ -1841,6 +1843,29 @@ Part 2 (Sandbox, Skins, the pointers, Save to the repo, unknown routes). The con
     level in the editor's test-play: paint what you like, write code against it, nothing to name or save. It replaces
     the separate Sandbox screen. To be built in a later QA package, not in this pass; until then the Sandbox stays as
     polished by QA-054 and QA-058.
+  - **Spec** *(2026-11-16)*: `docs/M4/M4.4-QA-061.md`, on the branch `qa-061-sandbox-editor`.
+  - **Fixed** *(2026-11-16)*: the Sandbox row opens a board of the player's own on the real level screen, with every
+    ability on; "Change the board" opens the real editor on it. Nothing to name, save or publish. Four choices
+    were made without the designer and wait for a yes or no ("As built" and "For the designer" in the spec):
+    Reset progress leaves the Sandbox alone; errors say "In this level it knows" everywhere; the Sandbox shows no
+    stars; there is no "Keep as one of my levels".
+  - **Retest** (Free Play → Sandbox):
+    1. It opens straight on a board with a code box: an 8 × 8, the piece bottom-left, a goal top-right. No Learn
+       tab, no hints, no tier tag. The Challenge tab says what the Sandbox is and lists no stars.
+    2. Write code that uses a late ability (a turn, a loop): it runs. Reload: the code is still there.
+    3. Reach the goal: the card says so, shows no stars and no "Compare" button, and offers "Change the board".
+    4. "Change the board": the editor, without title, brief, difficulty, Hints tab, Par, Share, Export or
+       "← My levels". Paint a wall, press "Write code": the wall is on the level screen. My levels doesn't list it.
+    5. In the editor's Level tab untick an ability, go back and call it: the error says "In this level it knows…".
+    6. Erase the goal: Problems says so and "Write code" is off. Open Free Play → Sandbox again: it lands in the
+       editor. Put a goal back: the level screen opens again.
+    7. "Start over" asks first, says the code goes too, and gives back the empty 8 × 8 and the starting code.
+    8. Settings → Reset progress: the question says your own levels and the Sandbox stay, and they do.
+    9. The Free Play hub's Sandbox row reads "A board of your own to paint and code on" with the board's size.
+- **QA-062 · In the editor, Undo stays off for a moment after painting** *(automated, 2026-11-16)* · Open, no change made
+  - **Observed:** after painting a square, the toolbar's Undo (and the test-play button) stay greyed until the
+    engine has answered, up to about 1.5 s. A player who paints and presses Undo at once finds it off. Seen in the
+    Sandbox's editor; it is the editor's own behaviour, so My levels has it too. Ctrl+Z was not tried.
 - **For the designer (no change made):**
   - Facing north, the worn Charger on a board is a narrow spire that looks little like the horse head on its card
     (which faces east). M3.7's approved design; say if it should change.

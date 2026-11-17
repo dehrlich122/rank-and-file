@@ -69,7 +69,7 @@ export class HelpPanel {
    * before showing a solution.
    */
   outcomeActions(result: LevelResult, runCode: string, showHelp: (focus?: HelpFocus) => void): HTMLElement[] {
-    if (result.status === "solved") return [this.compareButton(() => runCode, showHelp)];
+    if (result.status === "solved") return this.solution ? [this.compareButton(this.solution, () => runCode, showHelp)] : [];
     const offers: HTMLElement[] = [];
     if (!this.allOpen) offers.push(h("button", { class: "btn btn-small", onClick: () => showHelp("hint") }, "Need a hint?"));
     if (this.solution && this.store.offersSolution(this.levelId)) offers.push(h("button", { class: "btn btn-small", onClick: () => showHelp("solution") }, "Show me a solution…"));
@@ -111,14 +111,14 @@ export class HelpPanel {
   }
 
   /** `reveal` opens the Challenge panel, where the question is asked (from the outcome card). */
-  private compareButton(code: () => string, reveal?: () => void): HTMLElement {
+  private compareButton(solution: SolutionSource, code: () => string, reveal?: () => void): HTMLElement {
     const compare = () => {
       if (!this.comparingCosts) return this.showComparison(code());
       this.comparing = code;
       this.render();
       reveal?.();
     };
-    return h("button", { class: "btn btn-small", onClick: compare }, `Compare with ${this.solution?.name}`);
+    return h("button", { class: "btn btn-small", onClick: compare }, `Compare with ${solution.name}`);
   }
 
   private showComparison(yourCode: string): void {
@@ -171,7 +171,7 @@ export class HelpPanel {
             "Not yet",
             (yes) => (yes ? this.showComparison(code()) : this.cancelComparing()),
           )
-        : this.compareButton(this.currentCode);
+        : this.compareButton(this.solution, this.currentCode);
       this.solutionSection.replaceChildren(h("h3", {}, "Solution"), h("p", { class: "muted small" }, why), action);
     } else if (this.store.offersSolution(this.levelId)) {
       const action = this.confirming

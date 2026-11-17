@@ -289,7 +289,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       else boardHost.replaceChildren(board.element);
       help = new HelpPanel(source.id, level.hints, () => getCode(editor), { store, solution: host.solution });
       const tagsSlot = h("div", { class: "level-tags" });
-      challengePanel.replaceChildren(...describeChallenge(level, tagsSlot, openCodexEntry, chipTooltip, () => codex), help.element);
+      challengePanel.replaceChildren(...describeChallenge(level, tagsSlot, openCodexEntry, chipTooltip, () => codex, host.stars), help.element);
       updateControls();
       // Scratch Python gets a stand-in for this level's piece, and its tooltips follow this level's Codex.
       context.repl.setLevel({ piece: level.piece, api: level.api, codex: () => codex });
@@ -437,7 +437,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         }
       }
     }
-    outcomeHost.replaceChildren(outcomeCard(whole, result, actions));
+    outcomeHost.replaceChildren(outcomeCard(whole, result, actions, host.stars));
   }
 
   // -- several cases (M2): a hidden goal's ? squares ----------------------------------------
@@ -572,7 +572,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   };
 }
 
-function describeChallenge(level: LevelInfo, tags: HTMLElement, openEntry: (name: string) => void, tooltip: ChipTooltip, codex: () => CodexLookup | null): HTMLElement[] {
+function describeChallenge(level: LevelInfo, tags: HTMLElement, openEntry: (name: string) => void, tooltip: ChipTooltip, codex: () => CodexLookup | null, showStars: boolean): HTMLElement[] {
   const parts: HTMLElement[] = [
     h("h2", { class: "challenge-title" }, level.title),
     ...(level.trains ? [h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), level.trains)] : []), // a level from the editor may not say
@@ -596,7 +596,7 @@ function describeChallenge(level: LevelInfo, tags: HTMLElement, openEntry: (name
   }
   if (level.obstacles.length) parts.push(h("h3", {}, "Obstacles"), list("obstacles", level.obstacles));
   if (level.rules.length) parts.push(h("h3", {}, "Rules"), list("rules", level.rules));
-  parts.push(h("h3", {}, "Stars"), list("star-goals", level.stars));
+  if (showStars) parts.push(h("h3", {}, "Stars"), list("star-goals", level.stars));
 
   // Each ability is a way into the Codex: hover for its entry, click to open it there.
   const chip = (name: string) => {

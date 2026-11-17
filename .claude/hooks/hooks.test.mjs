@@ -133,14 +133,14 @@ describe("context guard", () => {
     const path = subagentTranscript({ transcript_path: join(dir, "s1.jsonl"), session_id: "s1", agent_id: "a9" });
     assert.equal(path, join(dir, "s1", "subagents", "agent-a9.jsonl"));
   });
-  test("the orchestrator is warned once per 10k from 150k, and told to stop from 190k", () => {
+  test("the orchestrator is warned once per 10k from 250k, and told to stop from 290k", () => {
     const state = {};
-    assert.equal(onToolUse({}, 149_000, state), null);
+    assert.equal(onToolUse({}, 170_000, state), null); // past a worker's limit, well inside the orchestrator's
     assert.equal(onToolUse({}, LIMITS.handoff - 1, state), null);
-    assert.match(onToolUse({}, 150_000, state), /`handoff` skill/);
-    assert.equal(onToolUse({}, 159_000, state), null);
-    assert.match(onToolUse({}, 161_000, state), /Finish the unit/);
-    assert.match(onToolUse({}, 190_000, state), /Stop the current work now/);
+    assert.match(onToolUse({}, 250_000, state), /handoff at 250k, ceiling 300k.*`handoff` skill/);
+    assert.equal(onToolUse({}, 259_000, state), null);
+    assert.match(onToolUse({}, 261_000, state), /Finish the unit/);
+    assert.match(onToolUse({}, 290_000, state), /close to the 300k ceiling\. Stop the current work now/);
   });
   test("a worker is told to wrap up from 150k", () => {
     const state = {};
@@ -148,12 +148,12 @@ describe("context guard", () => {
     assert.match(onToolUse({ agent_id: "a1" }, 150_000, state), /Status: partial/);
     assert.match(onToolUse({ agent_id: "a1" }, 160_000, state), /starts no further worker/);
   });
-  test("stopping past 150k is blocked once until handoff.md is rewritten", () => {
+  test("stopping past 250k is blocked once until handoff.md is rewritten", () => {
     const state = { crossedAt: 1000 };
-    assert.match(onStop({}, 170_000, state, 500), /handoff\.md/);
-    assert.equal(onStop({}, 170_000, state, 2000), null);
-    assert.equal(onStop({ stop_hook_active: true }, 170_000, state, 500), null);
-    assert.equal(onStop({}, 140_000, {}, null), null);
+    assert.match(onStop({}, 270_000, state, 500), /handoff\.md/);
+    assert.equal(onStop({}, 270_000, state, 2000), null);
+    assert.equal(onStop({ stop_hook_active: true }, 270_000, state, 500), null);
+    assert.equal(onStop({}, 240_000, {}, null), null);
   });
   after(() => rmSync(dir, { recursive: true, force: true }));
 });

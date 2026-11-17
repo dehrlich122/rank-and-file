@@ -101,7 +101,7 @@ const HEADLINE: Record<LevelResult["status"], string> = {
  * run: its headline, colour and stars. `shown` is the recording being played:
  * the run itself, or one of its cases (M2), which supplies the details.
  */
-export function outcomeCard(run: LevelResult, shown: LevelResult, actions: HTMLElement[] = []): HTMLElement {
+export function outcomeCard(run: LevelResult, shown: LevelResult, actions: HTMLElement[] = [], showStars = true): HTMLElement {
   const result = shown;
   const body: HTMLElement[] = [];
   const note = [run.case_note, shown === run ? "" : shown.case_note].filter(Boolean).join(" ");
@@ -114,7 +114,7 @@ export function outcomeCard(run: LevelResult, shown: LevelResult, actions: HTMLE
     const summary = result.status === "solved" ? result.summary.replace(/^Solved! /, "") : result.summary;
     body.push(h("p", {}, summary));
   }
-  if (run.stars.length) body.push(starList(run.stars));
+  if (showStars && run.stars.length) body.push(starList(run.stars));
   if (result.truncated) {
     body.push(h("p", { class: "muted small" }, "This run was very long, so only its beginning was recorded for playback."));
   }

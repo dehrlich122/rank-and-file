@@ -105,8 +105,20 @@ function buildTools(options: EditorOptions): Tool[] {
 
 // -- the screen -----------------------------------------------------------------------------------------------------
 
-export function mountEditor(root: HTMLElement, client: PyClient, id: string, onTitle: (title: string) => void): () => void {
-  const first = drafts.load(id);
+/**
+ * The Sandbox's scratch level (QA-061) opened in the editor: `first` is the level, `save` keeps it (in place of My levels), and
+ * `startOver` gives the starting level back. Without what is about naming and publishing a level: no title, brief, difficulty,
+ * hints, solvability check, Export, Save to the repo, Share or way back to My levels, and the main button goes to the level screen.
+ */
+interface ScratchMode {
+  first: Draft;
+  save(draft: Draft): void;
+  startOver(): Draft;
+}
+
+export function mountEditor(root: HTMLElement, client: PyClient, id: string, onTitle: (title: string) => void, scratch?: ScratchMode): () => void {
+  const first = scratch ? scratch.first : drafts.load(id);
+  const persist = scratch ? scratch.save : (draft: Draft) => drafts.save(draft);
   if (!first) {
     root.replaceChildren(h("div", { class: "editor-missing" }, h("h1", {}, "No such level"), h("p", {}, "This level isn't saved in this browser."), h("a", { class: "btn", href: "#/editor" }, "← My levels")));
     return () => {};
@@ -147,15 +159,19 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   const undoButton = h("button", { class: "btn btn-small", onClick: () => undo() }, "Undo");
   const redoButton = h("button", { class: "btn btn-small", onClick: () => redo() }, "Redo");
   const clearButton = h("button", { class: "btn btn-small", onClick: () => askToClear() }, "Clear board");
-  const exportButton = h("button", { class: "btn btn-small", onClick: () => downloadLevel(whole()) }, "Export");
+  const startOverButton = scratch ? h("button", { class: "btn btn-small", onClick: () => askToStartOver() }, "Start over") : null;
+  // publishing: not for the Sandbox's scratch level
+  const exportButton = scratch ? null : h("button", { class: "btn btn-small", onClick: () => downloadLevel(whole()) }, "Export");
   // dev only (`vite dev` serves the endpoint; a build has neither the button nor the path)
-  const saveButton = import.meta.env.DEV ? h("button", { class: "btn btn-small", onClick: () => void saveToRepo(false) }, "Save to the repo") : null;
-  const shareButton = h(
-    "button",
-    { class: "btn btn-small", "aria-haspopup": "dialog", onClick: () => openShareDialog(client, whole, (lines) => commit(setPar(draft(), lines), `Par is ${lines} lines.`)) },
-    "Share…",
-  );
-  const testButton = h("button", { class: "btn btn-small btn-primary", onClick: () => (location.hash = `#/editor/${id}/play`) }, "Test-play");
+  const saveButton = import.meta.env.DEV && !scratch ? h("button", { class: "btn btn-small", onClick: () => void saveToRepo(false) }, "Save to the repo") : null;
+  const shareButton = scratch
+    ? null
+    : h(
+        "button",
+        { class: "btn btn-small", "aria-haspopup": "dialog", onClick: () => openShareDialog(client, whole, (lines) => commit(setPar(draft(), lines), `Par is ${lines} lines.`)) },
+        "Share…",
+      );
+  const testButton = h("button", { class: "btn btn-small btn-primary", onClick: () => (location.hash = scratch ? "#/free/sandbox" : `#/editor/${id}/play`) }, scratch ? "Write code" : "Test-play");
   const widthInput = h("input", { type: "number", min: "2", "aria-label": "Width in squares" });
   const heightInput = h("input", { type: "number", min: "2", "aria-label": "Height in squares" });
   widthInput.addEventListener("change", () => resizeTo(Number(widthInput.value), draft().height));
@@ -163,12 +179,13 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   const toolbar = h(
     "div",
     { class: "toolbar ed-toolbar" },
-    h("a", { class: "btn btn-small", href: "#/editor" }, "← My levels"),
+    scratch ? null : h("a", { class: "btn btn-small", href: "#/editor" }, "← My levels"),
     undoButton,
     redoButton,
     h("span", { class: "ed-sep" }),
     h("span", { class: "ed-size" }, "Size ", widthInput, " × ", heightInput),
     clearButton,
+    startOverButton,
     h("span", { class: "grow" }),
     h("span", { class: "muted small" }, "Saved in this browser"),
     exportButton,
@@ -285,7 +302,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   /** The draft is different now (a change, an undo or a redo): save it, ask the engine, redraw. */
   function changed(note?: string): void {
     revision++;
-    drafts.save(whole());
+    persist(whole());
     onTitle(whole().title);
     checker.ask(whole(), revision);
     if (note !== undefined) message = note;
@@ -365,6 +382,17 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
   }
 
   const askToClear = () => ask("Clear every tile, enemy and ? square? The start and the goal stay. You can undo it.", "Yes, clear the board", "Keep it", () => commit(clearBoard(draft()), "Cleared the board."));
+
+  /** The Sandbox's own reset: the starting board and the starting code (the kept ones go), from the first board. */
+  const askToStartOver = () =>
+    ask("Start over with an empty 8 × 8 board and the starting code? Your code goes too.", "Yes, start over", "Keep it", () => {
+      boardIndex = 0;
+      selection = null;
+      anchor = null;
+      history.set(scratch!.startOver());
+      changed("Started over.");
+      drawProps();
+    });
 
   function resizeTo(width: number, height: number): void {
     const max = options?.max_side ?? 12;
@@ -567,7 +595,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     // test-play opens the level the engine has accepted, so it waits for the engine's answer to this very draft
     const checked = verdict && verdict.revision === revision;
     testButton.disabled = !checked || !verdict?.level;
-    testButton.title = !verdict || !checked ? "Checking the level…" : verdict.problem ? `Fix the problem first: ${verdict.problem.message}` : "Play this level, with the real level screen";
+    testButton.title = !verdict || !checked ? "Checking the level…" : verdict.problem ? `Fix the problem first: ${verdict.problem.message}` : scratch ? "Write code against this board" : "Play this level, with the real level screen";
   }
 
   // -- the kept solution's length, which only the engine counts ----------------------------------------------------
@@ -595,6 +623,7 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     draft: draft(),
     solutionLines: solutionLines(),
     options: options!,
+    scratch: !!scratch,
     selection,
     tab,
     problem: verdict?.problem ?? null,
@@ -808,6 +837,6 @@ export function mountEditor(root: HTMLElement, client: PyClient, id: string, onT
     checker.stop();
     document.removeEventListener("keydown", onKey);
     board?.dispose();
-    if (revision > 0) drafts.save(whole()); // only a level that was changed counts as edited
+    if (revision > 0) persist(whole()); // only a level that was changed counts as edited
   };
 }

@@ -18,7 +18,7 @@ import re
 import traceback
 from dataclasses import dataclass
 
-from .exceptions import GameError, Lost, it_knows
+from .exceptions import IT_KNOWS, GameError, Lost
 from .pieces import Piece
 from .tracer import PLAYER_FILENAME, StepBudgetExceeded
 from .words import count
@@ -182,8 +182,7 @@ def _explain_attribute(exc: AttributeError) -> str:
             return f"The {piece} doesn't know `{name}`. Did you mean `{suggestion}`?"
         if suggestion:
             return f"The {piece} doesn't know `{name}`. Did you mean `{suggestion}`? (The {piece} hasn't learned that yet.)"
-        where = it_knows(object.__getattribute__(obj, "_sandbox"))
-        return f"The {piece} doesn't have an ability called `{name}`. {where}: {', '.join(unlocked)}."
+        return f"The {piece} doesn't have an ability called `{name}`. {IT_KNOWS}: {', '.join(unlocked)}."
     if obj is None and name:
         return f"The value here is None, which has no `{name}`. {_NONE_FROM_READ}"
     if name and obj is not None:
