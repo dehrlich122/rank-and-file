@@ -26,10 +26,10 @@ export function mountPromotion(main: HTMLElement, tier: string, progress: Progre
   const wear = h("button", { class: "btn btn-small" }, `Wear the ${promotion.to} skin`);
   const wearing = () => settings.get().piece === promotion.to;
   const paint = () => {
-    wear.textContent = wearing() ? `Wearing the ${promotion.to}: switch back to the ${promotion.from}` : `Wear the ${promotion.to} skin`;
+    wear.textContent = wearing() ? `Wearing the ${promotion.to}: switch back to Auto` : `Wear the ${promotion.to} skin`;
   };
   wear.addEventListener("click", () => {
-    settings.set({ piece: wearing() ? promotion.from : promotion.to });
+    settings.set({ piece: wearing() ? "auto" : promotion.to });
     paint();
   });
   paint();
