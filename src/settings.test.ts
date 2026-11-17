@@ -77,6 +77,37 @@ describe("SettingsStore", () => {
   });
 });
 
+describe("the piece setting's move to auto", () => {
+  const KEY = "rank-and-file:settings";
+  const piece = (storage: ReturnType<typeof memoryStorage>) => new SettingsStore(storage).get().piece;
+
+  it("is auto with nothing saved, and for an unknown saved value", () => {
+    expect(piece(memoryStorage())).toBe("auto");
+    expect(piece(memoryStorage({ [KEY]: '{"piece":"dragon"}' }))).toBe("auto");
+  });
+
+  it("moves an old saved pawn to auto once; a pawn chosen afterwards stays", () => {
+    const storage = memoryStorage({ [KEY]: '{"piece":"pawn"}' });
+    expect(piece(storage)).toBe("auto");
+    expect(piece(storage)).toBe("auto");
+    new SettingsStore(storage).set({ piece: "pawn" });
+    expect(piece(storage)).toBe("pawn");
+    expect(piece(storage)).toBe("pawn");
+  });
+
+  it("leaves a saved knight alone", () => {
+    const storage = memoryStorage({ [KEY]: '{"piece":"knight"}' });
+    expect(piece(storage)).toBe("knight");
+    expect(piece(storage)).toBe("knight");
+  });
+
+  it("keeps a pawn chosen right after a fresh start", () => {
+    const storage = memoryStorage();
+    new SettingsStore(storage).set({ piece: "pawn" });
+    expect(piece(storage)).toBe("pawn");
+  });
+});
+
 describe("motionReduced", () => {
   const os = (reduce: boolean) => vi.stubGlobal("matchMedia", () => ({ matches: reduce }));
 

@@ -41,7 +41,7 @@ export function skinCardElement(card: SkinCard, onWear: () => void): HTMLElement
 
 /** The pawn, then the skin each promotion earns. */
 export function skinCards(store: ProgressStore = progress): SkinCard[] {
-  const worn = wornPiece(store);
+  const worn = wornPiece(undefined, store);
   const cards: SkinCard[] = [{ piece: "pawn", name: SKIN_NAMES.pawn, unlocked: true, worn: worn === "pawn", how: "Yours from the start" }];
   for (const promotion of PROMOTIONS) {
     const unlocked = tierCleared(promotion.tier, store);
