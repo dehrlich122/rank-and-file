@@ -288,3 +288,13 @@ def test_other_maps_are_boards():
     assert result.case == 1
     assert result.case_note == "It worked for 1 of the 2 boards."
     assert result.cases[1]["case_note"] == "This run is the one on board 2."
+
+
+def test_bridge_sandbox_follows_the_piece():
+    knight = json.loads(bridge.run_sandbox("knight.jump(1, 2)", '["jump"]', "null", "knight"))
+    assert knight["status"] == "finished"
+    assert [e["kind"] for step in knight["steps"] for e in step["events"]].count("jump") == 1
+    assert json.loads(bridge.load_sandbox('["jump"]', "null", "knight"))["piece"] == "knight"
+    named = json.loads(bridge.run_sandbox("pawn.move()\nknight", '["move"]'))  # no piece given: a pawn
+    assert named["status"] != "finished" or named["error"] is not None
+    assert json.loads(bridge.load_sandbox('["move"]'))["piece"] == "pawn"
