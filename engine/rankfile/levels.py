@@ -159,15 +159,16 @@ class Enemy:
     strategy: str = "simple"  # a chaser: how it picks its step
     armoured: bool = False  # can't be captured
 
-    def describe(self) -> str:
-        """Its rule, in words, for the Challenge panel."""
+    def describe(self, piece: str = "pawn") -> str:
+        """Its rule, in words, for the Challenge panel, as the level's `piece` reads it."""
         start = square_name(self.start)
         ticks = CLOCK_TICKS[self.clock]
         if self.kind in CHESS_LINES:
             lines = "rank and file (straight across, and up and down)" if self.kind == "rook" else "diagonals"
+            onto = "Land on" if piece == "knight" else "Step onto"
             text = (
                 f"A {self.kind} stands on {start}. It attacks every square along its {lines}, up to the first wall, "
-                "closed gate or piece. Step onto one of those squares and it takes you: the run is lost."
+                f"closed gate or piece. {onto} one of those squares and it takes you: the run is lost."
             )
         elif self.kind == "chaser":
             text = (
@@ -252,15 +253,25 @@ class Level:
             else:
                 goals.append(f'Say "{phrase}" (print it).')
         waypoints = names(self.board.squares(Tile.WAYPOINT))
+        jumps = self.piece == "knight"  # a jump flies over what's between: only the square it lands on counts (M5.1)
         if len(waypoints) == 1:
-            goals.append(f"Cross the waypoint on {waypoints[0]} on the way. Passing over it is enough.")
+            goals.append(
+                f"Land on the waypoint on {waypoints[0]} on the way. A jump flies over it: it only counts where you land."
+                if jumps
+                else f"Cross the waypoint on {waypoints[0]} on the way. Passing over it is enough."
+            )
         elif waypoints:
-            goals.append(f"Cross all {len(waypoints)} waypoints on the way: {and_list(waypoints)}. Passing over them is enough.")
+            goals.append(
+                f"Land on all {len(waypoints)} waypoints on the way: {and_list(waypoints)}. A jump flies over them: they only count where you land."
+                if jumps
+                else f"Cross all {len(waypoints)} waypoints on the way: {and_list(waypoints)}. Passing over them is enough."
+            )
         gems = self.gems
+        over = "landing on" if jumps else "walking over"
         if self.objectives.collect == "all":
-            goals.append("Collect the gem by walking over it." if gems == 1 else f"Collect all {gems} gems by walking over them.")
+            goals.append(f"Collect the gem by {over} it." if gems == 1 else f"Collect all {gems} gems by {over} them.")
         elif self.objectives.collect:
-            goals.append(f"Collect at least {count(self.objectives.collect, 'gem')} of the {gems} by walking over them.")
+            goals.append(f"Collect at least {count(self.objectives.collect, 'gem')} of the {gems} by {over} them.")
         capture = self.captures_needed()
         if self.objectives.capture == "all":
             goals.append("Capture the enemy that can be taken." if capture == 1 else f"Capture all {capture} enemies that can be taken.")
@@ -301,17 +312,24 @@ class Level:
     def obstacles(self) -> list[str]:
         """The obstacles' rules, one sentence each (M3.1), for the Challenge panel."""
         obstacles = []
+        jumps = self.piece == "knight"  # it lands on squares, it doesn't step or walk (M5.1)
         pits = names(self.board.squares(Tile.PIT))
         if pits:
             where = f"A pit on {pits[0]}" if len(pits) == 1 else f"Pits on {and_list(pits)}"
-            obstacles.append(f"{where}: step in and the run is lost.")
+            into = ("land on it" if len(pits) == 1 else "land on one") if jumps else "step in"
+            obstacles.append(f"{where}: {into} and the run is lost.")
             if "bridge" in self.api:
                 obstacles.append("A plank laid over a pit (`bridge()`) makes it safe to cross. Walk over a plank to pick it up.")
             if any(enemy.kind == "chaser" for enemy in self.enemies):
                 obstacles.append("A chaser doesn't see pits: if its step lands on one, it falls in and is gone.")
         obstacles.extend(gate_rule(pos, timer) for pos, timer in sorted(self.board.timers.items()))
-        obstacles.extend(enemy.describe() for enemy in self.enemies)
-        if any(enemy.kind not in CHESS_LINES for enemy in self.enemies):
+        obstacles.extend(enemy.describe(self.piece) for enemy in self.enemies)
+        if jumps:  # landing on an enemy takes it (or is an error, if it's armoured): only its own move or attack catches a knight
+            if any(enemy.kind not in CHESS_LINES for enemy in self.enemies):
+                obstacles.append("If an enemy lands on your square, you're caught and the run is lost.")
+            elif self.enemies:
+                obstacles.append("If you land on a square an enemy attacks, you're caught and the run is lost.")
+        elif any(enemy.kind not in CHESS_LINES for enemy in self.enemies):
             obstacles.append("If an enemy lands on your square, or you walk into one, you're caught and the run is lost.")
         elif self.enemies:
             obstacles.append("If you walk into an enemy, you're caught and the run is lost.")
