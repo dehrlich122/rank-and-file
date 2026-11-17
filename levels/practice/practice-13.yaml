@@ -1,0 +1,48 @@
+id: practice-13
+chapter: 0
+title: "Look Before You Leap"
+trains: "Looking at a landing square first: knight.look(dx, dy)"
+brief: "One of your knight's first landing squares is deadly or blocked, and which one depends on the board. Look before you jump."
+piece: knight
+map: |
+  . . . . G .
+  . . . . . .
+  . . . . . .
+  . O . . . .
+  . . . . . .
+  P . . . . .
+  
+legend: {"O": "pit"}
+start: {"facing": "north"}
+api: ["jump", "look"]
+par: {"lines": 6}
+hints:
+- "The boards differ on the first jump. Your code can't know which board it is on until it looks."
+- "knight.look(dx, dy) names what is on a landing square without jumping. Look at one of the two squares your first jump could land on, and let an if choose the jump. One test has to be right on every board."
+- "One way to look before a jump:\nif knight.look(2, 1) == \"pit\":\n    knight.jump(1, 2)"
+lesson: practice/practice-13.md
+lesson_board:
+  map: |
+    . . . . .
+    # . . . .
+    . # . O .
+    . P . . .
+  legend: {"O": "pit"}
+  start: {"facing": "north"}
+variants:
+- map: |
+    . . . . G .
+    . . . . . .
+    . . . . . .
+    . . . . . .
+    . . O . . .
+    P . . . . .
+    
+- map: |
+    . . . . G .
+    . . . . . .
+    . . . . . .
+    . # . . . .
+    . . . . . .
+    P . . . . .
+    

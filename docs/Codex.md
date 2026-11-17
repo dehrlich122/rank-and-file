@@ -59,6 +59,10 @@ Example:
 
 - **The pawn's abilities** are documented where they're defined, in
   `engine/rankfile/pieces.py`. How to call one comes from its real signature.
+- **The knight's abilities** *(M5.1)* are documented the same way, on `Knight` in the same file: `jump(dx, dy)`
+  and `look(dx, dy)` in full, and `at_goal()`, `position`, `wait()` and `read()` as short entries of the
+  knight's own that say they work just like the pawn's (M5.1 decision 6). A level's Codex lists its own
+  piece's abilities, so a knight level shows `knight.jump`, never `pawn.move`.
 - **Python's built-ins** (`print`, `range`, and more as chapters teach them)
   are documented in `engine/rankfile/codex.py`, in the same style. Python's
   own help text for them is written for experienced programmers.
@@ -116,3 +120,12 @@ level's abilities.
   snippet or the level itself.
 - The UI sends the level's piece and abilities with every line typed, so the
   stand-in follows the level, and it survives a restart of Python.
+
+**`help()` speaks of the level's piece** *(M5.1)*. Each run, snippet and Scratch session gets its own `help`,
+and the namespace records which piece the level has (`errors.LEVEL_PIECE`), so the answer doesn't change
+when the player reuses the piece's name.
+- On a knight level `help()` introduces the knight, `help(knight)` lists what it knows, and
+  `help("knight.jump")` answers; `help("pawn.move")` there is unknown text, and the other way round.
+- The knight's first levels are three in the Testing ground (`practice-11` to `practice-13`, from
+  `scripts/gen_knight.py`): the jump, jumping over and landing on, and `knight.look(dx, dy)`. Their entries
+  are marked as brought in there until Chapter 7 exists.
