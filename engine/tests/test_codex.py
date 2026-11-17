@@ -5,9 +5,9 @@ import builtins
 import pytest
 
 from rankfile import codex
-from rankfile.pieces import PIECES, Pawn
+from rankfile.pieces import PIECES, Knight, Pawn
 from rankfile.repl import Repl
-from rankfile.runner import run_level, run_sandbox
+from rankfile.runner import run_level, run_sandbox, run_snippet
 
 FENCE = "```"
 
@@ -166,6 +166,91 @@ def test_help_on_a_plain_value_or_unknown_text_says_so_briefly():
 
 def test_help_with_nothing_explains_itself():
     assert "help(pawn.move)" in run_sandbox("help()", ["move"]).output
+
+
+PAWN_INTRO = """help(something) shows what it does and how to use it. For example:
+
+    help(print)
+    help(pawn.move)
+    help(pawn)          everything your pawn knows in this level
+
+The Codex tab lists everything you've learned so far."""
+
+KNIGHT_API = list(Knight.ABILITIES)
+
+
+def knight_says(code: str) -> str:
+    """What a knight level prints for `code` (a run on a knight's sandbox board)."""
+    result = run_sandbox(code, KNIGHT_API, "knight")
+    assert result.status == "finished", result.error
+    return result.output
+
+
+def test_help_on_a_pawn_level_with_nothing_is_the_pawns_intro_as_before():
+    assert run_sandbox("help()", ["move"]).output == PAWN_INTRO + "\n\n"
+    assert run_sandbox("help(help)", ["move"]).output == PAWN_INTRO + "\n\n"
+    assert run_sandbox('help("modules")', ["move"]).output == PAWN_INTRO + "\n\n"
+    assert codex.describe(codex._NOTHING) == PAWN_INTRO  # no piece known (a plain snippet): the pawn's words
+    assert run_snippet("help()").output == PAWN_INTRO + "\n\n"
+
+
+def test_help_on_a_knight_level_introduces_the_knight():
+    for code in ("help()", "help(help)", 'help("help")'):
+        output = knight_says(code)
+        assert output == (
+            "help(something) shows what it does and how to use it. For example:\n\n"
+            "    help(print)\n"
+            "    help(knight.jump)\n"
+            "    help(knight)        everything your knight knows in this level\n\n"
+            "The Codex tab lists everything you've learned so far.\n\n"
+        )
+        assert "pawn" not in output.lower()
+
+
+def test_help_on_the_knight_lists_its_abilities_and_never_says_pawn():
+    output = knight_says("help(knight)")
+    listed = [line.strip() for line in output.splitlines() if line.startswith("    knight.")]
+    assert listed == ["knight.jump(dx, dy)", "knight.look(dx, dy)", "knight.at_goal()", "knight.position", "knight.wait(ticks=1)", "knight.read()"]
+    assert "Help on knight: your piece. In this level it knows:" in output
+    assert "pawn" not in output.lower()
+
+
+def test_help_on_a_value_or_unknown_text_names_the_knight_on_a_knight_level():
+    output = knight_says('help(knight.position)\nhelp("nonsense")')
+    assert 'Try help(print), help(knight) for what your knight knows, or help("knight.position") for one of them.' in output
+    assert "There's no help on 'nonsense'. Try help(print), or help(knight) for what your knight knows." in output
+    assert "pawn" not in output.lower()
+    pawn = run_sandbox('help(pawn.position)\nhelp("nonsense")', ["move", "position"]).output
+    assert 'Try help(print), help(pawn) for what your pawn knows, or help("pawn.position") for one of them.' in pawn
+    assert "There's no help on 'nonsense'. Try help(print), or help(pawn) for what your pawn knows." in pawn
+
+
+def test_help_by_text_answers_only_for_the_levels_own_piece():
+    on_pawn_level = run_sandbox('help("knight.jump")\nhelp("pawn.move")', ["move"]).output
+    assert "Help on knight.jump" not in on_pawn_level
+    assert "There's no help on 'knight.jump'. Try help(print), or help(pawn) for what your pawn knows." in on_pawn_level
+    assert "Help on pawn.move:" in on_pawn_level
+    on_knight_level = knight_says('help("knight.jump")\nhelp("pawn.move")')
+    assert "Help on knight.jump:" in on_knight_level and "knight.jump(dx, dy)" in on_knight_level
+    assert "Help on pawn.move" not in on_knight_level
+    assert "There's no help on 'pawn.move'" in on_knight_level
+
+
+def test_help_on_the_knights_jump_shows_its_entry_by_name_or_by_method():
+    by_text, by_method = knight_says('help("knight.jump")'), knight_says("help(knight.jump)")
+    assert by_text == by_method
+    assert by_text.startswith("Help on knight.jump:")
+
+
+def test_the_scratch_stand_in_knows_its_levels_piece_for_help():
+    repl = Repl()
+    knight_api = list(Knight.ABILITIES)
+    assert "pawn" not in repl.push("help()", "knight", knight_api)["output"]
+    assert "Help on knight.jump:" in repl.push("help('knight.jump')", "knight", knight_api)["output"]
+    assert "Help on pawn.move" not in repl.push("help('pawn.move')", "knight", knight_api)["output"]
+    pawn_repl = Repl()
+    assert "Help on pawn.move:" in pawn_repl.push("help('pawn.move')", "pawn", ["move"])["output"]
+    assert "Help on knight.jump" not in pawn_repl.push("help('knight.jump')", "pawn", ["move"])["output"]
 
 
 def test_help_falls_back_to_pythons_own_for_everything_else():

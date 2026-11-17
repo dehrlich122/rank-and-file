@@ -19,7 +19,7 @@ import traceback
 from dataclasses import dataclass
 
 from .exceptions import IT_KNOWS, GameError, Lost
-from .pieces import Piece
+from .pieces import Pawn, Piece
 from .tracer import PLAYER_FILENAME, StepBudgetExceeded
 from .words import count
 
@@ -59,9 +59,9 @@ def friendly_message(exc: BaseException, namespace: dict) -> str:
     if isinstance(exc, NameError):
         return _explain_name(exc, namespace)
     if isinstance(exc, AttributeError):
-        return _explain_attribute(exc)
+        return _explain_attribute(exc, namespace)
     if isinstance(exc, TypeError):
-        return _explain_type(exc)
+        return _explain_type(exc, namespace)
     if isinstance(exc, IndexError):
         return _explain_index(exc)
     if isinstance(exc, ValueError):
@@ -155,14 +155,22 @@ COMMON_BUILTINS = [
 assert all(hasattr(builtins, name) for name in COMMON_BUILTINS)
 
 
+def piece_class(namespace: dict) -> type[Piece]:
+    """The kind of piece the player's names hold: the level's own, or the pawn where there isn't one (a plain snippet)."""
+    return next((type(value) for value in namespace.values() if isinstance(value, Piece)), Pawn)
+
+
 def _explain_name(exc: NameError, namespace: dict) -> str:
     name = exc.name or ""
     for piece_name, value in namespace.items():
-        if isinstance(value, Piece) and name in type(value).ABILITIES:
-            return (
-                f"`{name}` is one of the {piece_name}'s abilities, so it needs the {piece_name}'s name "
-                f"in front of it: {piece_name}.{name}()"
-            )
+        if isinstance(value, Piece):
+            if name in type(value).ABILITIES:
+                return (
+                    f"`{name}` is one of the {piece_name}'s abilities, so it needs the {piece_name}'s name "
+                    f"in front of it: {piece_name}.{name}()"
+                )
+            if name in type(value).CANT:  # another piece's ability, asked of this one: its kind answer (M5.1)
+                return type(value).CANT[name]
     candidates = [key for key in namespace if not key.startswith("__")] + COMMON_BUILTINS
     if suggestion := closest(name, candidates):
         return f"Python doesn't know the name `{name}`. Did you mean `{suggestion}`?"
@@ -172,7 +180,7 @@ def _explain_name(exc: NameError, namespace: dict) -> str:
     )
 
 
-def _explain_attribute(exc: AttributeError) -> str:
+def _explain_attribute(exc: AttributeError, namespace: dict) -> str:
     name, obj = exc.name, exc.obj
     if isinstance(obj, Piece):
         piece = type(obj).NAME
@@ -184,7 +192,7 @@ def _explain_attribute(exc: AttributeError) -> str:
             return f"The {piece} doesn't know `{name}`. Did you mean `{suggestion}`? (The {piece} hasn't learned that yet.)"
         return f"The {piece} doesn't have an ability called `{name}`. {IT_KNOWS}: {', '.join(unlocked)}."
     if obj is None and name:
-        return f"The value here is None, which has no `{name}`. {_NONE_FROM_READ}"
+        return f"The value here is None, which has no `{name}`. {_none_from_read(namespace)}"
     if name and obj is not None:
         type_name = type(obj).__name__
         options = [attr for attr in dir(obj) if not attr.startswith("_")]
@@ -194,8 +202,13 @@ def _explain_attribute(exc: AttributeError) -> str:
     return f"Python stopped with an AttributeError: {exc}"
 
 
-# What a None usually means in the game (M3.6): read() gives None off a rune.
-_NONE_FROM_READ = "If it came from `read()`, your pawn isn't standing on a rune: walk onto one first."
+# What a None usually means in the game (M3.6): read() gives None off a rune. A pawn walks onto one, a knight lands on one.
+_GET_ONTO_A_RUNE = {"pawn": "walk onto one", "knight": "land on one"}
+
+
+def _none_from_read(namespace: dict) -> str:
+    piece = piece_class(namespace).NAME
+    return f"If it came from `read()`, your {piece} isn't standing on a rune: {_GET_ONTO_A_RUNE.get(piece, 'get onto one')} first."
 
 
 # -- text: positions and numbers read from it (M3.6) ----------------------------
@@ -236,7 +249,7 @@ def _kind(type_name: str) -> str:
     return _KINDS.get(type_name, f"a {type_name}")
 
 
-def _explain_type(exc: TypeError) -> str:
+def _explain_type(exc: TypeError, namespace: dict) -> str:
     msg = str(exc)
     pattern = r"([\w.]+)\(\) takes (?:from (\d+) to )?(\d+) positional arguments? but (\d+) (?:were|was) given"
     if match := re.match(pattern, msg):
@@ -252,6 +265,11 @@ def _explain_type(exc: TypeError) -> str:
         return f"`{name}()` takes {takes} inside its parentheses, but got {given}."
     if match := re.match(r"([\w.]+)\(\) missing \d+ required positional arguments?: (.+)", msg):
         name = match.group(1).rsplit(".", 1)[-1]
+        if match.group(1) in ("Knight.jump", "Knight.look"):  # a jump's two numbers (M5.1)
+            return (
+                f"`{name}()` needs two numbers inside its parentheses: how many squares right, then how many up, "
+                f"like `knight.{name}(1, 2)`."
+            )
         return f"`{name}()` needs more inside its parentheses: a value for {match.group(2).replace(chr(39), '`')}."
     if match := re.match(r"'(\w+)' object is not callable", msg):
         return (
@@ -270,7 +288,7 @@ def _explain_type(exc: TypeError) -> str:
             "Make a new text instead, with a method like replace() or by joining pieces together."
         )
     if msg in ("'NoneType' object is not subscriptable", "object of type 'NoneType' has no len()"):
-        return f"There's no text here: the value is None. {_NONE_FROM_READ}"
+        return f"There's no text here: the value is None. {_none_from_read(namespace)}"
     if match := re.match(r"'(\w+)' object is not iterable", msg):
         return (
             f"Python can't go through {_kind(match.group(1))} one item at a time, "
