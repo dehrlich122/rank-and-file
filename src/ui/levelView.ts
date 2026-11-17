@@ -70,6 +70,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     client,
     api: (source.data.api as string[] | undefined) ?? [],
     board: source.data.lesson_board,
+    piece: source.data.piece as string | undefined,
     codex: () => codex,
   });
   learnPanel.append(h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), source.trains), lesson.element);

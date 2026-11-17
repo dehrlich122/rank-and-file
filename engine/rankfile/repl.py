@@ -43,6 +43,7 @@ class Repl:
         self.namespace = codex.player_namespace()
         self.pending: list[str] = []
         self.stand_in: tuple[str, tuple[str, ...]] | None = None  # the stand-in piece: its name and abilities
+        self.stand_in_object: object | None = None  # the stand-in itself, to tell it from a value the player put under its name
 
     def push(self, line: str, piece: str | None = None, api: list[str] | None = None) -> dict:
         """Add one line. Returns {"more": bool, "output": str, "error": ErrorInfo-dict | None}.
@@ -72,5 +73,10 @@ class Repl:
         """Give the session a stand-in for the level's piece, unless it already has this one."""
         if piece is None or (piece, tuple(api)) == self.stand_in:
             return
+        if self.stand_in is not None and self.stand_in[0] != piece:
+            old = self.stand_in[0]  # the level changed piece: the old stand-in goes, unless the player has put their own under that name
+            if self.namespace.get(old) is self.stand_in_object:
+                del self.namespace[old]
         self.stand_in = (piece, tuple(api))
-        self.namespace[piece] = PIECES[piece](NoBoard(piece), api)
+        self.stand_in_object = PIECES[piece](NoBoard(piece), api)
+        self.namespace[piece] = self.stand_in_object

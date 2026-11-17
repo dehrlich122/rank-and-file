@@ -32,6 +32,7 @@ export interface LessonContext {
   client: PyClient;
   api: string[]; // the level's abilities; snippets can use exactly these
   board?: unknown; // the level's lesson_board, as its file gives it; snippets run on a small open board without one (QA-019)
+  piece?: string; // the level's piece, which the snippets run; left out: the pawn
   codex: () => CodexLookup | null; // for hover tooltips, once the level's Codex has loaded
 }
 
@@ -58,12 +59,12 @@ export function splitIntoSteps(tokens: Token[]): Token[][] {
 }
 
 /** The board the snippets run on, asked for once and shared; a failed try is forgotten, so the next Run asks again. */
-function sandboxLoader(context: LessonContext): () => Promise<LevelInfo> {
+export function sandboxLoader(context: LessonContext): () => Promise<LevelInfo> {
   let sandbox: Promise<LevelInfo> | null = null;
   const ask = () =>
     context.client
       .ready()
-      .then(() => context.client.call("loadSandbox", { api: context.api, board: context.board }))
+      .then(() => context.client.call("loadSandbox", { api: context.api, board: context.board, piece: context.piece }))
       .catch((error: unknown) => {
         sandbox = null;
         throw error;
@@ -179,7 +180,7 @@ class Snippet {
     try {
       const level = await this.loadSandbox();
       const board = this.showBoard(level);
-      const result = await this.context.client.call("runSandbox", { code: getCode(this.editor), api: this.context.api, board: this.context.board });
+      const result = await this.context.client.call("runSandbox", { code: getCode(this.editor), api: this.context.api, board: this.context.board, piece: this.context.piece });
       this.play(result, board);
     } catch (error) {
       this.status.textContent =
