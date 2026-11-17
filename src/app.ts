@@ -57,7 +57,7 @@ export function startApp(root: HTMLElement): void {
     () => {
       progress.reset();
       sharedProgress.reset(); // shared levels' stars, hints and code; the levels themselves stay (M4.3)
-      settings.set({ piece: "pawn" }); // the skins are locked again (QA-052)
+      settings.set({ piece: "auto" }); // a worn skin is locked again (QA-052); Auto is the default
       context.knownCalls.clear();
       route(); // redraw the screen from the cleared progress
     },

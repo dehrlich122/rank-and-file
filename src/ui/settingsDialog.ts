@@ -32,8 +32,9 @@ const GROUPS: Array<{ key: keyof Settings; title: string; hint?: string; choices
   {
     key: "piece",
     title: "Piece",
-    hint: "How your piece looks, on every level. A skin unlocks when you earn its promotion: the knight, by clearing Chapter 6.",
+    hint: "How your piece looks. Auto: each level uses the piece it was made for. Or pick a skin, once you have earned its promotion, to wear it on every level.",
     choices: [
+      { value: "auto", label: "Auto" },
       { value: "pawn", label: "Pawn" },
       { value: "knight", label: `Knight · ${SKIN_NAMES.knight}` },
     ],
@@ -178,11 +179,11 @@ export class SettingsDialog {
     return () => this.openListeners.delete(listener);
   }
 
-  /** A piece whose promotion isn't earned yet is greyed out, and says what unlocks it. */
+  /** A skin whose promotion isn't earned yet is greyed out, and says what unlocks it. Auto is never locked. */
   private lockPieces(): void {
     const open = this.unlocked();
     for (const input of this.inputs.filter((i) => i.dataset.key === "piece")) {
-      const locked = !open.includes(input.value as Piece);
+      const locked = input.value !== "auto" && !open.includes(input.value as Piece);
       input.disabled = locked;
       const label = input.closest("label");
       label?.classList.toggle("locked", locked);
