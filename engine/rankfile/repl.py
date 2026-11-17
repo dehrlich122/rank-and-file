@@ -14,7 +14,7 @@ import codeop
 from dataclasses import asdict
 
 from . import codex
-from .errors import explain
+from .errors import LEVEL_PIECE, explain
 from .exceptions import NoBoardError
 from .pieces import PIECES
 from .runner import DEFAULT_LINE_BUDGET, execute
@@ -80,3 +80,4 @@ class Repl:
         self.stand_in = (piece, tuple(api))
         self.stand_in_object = PIECES[piece](NoBoard(piece), api)
         self.namespace[piece] = self.stand_in_object
+        self.namespace[LEVEL_PIECE] = PIECES[piece]  # help() follows the level, whatever the player does with the name

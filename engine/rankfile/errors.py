@@ -155,9 +155,12 @@ COMMON_BUILTINS = [
 assert all(hasattr(builtins, name) for name in COMMON_BUILTINS)
 
 
+LEVEL_PIECE = "__level_piece__"  # where a namespace records its level's piece class: a dunder, so it never shows among the player's variables
+
+
 def piece_class(namespace: dict) -> type[Piece]:
-    """The kind of piece the player's names hold: the level's own, or the pawn where there isn't one (a plain snippet)."""
-    return next((type(value) for value in namespace.values() if isinstance(value, Piece)), Pawn)
+    """The kind of piece the level has, as its namespace recorded it, or the pawn where it recorded none (a plain snippet)."""
+    return namespace.get(LEVEL_PIECE, Pawn)
 
 
 def _explain_name(exc: NameError, namespace: dict) -> str:
@@ -265,7 +268,9 @@ def _explain_type(exc: TypeError, namespace: dict) -> str:
         return f"`{name}()` takes {takes} inside its parentheses, but got {given}."
     if match := re.match(r"([\w.]+)\(\) missing \d+ required positional arguments?: (.+)", msg):
         name = match.group(1).rsplit(".", 1)[-1]
-        if match.group(1) in ("Knight.jump", "Knight.look"):  # a jump's two numbers (M5.1)
+        # a jump's two numbers (M5.1). Keyed on the name in Python's message, so a player's own class called Knight
+        # with a `jump` method gets this answer too; contrived enough to leave.
+        if match.group(1) in ("Knight.jump", "Knight.look"):
             return (
                 f"`{name}()` needs two numbers inside its parentheses: how many squares right, then how many up, "
                 f"like `knight.{name}(1, 2)`."

@@ -179,6 +179,15 @@ def knight_level(map_text: str, **overrides):
     return make_level(map_text, piece="knight", api=list(Knight.ABILITIES), **overrides)
 
 
+def test_an_unmet_waypoint_on_a_knight_level_says_land_not_cross():
+    one = knight_level(". W .\n. . G\nP . .\n", legend={"W": "waypoint"})
+    result = run_level(one, "knight.jump(2, 1)")
+    assert result.status == "incomplete"
+    assert "you didn't land on the waypoint on b3." in result.summary and "cross" not in result.summary
+    two = knight_level("W . .\n. . G\nP . W\n", legend={"W": "waypoint"})
+    assert "you didn't land on the waypoints on c1 and a3." in run_level(two, "knight.jump(2, 1)").summary
+
+
 def test_a_knight_levels_waypoints_must_be_landed_on():
     one = knight_level(". W G\n. . .\nP . .\n", legend={"W": "waypoint"})
     assert one.goals()[1] == "Land on the waypoint on b3 on the way. A jump flies over it: it only counts where you land."
@@ -255,7 +264,9 @@ def test_a_pawn_levels_obstacles_read_as_before():
         "A chaser doesn't see pits: if its step lands on one, it falls in and is gone.",
         "A rook stands on c3. It attacks every square along its rank and file (straight across, and up and down), "
         "up to the first wall, closed gate or piece. Step onto one of those squares and it takes you: the run is lost.",
-        level.enemies[1].describe(),
+        "A chaser starts on e2. It steps one square toward you for each square you move, each turn and each wait: along the rank or "
+        "the file, whichever gap is bigger (east or west when they're equal). If that way is blocked "
+        "it tries the other, and if both are blocked it waits.",
         "If an enemy lands on your square, or you walk into one, you're caught and the run is lost.",
     ]
 

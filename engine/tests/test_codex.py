@@ -1,6 +1,7 @@
 """The Codex (docs/Codex.md): its entries, a level's list, help(), and Scratch Python's stand-in piece."""
 
 import builtins
+import types
 
 import pytest
 
@@ -8,6 +9,7 @@ from rankfile import codex
 from rankfile.pieces import PIECES, Knight, Pawn
 from rankfile.repl import Repl
 from rankfile.runner import run_level, run_sandbox, run_snippet
+from rankfile.tracer import snapshot_vars
 
 FENCE = "```"
 
@@ -141,6 +143,31 @@ def test_help_is_a_builtin_not_one_of_the_players_variables():
     assert "x" in names and "help" not in names  # the Variables panel stays the player's own
 
 
+def test_help_shows_nothing_internal_when_printed_or_asked_for_its_doc():
+    for api, piece in ((["move"], "pawn"), (KNIGHT_API, "knight")):
+        output = run_sandbox("print(help)\nprint(help.__doc__)", api, piece).output
+        assert "help" in output and "Show what something does" in output
+        for internal in ("player_namespace", "<locals>", "level_help", "rankfile"):
+            assert internal not in output
+
+
+def test_help_with_one_thing_too_many_gets_the_friendly_answer_on_either_piece():
+    for api, piece in ((["move"], "pawn"), (KNIGHT_API, "knight")):
+        result = run_sandbox("help(print, len)", api, piece)
+        assert result.status == "error"
+        assert result.error.friendly == "`help()` takes at most 1 value inside its parentheses, but got 2."
+
+
+def test_the_piece_record_is_not_one_of_the_players_variables():
+    for api, piece in ((["move"], "pawn"), (KNIGHT_API, "knight")):
+        names = {var["name"] for step in run_sandbox("x = 1", api, piece).steps for var in step["vars"]}
+        assert "x" in names and not any(name.startswith("__") for name in names)
+    repl = Repl()
+    repl.push("x = 1", "knight", KNIGHT_API)
+    shown = {var["name"] for var in snapshot_vars(types.SimpleNamespace(f_locals=repl.namespace))}
+    assert "x" in shown and "knight" in shown and not any(name.startswith("__") for name in shown)
+
+
 def test_help_on_the_piece_lists_what_it_knows_here():
     output = run_sandbox("help(pawn)", ["move", "wait", "turn_left"]).output
     listed = [line.strip() for line in output.splitlines() if line.startswith("    pawn.")]
@@ -225,6 +252,12 @@ def test_help_on_a_value_or_unknown_text_names_the_knight_on_a_knight_level():
     assert "There's no help on 'nonsense'. Try help(print), or help(pawn) for what your pawn knows." in pawn
 
 
+def test_help_on_a_knight_level_still_speaks_of_the_knight_when_the_player_reuses_its_name():
+    for code in ("knight = 3\nhelp()", "del knight\nhelp()", "knight = None\nhelp()"):
+        output = knight_says(code)
+        assert "help(knight.jump)" in output and "pawn" not in output
+
+
 def test_help_by_text_answers_only_for_the_levels_own_piece():
     on_pawn_level = run_sandbox('help("knight.jump")\nhelp("pawn.move")', ["move"]).output
     assert "Help on knight.jump" not in on_pawn_level
@@ -251,6 +284,21 @@ def test_the_scratch_stand_in_knows_its_levels_piece_for_help():
     pawn_repl = Repl()
     assert "Help on pawn.move:" in pawn_repl.push("help('pawn.move')", "pawn", ["move"])["output"]
     assert "Help on knight.jump" not in pawn_repl.push("help('knight.jump')", "pawn", ["move"])["output"]
+
+
+def test_scratch_help_follows_the_level_not_the_players_variables():
+    repl = Repl()
+    pawn_api = ["move"]
+    assert "help(pawn.move)" in repl.push("help()", "pawn", pawn_api)["output"]
+    repl.push("me = pawn", "pawn", pawn_api)  # a variable holding the old stand-in
+    output = repl.push("help()", "knight", KNIGHT_API)["output"]
+    assert "help(knight.jump)" in output and "pawn" not in output
+    repl.push("knight = 3", "knight", KNIGHT_API)
+    assert "help(knight.jump)" in repl.push("help()", "knight", KNIGHT_API)["output"]
+
+
+def test_scratch_python_with_no_level_speaks_of_the_pawn():
+    assert "help(pawn.move)" in Repl().push("help()")["output"]
 
 
 def test_help_falls_back_to_pythons_own_for_everything_else():

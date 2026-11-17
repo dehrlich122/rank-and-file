@@ -193,6 +193,12 @@ def test_reading_off_a_rune_on_a_pawn_level_reads_as_before(rune_corridor):
     )
 
 
+def test_a_none_message_still_names_the_knight_after_the_player_reuses_its_name(knight_runes):
+    result = run_level(knight_runes, "knight = 3\nvalue = None\nprint(value.upper())")
+    assert "If it came from `read()`, your knight isn't standing on a rune: land on one first." in result.error.friendly
+    assert "pawn" not in result.error.friendly
+
+
 def test_a_pawn_level_does_not_know_the_knights_words(corridor):
     result = run_level(corridor, "jump(1, 2)")
     assert "Did you mean" not in result.error.friendly and "Knights" not in result.error.friendly

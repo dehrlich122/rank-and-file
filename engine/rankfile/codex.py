@@ -38,7 +38,7 @@ import re
 import textwrap
 from dataclasses import asdict, dataclass, field
 
-from .errors import piece_class
+from .errors import LEVEL_PIECE, piece_class
 from .exceptions import IT_KNOWS
 from .levels import parse_level
 from .pieces import PIECES, Pawn, Piece
@@ -492,36 +492,32 @@ The Codex tab lists everything you've learned so far."""
 _VALUES = (int, float, bool, tuple, list, dict, set, type(None))
 
 
-def help(thing=_NOTHING) -> None:
-    """Show what something does and how to use it, like Python's own help().
-
-    A stand-in for Python's `help` in player code: that one shows engine
-    internals (rankfile.pieces), and its interactive mode can't run here.
-    This copy doesn't know the level's piece, so it speaks of the pawn;
-    `player_namespace` gives each run one that does.
-    """
-    print(describe(thing), end="\n\n")  # a blank line after, as Python's own help() leaves
-
-
 def player_namespace(**names) -> dict:
     """A fresh namespace for player code (a run, a snippet, the REPL), with `names` in it (e.g. the piece).
 
     Its built-ins are Python's, with the Codex's help() in place of Python's:
     so `help` is a built-in there, as in real Python, and never shows up
     among the player's variables. Each namespace gets its own copy, so one
-    run's changes to them can't reach the next. Its help() looks in the
-    namespace for the level's piece each time it's asked (the REPL's
-    stand-in arrives after the namespace is made), and speaks of that piece.
+    run's changes to them can't reach the next. Its help() speaks of the
+    level's piece, which the namespace records under a dunder name (LEVEL_PIECE)
+    when it's given one; the REPL records its stand-in there later. A player
+    can't lose it by reassigning or deleting the piece's name.
     """
     namespace = {"__name__": "__main__", **names}
+    if piece := next((type(value) for value in names.values() if isinstance(value, Piece)), None):
+        namespace[LEVEL_PIECE] = piece
 
-    def level_help(thing=_NOTHING) -> None:
-        print(describe(thing, piece_class(namespace)), end="\n\n")
+    def help(thing=_NOTHING) -> None:
+        """Show what something does and how to use it, like Python's own help().
 
-    level_help.__name__ = "help"
-    level_help.__doc__ = help.__doc__
-    level_help._codex_help = True
-    namespace["__builtins__"] = {**vars(builtins), "help": level_help}
+        Python's own help() would show the game's inner workings, and its
+        interactive mode can't run here, so this one stands in for it.
+        """
+        print(describe(thing, piece_class(namespace)), end="\n\n")  # a blank line after, as Python's own help() leaves
+
+    help.__qualname__ = "help"  # Python's error messages quote this: "help() takes ...", not "player_namespace.<locals>.help()"
+    help._codex_help = True
+    namespace["__builtins__"] = {**vars(builtins), "help": help}
     return namespace
 
 
@@ -547,8 +543,8 @@ def describe(thing, piece: type[Piece] = Pawn) -> str:
 
 
 def _is_help(thing) -> bool:
-    """help itself: the module's, or a namespace's own copy of it."""
-    return thing is help or getattr(thing, "_codex_help", False) is True
+    """help itself: a namespace's own copy of it."""
+    return getattr(thing, "_codex_help", False) is True
 
 
 def _entry_for(thing, piece: type[Piece] = Pawn) -> Entry | None:
