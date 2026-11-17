@@ -5,7 +5,7 @@
 now the project's vision and curriculum. It says what we're building and why.
 The decisions and how they were made live elsewhere:
 - `docs/ARCHITECTURE.md`: the architecture, and the level file format.
-- `docs/M2/`, `docs/M3/`: each milestone's plan, specs and build notes.
+- `docs/M2/` to `docs/M5/`: each milestone's plan, specs and build notes.
 - `docs/QA.md`: the play-test log, with the designer's decisions.
 - `docs/Codex.md`: the in-game dictionary of what the player knows.
 - `CLAUDE.md`: the working rules for building it.
@@ -15,11 +15,13 @@ date)* marks a decision.
 
 ---
 
-## 0. Where the project stands *(Updated 2026-10-07)*
+## 0. Where the project stands *(Updated 2026-11-17)*
 
 Playable now: the Pawn tier's six chapters, each with five levels and (from
 Chapter 2) one optional mastery challenge, plus a Testing ground of practice
-levels.
+levels. Since M4: sound, a level editor whose levels can be shared, and Free
+Play, which holds the Pawn tier's five mastery challenges, the player's own
+and shared levels, a Sandbox and the skins gallery.
 
 Built beyond the first brief:
 - **Feedback:** tiered hints, stars for par, a reveal of the idiomatic solution,
@@ -39,8 +41,10 @@ Built beyond the first brief:
 
 The first design pass (§9) is merged: a wire world with one solid hero, the start
 menu, the Lessons directory, the promotion ceremony and the knight skin (§8), the
-motion kit and an accessibility pass. Next is M4 (§7, `docs/M4/M4.md`): sound,
-the level editor with sharing, free play, and the Pawn tier's mastery set.
+motion kit and an accessibility pass. M4 (`docs/M4/M4.md`) is complete and
+published. Next is M5, the Knight tier (§7, `docs/M5/M5.md`): the knight as a
+piece with its own rules, Chapters 7 and 8, the promotion to bishop and the
+tier's mastery set.
 
 ---
 
@@ -83,6 +87,11 @@ Learned from play-testing *(Updated 2026-10-02; Designer decisions)*:
 12. **Every new obstacle or interaction is shown at work in its lesson,** including how it loses a run.
 13. **Where par can't force a construct, a rule can.** A level may require one (for example `break`) when the shortest solution doesn't need it.
 
+Decided while planning the Knight tier *(Designer, 2026-11-17)*:
+14. **The right lessons matter more than a strict number of them.** A chapter has five core levels unless what it teaches needs more. Chapter 7 has six: the first is for the knight's jump.
+15. **A mastery challenge practises, it never teaches.** Everything it needs was taught in a lesson. The hints and "Show me a solution" work there as everywhere: "these aren't torture devices."
+16. **The puzzle is the Python, never the piece's geometry.** Working out a knight's route by eye is a chess puzzle. Boards are laid out, or say enough, that the hard part is the concept the level trains.
+
 ---
 
 ## 3. Mechanics toolkit *(Updated 2026-10-02)*
@@ -94,15 +103,20 @@ The engine composes levels from reusable, extensible elements. Levels name tile 
 - **Enemies:** patrols, chasers, and standing rooks and bishops whose attacked squares are drawn on the board. Each moves on its own clock: per move, per line of code, or the first time each line runs.
 - **Avatar API, unlocked progressively** (locked methods give a friendly "you haven't learned this yet"): `move()`, `move(n)`, `turn_left()`, `turn_right()`, `position`, `facing`, `squares_ahead()`, `look()`, `at_goal()`, `wait()`, `capture_left()`, `capture_right()`, `bridge()`, and `read()`.
 
-**Planned, as chapters need them:** fog and `sense()`, `pick_up()`, `use(item)`, `inventory`, `place(obj)`, movable blocks, hidden traps that raise exceptions, teleporter pairs, crumbling floor.
+**Planned for the Knight tier** *(Designer, 2026-11-17; `docs/M5/M5.md`)*:
+- **The knight moves by offset:** `knight.jump(1, 2)` is one square right and two up, any of the eight L shapes, over anything in the way. Landing on an enemy takes it. It only jumps: no walking, no turns, no `facing`. It keeps `position`, `at_goal()`, `wait()` and `read()`, and `look()` looks at the square a jump would land on.
+- **The examiner:** a level can name a function the player must write, call it itself, and judge what it did or returned (Chapter 7).
+- **Keys, locked doors, `pick_up()` and `inventory`,** a real Python list (Chapter 8).
+
+**Planned, as chapters need them:** fog and `sense()`, `use(item)`, `place(obj)`, movable blocks, hidden traps that raise exceptions, teleporter pairs, crumbling floor.
 
 **Chess as progression metaphor:** the player starts as a **pawn** (forward only) and "promotes" as they advance — knight L-moves, bishop diagonals, rook lines, finally the queen. New movement rules arrive alongside new concepts, and each promotion is celebrated (§8).
 
 ---
 
-## 4. Curriculum map *(Updated 2026-10-07)*
+## 4. Curriculum map *(Updated 2026-11-17)*
 
-Chapter 4 was split in two, so every later chapter moved up by one. Each chapter has **5 levels plus 1 optional mastery challenge**, except Chapter 1, a prologue of the basics of the basics, which needs none *(Designer, 2026-10-07)*. Each tier ends with a promotion (§8) and a set of optional mastery challenges that cover the whole tier; the Pawn tier's comes in M4. *(Designer, 2026-10-07)* The sets live in Free Play, not Lessons, with no lesson phase, and are free play's default levels for now; each is tagged with its tier and a difficulty (`docs/M4/M4.md`).
+Chapter 4 was split in two, so every later chapter moved up by one. Each chapter has **5 levels plus 1 optional mastery challenge**, except Chapter 1, a prologue of the basics of the basics, which needs none *(Designer, 2026-10-07)*, and wherever the right lessons need more (§2, rule 14): Chapter 7 has six, and a tier's first chapter opens with a level for its new piece *(Designer, 2026-11-17)*. Each tier ends with a promotion (§8) and a set of optional mastery challenges that cover the whole tier; the Pawn tier's comes in M4. *(Designer, 2026-10-07)* The sets live in Free Play, not Lessons, with no lesson phase, and are free play's default levels for now; each is tagged with its tier and a difficulty (`docs/M4/M4.md`).
 
 | # | Tier | Chapter | Python concepts | Board mechanic | Status |
 |---|------|---------|-----------------|----------------|--------|
@@ -112,8 +126,8 @@ Chapter 4 was split in two, so every later chapter moved up by one. Each chapter
 | 4 | Pawn | Eyes Open | booleans, comparisons, `if/elif/else`, `None` | pits, enemy rooks and bishops, `look()` | Playable |
 | 5 | Pawn | Keep Going | `while`, `break`, `continue`, counters | goals hidden on several squares, winding roads | Playable |
 | 6 | Pawn | Runes | strings: indexing, slicing, methods, `in`, `int()`, `split()` | read rune tiles to decode guards, roads and destinations | Playable |
-| 7 | Knight | Spellbook | `def`, parameters, `return`, scope | reusable maneuvers; knight L-moves | Planned |
-| 8 | Knight | The Satchel | lists, tuples (coordinates), iteration, sorting | collect keys in the right order | Planned |
+| 7 | Knight | Spellbook | `def`, parameters and default values, `return`, scope | the knight's jump; reusable maneuvers; an examiner who calls your function | M5.2 |
+| 8 | Knight | The Satchel | lists, tuples (coordinates), iteration, sorting | keys, locked doors and an inventory; collect keys in the right order | M5.3 |
 | 9 | Bishop | The Map Legend | dicts, sets | key→door pairs, tracking visited squares | Planned |
 | 10 | Bishop | Traps | `try/except/finally`, `raise`, custom exceptions | hidden traps raise errors; survive and recover | Planned |
 | 11 | Rook | Compact Casting | comprehensions, `lambda`, `sorted(key=)`, `enumerate`, `zip` | batch-process board data | Planned |
@@ -160,7 +174,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 
 ---
 
-## 7. Milestones *(Updated 2026-10-07)*
+## 7. Milestones *(Updated 2026-11-17)*
 
 | Milestone | What | Status |
 |---|---|---|
@@ -170,8 +184,16 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 | M3.0–M3.5 | the obstacle toolkit, the Codex, Chapters 2–5 | Done |
 | M3.6 Chapter 6 | Runes | Merged 2026-10-02 (`docs/M3/M3.6.md`), PR #16 |
 | **M3.7 Look & Feel** | the first major design pass (§9), with the **promotion ceremony** and the knight skin (§8) | Merged 2026-10-03 (`docs/M3/M3.7.md`), PR #17 |
-| **M4 Sound, editor and free play** | **sound** (a soundtrack and effects); author levels without hand-writing YAML, and **share** them; **free play** (challenges, your own and shared levels, a sandbox, the skins gallery); the Pawn tier's set of mastery challenges | In progress: M4.0, M4.1 (sound) and M4.2 (the editor's board) merged 2026-10-08; rules, a solvability check and sharing are next (M4.3, `docs/M4/M4.md`) |
-| M5+ | the remaining chapters, one tier at a time, each ending in a promotion | Planned |
+| **M4 Sound, editor and free play** | **sound** (a soundtrack and effects); author levels without hand-writing YAML, and **share** them; **free play** (challenges, your own and shared levels, a sandbox, the skins gallery); the Pawn tier's set of mastery challenges | Done: M4.0 to M4.5 merged between 2026-10-08 and 2026-11-17 (`docs/M4/M4.md`) |
+| **M5 The Knight tier** | the knight as a piece (M5.1), Chapter 7 (M5.2), Chapter 8 (M5.3), the promotion to bishop and the tier's mastery set (M5.4), the editor learns the tier (M5.5) | Plan approved 2026-11-17 (`docs/M5/M5.md`) |
+| M6 The Bishop tier | Chapters 9 and 10; a piece that slides along diagonals; teleporter pairs, crumbling floor, traps that raise real exceptions | Roadmap |
+| M7 The Rook tier | Chapters 11 and 12; the first Workshop levels; player-defined pieces running inside the engine | Roadmap. Both chapters look heavy and may each split in two |
+| M8 The Queen tier | Chapters 13 to 16; fog and `sense()`; several files and a pretend file system; the player's own tests | Roadmap. Probably two milestones |
+| M9 Capstone | Chapter 17; several pieces at once; a level generator the player writes | Roadmap. Shaped after the Queen tier has been played |
+
+*(Designer, 2026-11-17)* **One milestone per tier from here on,** each with the same skeleton: the plan, the new piece, its chapters, the promotion and mastery set, the editor. The plan goes one tier deep: M5 in detail, M6 to M9 as the roadmap above (`docs/M5/M5.md`, "Beyond M5"), each detailed when it starts. Every sub-milestone stops for the three gates; the autonomous run that ended M4 is over.
+
+**Not in a milestone yet:** an experience pass (rewards and trophies for mastery sets, CRT scanlines, export and import of progress), proposed for right after M5 and decided at its end; Workshop levels, first in M7.
 
 *(Designer, 2026-10-02)* The design pass comes **before** the editor. By then the Pawn tier holds every tile, enemy and ability the editor's palette must show, and an editor built on the old look would be restyled straight away.
 
@@ -195,6 +217,9 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 - **Using a skin:**
   - From M3.7, once a skin is unlocked it is **selectable in the menu**: Settings has a **Piece** choice (pawn or knight) that works on every level.
   - Free play (M4.4) gets a gallery of unlocked skins.
+- *(Designer, 2026-11-17)* **From M5, each level shows its own piece by default** ("Auto" in Settings → Piece): the pawn in Chapters 1 to 6, the knight from Chapter 7. A chosen skin still overrides it everywhere and still never renames the object in code.
+- *(Designer, 2026-11-17)* **The knight's facing is only its look.** A jump is drawn as its L, the long leg first and then the short one, and the knight ends facing the way the short leg went. The code never reads it.
+- *(Designer, 2026-11-17)* **Building is never locked.** Once the editor can make knight levels (M5.5), every player can, whatever their progress. A promotion unlocks a skin, nothing else.
 - **Rewards for mastery sets:** none yet. The designer has ideas for skins and trophies, for a later design and experience pass *(Designer, 2026-10-07)*.
 
 ---
