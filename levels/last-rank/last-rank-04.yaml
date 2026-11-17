@@ -1,0 +1,65 @@
+id: last-rank-04
+set: last-rank
+difficulty: 4
+draws_on: [4, 5]
+title: "The Long Gallery"
+trains: "One loop that asks the board several questions on every pass, and waits for what moves"
+brief: "Rooks stand guard along the gallery, and sentries pace it from wall to wall. Your pawn's look() calls a sentry \"patrol\". The gallery is a different length on every board, and no two are guarded the same way."
+piece: pawn
+map: |
+  # . . G #
+  # . . . #
+  # . . . #
+  # . . # #
+  # . . . #
+  # . . . #
+  # . . . #
+  # # . . #
+  # . P . #
+enemies:
+- {"kind": "rook", "start": "b3"}
+- {"kind": "patrol", "start": "c5", "route": ["b5", "d5"]}
+- {"kind": "rook", "start": "d7"}
+start: {"facing": "north"}
+api: ["move", "wait", "at_goal", "look", "capture_left", "capture_right"]
+par: {"lines": 9}
+hints:
+- "A rook can only be taken, never passed. A sentry keeps moving, so what your pawn sees changes from one tick to the next."
+- "Repeat until the goal. Each time, look three ways. If a rook or a sentry stands diagonally ahead, take it. If a sentry stands straight ahead, wait a tick and look again. Otherwise step forward."
+- "Waiting for a sentry to step aside looks like this:\nelif pawn.look() == \"patrol\":\n    pawn.wait()"
+variants:
+- map: |
+    # . G . #
+    # . . . #
+    # . . . #
+    # . . . #
+    # . . . #
+    # . . # #
+    # . # . #
+    # . . . #
+    # . . . #
+    # . . . #
+    # . P . #
+  enemies: [{"kind": "patrol", "start": "d4", "route": ["d4", "b4"]}, {"kind": "rook", "start": "c6"}, {"kind": "rook", "start": "d7"}, {"kind": "patrol", "start": "c9", "route": ["d9", "b9"]}]
+- map: |
+    # . . G #
+    # . . . #
+    # . . . #
+    # . . . #
+    # . # . #
+    # . . . #
+    # . P # #
+  enemies: [{"kind": "rook", "start": "d2"}, {"kind": "rook", "start": "c4"}, {"kind": "patrol", "start": "d6", "route": ["d6", "b6"]}]
+- map: |
+    # . G . #
+    # . . . #
+    # . # . #
+    # . . . #
+    # # . . #
+    # . . . #
+    # . . . #
+    # . . . #
+    # . . . #
+    # . . . #
+    # . P . #
+  enemies: [{"kind": "patrol", "start": "d3", "route": ["d3", "b3"]}, {"kind": "patrol", "start": "b6", "route": ["b6", "d6"]}, {"kind": "rook", "start": "b8"}, {"kind": "rook", "start": "c10"}]

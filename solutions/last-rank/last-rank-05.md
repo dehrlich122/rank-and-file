@@ -1,0 +1,1 @@
+The way up has no known length, so it is a while loop; the walk's length is read from the rune, so it is a for loop. The counter answers the guard, a question to the text picks the turn, and one piece of it, as a number, sets the range. 21 lines.

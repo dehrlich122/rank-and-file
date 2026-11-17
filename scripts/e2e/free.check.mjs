@@ -7,7 +7,7 @@
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { sleep } from "./cdp.mjs";
-import { buttonHelpers, hoverHelpers, levelHelpers } from "./helpers.mjs";
+import { BUTTONS, buttonHelpers, hoverHelpers, levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const SETTINGS = "rank-and-file:settings";
@@ -27,7 +27,7 @@ const corridor = (title) => ({
 });
 
 export default async function freeChecks({ browser: b, base, root, check }) {
-  const { setCode, editorText } = levelHelpers(b, base, root);
+  const { setCode, editorText, solution, withoutExpectLine, openLevel } = levelHelpers(b, base, root);
   const { clickButton, hasButton } = buttonHelpers(b);
   const { wordAt, hover, hoverAway } = hoverHelpers(b);
   const text = (selector) => b.evaluate(`document.querySelector(${JSON.stringify(selector)})?.textContent ?? ''`);
@@ -83,6 +83,18 @@ export default async function freeChecks({ browser: b, base, root, check }) {
   const controlValue = (label) =>
     b.evaluate(`[...document.querySelectorAll('.list-controls label')].find((l) => l.firstChild.textContent === ${JSON.stringify(label)})?.querySelector('select').value`);
 
+  /** Whether a filter row (the list controls) is on screen. */
+  const filterRowShown = () => b.evaluate(`[...document.querySelectorAll('.list-controls-host, .list-controls')].some((e) => e.getClientRects().length > 0)`);
+  /** The Challenges page's rows, in screen order: the number, title, "Draws on" line and difficulty tag of each. */
+  const challengeRows = () =>
+    b.evaluate(`[...document.querySelectorAll('.ch-row')].map((a) => {
+      const tag = a.querySelector('.diff-tag');
+      return {
+        num: a.querySelector('.lrow-num').textContent, title: a.querySelector('.lrow-text strong').textContent, draws: a.querySelector('.lrow-text .muted').textContent,
+        step: Number(tag?.dataset.step), word: tag?.querySelector('code')?.textContent ?? '', pips: tag?.querySelectorAll('.diff-pip').length ?? 0, on: tag?.querySelectorAll('.diff-pip.on').length ?? 0,
+      };
+    })`);
+
   // -- the hub --------------------------------------------------------------------------------------------------
   await check("M4.4: the start menu's Free Play opens the hub: five rows with counts, crumbs 'Free Play', the heading focused", async () => {
     await load("#/", { fresh: true });
@@ -137,17 +149,20 @@ export default async function freeChecks({ browser: b, base, root, check }) {
   });
 
   // -- Challenges ----------------------------------------------------------------------------------------------
-  await check("M4.4: Challenges lists The Last Rank with its Pawn tier tag and says its challenges are coming soon; no filter row yet (QA-049)", async () => {
+  await check("M4.5: Challenges lists The Last Rank with its Pawn tier tag and '0 of 5 solved': five rows numbered 1 to 5, each with a title, a 'Draws on' line and a difficulty tag; no 'coming soon'; the filter row is shown", async () => {
     await load("#/free/challenges", { fresh: true });
-    await b.waitFor(`document.querySelector('.set-head')`, 30_000, "the Challenges page");
+    await b.waitFor(`document.querySelector('.set-head') && document.querySelector('.ch-row')`, 30_000, "the Challenges page");
     expect((await text(".set-head h2")) === "The Last Rank", `set: ${await text(".set-head h2")}`);
     const tag = await text(".set-head .tier-tag");
     expect(tag.includes("Pawn"), `tier tag: ${tag}`);
-    expect((await text(".free-play")).includes("Its challenges are coming soon."), "the coming soon line");
-    expect(!(await exists(".ch-row")), "no challenge rows until M4.5 adds them");
-    // QA-049: no filter row while no set has a level to filter
-    expect(!(await b.evaluate(`!!document.querySelector('.list-controls') && !document.querySelector('.list-controls-host').hidden`)), "no filter row while no set has a level");
-    return `The Last Rank, ${tag.trim()}`;
+    expect((await text(".set-head")).includes("0 of 5 solved"), `the head: ${await text(".set-head")}`);
+    expect(!(await text(".free-play")).includes("coming soon"), "the page still says coming soon");
+    const found = await challengeRows();
+    expect(found.map((r) => r.num).join() === "1,2,3,4,5", `row numbers: ${found.map((r) => r.num)}`);
+    expect(found.every((r) => r.title.length > 0 && r.draws.startsWith("Draws on ") && r.word.length > 0 && r.pips === 5), `a row lacks a title, a Draws on line or a difficulty tag: ${JSON.stringify(found.map((r) => [r.title.length, r.draws.length, r.word, r.pips]))}`);
+    expect(found.every((r) => r.step >= 1 && r.step <= 5 && r.on === r.step), "a difficulty tag's pips do not match its step");
+    expect(await filterRowShown(), "no filter row on Challenges");
+    return `The Last Rank, ${tag.trim()}, five rows`;
   });
 
   // -- the Difficulty select reaches My levels ----------------------------------------------------------------------
@@ -637,9 +652,7 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     return "note under the box, both tries answered, Esc closes";
   });
 
-  await check("QA-049: no filter row on an empty list; with two levels and nothing matching, 'Clear filters' resets Tier and Difficulty, keeps the sort, and both rows return", async () => {
-    const filterRowShown = () =>
-      b.evaluate(`[...document.querySelectorAll('.list-controls-host, .list-controls')].some((e) => e.getClientRects().length > 0)`);
+  await check("QA-049: no filter row on the empty My levels and Shared with me (Challenges, having levels, shows one); with two levels and nothing matching, 'Clear filters' resets Tier and Difficulty, keeps the sort, and both rows return", async () => {
     await load("#/editor", { fresh: true });
     await myLevelsReady();
     expect(!(await filterRowShown()), "a filter row on the empty My levels");
@@ -648,7 +661,7 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     expect(!(await filterRowShown()), "a filter row on the empty Shared with me");
     await goto("#/free/challenges");
     await b.waitFor(`document.querySelector('.set-head')`, 30_000, "Challenges");
-    expect(!(await filterRowShown()), "a filter row on Challenges");
+    expect(await filterRowShown(), "no filter row on Challenges, which has levels");
     await makeLevels([2, 5]);
     expect(await filterRowShown(), "no filter row once there are levels");
     try {
@@ -765,5 +778,284 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     }
     expect(label === "Knight · Charger", `Settings → Piece labels the knight ${JSON.stringify(label)}`);
     return `Tab reaches the locked Charger in ${presses} presses; Settings says "${label}"`;
+  });
+
+
+  // -- M4.5: The Last Rank, a challenge played for real ---------------------------------------------------------------
+  // The programs typed are the references (and wrong attempts) read from disk in Node; no check here reports editor
+  // contents or a hint's text, only counts, lengths and yes/no. Which challenge has which difficulty is read off the page.
+  const CHALLENGES = [1, 2, 3, 4, 5].map((n) => `last-rank-0${n}`);
+  const openChallenge = async (id, { fresh = false } = {}) => {
+    await load(`#/challenge/${id}`, { fresh });
+    await b.waitFor(
+      `document.querySelector('.level[data-level-id="${id}"] .board-host .board .piece') && !document.querySelector('.level-right .btn-primary').disabled`,
+      90_000,
+      `challenge ${id}`,
+    );
+  };
+  /** Type `code`, Run, jump to the end of playback, and describe the outcome card (its head, earned stars and links). */
+  const runChallenge = async (code) => {
+    await setCode(code);
+    await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
+    await b.waitFor(`!document.querySelector('.outcome-host').textContent.includes('Running')`, 60_000, "the run to finish");
+    await b.evaluate(`(() => { const e = document.querySelectorAll(${JSON.stringify(BUTTONS)})[4]; if (e && !e.disabled) e.click(); })()`);
+    await b.waitFor(`document.querySelector('.outcome-host .outcome')`, 60_000, "the outcome card");
+    return b.evaluate(`({
+      head: document.querySelector('.outcome-head strong').textContent,
+      stars: document.querySelectorAll('.outcome-host .stars li.earned').length,
+      links: [...document.querySelectorAll('.outcome-host a')].map((a) => ({ text: a.textContent.trim(), href: a.getAttribute('href') })),
+    })`);
+  };
+  /** The Challenges page once its rows are up (progress kept unless `fresh`). */
+  const challengesPage = async ({ fresh = false } = {}) => {
+    await load("#/free/challenges", { fresh });
+    await b.waitFor(`document.querySelector('.set-head') && document.querySelector('.ch-row')`, 30_000, "the Challenges page");
+  };
+  const stepsOnScreen = () => b.evaluate(`[...document.querySelectorAll('.ch-row .diff-tag')].map((t) => Number(t.dataset.step))`);
+  const numbersOnScreen = () => b.evaluate(`[...document.querySelectorAll('.ch-row .lrow-num')].map((n) => n.textContent).join()`);
+
+  await check("M4.5: the Difficulty and Tier filters narrow Challenges, Hardest first orders by difficulty (read from the rows), and the choices are put back", async () => {
+    await challengesPage({ fresh: true });
+    const all = await stepsOnScreen();
+    expect(all.length === 5 && all.every((n) => n >= 1 && n <= 5), `difficulties on screen: ${all}`);
+    try {
+      const wanted = all[0];
+      await control("Difficulty", String(wanted));
+      const narrowed = await stepsOnScreen();
+      expect(narrowed.length === all.filter((n) => n === wanted).length && narrowed.every((n) => n === wanted), `Difficulty ${wanted}: ${narrowed}`);
+      const absent = [1, 2, 3, 4, 5].find((n) => !all.includes(n));
+      if (absent !== undefined) {
+        await control("Difficulty", String(absent));
+        expect((await stepsOnScreen()).length === 0 && (await text(".free-play")).includes("No challenges match these filters."), `Difficulty ${absent} (no challenge has it) did not say nothing matches`);
+      }
+      await control("Difficulty", "");
+      expect((await stepsOnScreen()).length === 5, "Any brings all five back");
+      await control("Sort", "hardest");
+      const hardest = await stepsOnScreen();
+      expect(hardest.length === 5 && hardest.every((n, i) => i === 0 || hardest[i - 1] >= n), `Hardest first: ${hardest}`);
+      expect((await numbersOnScreen()).split(",").sort().join() === "1,2,3,4,5", "Hardest first lost or repeated a row");
+      await control("Sort", "easiest");
+      const easiest = await stepsOnScreen();
+      expect(easiest.every((n, i) => i === 0 || easiest[i - 1] <= n), `Easiest first: ${easiest}`);
+      await control("Tier", "pawn");
+      expect((await stepsOnScreen()).length === 5 && (await text(".set-head .tier-tag")).includes("Pawn"), "the Pawn tier filter dropped the Pawn set");
+    } finally {
+      await control("Tier", "");
+      await control("Difficulty", "");
+      await control("Sort", "order");
+    }
+    expect((await numbersOnScreen()) === "1,2,3,4,5", `the order after putting the choices back: ${await numbersOnScreen()}`);
+    return `five rows, steps ${all}`;
+  });
+
+  await check("M4.5: a challenge opens at #/challenge/<id>: its brief, the tier tag and difficulty in the Challenge panel, 'Draws on' chips that link to lessons, and no Learn tab", async () => {
+    await challengesPage({ fresh: true });
+    const first = (await challengeRows())[0];
+    await openChallenge(CHALLENGES[0], { fresh: true });
+    const panel = ".level-left .tab-scroll .tab-panel:not([hidden])";
+    const tabs = await b.evaluate(`[...document.querySelectorAll('.level-left .tabs button')].filter((t) => t.getClientRects().length > 0).map((t) => t.textContent.trim())`);
+    expect(!tabs.includes("Learn"), `tabs: ${tabs}`);
+    expect((await text(panel)).includes(first.title) && (await text(panel)).length > 150, "the Challenge panel does not show the title and the brief");
+    await b.waitFor(`document.querySelector('.level-left .level-tags .tier-tag')`, 30_000, "the tier tag");
+    expect((await text(".level-left .level-tags .tier-tag")).includes("Pawn"), "tier Pawn in the Challenge panel");
+    const step = await b.evaluate(`document.querySelector('.level-left .level-tags .diff-tag')?.dataset.step`);
+    expect(Number(step) === first.step, `difficulty in the panel ${step}, on the list ${first.step}`);
+    const chips = await b.evaluate(`[...document.querySelectorAll('.level-left .draws-on a.chapter-chip')].map((a) => ({ text: a.textContent, href: a.getAttribute('href') }))`);
+    expect(chips.length >= 2 && chips.every((c) => /^#\/lessons\/\d+$/.test(c.href) && c.text.length > 0), `chips: ${JSON.stringify(chips)}`);
+    await b.evaluate(`document.querySelector('.level-left .draws-on a.chapter-chip').click()`);
+    await b.waitFor(`location.hash === ${JSON.stringify(chips[0].href)} && !document.querySelector('.level')`, 30_000, "the lessons page");
+    expect(await exists("main h1, main h2"), "the chip landed on an empty page");
+    await goto(`#/challenge/${CHALLENGES[0]}`);
+    await b.waitFor(`document.querySelector('.level[data-level-id="${CHALLENGES[0]}"] .board-host .board .piece')`, 60_000, "the challenge again");
+    return `no Learn tab, ${chips.length} chips, lands at ${chips[0].href}`;
+  });
+
+  /** Run `fn` with the window at width x height, and put the suite's own size back after. */
+  const atSize = async (width, height, fn) => {
+    await b.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+    try {
+      await sleep(400);
+      return await fn();
+    } finally {
+      await b.send("Emulation.setDeviceMetricsOverride", { width: 1400, height: 860, deviceScaleFactor: 1, mobile: false });
+    }
+  };
+  /** After a run: how far the middle panel scrolls sideways, and whether the card and each link lie inside its visible width. */
+  const outcomeFit = () =>
+    b.evaluate(`(() => {
+      const host = document.querySelector('.outcome-host');
+      const panel = host.closest('.level-middle, .level-right');
+      const left = panel.getBoundingClientRect().left + panel.clientLeft;
+      const inside = (e) => { const r = e.getBoundingClientRect(); return r.left >= left - 0.5 && r.right <= left + panel.clientWidth + 0.5; };
+      return { over: panel.scrollWidth - panel.clientWidth, card: inside(host.firstElementChild), links: [...host.querySelectorAll('a')].map(inside) };
+    })()`);
+  const fitsColumn = (fit) => fit.over <= 0 && fit.card && fit.links.length > 0 && fit.links.every(Boolean);
+
+  await check("M4.5: solving The Toll Road with its reference earns three stars and offers 'Next challenge →'; Challenges and the hub then say '1 of 5 solved', kept over a reload; the last challenge offers 'Back to Free Play'", async () => {
+    await openChallenge(CHALLENGES[0], { fresh: true });
+    const r = await runChallenge(solution(CHALLENGES[0]));
+    expect(r.head === "Solved!" && r.stars === 3, `${r.head}, ${r.stars} stars`);
+    const next = r.links.find((l) => l.text === "Next challenge →");
+    expect(next?.href === `#/challenge/${CHALLENGES[1]}`, `links: ${JSON.stringify(r.links)}`);
+    await b.evaluate(`document.querySelector('.outcome-host a[href="${next.href}"]').click()`);
+    await b.waitFor(`location.hash === ${JSON.stringify(next.href)} && document.querySelector('.level[data-level-id="${CHALLENGES[1]}"] .board-host .board .piece')`, 60_000, "the next challenge");
+    const onPage = async () => {
+      const row = await b.evaluate(`(() => { const a = document.querySelector('.ch-row'); return { num: a.querySelector('.lrow-num').textContent, stars: a.querySelector('.card-stars').textContent }; })()`);
+      expect(row.num === "✓" && row.stars.startsWith("★★★"), `row 1: ${JSON.stringify(row)}`);
+      expect((await text(".set-head")).includes("1 of 5 solved"), `the head: ${await text(".set-head")}`);
+      expect((await b.evaluate(`document.querySelectorAll('.ch-row .lrow-num')[1].textContent`)) === "2", "row 2 should still be unsolved");
+    };
+    await goto("#/free/challenges");
+    await b.waitFor(`document.querySelector('.ch-row')`, 30_000, "Challenges");
+    await onPage();
+    await challengesPage(); // a reload keeps the progress
+    await onPage();
+    await load("#/free");
+    await b.waitFor(`document.querySelector('.fp-row[data-section="challenges"]')`, 30_000, "the hub");
+    const count = (await text('.fp-row[data-section="challenges"] .fp-count')).trim();
+    expect(count === "1 of 5 solved", `hub: ${count}`);
+    // the last challenge ends the set: no next one, so the card leads back
+    await openChallenge(CHALLENGES[4]);
+    const last = await runChallenge(solution(CHALLENGES[4]));
+    expect(last.head === "Solved!" && last.stars >= 1, `${last.head}, ${last.stars} stars`);
+    const lastFit = await atSize(1440, 900, outcomeFit);
+    expect(fitsColumn(lastFit), `QA-063 on the last challenge: ${JSON.stringify(lastFit)}`);
+    const back = last.links.find((l) => l.text === "Back to Free Play");
+    expect(back?.href === "#/free/challenges" && !last.links.some((l) => l.text === "Next challenge →"), `links: ${JSON.stringify(last.links)}`);
+    await b.evaluate(`document.querySelector('.outcome-host a[href="#/free/challenges"]').click()`);
+    await b.waitFor(`location.hash === '#/free/challenges' && document.querySelector('.ch-row')`, 30_000, "Challenges");
+    expect((await text(".set-head")).includes("2 of 5 solved"), `the head after the last: ${await text(".set-head")}`);
+    return "3 stars, next offered, 1 of 5 then 2 of 5, kept over a reload";
+  });
+
+  await check("M4.5: a challenge's hints open in order, its third failed run offers 'Show me a solution', and what it shows is the reference on disk", async () => {
+    const id = CHALLENGES[1];
+    await openChallenge(id, { fresh: true });
+    const wrong = withoutExpectLine(solution(id, ".naive"));
+    const failedOffers = async () => {
+      const r = await runChallenge(wrong);
+      expect(r.head !== "Solved!", `a wrong attempt solved ${id}`);
+      return hasButton("Show me a solution…", ".outcome-host");
+    };
+    expect(!(await failedOffers()), "a solution is offered after one failed run");
+    expect(await hasButton("Need a hint?", ".outcome-host"), "no 'Need a hint?' after a failed run");
+    await clickButton("Need a hint?", ".outcome-host");
+    const lengths = [];
+    for (let n = 1; n <= 3; n++) {
+      await b.evaluate(`document.querySelector('.hints .hint-button').click()`);
+      const open = await b.evaluate(`[...document.querySelectorAll('.hints .hint-list li')].map((li) => li.textContent.trim().length)`);
+      expect(open.length === n && open.every((len) => len > 0), `after ${n} clicks: ${open.length} hints open, lengths ${open}`);
+      lengths.push(open[n - 1]);
+    }
+    expect(!(await failedOffers()), "a solution is offered after two failed runs");
+    expect(await failedOffers(), "no 'Show me a solution' after the third failed run");
+    await clickButton("Show me a solution…", ".outcome-host");
+    await b.evaluate(`document.querySelector('.give-up-button').click()`);
+    await clickButton("Show it", ".solution-section .confirm-step");
+    await b.waitFor(`!!document.querySelector('.compare-dialog .compare-idiomatic .cm-line')`, 10_000, "the solution");
+    const shown = (await editorText(".compare-dialog .compare-idiomatic")) === solution(id).trimEnd();
+    await b.key("Escape");
+    expect(shown, "the solution shown is not the reference on disk");
+    return `three hints (text lengths ${lengths}), solution offered on the third failed run and equal to the file`;
+  });
+
+  // -- QA-063 to QA-065 (docs/QA.md, Session 18): the level screen with real challenges on it ----------------------------
+  await check("QA-063: at 1440x900 a solved challenge's card and its way on fit the board's column, with no sideways scroll", async () => {
+    await atSize(1440, 900, async () => {
+      await openChallenge(CHALLENGES[0], { fresh: true });
+      const r = await runChallenge(solution(CHALLENGES[0]));
+      expect(r.head === "Solved!" && r.links.some((l) => l.text === "Next challenge →"), `${r.head}: ${JSON.stringify(r.links)}`);
+      const fit = await outcomeFit();
+      expect(fitsColumn(fit), JSON.stringify(fit));
+    });
+  });
+
+  await check("QA-063: the same holds for a lesson level with several boards", async () => {
+    await atSize(1440, 900, async () => {
+      await openLevel("ch02-l02", { fresh: true });
+      const r = await runChallenge(solution("ch02-l02"));
+      expect(r.head === "Solved!" && r.links.length > 0, `${r.head}: ${JSON.stringify(r.links)}`);
+      const fit = await outcomeFit();
+      expect(fitsColumn(fit), JSON.stringify(fit));
+    });
+  });
+
+  /** A level with several boards, before a run: the board on show against the small ones, and whether it all sits inside the middle panel. */
+  const boardsShape = () =>
+    b.evaluate(`(() => {
+      const box = (e) => e.getBoundingClientRect();
+      const panel = document.querySelector('.level-middle');
+      const left = box(panel).left + panel.clientLeft;
+      const main = document.querySelector('.boards-main');
+      const side = document.querySelector('.boards-side');
+      const parts = [main.querySelector('.board'), ...side.querySelectorAll('.board-thumb')].map(box);
+      return {
+        width: Math.round(box(main.querySelector('.board')).width),
+        under: box(side).top >= box(main).bottom - 1,
+        beside: box(side).left >= box(main).right - 1,
+        thumbs: side.children.length,
+        over: panel.scrollWidth - panel.clientWidth,
+        whole: parts.every((r) => r.left >= left - 0.5 && r.right <= left + panel.clientWidth + 0.5),
+      };
+    })()`);
+  /** Put board `n` on show by its small board (if it is not on show already), and wait for its caption. */
+  const showBoard = async (n) => {
+    await b.evaluate(`document.querySelector('.board-thumb[aria-label="Look at board ${n}"]')?.click()`);
+    await b.waitFor(`document.querySelector('.boards-caption')?.textContent.startsWith('Board ${n} of')`, 10_000, `board ${n} on show`);
+  };
+  const codePanel = (where) => b.evaluate(`document.querySelector('input[name="setting-codePanel"][value="${where}"]').click()`);
+
+  await check("QA-064: wide boards: the small boards sit in a row under the board on show (at least 380px wide, whichever board is on show), at 1440x900, 1000x700 and with Code panel = bottom", async () => {
+    await openChallenge(CHALLENGES[4], { fresh: true });
+    const seen = [];
+    await atSize(1440, 900, async () => {
+      for (const n of [1, 2, 3, 4]) {
+        await showBoard(n);
+        const shape = await boardsShape();
+        seen.push(shape);
+        expect(shape.thumbs === 3 && shape.under && !shape.beside && shape.width >= 380 && shape.whole && shape.over <= 0, `board ${n}: ${JSON.stringify(shape)}`);
+      }
+    });
+    await showBoard(1);
+    await atSize(1000, 700, async () => {
+      const shape = await boardsShape();
+      expect(shape.under && shape.whole && shape.over <= 0, `at 1000x700: ${JSON.stringify(shape)}`);
+    });
+    try {
+      await codePanel("bottom");
+      await atSize(1440, 900, async () => {
+        const shape = await boardsShape();
+        expect(shape.under && shape.whole && shape.over <= 0, `Code panel = bottom: ${JSON.stringify(shape)}`);
+      });
+    } finally {
+      await codePanel("right");
+    }
+    return `widths ${seen.map((s) => s.width)}`;
+  });
+
+  await check("QA-064: levels with no board wider than 8 columns keep the small boards beside the one on show (a challenge, a tall lesson level, a wide-but-not-over-8 lesson level, 1440x900)", async () => {
+    await atSize(1440, 900, async () => {
+      const shapes = [];
+      await openChallenge(CHALLENGES[0], { fresh: true });
+      shapes.push(["challenge", await boardsShape()]);
+      await openLevel("ch02-l05", { fresh: true }); // four boards, all taller than wide
+      shapes.push(["tall lesson level", await boardsShape()]);
+      await openLevel("ch02-l02", { fresh: true }); // boards wider than tall, none over 8 columns
+      shapes.push(["wide lesson level", await boardsShape()]);
+      for (const [name, shape] of shapes) {
+        expect(shape.beside && !shape.under && shape.whole && shape.over <= 0, `${name}: ${JSON.stringify(shape)}`);
+      }
+    });
+  });
+
+  await check("QA-065: the Challenge panel's lists show `code` spans as code, with no backtick left (the plank's line shows bridge() in a code element)", async () => {
+    await openChallenge(CHALLENGES[4], { fresh: true });
+    const lists = await b.evaluate(`(() => {
+      const items = [...document.querySelectorAll('.level-left :is(.objectives, .obstacles, .rules, .star-goals) li')];
+      const plank = items.find((li) => li.textContent.includes('bridge()'));
+      return { items: items.length, backticks: items.filter((li) => li.textContent.includes('\`')).length, plankCode: [...(plank?.querySelectorAll('code') ?? [])].map((c) => c.textContent) };
+    })()`);
+    expect(lists.items >= 4 && lists.backticks === 0, JSON.stringify(lists));
+    expect(lists.plankCode.includes("bridge()"), JSON.stringify(lists));
   });
 }

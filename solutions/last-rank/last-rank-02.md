@@ -1,0 +1,1 @@
+Two loops share the work. The outer one goes on until the goal, however many runes there are; the inner one takes the legs of one rune in turn. Cutting each leg at the space gives its number, whatever its length. 8 lines.

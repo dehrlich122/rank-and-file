@@ -1,0 +1,62 @@
+id: last-rank-03
+set: last-rank
+difficulty: 3
+draws_on: [2, 6]
+title: "The Written Hour"
+trains: "A number cut out of a rune's words, and arithmetic with the remainder to time a gate"
+brief: "The gate ahead opens for two ticks, then shuts on anything under it. A rune says how often, and every board's gate keeps its own time. The walk to it is a different length on every board too."
+piece: pawn
+map: |
+  # G #
+  # T #
+  # . #
+  # . #
+  # . #
+  # R #
+  # P #
+legend: {"R": {"tile": "rune", "text": "The gate opens once every 7 ticks."}, "T": {"tile": "timed_gate", "every": 7, "open": 2}}
+start: {"facing": "north"}
+api: ["move", "squares_ahead", "wait", "read"]
+par: {"lines": 5}
+hints:
+- "Every gate keeps its own time, and only the rune says what it is. The walk to the gate takes ticks too, and it is a different length on each board."
+- "Read the rune, cut out the number and turn it into a whole number. Count the ticks your pawn spends from the start until it steps under the gate: one for each square. The gate is open when that count is a multiple of the rune's number, so wait for the ticks that are missing. The remainder operator tells how far into a cycle a count is."
+- "Wait for the missing ticks with a line like:\npawn.wait(cycle - (ahead + 1) % cycle)"
+variants:
+- map: |
+    # G #
+    # T #
+    # . #
+    # . #
+    # . #
+    # . #
+    # . #
+    # . #
+    # R #
+    # P #
+  legend: {"R": {"tile": "rune", "text": "The gate opens once every 12 ticks."}, "T": {"tile": "timed_gate", "every": 12, "open": 2}}
+- map: |
+    # G #
+    # T #
+    # . #
+    # . #
+    # . #
+    # . #
+    # . #
+    # R #
+    # P #
+  legend: {"R": {"tile": "rune", "text": "The gate opens once every 4 ticks."}, "T": {"tile": "timed_gate", "every": 4, "open": 2}}
+- map: |
+    # G #
+    # T #
+    # . #
+    # . #
+    # . #
+    # . #
+    # . #
+    # . #
+    # . #
+    # . #
+    # R #
+    # P #
+  legend: {"R": {"tile": "rune", "text": "The gate opens once every 5 ticks."}, "T": {"tile": "timed_gate", "every": 5, "open": 2}}

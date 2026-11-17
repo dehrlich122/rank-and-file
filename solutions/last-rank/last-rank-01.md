@@ -1,0 +1,1 @@
+The loop looks before every step, so it works on any road. A pit ahead means the way round and four more squares; anything else means one step and one more. The counter is set before the loop, changed inside it and printed after it. 16 lines.
