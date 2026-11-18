@@ -539,3 +539,45 @@ def test_help_on_the_players_function_without_a_docstring_says_how_to_add_one():
 def test_help_on_a_lambda_does_not_crash():
     output = function_help("double = lambda n: n * 2\nhelp(double)")
     assert output.splitlines()[0] == "<lambda>(n)"
+
+
+# -- the fence of a lesson's runnable snippet (M5.2-5a) --------------------------------------------------------
+
+
+def fenced(info, code="pawn.move(1)\n"):
+    return f"{FENCE}python {info}\n{code}{FENCE}\n"
+
+
+@pytest.mark.parametrize(
+    ("info", "meant", "call"),
+    [
+        ("run", "", ""),
+        ("run error", "error", ""),
+        ("run lost", "lost", ""),
+        ("run timeout", "timeout", ""),
+        ("run calls gallop(1, 2)", "", "gallop(1, 2)"),
+        ("run error calls gallop(1)", "error", "gallop(1)"),
+        ("run lost calls gallop(1)", "lost", "gallop(1)"),
+        ("run timeout calls gallop(1)", "timeout", "gallop(1)"),
+        ("run calls  gallop('a b', -1)  ", "", "gallop('a b', -1)"),
+    ],
+)
+def test_a_snippets_fence_gives_its_meaning_call_and_code_by_name(info, meant, call):
+    [snippet] = codex.snippets("Words.\n\n" + fenced(info, "a = 1\nb = 2\n") + "\nMore words.\n")
+    assert (snippet.meant, snippet.call, snippet.code) == (meant, call, "a = 1\nb = 2\n")
+
+
+@pytest.mark.parametrize("info", ["run calls", "run calls ", "runner", "run erro", "run error calls", "py run calls f()", "calls f()"])
+def test_a_fence_that_is_not_a_runnable_snippet_is_not_found(info):
+    assert codex.snippets(fenced(info)) == []
+
+
+def test_lesson_snippets_are_still_just_the_codes_in_order():
+    text = fenced("run", "one()\n") + "\n" + fenced("run calls hop(1)", "def hop(n):\n    pass\n") + fenced("run error", "two(\n")
+    assert codex.lesson_snippets(text) == ["one()\n", "def hop(n):\n    pass\n", "two(\n"]
+    assert [snippet.meant for snippet in codex.snippets(text)] == ["", "", "error"]
+
+
+def test_what_a_marked_snippet_calls_is_still_taught():
+    text = fenced("run calls shout('hi')", "def shout(word):\n    print(word.upper())\n")
+    assert codex.taught(text) == {"print", "str.upper"}

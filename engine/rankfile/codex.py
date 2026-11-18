@@ -38,6 +38,7 @@ import re
 import textwrap
 import types
 from dataclasses import asdict, dataclass, field
+from typing import NamedTuple
 
 from .errors import LEVEL_PIECE, piece_class
 from .exceptions import IT_KNOWS
@@ -46,8 +47,12 @@ from .pieces import PIECES, Pawn, Piece
 
 SECTIONS = ("Args", "Returns", "Example")
 
-# A lesson's runnable snippets: ```python run``` blocks, optionally `run error`, `run lost` or `run timeout`.
-SNIPPET = re.compile(r"^```python run(?: (error|lost|timeout))?\n(.*?)^```", re.MULTILINE | re.DOTALL)
+# A lesson's runnable snippets: ```python run``` blocks, optionally `run error`, `run lost` or `run timeout`, and
+# optionally `calls gallop(1, 2)` after that (M5.2-5a): the call the examiner makes once the snippet has run, the
+# rest of the fence line.
+SNIPPET = re.compile(
+    r"^```python run(?: (?P<meant>error|lost|timeout))?(?: calls +(?P<call>\S[^\n]*))?\n(?P<code>.*?)^```", re.MULTILINE | re.DOTALL
+)
 
 
 @dataclass
@@ -466,9 +471,22 @@ def python_called(code: str) -> set[str]:
     return _builtins_in(callees) | _methods_in(callees)
 
 
+class Snippet(NamedTuple):
+    """One runnable snippet of a lesson, as its fence gives it."""
+
+    meant: str  # how it ends on purpose: "error", "lost", "timeout", or "" (it finishes)
+    call: str  # the call the examiner makes after it ("gallop(1, 2)"), or "" (none)
+    code: str
+
+
+def snippets(markdown: str) -> list[Snippet]:
+    """A lesson's runnable snippets, in order, read by name from the pattern."""
+    return [Snippet(found["meant"] or "", (found["call"] or "").strip(), found["code"]) for found in SNIPPET.finditer(markdown)]
+
+
 def lesson_snippets(markdown: str) -> list[str]:
     """The code of a lesson's runnable snippets, in order."""
-    return [code for _, code in SNIPPET.findall(markdown)]
+    return [snippet.code for snippet in snippets(markdown)]
 
 
 def taught(markdown: str) -> set[str]:

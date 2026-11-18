@@ -168,10 +168,10 @@ def test_lesson_is_short_and_runnable(level_file):
     words = re.findall(r"[A-Za-z0-9_']+", prose)
     assert len(words) <= MAX_LESSON_WORDS, f"{level.lesson} has {len(words)} words of prose"
 
-    snippets = codex.SNIPPET.findall(text)
+    snippets = codex.snippets(text)
     assert 1 <= len(snippets) <= 3, f"{level.lesson} needs 1-3 runnable snippets"
-    for meant, code in snippets:
-        result = run_sandbox(code, level.api, piece=level.piece, lesson_board=level.lesson_board)
+    for meant, call, code in snippets:
+        result = run_sandbox(code, level.api, piece=level.piece, lesson_board=level.lesson_board, call=call)
         if meant:
             assert result.status == meant, f"snippet should end in {meant} on purpose, not {result.status}:\n{code}"
         else:

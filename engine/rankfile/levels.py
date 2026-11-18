@@ -127,7 +127,7 @@ class FunctionRule:
 
     params: int | None = None  # how many parameters it takes
     defaults: int | None = None  # how many of them have a default value
-    calls: int | None = None  # how many times the program calls it, at least
+    calls: int | None = None  # in how many places the program calls it, at least
     returns: bool = False  # it hands back a value with `return`
 
 

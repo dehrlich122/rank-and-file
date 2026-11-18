@@ -8,8 +8,9 @@ from pathlib import Path
 import pytest
 
 from conftest import make_level
+from rankfile import bridge
 from rankfile.levels import NOT_JUDGED, Examine, ExamineCall, LevelError, parse_level
-from rankfile.runner import examiner_line, execute, run_level
+from rankfile.runner import examiner_line, execute, parse_snippet_call, run_level, run_sandbox
 from rankfile.tracer import PLAYER_FILENAME
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "scripts"))
@@ -612,3 +613,145 @@ def test_the_examiner_makes_the_calls_so_its_function_cannot_be_asked_to_be_call
 def test_a_rule_that_asks_for_calls_of_another_function_is_fine_on_an_examiner_level():
     level = examiner({"args": [1]}, constraints={"functions": {"hop": {"calls": 2}, "gallop": {"params": 1}}})
     assert level.constraints.functions["hop"].calls == 2
+
+
+# -- a lesson snippet the examiner calls (M5.2-5a) -------------------------------------------------------------
+
+DEFINES = "def gallop(a, b):\n    pawn.move(a)\n    return b\n"
+
+
+def sandbox(code, call="gallop(1, 2)", **kwargs):
+    return run_sandbox(code, ["move", "turn_left"], call=call, **kwargs)
+
+
+@pytest.mark.parametrize(
+    ("text", "parsed"),
+    [
+        ("gallop(1, 2)", ("gallop", [1, 2])),
+        ("  gallop( -1 , 2.5 , 'a', \"b\", True, False, None )  ", ("gallop", [-1, 2.5, "a", "b", True, False, None])),
+        ("hop()", ("hop", [])),
+        ("hop(-0.5)", ("hop", [-0.5])),
+    ],
+)
+def test_a_snippets_call_is_read_with_ast(text, parsed):
+    name, args = parse_snippet_call(text)
+    assert (name, args) == parsed
+    assert [type(arg) for arg in args] == [type(arg) for arg in parsed[1]]  # True is not 1
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["pawn.move(1)", "gallop(a=1)", "gallop(x)", "gallop(1 + 2)", "gallop(-True)", "gallop(-'a')", "gallop(--1)", "gallop(+1)",
+     "gallop([1])", "gallop(b'a')", "gallop(1j)", "gallop(*args)", "gallop(1)(2)", "gallop", "gallop(1); gallop(2)", "gallop(",
+     "gallop(1)\ngallop(2)", "", "x = gallop(1)"],
+)  # fmt: skip
+def test_a_snippets_call_that_is_not_one_plain_call_is_a_lesson_authors_mistake(text):
+    with pytest.raises(ValueError, match="must be one call of a plain function name with plain values") as raised:
+        parse_snippet_call(text)
+    assert repr(text) in str(raised.value)
+    if text:  # run_sandbox refuses it the same way, before anything runs
+        with pytest.raises(ValueError, match="plain function name"):
+            sandbox(DEFINES, call=text)
+
+
+def test_a_call_that_is_made_is_a_finished_run_that_says_so():
+    result = sandbox("def gallop(a, b):\n    pawn.move(a)\n")
+    assert result.status == "finished" and result.summary == "The examiner called `gallop(1, 2)`."
+    assert result.call.text == "gallop(1, 2)" and result.call.returned == "None" and result.call.wanted is None
+    assert "“" not in result.summary
+
+
+def test_a_call_that_hands_something_back_says_what():
+    result = sandbox("def double(n):\n    return n * 2\n", call="double(4)")
+    assert (result.status, result.summary) == ("finished", "The examiner called `double(4)` and got 8 back.")
+    assert result.call.returned == "8"
+    assert sandbox("def f(s):\n    return s\n", call="f('hi')").summary == "The examiner called `f('hi')` and got 'hi' back."
+
+
+def test_the_calls_steps_start_at_first_step_one_level_deep():
+    result = sandbox("pawn.move(1)\ndef gallop(a, b):\n    pawn.move(a)\n    pawn.move(b)\n", call="gallop(1, 1)")
+    steps = result.to_dict()["steps"]
+    first = result.call.first_step
+    assert result.status == "finished" and 0 < first < len(steps), result.summary
+    assert all(step["depth"] == 0 for step in steps[:first])
+    assert [step["depth"] for step in steps[first:]] == [1, 1]
+    assert {step["scope"] for step in steps[first:]} == {"gallop"}
+    assert result.final != result.start
+
+
+@pytest.mark.parametrize(
+    ("code", "call", "kind"),
+    [
+        ("pawn.move(1)\n", "gallop(1, 2)", "missing"),
+        ("gallop = 5\n", "gallop(1, 2)", "not_function"),
+        (DEFINES, "gallop(1)", "arguments"),
+        (DEFINES, "gallop(1, 2, 3)", "arguments"),
+    ],
+)
+def test_a_function_the_examiner_cannot_call_is_incomplete_in_the_examiners_words(code, call, kind):
+    result = sandbox(code, call=call)
+    assert result.status == "incomplete" and result.call.returned is None and result.call.wanted is None
+    assert result.summary.endswith(f"“{examiner_line(kind)}”")
+    assert ("no function called `gallop`" in result.summary) == (kind == "missing")
+    assert ("is 5" in result.summary or "a number" in result.summary) == (kind == "not_function")
+    assert ("takes 2" in result.summary) == (kind == "arguments")
+
+
+def test_the_words_are_the_ones_a_level_run_gives_for_the_same_trouble():
+    code = "def gallop(a, b):\n    pass\n"
+    level = examiner({"args": [1]})
+    assert sandbox(code, call="gallop(1)").summary == run_level(level, code).summary
+
+
+def test_a_near_miss_among_the_programs_own_functions_is_named():
+    result = sandbox("def galop(a, b):\n    pass\n")
+    assert result.status == "incomplete" and "It has `galop`" in result.summary
+
+
+@pytest.mark.parametrize(
+    ("code", "status"),
+    [
+        ("def gallop(a, b):\n    pawn.move(a)\n    raise ValueError('x')\n", "error"),
+        ("def gallop(a, b):\n    while True:\n        pass\n", "timeout"),
+        ("pawn.move(1)\nboom\ndef gallop(a, b):\n    pass\n", "error"),
+        ("def gallop(a, b):\n    pass\nwhile True:\n    pass\n", "timeout"),
+    ],
+)
+def test_an_error_a_loss_or_a_timeout_is_as_any_snippet_with_the_call_filled(code, status):
+    result = sandbox(code)
+    assert result.status == status, result.summary
+    assert result.call is not None and result.call.text == "gallop(1, 2)" and result.call.returned is None
+
+
+def test_a_loss_inside_the_call_is_a_lost_snippet():
+    board = {"map": "O\n.\nP\n", "legend": {"O": {"tile": "pit"}}}
+    result = sandbox("def gallop(a, b):\n    pawn.move(a)\n", call="gallop(2, 0)", lesson_board=board)
+    assert result.status == "lost" and result.call.text == "gallop(2, 0)"
+
+
+def test_the_called_function_is_not_noted_as_never_called_but_another_one_is():
+    result = sandbox("def gallop(a, b):\n    pass\ndef hop():\n    pass\n")
+    notes = [warning["message"] for warning in result.to_dict()["warnings"]]
+    assert len(notes) == 1 and "`hop` is defined here but never called" in notes[0]
+    assert not sandbox("def gallop(a, b):\n    pass\n").to_dict()["warnings"]
+
+
+def test_the_call_is_made_on_the_lesson_board():
+    result = sandbox("def gallop(a, b):\n    pawn.move(a)\n", lesson_board={"map": ". . .\n. P .\n"})
+    assert result.status == "finished" and result.final != result.start
+
+
+@pytest.mark.parametrize("call", [None, ""])
+def test_without_a_call_a_snippet_runs_as_before(call):
+    result = sandbox("pawn.move(1)\n", call=call)
+    assert result.status == "finished" and result.summary == "Finished." and result.call is None
+
+
+def test_the_bridge_takes_the_call_as_a_fifth_argument_and_the_old_four_still_work():
+    args = ("def gallop(a, b):\n    return a + b\n", json.dumps(["move"]), "null", "pawn")
+    with_call = json.loads(bridge.run_sandbox(*args, "gallop(1, 2)"))
+    assert with_call["status"] == "finished" and with_call["call"]["returned"] == "3"
+    assert with_call["summary"] == "The examiner called `gallop(1, 2)` and got 3 back."
+    for old in (json.loads(bridge.run_sandbox(*args)), json.loads(bridge.run_sandbox(*args, ""))):
+        assert old["call"] is None and old["summary"] == "Finished."
+    assert json.loads(bridge.run_sandbox("pawn.move(1)\n", json.dumps(["move"]), call="gallop(1)"))["status"] == "incomplete"
