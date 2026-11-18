@@ -1,0 +1,31 @@
+id: ch07-l02
+chapter: 7
+title: "A Spell of Your Own"
+trains: "def: giving some lines a name, and calling them by it"
+brief: "The same steps, again and again, with something different in between each time. Teach your knight the steps once, and give them a name."
+piece: knight
+map: |
+  O . O O O O O O O O
+  O O O O O O O O O O
+  P O . O O O O O O O
+  . O O O O . O O . O
+  O O . O O O O O O O
+  O O O O . O . . O .
+  O O O O . O O . O O
+  O O O O O O . O O G
+legend: {"O": "pit"}
+start: {"facing": "north"}
+api: ["jump"]
+constraints: {"max_lines": 10, "define": 1}
+par: {"lines": 10}
+hints:
+- "The same figure of jumps comes three times on this board. Find it in the stones before you write a line."
+- "def gives a name to some lines: the lines indented under it are the function's body. Defining runs nothing. The body runs each time you call the name, with parentheses. Put the figure in a function, and write only the jumps in between by hand."
+- "A function, and two calls to it:\ndef figure():\n    knight.jump(...)\n    knight.jump(...)\n\nfigure()\nfigure()"
+lesson: ch07/ch07-l02.md
+lesson_board:
+  map: |
+    . . . . .
+    . . . . .
+    P . . . .
+  start: {"facing": "north"}

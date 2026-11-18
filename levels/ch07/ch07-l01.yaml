@@ -1,0 +1,33 @@
+id: ch07-l01
+chapter: 7
+title: "Stepping Stones"
+trains: "The knight's jump: knight.jump(dx, dy), over walls and onto enemies"
+brief: "Your pawn is a knight now. It can't walk a single square, and no wall can stop it. Cross the stones."
+piece: knight
+map: |
+  O O O . O O # P O
+  O O . O O . # O O
+  O . O O . O # O O
+  G O O . O O # O O
+  O O . O O O # O O
+legend: {"O": "pit"}
+enemies:
+- {"kind": "patrol", "start": "d2"}
+start: {"facing": "north"}
+objectives: ["reach_goal", {"capture": "all"}]
+api: ["jump"]
+par: {"lines": 5}
+hints:
+- "Follow the stones. Each jump has to land on the next one: the pits are a fall, and the wall is only in the way of a pawn."
+- "The first number of a jump is how far right, the second how far up; a minus goes left or down. Look for the pair of jumps that comes again and again on the path: a for loop can repeat it."
+- "One way to start:\nknight.jump(-2, -1)"
+lesson: ch07/ch07-l01.md
+lesson_board:
+  map: |
+    . . . . .
+    # . . . .
+    . # . O .
+    . P . . .
+  legend: {"O": "pit"}
+  enemies: [{"kind": "patrol", "start": "c3"}]
+  start: {"facing": "north"}

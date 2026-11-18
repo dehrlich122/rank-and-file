@@ -89,8 +89,11 @@ def main(levels: list[dict], build_one: Callable[[dict], list[str]], probe: Call
 def third_hint(spec: dict, reference: str) -> str:
     """Hint 3, from the reference's own lines (spec["hint3"]): "start" (the first n
     lines), "loops" (up to and including the nth loop's first line), "key" (the first
-    line containing a text) or "block" (that line and the lines indented under it)."""
+    line containing a text) or "block" (that line and the lines indented under it).
+    Or "said": a text of its own."""
     kind, *how = spec["hint3"]
+    if kind == "said":  # written by hand, in ROT13: the mechanic's code with none of the level's own figures
+        return said(how[0])
     code = reference.splitlines()
     if kind == "start":
         return "One way to start:\n" + "\n".join(code[: how[0]])
@@ -157,8 +160,13 @@ def yaml_text(spec: dict, *, chapter: int, api: list[str], par: int, hints: list
         rules["max_lines"] = par + 2
     if spec.get("require"):
         rules["require_nodes"] = spec["require"]
+    if "slack" in spec:  # a line limit this far above par (0: par is the limit)
+        rules["max_lines"] = par + spec["slack"]
+    rules.update(spec.get("rules", {}))
     if rules:
         lines.append(f"constraints: {q(rules)}")
+    if spec.get("examine"):
+        lines.append(f"examine: {q(spec['examine'])}")
     lines.append(f"par: {q({'lines': par})}")
     lines.append("hints:")
     lines += [f"- {q(hint)}" for hint in hints]

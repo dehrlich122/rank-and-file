@@ -1,0 +1,45 @@
+id: ch07-l03
+chapter: 7
+title: "Spells That Take Orders"
+trains: "Parameters: a function with blanks to fill, and a default value for one nobody fills"
+brief: "The examiner will call your spell gallop: which way, and how many strides. Sometimes it won't say how many. Then it means one."
+piece: knight
+map: |
+  G O . O . O P
+  O O O O O O O
+  O . O . O . O
+legend: {"O": "pit"}
+start: {"facing": "north"}
+api: ["jump"]
+examine: {"function": "gallop", "calls": [{"args": [-1, 3], "board": 1}, {"args": [1], "board": 2}, {"args": [1, 2], "board": 3}, {"args": [-1, 4], "board": 4}]}
+par: {"lines": 4}
+hints:
+- "The examiner's calls are listed before the run. Read them against the boards: what does the first value say, and what the second?"
+- "A parameter is a name in the parentheses of the def line: each call fills it with a value, in order. Use the second one to count the strides, and multiply the first number of each jump by the first one: minus one turns east into west. A parameter with a default, like strides=1, may be left out of a call."
+- "A parameter with a default, and a jump that follows the direction:\ndef gallop(direction, strides=1):\n    knight.jump(direction * ..., ...)"
+lesson: ch07/ch07-l03.md
+lesson_board:
+  map: |
+    . . .
+    . . .
+    . . .
+    . . .
+    . . .
+    . . .
+    P . .
+    . . .
+    . . .
+  start: {"facing": "north"}
+variants:
+- map: |
+    P O G
+    O O O
+    O . O
+- map: |
+    P O . O G
+    O O O O O
+    O . O . O
+- map: |
+    G O . O . O . O P
+    O O O O O O O O O
+    O . O . O . O . O

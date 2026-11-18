@@ -1,0 +1,43 @@
+id: ch07-l04
+chapter: 7
+title: "Spells That Answer"
+trains: "return: a function that hands a value back to whoever called it"
+brief: "Near the far end of the stones is a rune with a number on it. The examiner sends your knight across to the goal, and wants the number back."
+piece: knight
+map: |
+  O . O O O
+  O O O O G
+  P O R O O
+legend: {"O": "pit", "R": {"tile": "rune", "text": "42"}}
+start: {"facing": "north"}
+api: ["jump", "read"]
+examine: {"function": "fetch", "calls": [{"args": [1], "board": 1, "returns": 42}, {"args": [4], "board": 2, "returns": 3}, {"args": [2], "board": 3, "returns": 9}, {"args": [3], "board": 4, "returns": 5}]}
+par: {"lines": 7}
+hints:
+- "The number is written on the rune, and it is different on every board. Your knight has to land on the rune to read it."
+- "return hands a value back to whoever called the function, and ends the function right there. Printing only shows a value on the screen. The rune gives text, and the examiner wants a number. The goal is one jump past the rune, so keep the number in a name until the last jump is done."
+- "Keep the answer, finish the move, then hand it back:\n    number = int(knight.read())\n    knight.jump(...)\n    return number"
+lesson: ch07/ch07-l04.md
+lesson_board:
+  map: |
+    . R . . .
+    . . . . .
+    P . . . .
+  legend: {"R": {"tile": "rune", "text": "21"}}
+  start: {"facing": "north"}
+variants:
+- map: |
+    O . O . O . O . O O O
+    O O O O O O O O O O G
+    P O . O . O . O R O O
+  legend: {"R": {"tile": "rune", "text": "3"}}
+- map: |
+    O . O . O O O
+    O O O O O O G
+    P O . O R O O
+  legend: {"R": {"tile": "rune", "text": "9"}}
+- map: |
+    O . O . O . O O O
+    O O O O O O O O G
+    P O . O . O R O O
+  legend: {"R": {"tile": "rune", "text": "5"}}
