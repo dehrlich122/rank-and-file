@@ -1350,13 +1350,16 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   // Chosen from the boards (`scripts.show_level`): practice-11's knight starts in the corner a1, so one square left
   // is off the board; practice-12's wall is the whole d file, so a1 → c2 → (one right, two up) lands on the wall on d4.
-  await check("M5.1: a jump off the board or onto a wall is refused as blocked, in words of landing", async () => {
+  // The designer's rule: on a bumped run the rings stay (the knight stands where it was), so each board is read after its run.
+  await check("M5.1: a jump off the board or onto a wall is refused as blocked, in words of landing, and the rings stay drawn", async () => {
     await openLevel("practice-11", { fresh: true });
     await setCode("knight.jump(-1, 2)");
     const off = await run();
+    expectRingsAgree(await knightView(), "after the jump off the board");
     await openLevel("practice-12", { fresh: true });
     await setCode("knight.jump(2, 1)\nknight.jump(1, 2)");
     const wall = await run();
+    expectRingsAgree(await knightView(), "after the jump onto the wall");
     expect(off.head === "Python stopped" && off.errorLine && off.text.includes("land off the edge of the board"), brief(off));
     expect(wall.head === "Python stopped" && wall.errorLine && wall.text.includes("can't land on a wall on d4"), brief(wall));
     for (const r of [off, wall]) expect(!/walk|bumped|Traceback/.test(r.text), `a pawn's words: ${brief(r)}`);
