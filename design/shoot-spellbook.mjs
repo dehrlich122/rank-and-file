@@ -15,11 +15,11 @@ const browser = await launch({ width: 1520, height: 900 });
 try {
   await browser.send("Emulation.setScrollbarsHidden", { hidden: true });
   await browser.send("Page.navigate", { url: base });
-  await browser.waitFor(`document.querySelectorAll(".pane").length === 6 && document.querySelectorAll(".pane .board").length >= 2`, 60_000, "sheet rendered");
+  await browser.waitFor(`document.querySelectorAll(".pane").length === 10 && document.querySelectorAll(".pane .board").length >= 2`, 60_000, "sheet rendered");
   await browser.evaluate(`document.fonts.ready.then(() => true)`);
   await sleep(800);
 
-  const names = ["boards", "variables", "code"];
+  const names = ["boards", "examiner-before", "examiner-after", "variables", "code"];
   for (const [i, name] of names.entries()) {
     for (const [j, theme] of ["dark", "light"].entries()) {
       const rect = await browser.evaluate(`(() => { const r = document.querySelectorAll('.pane')[${i * 2 + j}].getBoundingClientRect(); return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height }; })()`);
@@ -30,7 +30,7 @@ try {
   }
 
   // V2's folded line opens and closes
-  const fold = `document.querySelectorAll('.pane')[2].querySelector('details.fold')`;
+  const fold = `document.querySelectorAll('.pane')[6].querySelector('details.fold')`;
   await browser.evaluate(`${fold}.querySelector('summary').click()`);
   const opened = await browser.evaluate(`${fold}.open`);
   await browser.evaluate(`${fold}.querySelector('summary').click()`);

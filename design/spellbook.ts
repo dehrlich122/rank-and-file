@@ -1,6 +1,6 @@
 // M5.2 (design sheet): Chapter 7 (Spellbook), before any of it goes into the game.
 //   /design/spellbook.html
-// Panes 1, 4 and 5, each in both themes (2 and 3, the examiner, come later): the stepping-stone boards, the variables
+// Panes 1 to 5, each in both themes: the stepping-stone boards, the examiner before and after a run, the variables
 // panel while a step is inside a function, and the code panel during a call. It draws with the game's real sprites and
 // classes (the Inspector, the highlighted line). Dev-only; nothing here is in the game. The only new colours are tokens
 // in spellbook.css.
@@ -37,9 +37,27 @@ const has = (list: Pos[], p: Pos) => list.some((q) => same(q, p));
 const inside = ([x, y]: Pos) => x >= 0 && x < W && y >= 0 && y < H;
 const isKnightJump = (a: Pos, b: Pos) => L_JUMPS.some((j) => same([a[0] + j[0], a[1] + j[1]], b));
 
-if (!STONES.slice(1).every((s, i) => isKnightJump(STONES[i]!, s))) throw new Error("the path has a step that is not a knight's jump");
-
 type Chasm = "pit" | "wall";
+
+/** Everything one stepping-stone board is drawn from: panes 1, 2 and 3 all draw through `drawBoard`. */
+interface Spec {
+  w: number;
+  h: number;
+  stones: Pos[];
+  walls: Pos[];
+  rest: Chasm;
+  knight: Pos;
+  face: "east" | "west";
+  label: string;
+  goalAt?: Pos;
+  rune?: { at: Pos; text?: string };
+  enemy?: Pos;
+  rings?: Pos[];
+  mini?: boolean;
+}
+
+const isPath = (stones: Pos[]) => stones.slice(1).every((s, i) => isKnightJump(stones[i]!, s));
+if (!isPath(STONES)) throw new Error("the path has a step that is not a knight's jump");
 
 /** Where a jump from the knight lands without an error: on the board, not in a wall (a pit is a legal, deadly landing). */
 function landings(rest: Chasm): Pos[] {
@@ -47,25 +65,34 @@ function landings(rest: Chasm): Pos[] {
   return L_JUMPS.map((j): Pos => [KNIGHT[0] + j[0], KNIGHT[1] + j[1]]).filter((p) => inside(p) && open(p));
 }
 
-function stoneBoard(rest: Chasm): SVGSVGElement {
-  const at = ([x, y]: Pos) => `translate(${M + x * S + S / 2} ${(H - 1 - y) * S + S / 2})`;
+function drawBoard(spec: Spec): SVGSVGElement {
+  const { w, h: rows, stones, walls, rest } = spec;
+  const at = ([x, y]: Pos) => `translate(${M + x * S + S / 2} ${(rows - 1 - y) * S + S / 2})`;
   const sprite = (cls: string, pos: Pos, art: SVGElement) => svg("g", { class: cls, transform: at(pos) }, art);
-  const board = svg("svg", { class: "board", viewBox: `0 0 ${M + W * S} ${H * S}`, role: "img", "aria-label": `Stepping stones, the rest ${rest === "pit" ? "pits" : "walls"}` });
+  const board = svg("svg", { class: spec.mini ? "board board-mini" : "board", viewBox: `0 0 ${M + w * S} ${rows * S}`, role: "img", "aria-label": spec.label });
   const squares = svg("g", { class: "squares" });
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < w; x++) {
       const pos: Pos = [x, y];
-      squares.append(svg("rect", { x: M + x * S, y: (H - 1 - y) * S, width: S, height: S, class: (x + y) % 2 === 1 ? "sq-light" : "sq-dark" }));
-      if (has(WALLS, pos) || (!has(STONES, pos) && rest === "wall")) squares.append(sprite("spr wall", pos, tile("wall")));
-      else if (!has(STONES, pos)) squares.append(sprite("spr", pos, tile("pit")));
+      squares.append(svg("rect", { x: M + x * S, y: (rows - 1 - y) * S, width: S, height: S, class: (x + y) % 2 === 1 ? "sq-light" : "sq-dark" }));
+      if (has(walls, pos) || (!has(stones, pos) && rest === "wall")) squares.append(sprite("spr wall", pos, tile("wall")));
+      else if (!has(stones, pos)) squares.append(sprite("spr", pos, tile("pit")));
     }
   }
-  squares.append(sprite("spr", RUNE, tile("rune")), sprite("spr", STONES[STONES.length - 1]!, goal()));
-  const rings = landings(rest).map((p) => svg("g", { class: "land", transform: at(p) }, svg("circle", { r: 21, class: "halo" }), svg("circle", { r: 21, class: "ink" })));
-  board.append(squares, litGrid(W, H), svg("g", { "aria-hidden": "true" }, ...rings));
-  board.append(svg("g", { class: "enemy enemy-rook", transform: at(ENEMY) }, enemy("rook", "rest")), svg("g", { transform: at(KNIGHT) }, hero("knight", "east")));
+  if (spec.rune) {
+    squares.append(sprite("spr", spec.rune.at, tile("rune")));
+    if (spec.rune.text) squares.append(svg("text", { class: "rune-num", transform: at(spec.rune.at), "text-anchor": "middle", "dominant-baseline": "central" }, spec.rune.text));
+  }
+  if (spec.goalAt) squares.append(sprite("spr", spec.goalAt, goal()));
+  const rings = (spec.rings ?? []).map((p) => svg("g", { class: "land", transform: at(p) }, svg("circle", { r: 21, class: "halo" }), svg("circle", { r: 21, class: "ink" })));
+  board.append(squares, litGrid(w, rows), svg("g", { "aria-hidden": "true" }, ...rings));
+  if (spec.enemy) board.append(svg("g", { class: "enemy enemy-rook", transform: at(spec.enemy) }, enemy("rook", "rest")));
+  board.append(svg("g", { transform: at(spec.knight) }, hero("knight", spec.face)));
   return board;
 }
+
+const stoneBoard = (rest: Chasm) =>
+  drawBoard({ w: W, h: H, stones: STONES, walls: WALLS, rest, knight: KNIGHT, face: "east", label: `Stepping stones, the rest ${rest === "pit" ? "pits" : "walls"}`, goalAt: STONES[STONES.length - 1]!, rune: { at: RUNE }, enemy: ENEMY, rings: landings(rest) });
 
 function boardPane(): HTMLElement {
   const take = (id: string, text: string, rest: Chasm, caption: string) =>
@@ -92,14 +119,14 @@ const CALL = 6; // the line that made the call
 type Mark = "call" | "call-return";
 
 /** The program, with the game's own class on the running line, and the call line marked as a take asks. */
-function code(running: number, mark?: Mark): HTMLElement {
-  const rows = PROGRAM.map((text, i) => {
+function code(running: number, mark?: Mark, program = PROGRAM, extra: HTMLElement[] = []): HTMLElement {
+  const rows = program.map((text, i) => {
     const line = i + 1;
     const classes = ["code-row", line === running ? "cm-step-line" : "", line === CALL && mark === "call" ? "call-line" : ""].join(" ");
     const gutter = line === CALL && mark === "call-return" ? h("span", { class: "gutter" }, h("span", { class: "return-mark", title: "the line that made the call" }, "↩ "), String(line)) : h("span", { class: "gutter" }, String(line));
     return h("div", { class: classes }, gutter, h("span", { class: "cm-line" }, text));
   });
-  return h("div", { class: "code cm-editor" }, ...rows);
+  return h("div", { class: "code cm-editor" }, ...rows, ...extra);
 }
 
 // -- pane 4: the variables panel inside a function ----------------------------------------------------------------
@@ -184,6 +211,151 @@ function codePane(): HTMLElement {
   );
 }
 
+// -- pane 2: the examiner before a run ------------------------------------------------------------------------------
+
+interface Call {
+  call: string;
+  dir: 1 | -1;
+  strides: number;
+}
+const GALLOPS: Call[] = [
+  { call: "gallop(1, 3)", dir: 1, strides: 3 },
+  { call: "gallop(-1, 2)", dir: -1, strides: 2 },
+  { call: "gallop(1)", dir: 1, strides: 1 },
+  { call: "gallop(-1, 4)", dir: -1, strides: 4 },
+];
+
+/** A zigzag row of stones (right one, up two; right one, down two), a stride being two jumps; the knight at the end it starts from. */
+function zigzag(jumps: number, dir: 1 | -1): Pos[] {
+  const stones = Array.from({ length: jumps + 1 }, (_, i): Pos => [dir === 1 ? i : jumps - i, i % 2 === 0 ? 1 : 3]);
+  if (!isPath(stones)) throw new Error("the row has a step that is not a knight's jump");
+  return stones;
+}
+
+function rowBoard(c: Call, opts: { mini?: boolean; rune?: string; end?: boolean } = {}): SVGSVGElement {
+  const stones = zigzag(c.strides * 2, c.dir);
+  const far = stones[stones.length - 1]!;
+  return drawBoard({
+    w: stones.length,
+    h: 4,
+    stones,
+    walls: [],
+    rest: "pit",
+    knight: opts.end ? far : stones[0]!,
+    face: c.dir === 1 ? "east" : "west",
+    label: `The board for ${c.call}`,
+    goalAt: opts.rune === undefined ? far : undefined,
+    rune: opts.rune === undefined ? undefined : { at: far, text: opts.rune },
+    mini: opts.mini,
+  });
+}
+
+const callCode = (text: string) => h("code", { class: "call-code" }, text);
+
+type Ask = "E1" | "E2" | "E3";
+
+function examinerMock(ask: Ask): HTMLElement {
+  const panel = h("div", { class: "challenge-box" }, h("p", { class: "box-head" }, "Challenge"));
+  if (ask === "E1") panel.append(h("p", {}, "The examiner will call:"), h("ol", { class: "call-list" }, ...GALLOPS.map((c) => h("li", {}, callCode(c.call)))));
+  else panel.append(h("p", {}, "The examiner calls ", callCode("gallop"), " once on each board."));
+  const stage = h("div", { class: "stage" });
+  const show = (picked: number) => {
+    if (ask === "E3") {
+      const buttons = GALLOPS.map((c, i) => h("button", { class: "btn btn-small btn-toggle", "aria-pressed": String(i === picked), onClick: () => show(i) }, c.call));
+      stage.replaceChildren(h("div", { class: "case-row", role: "group", "aria-label": "Calls" }, ...buttons), node(rowBoard(GALLOPS[picked]!)));
+      return;
+    }
+    const thumb = (c: Call, i: number) => {
+      const label = h("span", { class: "board-thumb-label" }, ask === "E1" ? `Board ${i + 1}` : c.call);
+      const art = node(rowBoard(c, { mini: true }));
+      return h("button", { class: "btn board-thumb", title: `Look at board ${i + 1}`, onClick: () => show(i) }, ...(ask === "E1" ? [label, art] : [art, label]));
+    };
+    const others = GALLOPS.flatMap((c, i) => (i === picked ? [] : [thumb(c, i)]));
+    const caption = ask === "E1" ? `Board ${picked + 1} of 4` : GALLOPS[picked]!.call;
+    stage.replaceChildren(h("div", { class: "boards" }, h("div", { class: "boards-main" }, h("p", { class: "boards-caption" }, caption), node(rowBoard(GALLOPS[picked]!))), h("div", { class: "boards-side", role: "group", "aria-label": "The other boards" }, ...others)));
+  };
+  show(0);
+  return h("div", { class: "mock" }, panel, stage);
+}
+
+function examinerPane(): HTMLElement {
+  const take = (id: Ask, text: string) => h("figure", { class: "take" }, tag(id, text), examinerMock(id));
+  return h(
+    "div",
+    {},
+    h("p", { class: "note" }, "Made up: a function gallop(direction, strides) and four calls, one board each (a stride is two jumps along the row; the knight starts at the left end when the direction is 1, the right end when it is -1). The small boards and the buttons are clickable."),
+    h("div", { class: "column" }, take("E1", "the panel lists the numbered calls; each small board carries its number"), take("E2", "the panel has one sentence; each small board carries its call as a caption"), take("E3", "buttons above the board, one per call; the picked call's board is the main board")),
+  );
+}
+
+// -- pane 3: the examiner after a run -------------------------------------------------------------------------------
+
+interface Result extends Call {
+  want: string;
+  got: string;
+  ok: boolean;
+}
+const FETCHES: Result[] = [
+  { call: "fetch(3)", dir: 1, strides: 3, want: "7", got: "7", ok: true },
+  { call: "fetch(5)", dir: 1, strides: 5, want: "12", got: "None", ok: false },
+  { call: "fetch(2)", dir: 1, strides: 2, want: "4", got: "'4'", ok: false },
+  { call: "fetch(4)", dir: 1, strides: 4, want: "9", got: "9", ok: true },
+];
+const PICKED = 1;
+const FAIL_LINE = "You showed me the number. I asked you to hand it to me.";
+const FETCH_PROGRAM = ["def fetch(strides):", "    # ... the ride to the far stone ...", "    print(knight.read())"];
+
+const tick = (ok: boolean) => (ok ? "✓" : "✗");
+const examinerSays = (text: string) => h("p", { class: "examiner-line" }, h("span", { class: "examiner-mark", title: "the examiner" }, "E"), `“${text}”`);
+
+interface After {
+  buttons?: boolean;
+  table?: boolean;
+  voice?: "card" | "console" | "caption";
+}
+
+function resultMock(opts: After): HTMLElement {
+  const r = FETCHES[PICKED]!;
+  const body: HTMLElement[] = [h("p", {}, `${r.call} gave back ${r.got}. The examiner wanted ${r.want}.`)];
+  if (opts.voice === "card") body.push(examinerSays(FAIL_LINE));
+  if (opts.table) {
+    const rows = FETCHES.map((f, i) =>
+      h("tr", { class: i === PICKED ? "picked" : "" }, h("td", {}, h("button", { class: "btn btn-small", title: `Replay ${f.call}` }, f.call)), h("td", {}, f.want), h("td", {}, f.got), h("td", { class: f.ok ? "ok" : "no" }, tick(f.ok))),
+    );
+    body.push(h("table", { class: "calls" }, h("thead", {}, h("tr", {}, ...["call", "wanted", "got", ""].map((t) => h("th", {}, t)))), h("tbody", {}, ...rows)));
+  }
+  const card = h("div", { class: "outcome outcome-bad" }, h("div", { class: "outcome-head" }, h("strong", {}, "Not solved")), ...body);
+  const buttons = FETCHES.map((f, i) => h("button", { class: "btn btn-small btn-toggle", "aria-pressed": String(i === PICKED) }, `${f.call} ${tick(f.ok)}`));
+  const top: HTMLElement[] = opts.buttons ? [h("div", { class: "case-row", role: "group", "aria-label": "Calls" }, ...buttons)] : [];
+  const caption = opts.voice === "caption" ? [h("p", { class: "boards-caption" }, FAIL_LINE)] : [];
+  const consoleBox = opts.voice === "console" ? [h("pre", { class: "console" }, `${FAIL_LINE}\n`)] : [];
+  return h("div", { class: "mock mock-after" }, h("div", { class: "stage" }, ...top, ...caption, node(rowBoard(r, { rune: r.want, end: true }))), h("div", { class: "side" }, card, ...consoleBox));
+}
+
+type Calling = "K1" | "K2" | "K3";
+
+function callMoment(k: Calling): HTMLElement {
+  const r = FETCHES[PICKED]!;
+  const line = h("div", { class: "code-row extra-row cm-step-line" }, h("span", { class: "gutter" }, ""), h("span", { class: "cm-line" }, r.call), h("span", { class: "examiner-tag" }, "the examiner"));
+  const caption = h("p", { class: "boards-caption" }, k === "K2" ? " " : `The examiner calls ${r.call}`);
+  return h("div", { class: "mock mock-after" }, h("div", { class: "stage" }, caption, node(rowBoard(r, { rune: r.want }))), h("div", { class: "side" }, code(0, undefined, FETCH_PROGRAM, k === "K1" ? [] : [line])));
+}
+
+function resultPane(): HTMLElement {
+  const take = (id: string, text: string, mock: HTMLElement) => h("figure", { class: "take" }, tag(id, text), mock);
+  const voice = (id: string, text: string, v: After["voice"]) => take(id, text, resultMock({ buttons: true, voice: v }));
+  return h(
+    "div",
+    {},
+    h("p", { class: "note" }, "Made up: fetch(strides) rides to the far stone, a rune, and has to hand its number back. Four calls; the failed fetch(5) is picked, its board on show with the knight on the far stone."),
+    h("div", { class: "column" }, take("R1", "buttons above the board with a tick or cross each; the card names the picked call", resultMock({ buttons: true })), take("R2", "no buttons; a small table in the card, one row per call, the picked row marked, each row a button", resultMock({ table: true })), take("R3", "both the buttons and the table", resultMock({ buttons: true, table: true }))),
+    h("p", { class: "note" }, "Where the examiner speaks (shown on R1's layout):"),
+    h("div", { class: "column" }, voice("S1", "in the result card, a quoted line under the verdict with a small mark", "card"), voice("S2", "in the console, where the gate guards' replies appear today", "console"), voice("S3", "a caption over the board when the call ends", "caption")),
+    h("p", { class: "note" }, "How playback shows the examiner making its call (the player's code only defines the function). A passing call's line would be: “Correct. I had rather hoped to be disappointed.”"),
+    h("div", { class: "column" }, take("K1", "a caption over the board", callMoment("K1")), take("K2", "a dimmed extra line under the code, not theirs to edit, highlighted as the calling line", callMoment("K2")), take("K3", "both", callMoment("K3"))),
+  );
+}
+
 // -- the sheet -------------------------------------------------------------------------------------------------------
 
 const pane = (scheme: "dark" | "light", name: string, child: HTMLElement) => h("div", { class: "pane", "data-scheme": scheme }, h("p", { class: "pane-name" }, name), child);
@@ -194,9 +366,11 @@ document.getElementById("sheet")!.append(
     "header",
     { class: "sheet-head" },
     h("h1", {}, "Chapter 7 · Spellbook"),
-    h("p", {}, "M5.2 design sheet. Choose between the labelled takes: B1 or B2 (the stepping-stone boards), V1 to V3 (the variables panel inside a function) with F1 or F2 (how a function the player defined is listed), and C1 to C3 (the code panel during a call). Panes 2 and 3 (the examiner) come later."),
+    h("p", {}, "M5.2 design sheet. Choose between the labelled takes: B1 or B2 (the stepping-stone boards), V1 to V3 (the variables panel inside a function) with F1 or F2 (how a function the player defined is listed), and C1 to C3 (the code panel during a call), E1 to E3 (the examiner before a run), R1 to R3 with S1 to S3 and K1 to K3 (after it)."),
   ),
   ...both("1 · Stepping-stone boards", boardPane),
+  ...both("2 · The examiner before a run", examinerPane),
+  ...both("3 · The examiner after a run", resultPane),
   ...both("4 · The variables panel inside a function", variablesPane),
   ...both("5 · The code panel during a call", codePane),
 );

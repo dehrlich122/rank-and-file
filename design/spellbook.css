@@ -9,6 +9,8 @@
   --call-bar: light-dark(rgb(10 127 156 / 0.7), rgb(59 224 255 / 0.6));
   --scope-bar: var(--accent);
   --gutter-text: var(--muted);
+  /* the examiner's mark, and a failed call's cross */
+  --examiner: light-dark(#a8610a, #ffb454);
 }
 
 body {
@@ -109,7 +111,7 @@ body {
   font: 700 13px var(--font-code);
 }
 
-.take .board {
+.take .board:not(.board-mini) {
   max-height: none;
   width: var(--bw, 560px);
 }
@@ -236,4 +238,131 @@ body {
   padding: 2px 8px 4px;
   font: 12px var(--font-code);
   color: var(--muted);
+}
+
+/* panes 2 and 3: the examiner */
+.column {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
+}
+
+.mock {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.mock-after {
+  grid-template-columns: 560px 320px;
+}
+
+.challenge-box {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.side {
+  display: grid;
+  gap: 8px;
+}
+
+.box-head {
+  margin: 0 0 6px;
+  font: 700 12px var(--font-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.challenge-box p {
+  margin: 0 0 6px;
+}
+
+.call-list {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.call-code {
+  font: 13px var(--font-code);
+  color: var(--accent);
+}
+
+.stage {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.mock .boards-main .board {
+  width: 420px;
+}
+
+.mock .board-thumb .board-mini {
+  width: 150px;
+  height: auto;
+}
+
+.rune-num {
+  fill: var(--text);
+  font: 700 22px var(--font-code);
+  paint-order: stroke;
+  stroke: var(--land-halo);
+  stroke-width: 4px;
+  pointer-events: none;
+}
+
+.calls {
+  border-collapse: collapse;
+  font: 13px var(--font-code);
+}
+
+.calls th,
+.calls td {
+  padding: 2px 8px;
+  text-align: left;
+}
+
+.calls tr.picked {
+  background: var(--panel);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.calls .ok {
+  color: var(--accent);
+}
+
+.calls .no {
+  color: var(--examiner);
+}
+
+.examiner-line {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-style: italic;
+}
+
+.examiner-mark,
+.examiner-tag {
+  flex: none;
+  padding: 0 6px;
+  font: 700 11px var(--font-code);
+  font-style: normal;
+  background: var(--examiner);
+  color: var(--accent-text);
+}
+
+.extra-row {
+  opacity: 0.8;
+  border-top: 1px dashed var(--border);
+}
+
+.extra-row .cm-line {
+  flex: 1;
+  font-style: italic;
 }
