@@ -10,6 +10,7 @@ checker instead of confusing a player.
 import ast
 import builtins
 import keyword
+import math
 import re
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, replace
@@ -104,7 +105,7 @@ CLOCK_TICKS = {
 ALLOWED_KEYS = {
     "id", "chapter", "title", "trains", "brief", "piece", "map", "legend", "start",
     "objectives", "api", "constraints", "par", "hints", "lesson", "starter", "variants",
-    "enemies", "lesson_board", "mastery", "solution", "set", "difficulty", "draws_on",
+    "enemies", "lesson_board", "mastery", "solution", "set", "difficulty", "draws_on", "examine",
 }  # fmt: skip
 # A level made in the editor (M4.2) has no chapter, lesson or "trains" line, so only these are required here;
 # the level checker (engine/tests/test_levels.py) still asks the repo's levels for all of them.
@@ -269,21 +270,47 @@ class Level:
     challenge_set: str = ""  # the Free Play set a challenge belongs to (M4.4; the file's `set`); "" for any other level
     difficulty: int | None = None  # 1 to 5, set by the author (M4.4); required in a challenge, optional elsewhere
     draws_on: list[int] = field(default_factory=list)  # the chapters a challenge mixes, for its "Draws on" chips (M4.4)
-    examine: Examine | None = None  # the examiner (M5.2): parsed by M5.2-4a; until then always None
+    examine: Examine | None = None  # the examiner (M5.2, the file's `examine`); None on a level whose own program does the moving
+    call: ExamineCall | None = None  # on a case's level (Level.cases): the one call that case makes; None on a level of the file
 
     def cases(self) -> list[Case]:
         """Every situation a solution must handle: one per square a hidden goal
-        could be on, or this board and then each other map. (A level has one
-        kind or the other, never both.)"""
+        could be on, or this board and then each other map, or (M5.2) one per call
+        the examiner makes. (A level has one kind: ? squares are refused together
+        with other maps, and together with an examiner.)"""
+        if self.examine:
+            return self._calls()
         if self.goal_spots:
             return [Case(square_name(spot), f"with the goal on {square_name(spot)}", replace(self, goal=spot)) for spot in self.goal_spots]
         boards = [Case(f"board {number}", f"on board {number}", variant) for number, variant in enumerate(self.variants, start=2)]
         return [Case("board 1", "on board 1", replace(self, variants=[])), *boards]
 
+    def _boards(self) -> list[Level]:
+        """This board, then each other map, as levels of their own (the examiner belongs to the whole level, not to them)."""
+        return [replace(self, variants=[], examine=None), *self.variants]
+
+    def _calls(self) -> list[Case]:
+        """An examiner level's cases (M5.2): one per call, in the file's order, on the call's board. A case's level
+        carries the examiner, has no other maps and knows its call, so asking it for its cases gives just itself."""
+        assert self.examine
+        function = self.examine.function
+        if self.call:
+            return [Case(self.call.text(function), f"where the examiner called {self.call.text(function)}", self, self.call)]
+        boards = self._boards()
+        cases = []
+        for call in self.examine.calls:
+            where = f"where the examiner called {call.text(function)}"
+            if self.variants:
+                where += f" on board {call.board}"
+            cases.append(Case(call.text(function), where, replace(boards[call.board - 1], examine=self.examine, call=call), call))
+        return cases
+
     @property
     def case_words(self) -> tuple[str, str]:
         """How the player reads about this level's cases: the title of the row
         of cases above the board, and the noun for counting them."""
+        if self.examine:
+            return "The examiner's calls", "calls"
         return ("Where the goal was", "places the goal could be") if self.goal_spots else ("Boards", "boards")
 
     def goals(self) -> list[str]:
@@ -331,7 +358,12 @@ class Level:
                 goals.append(f'Get past the gate on {square_name(gate)}. The guard asks: "{question}" Print the answer next to the gate.')
             else:
                 goals.append(f"Get past the locked gate on {square_name(gate)}. A guard keeps it shut.")
-        if self.variants:
+        if self.examine:
+            function, calls = self.examine.function, self.examine.calls
+            goals.append(f"The examiner calls {function} {count(len(calls), 'time')}, each call on a fresh board, and every call has to meet the goals above.")
+            if any(call.returns is not NOT_JUDGED for call in calls):
+                goals.append(f"{function} also has to hand back the answer the examiner wants.")
+        elif self.variants:
             goals.append(f"Your code has to work on all {len(self.variants) + 1} boards.")
         return goals
 
@@ -444,10 +476,13 @@ class Level:
             "difficulty": self.difficulty,
             "draws_on": self.draws_on,
             # With other maps (M3.2): every board, first to last, shown beside the one on show (QA-032).
-            "boards": [case.level.describe() for case in self.cases()] if self.variants else [],
-            # The examiner (M5.2-4a fills it in): {function, calls: [{text, board}]}, or None. The calls it will
-            # make, before the run (decision 3); never the answers it wants.
-            "examine": None,
+            "boards": [board.describe() for board in self._boards()] if self.variants else [],
+            # The examiner (M5.2): {function, calls: [{text, board}]}, or None. The calls it will make, before the
+            # run (decision 3); never the answers it wants.
+            "examine": self.examine and {
+                "function": self.examine.function,
+                "calls": [{"text": call.text(self.examine.function), "board": call.board} for call in self.examine.calls],
+            },
         }
 
 
@@ -517,6 +552,8 @@ def parse_level(data: dict) -> Level:
         level.variants = _parse_variants(data.get("variants") or [], legend, level)
         if level.variants and level.goal_spots:
             raise LevelError("a level has ? squares for a hidden goal or other maps (variants), not both")
+    if "examine" in data:  # after the other maps: they are copies of the level, and don't carry the examiner
+        level.examine = _parse_examine(data["examine"], len(level.variants) + 1, bool(level.goal_spots))
     return level
 
 
@@ -984,16 +1021,21 @@ def _parse_function_rules(data) -> dict[str, FunctionRule]:
     return {name: _parse_function_rule(name, rules) for name, rules in data.items()}
 
 
-def _parse_function_rule(name, rules) -> FunctionRule:
+def _check_function_name(name, where: str) -> None:
+    """A function's name in a level file (a rule's, or the examiner's) must be one the player can define and the checker can follow."""
     if not (isinstance(name, str) and name.isidentifier()):
-        raise LevelError(f"constraint functions: {name!r} isn't a name Python can use for a function")
+        raise LevelError(f"{where}: {name!r} isn't a name Python can use for a function")
     if keyword.iskeyword(name):
-        raise LevelError(f"constraint functions: {name!r} is a Python keyword, so it can't name a function")
+        raise LevelError(f"{where}: {name!r} is a Python keyword, so it can't name a function")
     if hasattr(builtins, name):
         raise LevelError(
-            f"constraint functions: {name!r} is the name of a Python built-in, and the checker can't tell a call to it "
+            f"{where}: {name!r} is the name of a Python built-in, and the checker can't tell a call to it "
             "from a call to the built-in: choose another name"
         )
+
+
+def _parse_function_rule(name, rules) -> FunctionRule:
+    _check_function_name(name, "constraint functions")
     rules = {} if rules is None else rules
     if not isinstance(rules, dict):
         raise LevelError(f"constraint functions: the rules for {name!r} must be a mapping, e.g. {{params: 2}}")
@@ -1013,4 +1055,55 @@ def _parse_function_rule(name, rules) -> FunctionRule:
     if not isinstance(rule.returns, bool):
         raise LevelError(f"constraint functions: returns for {name!r} must be true or false")
     return rule
+
+
+@_locate(field="examine")
+def _parse_examine(data, boards: int, hidden_goal: bool) -> Examine:
+    """`examine` (M5.2): the function the examiner calls, and the calls it makes, each on one of the level's `boards`."""
+    if not isinstance(data, dict):
+        raise LevelError("examine must be a mapping with a function and its calls, e.g. {function: gallop, calls: [{args: [1]}]}")
+    unknown = set(data) - {"function", "calls"}
+    if unknown:
+        raise LevelError(f"unknown examine key(s): {', '.join(sorted(map(str, unknown)))} (it takes function and calls)")
+    if "function" not in data:
+        raise LevelError("examine needs a function: the name of the function the examiner calls")
+    _check_function_name(data["function"], "examine function")
+    calls = data.get("calls")
+    if not isinstance(calls, list) or not calls:
+        raise LevelError("examine needs calls: a list of the calls the examiner makes, e.g. [{args: [1, 3]}]")
+    if len(calls) > MAX_BOARDS:
+        raise LevelError(f"an examiner may make at most {MAX_BOARDS} calls")
+    if hidden_goal:
+        raise LevelError("an examiner calls the function on boards, so a level can't also have ? squares for a hidden goal")
+    examine = Examine(data["function"], [_parse_examine_call(number, call, boards) for number, call in enumerate(calls, start=1)])
+    for board in range(1, boards + 1):
+        if all(call.board != board for call in examine.calls):
+            raise LevelError(f"no call is made on board {board}: every board of the level has to be used by a call")
+    return examine
+
+
+def _parse_examine_call(number: int, call, boards: int) -> ExamineCall:
+    if not isinstance(call, dict):
+        raise LevelError(f"examine call {number} must be a mapping, e.g. {{args: [1, 3], board: 1}}")
+    unknown = set(call) - {"args", "board", "returns"}
+    if unknown:
+        raise LevelError(f"unknown key(s) in examine call {number}: {', '.join(sorted(map(str, unknown)))} (a call takes args, board and returns)")
+    args = call.get("args", [])
+    if not isinstance(args, list):
+        raise LevelError(f"examine call {number}: args must be a list of the values the function is called with")
+    if not all(_plain(arg) for arg in args):
+        raise LevelError(f"examine call {number}: each arg must be a plain value: a number, text, true, false or null")
+    board = call.get("board", 1)
+    if not _positive(board):
+        raise LevelError(f"examine call {number}: board must be a whole number of at least 1")
+    if board > boards:
+        raise LevelError(f"examine call {number} is on board {board}, but the level has only {count(boards, 'board')}")
+    if "returns" in call and not _plain(call["returns"]):
+        raise LevelError(f"examine call {number}: returns must be a plain value: a number, text, true, false or null")
+    return ExamineCall(list(args), board, call.get("returns", NOT_JUDGED))
+
+
+def _plain(value) -> bool:
+    """A value the examiner can pass or want: a number, text, true or false, or null."""
+    return value is None or isinstance(value, bool | int | str) or (isinstance(value, float) and math.isfinite(value))
 
