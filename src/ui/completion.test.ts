@@ -6,10 +6,10 @@ import { callsTouched, KnownCalls, suggestCalls, type CompletionOptions } from "
 
 const stateOf = (doc: string) => EditorState.create({ doc, extensions: [python()] });
 
-function suggestionsAt(doc: string, known: string[], api = ["move", "turn_left"]): string[] | null {
+function suggestionsAt(doc: string, known: string[], api = ["move", "turn_left"], piece = "pawn"): string[] | null {
   const calls = new KnownCalls();
   known.forEach((call) => calls.add(call));
-  const options: CompletionOptions = { known: calls, piece: () => "pawn", api: () => api };
+  const options: CompletionOptions = { known: calls, piece: () => piece, api: () => api };
   const state = stateOf(doc);
   const result = suggestCalls(new CompletionContext(state, doc.length, false), options);
   return result ? result.options.map((option) => option.label) : null;
@@ -60,6 +60,16 @@ describe("suggestCalls: what's offered", () => {
     expect(suggestionsAt("pawn.", ["pawn.mvoe"])).toBeNull();
     expect(suggestionsAt("pawn.", ["pawn.turn_right"], ["move"])).toBeNull();
     expect(suggestionsAt("knight.", ["knight.move"])).toBeNull(); // not this level's piece
+  });
+
+  it("works the same for a knight level's piece and abilities", () => {
+    const api = ["jump", "look", "at_goal", "wait"];
+    const at = (doc: string, known: string[]) => suggestionsAt(doc, known, api, "knight");
+    expect(callsTouched(stateOf("knight.jump(1, 2)"), [[0, 17]])).toEqual(["knight.jump"]);
+    expect(at("knight.", ["knight.jump", "knight.look"])).toEqual(["jump()", "look()"]);
+    expect(at("knight.j", ["knight.jump", "knight.look"])).toEqual(["jump()"]);
+    expect(at("knight.", ["knight.move"])).toBeNull(); // not in the api, even typed
+    expect(at("pawn.", ["pawn.jump"])).toBeNull(); // not this level's piece
   });
 
   it("offers typed builtins from the first letter, and closes when they're ruled out", () => {
