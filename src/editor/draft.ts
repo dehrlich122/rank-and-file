@@ -124,7 +124,7 @@ const byFileThenRank = (a: Pos, b: Pos): number => a[0] - b[0] || a[1] - b[1];
 /** The parts of `LevelInfo` a bare board has no use for: no objectives, limits, par, hints or other boards. */
 export const NO_RULES = {
   objectives: { reach_goal: true, say: [], waypoints: false, collect: null, capture: null },
-  constraints: { max_lines: null, min_comments: 0, require_nodes: [], ban_nodes: [], max_numbers: null },
+  constraints: { max_lines: null, min_comments: 0, require_nodes: [], ban_nodes: [], max_numbers: null, functions: {}, define: 0 },
   par: { lines: null },
   starter: "",
   goals: [],
@@ -137,6 +137,7 @@ export const NO_RULES = {
   difficulty: null,
   draws_on: [],
   boards: [],
+  examine: null,
 } satisfies Partial<LevelInfo>;
 
 /** What the board draws, with the rest of `LevelInfo` left empty (the engine fills that in once the level is valid). */

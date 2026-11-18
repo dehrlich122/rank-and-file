@@ -53,6 +53,22 @@ class Star:
 
 
 @dataclass
+class CallInfo:
+    """The examiner's call on one case of an examiner level (M5.2-4b fills it in): only the facts.
+
+    The examiner's own words about the call (decision 5), passed or failed, are the case's `summary`, as any
+    run's verdict is: a case is judged in order (an error, a lost run, a problem with the function itself, the
+    answer, the board) and the first failure is the summary; a call that passed has the examiner's line for it.
+    A problem with the function or a wrong answer is status "incomplete"; an error raised inside the call is an
+    "error", as anywhere else."""
+
+    text: str  # the call as code writes it, "gallop(1, 3)" (levels.ExamineCall.text)
+    returned: str | None  # a safe repr of what came back; None when the call didn't finish (or never started)
+    wanted: str | None  # a repr of the answer wanted; None when the level judges only the board
+    first_step: int  # the index in `steps` of the call's first step (len(steps) when it recorded none)
+
+
+@dataclass
 class LevelResult:
     # "solved", "incomplete" (ran fine, objectives not met), "finished" (a board
     # with no objectives, e.g. the sandbox), "lost" (fell into a pit or was
@@ -79,6 +95,7 @@ class LevelResult:
     case: int = 0
     case_note: str = ""  # the run: how many cases it worked for; a case: which one it is
     duration_ms: float = 0.0
+    call: CallInfo | None = None  # on an examiner level, the call this case made (M5.2-4b); None on any other
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -159,7 +176,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
     warnings = [asdict(warning) for warning in lint(tree, namespace)]
     counted = code_lines(code, tree)
     if enforce_constraints:
-        problems = check_constraints(tree, code, level.constraints)
+        problems = check_constraints(tree, code, level.constraints, level.examine)
         if problems:
             return outcome("constraint", problems[0], problems=problems, warnings=warnings, code_lines=counted)
 
@@ -190,9 +207,13 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
     return outcome("solved", _solved_summary(level), **recording)
 
 
-def run_sandbox(code: str, api: list[str], piece: str = "pawn", lesson_board: dict | None = None) -> LevelResult:
+def run_sandbox(
+    code: str, api: list[str], piece: str = "pawn", lesson_board: dict | None = None, call: str | None = None
+) -> LevelResult:
     """Run a lesson snippet with the given abilities, on a small open board or the
-    level's lesson board. Snippets have no objectives: a run just finishes (or fails, or loses)."""
+    level's lesson board. Snippets have no objectives: a run just finishes (or fails, or loses).
+    `call` is a snippet the examiner calls, as the lesson writes it ("gallop(1, 2)"): M5.2-5a makes the call;
+    it's ignored until then."""
     return run_level(sandbox_level(api, piece, lesson_board), code, enforce_constraints=False, judge=False)
 
 
@@ -258,6 +279,7 @@ class Execution:
     error: BaseException | None  # None if the program ran to the end
     output: str
     tracer: Tracer
+    returned: object = None  # what the examiner's call handed back (M5.2-4b); only meaningful with a `call` and no error
 
 
 def execute(
@@ -268,8 +290,11 @@ def execute(
     line_budget: int,
     record: bool = False,
     world: World | None = None,
+    call: tuple[str, list] | None = None,
 ) -> Execution:
-    """Run compiled player code under the tracer, capturing everything it prints."""
+    """Run compiled player code under the tracer, capturing everything it prints.
+    `call` is (a function's name, its arguments): after the program, the examiner looks the function up and
+    calls it under the same tracer (M5.2-4b). It's ignored until then."""
     remember_source(source)
     # The code's own clocks only matter when something keeps time with them.
     keeps_time = world is not None and world.code_clocked

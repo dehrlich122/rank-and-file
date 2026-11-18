@@ -38,7 +38,7 @@ function level(facing: Facing): LevelInfo {
     start,
     objectives: { reach_goal: false, say: [], waypoints: false, collect: null, capture: null },
     api: [],
-    constraints: { max_lines: null, min_comments: 0, require_nodes: [], ban_nodes: [], max_numbers: null },
+    constraints: { max_lines: null, min_comments: 0, require_nodes: [], ban_nodes: [], max_numbers: null, functions: {}, define: 0 },
     par: { lines: null },
     starter: "",
     goals: [],
@@ -51,6 +51,7 @@ function level(facing: Facing): LevelInfo {
     difficulty: null,
     draws_on: [],
     boards: [],
+    examine: null,
   };
 }
 

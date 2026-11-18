@@ -93,8 +93,9 @@ def comment_count(code: str) -> int:
     return sum(1 for token in _tokens(code) if token.type == tokenize.COMMENT)
 
 
-def check_constraints(tree: ast.Module, code: str, constraints) -> list[str]:
-    """Every way `code` breaks the level's rules, as messages for the player."""
+def check_constraints(tree: ast.Module, code: str, constraints, examine=None) -> list[str]:
+    """Every way `code` breaks the level's rules, as messages for the player.
+    `examine` is the level's examiner (levels.Examine) or None: an examiner level adds rules of its own."""
     problems = []
     if constraints.max_lines is not None:
         used, shared = _line_count(code, tree)
@@ -115,7 +116,14 @@ def check_constraints(tree: ast.Module, code: str, constraints) -> list[str]:
     for name in constraints.ban_nodes:
         if name in used:
             problems.append(f"This level doesn't allow {describe_node(name)}.")
-    return problems + _number_problems(tree, constraints)
+    return problems + _number_problems(tree, constraints) + _function_problems(tree, constraints, examine)
+
+
+def _function_problems(tree: ast.Module, constraints, examine) -> list[str]:
+    """The function rules (M5.2-3 fills this in): `constraints.functions` and `constraints.define`, and on an
+    examiner level "the program only defines" (decision 4) and "define a function called <examine.function>".
+    No problems yet."""
+    return []
 
 
 def numbers_written(tree: ast.Module) -> list[int | float]:
@@ -188,8 +196,9 @@ def _condition_warnings(node: ast.While | ast.If, pieces: dict) -> list[LintWarn
     return found
 
 
-def describe_rules(constraints) -> list[str]:
-    """The level's rules as the Challenge panel lists them, one sentence each."""
+def describe_rules(constraints, examine=None) -> list[str]:
+    """The level's rules as the Challenge panel lists them, one sentence each. `examine` (levels.Examine or None)
+    will add an examiner level's own rules (M5.2-3); it adds none yet."""
     rules = []
     if constraints.max_lines is not None:
         rules.append(

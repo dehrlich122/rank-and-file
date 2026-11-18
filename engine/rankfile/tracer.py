@@ -51,6 +51,13 @@ class Step:
     events: list[dict] = field(default_factory=list)
     output: str = ""
     vars: list[dict] = field(default_factory=list)
+    # M5.2-1 fills these in. Inside a function: the program's own names too (same filter and safe repr as `vars`;
+    # empty at module level), and how deep the call is (0 at module level, 1 inside a function the program called).
+    globals: list[dict] = field(default_factory=list)
+    depth: int = 0
+    # The rest of a calling line, after a function it called returned to it: not another line run (not counted
+    # in lines_run) and it ticks no clock.
+    continues: bool = False
 
 
 class Tracer:

@@ -52,7 +52,9 @@ SNIPPET = re.compile(r"^```python run(?: (error|lost|timeout))?\n(.*?)^```", re.
 @dataclass
 class Entry:
     name: str  # as code writes it: "pawn.move", "print"
-    kind: str  # "ability", "property" (used without parentheses), "builtin" or "method" (of text, M3.6)
+    # "ability", "property" (used without parentheses), "builtin", "method" (of text, M3.6), or "keyword" (`def`,
+    # `return`, `for`...: a word of the language itself, M5.2; its entries come with M5.2-7)
+    kind: str
     calls: list[str]  # how to use it: ["pawn.move(squares=1)"]; some built-ins have more than one form
     paragraphs: list[str]  # what it does
     args: list[dict] = field(default_factory=list)  # {"name", "about"} for each argument
