@@ -1947,9 +1947,23 @@ looked at; a wrong attempt at 1000×700; Animations full during a run.
 
 ## Session 19 — 2026-11-18 · M5.1 QA1, the knight as a piece (`m5-1-knight`, PR #27)
 
-The designer's play-test of the three knight practice levels. Findings are added as they come.
+The designer's play-test of the three knight practice levels. **QA1 passed with nothing to fix** *(Designer,
+2026-11-18)*: "All play well and are good levels." His answers to the nine choices made during the build
+(`docs/M5/M5.1.md`, "Hand-test list"):
 
-### QA-066 · Look Before You Leap (`practice-13`): the reference writes jumps out; the designer's solve looks before every jump · Open
+| # | Choice | Answer |
+|---|---|---|
+| 1 | Decisions 1 to 3, now playable | The levels play well; no objection raised, so the three decisions stand *(the orchestrator's reading)* |
+| 2 | South leans to the same side as north | "This looks good, keep it." |
+| 3 | What a jump changes shows when it lands | Yes |
+| 4 | The jump's sound | "Sounds great." |
+| 5 | Under Auto, the title screen, gallery and editor's palette show the pawn | "Fine for now." |
+| 6 | The promotion button switches back to Auto | Okay |
+| 7 | The rings once a run is lost | **The rule, in his words:** on a lost run the rings go; on a bumped run the rings stay. A lost run has no more moves; a bumped run could continue from the square it bumped from. The first half is tested; the second is pinned in the QA2 pass |
+| 8 | "Your knight is called knight." | Fine |
+| 9 | The 5 px corner cut on a jump that turns first | Not noticed. Left as it is |
+
+### QA-066 · Look Before You Leap (`practice-13`): the reference writes jumps out; the designer's solve looks before every jump · Closed, left as it is
 
 - **Observed** *(Designer, 2026-11-18)*: the designer solved it with a loop that looks at the preferred landing
   square before every jump and takes the other jump when that square is a pit, a wall or off the board. The
@@ -1968,8 +1982,8 @@ The designer's play-test of the three knight practice levels. Findings are added
      (the rule from QA-023 and QA-029: the code works out what can't be known ahead). The reference and the
      hints follow from the new boards.
   3. Leave it: a practice level, and both ways pass.
-- **Waiting for:** the designer's pick. Fixed with QA1's other findings; level content is written blind by the
-  orchestrator (`scripts/gen_knight.py`).
+- **Decided** *(Designer, 2026-11-18)*: option 3. "It's not a real issue, and also it is a good test case." The
+  level, its boards and its reference stay.
 
 ---
 
