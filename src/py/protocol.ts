@@ -224,6 +224,8 @@ interface CallInfo {
   returned: string | null; // a safe repr of what came back; null when the call didn't finish
   wanted: string | null; // a repr of the answer wanted; null when only the board is judged
   first_step: number; // the index in `steps` of the call's first step (steps.length when it recorded none)
+  happened: string | null; // what the examiner did and found, when the case's summary is its words; else null
+  said: string | null; // the examiner's line without quotes, set together with `happened`
 }
 
 /** One case of a level (runner.run_level): its result, what to call it ("b3", "board 2") and its board. */

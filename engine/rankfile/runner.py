@@ -69,6 +69,8 @@ class CallInfo:
     returned: str | None  # a safe repr of what came back; None when the call didn't finish (or never started)
     wanted: str | None  # a repr of the answer wanted; None when the level judges only the board
     first_step: int  # the index in `steps` of the call's first step (len(steps) when it recorded none)
+    happened: str | None = None  # what the examiner did and found, when the case's summary is its words (else None)
+    said: str | None = None  # the examiner's line, without quotes, set with `happened`
 
 
 @dataclass
@@ -208,7 +210,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
     if call is not None and not judge:  # a lesson's snippet: only the call itself is looked at (M5.2-5a)
         facts = _call_facts(level, recording["call"].text, namespace, run, [])
         if run.problem is not None:
-            return outcome("incomplete", examiner_words(run.problem, facts), **recording)
+            return outcome("incomplete", _examiner_summary(recording["call"], run.problem, facts), **recording)
         return outcome("finished", _called_words(facts), **recording)
     if not judge or (level.nothing_to_do and call is None):
         return outcome("finished", "Finished.", **recording)
@@ -216,7 +218,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
     if call is not None:  # the function, then the answer, then the board
         facts = _call_facts(level, recording["call"].text, namespace, run, unmet)
         kind = _call_failure(run, facts) or _call_ending(facts)
-        return outcome("solved" if kind in PASSED else "incomplete", examiner_words(kind, facts), **recording)
+        return outcome("solved" if kind in PASSED else "incomplete", _examiner_summary(recording["call"], kind, facts), **recording)
     if unmet:
         return outcome("incomplete", "Your program finished, but " + " Also, ".join(unmet), **recording)
     return outcome("solved", _solved_summary(level), **recording)
@@ -229,6 +231,12 @@ def _call_facts(level: Level, text: str, namespace: dict, run: Execution, unmet:
         function, text, namespace.get(function), _own_functions(namespace), args, run.returned,
         level.call.returns, run.call_output, unmet, run.signature,
     )  # fmt: skip
+
+
+def _examiner_summary(info: CallInfo, kind: str, facts: CallFacts) -> str:
+    """The case's summary in the examiner's words, keeping its two parts apart on `info` for the UI."""
+    info.happened, info.said = what_happened(kind, facts), examiner_line(kind)
+    return examiner_words(kind, facts)
 
 
 def _called_words(facts: CallFacts) -> str:

@@ -115,6 +115,12 @@ def test_the_check_goes_through_the_bridge_in_slices():
 def test_every_repo_board_gets_the_same_answer_sliced_or_whole(path):
     level = parse_level(yaml.safe_load(path.read_text(encoding="utf-8")))
     sliced = finish(Search(level, max_states=400_000))["results"]
+    if level.examine:  # an examiner level is one case, the whole level (M5.2-4b-3): the search doesn't call the function
+        assert [(r["status"], r["lines"]) for r in sliced] == [(EXAMINER, None)]
+        one = RouteSearch(level, 400_000)
+        one.run()
+        assert one.status == EXAMINER
+        return
     whole = []
     for case in level.cases():
         one = RouteSearch(case.level, 400_000)

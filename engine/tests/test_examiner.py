@@ -539,6 +539,37 @@ THE_WORDS = [
 def test_the_examiner_says_what_happened_and_then_its_line(code, args, call, function, said):
     result = call_of({"args": args, **call}, code=code, constraints=False, function=function)
     assert result.summary == said
+    happened, line = result.call.happened, result.call.said
+    assert happened and line and result.summary == f"{happened} “{line}”"  # the two parts reach the UI apart
+
+
+def test_the_two_parts_are_in_the_json_of_a_result():
+    result = call_of({"args": [1]}, code="def gallop(n):\n    pass\n", constraints=False).to_dict()
+    call = result["call"]
+    assert call["said"] == examiner_line("board") and call["happened"] and result["summary"] == f"{call['happened']} “{call['said']}”"
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "def gallop(n):\n    raise ValueError('x')\n",
+        "def gallop(n):\n    while True:\n        pass\n",
+        "def (\n",
+        "x = 1 / 0\n",
+    ],
+)
+def test_no_examiner_words_means_no_parts(code):
+    result = run_level(examiner({"args": [1], "returns": 2}, start=EAST), code, line_budget=200, enforce_constraints=False)
+    assert result.status in ("error", "timeout") and (result.call is None or (result.call.happened, result.call.said) == (None, None))
+
+
+def test_a_lost_run_a_refused_program_and_an_unjudged_run_have_no_parts():
+    lost = run_level(pit_level({}), "pawn.move(1)\n", enforce_constraints=False)
+    assert lost.status == "lost" and (lost.call.happened, lost.call.said) == (None, None)
+    refused = call_of({"args": [1]}, code="pawn.move(1)\n")
+    assert refused.status == "constraint" and refused.call is None
+    unjudged = run_level(examiner({"args": [1]}, start=EAST), DEFINE, judge=False)
+    assert unjudged.call is not None and (unjudged.call.happened, unjudged.call.said) == (None, None)
 
 
 @pytest.mark.parametrize(("returns", "said"), [(NOT_JUDGED, "The examiner called `gallop(1)`, and when the call ended "), (7, "The examiner called `gallop(1)` and got the 7 it wanted, but when the call ended ")])
@@ -692,6 +723,7 @@ def test_a_function_the_examiner_cannot_call_is_incomplete_in_the_examiners_word
     result = sandbox(code, call=call)
     assert result.status == "incomplete" and result.call.returned is None and result.call.wanted is None
     assert result.summary.endswith(f"“{examiner_line(kind)}”")
+    assert result.call.said == examiner_line(kind) and result.summary == f"{result.call.happened} “{result.call.said}”"
     assert ("no function called `gallop`" in result.summary) == (kind == "missing")
     assert ("is 5" in result.summary or "a number" in result.summary) == (kind == "not_function")
     assert ("takes 2" in result.summary) == (kind == "arguments")
@@ -721,6 +753,12 @@ def test_an_error_a_loss_or_a_timeout_is_as_any_snippet_with_the_call_filled(cod
     result = sandbox(code)
     assert result.status == status, result.summary
     assert result.call is not None and result.call.text == "gallop(1, 2)" and result.call.returned is None
+    assert (result.call.happened, result.call.said) == (None, None)
+
+
+def test_a_snippets_call_that_ran_and_was_not_judged_has_no_parts():
+    result = sandbox(DEFINES)
+    assert result.status == "finished" and (result.call.happened, result.call.said) == (None, None)
 
 
 def test_a_loss_inside_the_call_is_a_lost_snippet():
