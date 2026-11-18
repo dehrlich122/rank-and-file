@@ -47,15 +47,7 @@ tracer.StepBudgetExceeded.__module__
 # Read by Python's error messages when they name the player's help().
 codex.player_namespace.help.__qualname__
 
-# M5.2's contract (functions and the examiner): JSON-only fields, and fields the later packages fill in.
-levels.FunctionRule.params  # M5.2-3
-levels.FunctionRule.defaults
-levels.Constraints.functions
-levels.Constraints.define
-runner.CallInfo.returned  # M5.2-4b
-runner.CallInfo.wanted
-runner.CallInfo.first_step
-runner.Execution.returned
+# M5.2 (functions and the examiner): fields only the UI reads, through JSON.
 runner.LevelResult.call
 tracer.Step.globals  # M5.2-1
 tracer.Step.depth

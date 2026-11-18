@@ -20,6 +20,7 @@ import inspect
 import io
 import linecache
 import time
+import types
 from dataclasses import asdict, dataclass, field, replace
 
 from . import codex
@@ -210,7 +211,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
     if call is not None:  # the function, then the answer, then the board
         facts = CallFacts(
             call[0], recording["call"].text, namespace.get(call[0]), _own_functions(namespace), call[1], run.returned,
-            level.call.returns, run.call_output, unmet,
+            level.call.returns, run.call_output, unmet, run.signature,
         )  # fmt: skip
         kind = _call_failure(run, facts) or _call_ending(facts)
         return outcome("solved" if kind in PASSED else "incomplete", examiner_words(kind, facts), **recording)
@@ -239,8 +240,8 @@ def _call_failure(run: Execution, facts: CallFacts) -> str | None:
     wanted, got = facts.wanted, facts.returned
     if wanted is NOT_JUDGED or (type(got) is type(wanted) and got == wanted):
         return None  # the same kind of thing and equal: 7 is not "7", True is not 1, 1.0 is not 1
-    if got is None:
-        return "printed" if facts.printed else "nothing"
+    if got is None:  # "printed" only when one of the lines printed in the call is the answer
+        return "printed" if any(line.strip() == str(wanted) for line in facts.printed.splitlines()) else "nothing"
     if wanted is None:
         return "unexpected"
     return "wrong_value" if type(got) is type(wanted) else "wrong_kind"
@@ -276,6 +277,7 @@ class CallFacts:
     wanted: object  # the answer wanted (NOT_JUDGED when none is)
     printed: str  # what was printed during the call
     unmet: list[str]  # the board's goals still unmet, in words
+    signature: inspect.Signature | None = None  # the function's own parameters, when the examiner could read them
 
 
 # The examiner's line for each kind of words, in quotes after what happened. (Reachable apart from the rest.)
@@ -322,7 +324,7 @@ def what_happened(kind: str, facts: CallFacts) -> str:
     if kind == "not_function":
         return f"{called}, but `{name}` in your program is {_what_it_is(facts.found)}, not a function. Keep that name for the `def`."
     if kind == "arguments":
-        return f"{called}{_with_values(len(facts.args))}, and {_what_it_takes(facts.found, len(facts.args))}"
+        return f"{called}{_with_values(len(facts.args))}, and {_what_it_takes(facts.found, facts.signature, len(facts.args))}"
     if kind == "board":
         return f"{called}, and when the call ended " + " Also, ".join(facts.unmet)
     if kind == "board_answered":
@@ -331,7 +333,7 @@ def what_happened(kind: str, facts: CallFacts) -> str:
     if kind in ("printed", "nothing"):
         got = f"{called} and got nothing back (None); it wanted {wanted}."
         if kind == "printed":
-            return f"{got} Your function printed, but the examiner doesn't read the screen: `print` shows a value, `return` hands it back."
+            return f"{got} Your function printed its answer, but the examiner doesn't read the screen: `print` shows a value, `return` hands it back."
         return f"{got} A function hands a value back only with `return`: check that every way through `{name}` reaches one."
     got = f"{called}: it wanted {wanted} and got {safe_repr(facts.returned)}"
     if kind == "wrong_kind":
@@ -351,18 +353,21 @@ def _with_values(n: int) -> str:
     return " with no values" if n == 0 else f" with {count(n, 'value')}"
 
 
-def _what_it_takes(function: object, given: int) -> str:
-    """"your `gallop` takes 1." and what to do about it, for a function that can't take `given` values."""
-    parameters = inspect.signature(function).parameters.values()
+def _what_it_takes(function: object, signature: inspect.Signature | None, given: int) -> str:
+    """"your `gallop` takes 1." and what to do about it, for a function that can't take `given` values.
+    `signature` is the one `execute` read when it checked the call."""
+    parameters = (signature or inspect.Signature()).parameters.values()
     positional = [p for p in parameters if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
     least = sum(p.default is p.empty for p in positional)
     most = None if any(p.kind is p.VAR_POSITIONAL for p in parameters) else len(positional)
     mine = f"your `{function.__name__}`"
     if given >= least and (most is None or given <= most):  # the count fits: only a name that can't be given by position is left
         by_name = [f"`{p.name}`" for p in parameters if p.kind is p.KEYWORD_ONLY and p.default is p.empty]
+        one = len(by_name) == 1
         return (
             f"{mine} also needs {and_list(by_name)}, which can only be given by name. "
-            "Take it before the `*` in its `def` line, or give it a default value."
+            + ("Take it before the `*` in its `def` line, or give it a default value." if one else
+               "Take them before the `*` in its `def` line, or give each one a default value.")
         )
     if most is None:
         takes = f"{least} or more"
@@ -370,6 +375,8 @@ def _what_it_takes(function: object, given: int) -> str:
         takes = "none"
     elif least == most:
         takes = str(most)
+    elif least == 0:
+        takes = "none or 1" if most == 1 else f"up to {most}"
     else:
         takes = f"{least} or {most}" if most == least + 1 else f"from {least} to {most}"
     return f"{mine} takes {takes}. Each value needs a name inside the parentheses of its `def` line."
@@ -452,6 +459,7 @@ class Execution:
     finished: bool = False  # the call was made and ended without an error (it handed back, or ended by exit())
     problem: str | None = None  # why it wasn't made: "missing", "not_function" or "arguments"
     first_step: int = 0  # len(tracer.steps) when the call was about to start (or, if it never was, when the run ended)
+    signature: inspect.Signature | None = None  # the function's own parameters, read when the call was checked
     call_output: str = ""  # what was printed during the call
 
 
@@ -486,8 +494,8 @@ def execute(
             if call is not None:
                 reached = True
                 name, args = call
-                made.problem = _function_problem(namespace, name, args)
-                made.first_step = len(tracer.steps)
+                made.first_step = len(tracer.steps)  # before the check, so it is right whenever the call is not made
+                made.problem, made.signature = _function_problem(namespace, name, args)
                 if made.problem is None:
                     printed_from = len(output.getvalue())
                     with contextlib.suppress(SystemExit):  # the call chose to stop: it handed back nothing
@@ -504,18 +512,34 @@ def execute(
     return replace(made, error=error, output=text, call_output=text[printed_from:] if reached else "")
 
 
-def _function_problem(namespace: dict, name: str, args: list) -> str | None:
-    """Why the examiner can't call `name(*args)`, found without calling it; None when it can: "missing" (no such
-    name), "not_function" (a number, text, a class...) or "arguments" (the function can't take them)."""
+def _function_problem(namespace: dict, name: str, args: list) -> tuple[str | None, inspect.Signature | None]:
+    """Why the examiner can't call `name(*args)`, found without calling it, and the function's signature (read once,
+    for the words). The problem is None when the call can be made: "missing" (no such name), "not_function" (a number,
+    text, a class...) or "arguments" (the function can't take them)."""
     if name not in namespace:
-        return "missing"
+        return "missing", None
     if not inspect.isfunction(namespace[name]):
-        return "not_function"
+        return "not_function", None
+    signature = _own_signature(namespace[name])
+    if signature is None:
+        return None, None  # can't read it: let the call itself say
     try:
-        inspect.signature(namespace[name]).bind(*args)
+        signature.bind(*args)
     except TypeError:
-        return "arguments"
-    return None
+        return "arguments", signature
+    return None, signature
+
+
+def _own_signature(function) -> inspect.Signature | None:
+    """The parameters a call to `function` meets, read from its own code, defaults and keyword defaults, never from
+    its `__wrapped__` or `__signature__` (a program can set either to anything, and `inspect.signature` follows both).
+    A bare copy of the function, built from those three parts, has neither attribute. None if it can't be read."""
+    try:
+        bare = types.FunctionType(function.__code__, {}, function.__name__, function.__defaults__, function.__closure__)
+        bare.__kwdefaults__ = function.__kwdefaults__
+        return inspect.signature(bare)
+    except Exception:
+        return None
 
 
 def remember_source(code: str) -> None:

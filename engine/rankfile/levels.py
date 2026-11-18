@@ -553,7 +553,7 @@ def parse_level(data: dict) -> Level:
         if level.variants and level.goal_spots:
             raise LevelError("a level has ? squares for a hidden goal or other maps (variants), not both")
     if "examine" in data:  # after the other maps: they are copies of the level, and don't carry the examiner
-        level.examine = _parse_examine(data["examine"], len(level.variants) + 1, bool(level.goal_spots))
+        level.examine = _parse_examine(data["examine"], len(level.variants) + 1, bool(level.goal_spots), level.constraints.functions)
     return level
 
 
@@ -1058,7 +1058,7 @@ def _parse_function_rule(name, rules) -> FunctionRule:
 
 
 @_locate(field="examine")
-def _parse_examine(data, boards: int, hidden_goal: bool) -> Examine:
+def _parse_examine(data, boards: int, hidden_goal: bool, rules: dict[str, FunctionRule]) -> Examine:
     """`examine` (M5.2): the function the examiner calls, and the calls it makes, each on one of the level's `boards`."""
     if not isinstance(data, dict):
         raise LevelError("examine must be a mapping with a function and its calls, e.g. {function: gallop, calls: [{args: [1]}]}")
@@ -1068,6 +1068,11 @@ def _parse_examine(data, boards: int, hidden_goal: bool) -> Examine:
     if "function" not in data:
         raise LevelError("examine needs a function: the name of the function the examiner calls")
     _check_function_name(data["function"], "examine function")
+    if (rules.get(data["function"]) or FunctionRule()).calls is not None:
+        raise LevelError(
+            f"the examiner makes the calls to {data['function']!r}, so constraints.functions can't ask the program to call it: "
+            "take calls out of that rule"
+        )
     calls = data.get("calls")
     if not isinstance(calls, list) or not calls:
         raise LevelError("examine needs calls: a list of the calls the examiner makes, e.g. [{args: [1, 3]}]")
