@@ -9,7 +9,8 @@ import pytest
 
 from conftest import make_level
 from rankfile.levels import NOT_JUDGED, Examine, ExamineCall, LevelError, parse_level
-from rankfile.runner import run_level
+from rankfile.runner import execute, run_level
+from rankfile.tracer import PLAYER_FILENAME
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "scripts"))
 import show_level  # noqa: E402  (the script, which has to be found first)
@@ -246,3 +247,222 @@ def test_parse_level_accepts_the_key_in_a_whole_file():
         "id": "t", "title": "T", "api": API, "map": ROW, "examine": {"function": "gallop", "calls": [{"args": [1]}]},
     })  # fmt: skip
     assert level.examine.function == "gallop"
+
+
+# -- M5.2-4b-1: the examiner's call and its judging (the facts: status, `call`, the steps; not the words) --------------
+
+DEFINE = "def gallop(n):\n    pawn.move(3)\n"  # reaches the goal of ROW whatever it is called with
+WANTS = 31337  # an answer no summary may ever show
+EAST = {"facing": "east"}
+
+
+def call_of(*calls, code=DEFINE, constraints=True, **overrides):
+    """Run `code` on an examiner level whose calls are given, and return the (verdict) result."""
+    return run_level(examiner(*calls, start=EAST, **overrides), code, enforce_constraints=constraints)
+
+
+def pit_level(*calls):
+    return make_level("P O G\n", api=API, start=EAST, legend={"O": {"tile": "pit"}}, examine={"function": "gallop", "calls": list(calls)})
+
+
+def depths(result, start=0):
+    return [step["depth"] for step in result.steps[start:]]
+
+
+def test_a_call_with_fewer_args_than_parameters_lets_a_default_fill_in():
+    result = call_of({"args": [1], "returns": 5}, code="def gallop(n, m=5):\n    pawn.move(3)\n    return m\n")
+    assert result.status == "solved"
+    assert (result.call.returned, result.call.wanted) == ("5", "5")
+
+
+def test_a_def_with_star_args_takes_any_number_of_arguments():
+    result = call_of({"args": [1, 2, 3], "returns": 3}, code="def gallop(*a):\n    pawn.move(3)\n    return len(a)\n")
+    assert result.status == "solved" and result.call.returned == "3"
+
+
+@pytest.mark.parametrize(
+    ("code", "args"),
+    [
+        ("def gallop(n):\n    pawn.move(3)\n", [1, 2]),  # too many
+        ("def gallop(n, m):\n    pawn.move(3)\n", [1]),  # too few
+        ("def gallop():\n    pawn.move(3)\n", [1]),  # none taken
+        ("def gallop(n, *, m):\n    pawn.move(3)\n", [1]),  # a keyword-only one nobody gives
+        ("x = 1\n", []),  # missing
+        ("gallop = 5\n", []),  # a number
+        ("gallop = 'text'\n", []),  # text
+        ("class gallop:\n    pass\n", []),  # a class
+    ],
+)
+def test_a_problem_with_the_function_is_found_without_calling_it(code, args):
+    result = call_of({"args": args, "returns": WANTS}, code=code, constraints=False)
+    assert result.status == "incomplete"
+    assert result.call.returned is None and result.call.wanted == repr(WANTS)
+    assert result.call.first_step == len(result.steps)
+    assert result.final == result.start  # the call was never made, so nothing moved
+    assert str(WANTS) not in result.summary and result.error is None
+
+
+def test_the_functions_steps_are_inside_the_call():
+    result = call_of({"args": [3]}, code="def gallop(n):\n    pawn.move(n)\n")
+    first = result.call.first_step
+    assert result.status == "solved" and 0 < first < len(result.steps)
+    assert depths(result, 0)[:first] == [0] * first
+    assert depths(result, first) == [1] * (len(result.steps) - first)
+    assert result.steps[first]["scope"] == "gallop"
+    assert any(step["events"] for step in result.steps[first:])
+
+
+@pytest.mark.parametrize(
+    ("returns", "gives", "solved"),
+    [
+        (7, "7", True),
+        (7, "'7'", False),
+        ("7", "7", False),
+        (1, "True", False),
+        (True, "1", False),
+        (1, "1.0", False),
+        (1.0, "1", False),
+        (None, "None", True),
+        (None, "0", False),
+        (0, "None", False),
+        (False, "0", False),
+        ("a", "'a'", True),
+        (1.5, "1.5", True),
+        (False, "False", True),
+    ],
+)
+def test_the_answer_must_be_the_same_kind_of_thing_and_equal(returns, gives, solved):
+    result = call_of({"args": [1], "returns": returns}, code=f"def gallop(n):\n    pawn.move(3)\n    return {gives}\n")
+    assert result.status == ("solved" if solved else "incomplete")
+    assert result.call.wanted == repr(returns) and result.call.returned == repr(eval(gives))
+
+
+def test_a_call_that_is_not_judged_ignores_what_comes_back():
+    result = call_of({"args": [1]}, code="def gallop(n):\n    pawn.move(3)\n    return [1, 2]\n")
+    assert result.status == "solved" and result.call.wanted is None and result.call.returned == "[1, 2]"
+
+
+@pytest.mark.parametrize(
+    ("moves", "gives", "status"),
+    [("pawn.move(3)", WANTS, "solved"), ("pawn.move(1)", WANTS, "incomplete"), ("pawn.move(3)", 1, "incomplete"), ("pass", 1, "incomplete")],
+)
+def test_the_answer_and_the_board_are_both_judged(moves, gives, status):
+    result = call_of({"args": [1], "returns": WANTS}, code=f"def gallop(n):\n    {moves}\n    return {gives}\n")
+    assert result.status == status
+    assert str(WANTS) not in result.summary
+
+
+def test_the_answer_is_judged_before_the_board():
+    wrong_answer = call_of({"args": [1], "returns": 2}, code="def gallop(n):\n    pawn.move(3)\n    return 3\n")
+    wrong_board = call_of({"args": [1], "returns": 2}, code="def gallop(n):\n    return 2\n")
+    both = call_of({"args": [1], "returns": 2}, code="def gallop(n):\n    return 3\n")
+    assert wrong_board.summary.startswith("Your program finished, but")
+    assert not wrong_answer.summary.startswith("Your program finished, but")
+    assert both.summary == wrong_answer.summary != wrong_board.summary
+
+
+def test_a_run_never_changes_the_levels_own_arguments():
+    level = examiner({"args": [1, "a", None]}, {"args": [2]})
+    run_level(level, "def gallop(n, *rest):\n    n = 99\n    rest = ()\n    pawn.move(3)\n")
+    assert [call.args for call in level.examine.calls] == [[1, "a", None], [2]]
+
+
+def test_the_call_gets_a_copy_of_its_arguments():
+    code = "def f(items):\n    items.append(4)\n    print('in')\n"
+    args = [[1, 2, 3]]
+    run = execute(compile(code, PLAYER_FILENAME, "exec"), code, {}, line_budget=1000, call=("f", args))
+    assert args == [[1, 2, 3]] and run.finished and run.problem is None and run.error is None
+    assert run.call_output == "in\n"
+
+
+def test_execute_without_a_call_leaves_the_call_facts_alone():
+    code = "print('a')\n"
+    run = execute(compile(code, PLAYER_FILENAME, "exec"), code, {}, line_budget=1000)
+    assert (run.finished, run.problem, run.returned, run.call_output, run.output) == (False, None, None, "", "a\n")
+
+
+def test_what_the_program_prints_is_not_what_the_call_printed():
+    code = "print('a')\ndef f():\n    print('b')\n"
+    run = execute(compile(code, PLAYER_FILENAME, "exec"), code, {}, line_budget=1000, call=("f", []))
+    assert (run.output, run.call_output) == ("a\nb\n", "b\n")
+
+
+def test_an_error_on_the_calls_second_line_names_the_players_line_and_no_engine_frame():
+    result = call_of({"args": [1], "returns": WANTS}, code="def gallop(n):\n    x = 1\n    y = x / 0\n")
+    assert result.status == "error" and result.error.type == "ZeroDivisionError" and result.error.line == 3
+    assert result.call.returned is None and result.call.first_step < len(result.steps)
+    assert result.steps[-1]["line"] == 3 and result.steps[-1]["depth"] == 1
+    files = [line for line in result.error.traceback.splitlines() if line.lstrip().startswith("File ")]
+    assert files and all(PLAYER_FILENAME in line for line in files)
+    assert "runner.py" not in result.error.traceback and "rankfile" not in result.error.traceback
+
+
+def test_an_error_is_judged_before_the_answer_and_the_function():
+    assert call_of({"args": [1], "returns": 2}, code="def gallop(n):\n    return 1 / 0\n").status == "error"
+    assert call_of({"args": [1], "returns": 2}, code="1 / 0\n", constraints=False).status == "error"
+
+
+def test_a_program_that_fails_before_the_call_has_a_call_that_never_started():
+    result = call_of({"args": [1], "returns": 2}, code="x = 1\ny = x / 0\n", constraints=False)
+    assert result.status == "error" and result.call.returned is None
+    assert result.call.first_step == len(result.steps) and result.call.text == "gallop(1)"
+
+
+def test_code_that_never_ran_has_no_call():
+    broken = call_of({"args": [1]}, code="def (\n")
+    forbidden = call_of({"args": [1]}, code="pawn.move(1)\n")
+    assert (broken.status, forbidden.status) == ("error", "constraint")
+    assert broken.call is None and forbidden.call is None
+
+
+def test_a_level_without_an_examiner_has_no_call():
+    assert run_level(make_level(ROW, api=API), "pawn.move(3)\n").call is None
+
+
+def test_a_call_that_prints_and_hands_back_nothing():
+    result = call_of({"args": [1], "returns": None}, code="def gallop(n):\n    print('hi')\n    pawn.move(3)\n")
+    assert result.status == "solved" and result.call.returned == "None" and result.call.wanted == "None"
+    assert result.output == "hi\n"
+    printing = [index for index, step in enumerate(result.steps) if step["output"]]
+    assert printing and all(index >= result.call.first_step for index in printing)
+
+
+def test_a_function_that_never_ends_is_a_timeout_and_the_budget_covers_the_call():
+    code = "def gallop(n):\n    while True:\n        pass\n"
+    result = run_level(examiner({"args": [1], "returns": 2}), code, line_budget=200)
+    assert result.status == "timeout" and result.call.returned is None and result.lines_run >= 200
+    assert result.steps[-1]["depth"] == 1
+
+
+def test_exit_in_the_call_ends_it_quietly_with_nothing_handed_back():
+    result = call_of({"args": [1], "returns": None}, code="def gallop(n):\n    pawn.move(3)\n    exit()\n    pawn.move(1)\n")
+    assert result.status == "solved" and result.call.returned == "None" and result.error is None
+    result = call_of({"args": [1], "returns": 4}, code="import sys\ndef gallop(n):\n    sys.exit()\n", constraints=False)
+    assert result.status == "incomplete" and result.call.returned == "None"
+
+
+def test_a_pit_walked_into_during_the_call_is_a_loss():
+    result = run_level(pit_level({"args": [], "returns": 2}), "def gallop():\n    pawn.move(2)\n    return 2\n")
+    assert result.status == "lost" and result.call.returned in (None, "2")
+    assert result.steps[-1]["depth"] == 1 and result.call.first_step < len(result.steps)
+
+
+def test_a_loss_in_the_program_is_judged_before_a_problem_with_the_function():
+    result = run_level(pit_level({}), "pawn.move(1)\n", enforce_constraints=False)
+    assert result.status == "lost" and result.call.returned is None
+
+
+def test_each_recorded_case_has_its_own_call_and_the_verdict_shows_the_failing_one():
+    level = examiner({"args": [3], "board": 1}, {"args": [1], "board": 2}, start=EAST, **boards(OTHER))
+    result = run_level(level, "def gallop(n):\n    pawn.move(n)\n")
+    assert result.status == "incomplete" and result.case == 1
+    assert result.call.text == "gallop(1)"
+    recorded = result.to_dict()["cases"]
+    assert [case["call"]["text"] for case in recorded] == ["gallop(3)", "gallop(1)"]
+    assert [case["status"] for case in recorded] == ["solved", "incomplete"]
+    for case in recorded:
+        first = case["call"]["first_step"]
+        assert 0 < first < len(case["steps"])
+        assert [step["depth"] for step in case["steps"]] == [0] * first + [1] * (len(case["steps"]) - first)
+        assert case["call"]["wanted"] is None
+    assert result.to_dict()["call"] == recorded[1]["call"]
