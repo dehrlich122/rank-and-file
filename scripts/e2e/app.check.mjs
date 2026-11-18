@@ -1221,4 +1221,200 @@ export default async function appChecks({ browser: b, base, root, check }) {
     const errors = b.logs.filter((line) => /exception|error/i.test(line));
     expect(errors.length === 0, errors.join(" | "));
   });
+
+  // -- M5.1: the knight ---------------------------------------------------------------------------
+  // What the screen shows and says around a run on a knight level (the Testing ground's practice-11 to practice-13).
+  // The programs typed are one or two lines that test one thing; none is a level's solution. Labels and counts only.
+  /** Which skin a piece is drawn in, inside the element `root` (a JS expression in the page): the knight's drawing has lit details (its eyes, class s-lit), the pawn's has none. */
+  const heroLit = (root) =>
+    b.evaluate(`(() => {
+      const hero = ${root}.querySelectorAll('g.piece g.pawn > g.hero');
+      return { heroes: hero.length, lit: [...hero].reduce((n, g) => n + g.querySelectorAll('.s-lit').length, 0) };
+    })()`);
+  const boardEl = `document.querySelector('.board-host .board')`;
+  const square = (name) => ({ x: name.charCodeAt(0) - 97, y: Number(name.slice(1)) - 1 });
+  const isKnightMove = (from, to) => {
+    const [a, c] = [square(from), square(to)];
+    return [Math.abs(a.x - c.x), Math.abs(a.y - c.y)].sort().join() === "1,2";
+  };
+  /** The board's label and rings, parsed in Node: size, the piece's square, the "It can land on" squares, the rings' squares. */
+  async function knightView() {
+    const raw = await b.evaluate(`(() => {
+      const board = document.querySelector('.board-host .board');
+      return {
+        label: board.getAttribute('aria-label'),
+        layer: !!board.querySelector('g.landings'),
+        rings: [...board.querySelectorAll('g.landings g.landing')].map((g) => g.dataset.square),
+        haloed: board.querySelectorAll('g.landings g.landing circle.landing-halo').length,
+        inked: board.querySelectorAll('g.landings g.landing circle.landing-ink').length,
+      };
+    })()`);
+    const [, width, height] = /^(\d+) by (\d+) board/.exec(raw.label) ?? [];
+    const sentence = /It can land on ([^.]+)\./.exec(raw.label)?.[1];
+    return {
+      ...raw,
+      width: Number(width),
+      height: Number(height),
+      piece: /Your (\w+) is on/.exec(raw.label)?.[1],
+      at: /Your \w+ is on ([a-z]\d+)/.exec(raw.label)?.[1],
+      said: sentence ? sentence.split(/, | and /) : [],
+    };
+  }
+  /** The rings are on the board, each a knight's move from the piece, drawn whole, and the label's sentence names them in order. */
+  function expectRingsAgree(view, where) {
+    expect(view.at && view.rings.length > 0, `${where}: ${view.rings.length} rings, the piece on ${view.at}`);
+    const onBoard = (name) => square(name).x >= 0 && square(name).x < view.width && square(name).y >= 0 && square(name).y < view.height;
+    const stray = view.rings.filter((ring) => !onBoard(ring) || !isKnightMove(view.at, ring));
+    expect(stray.length === 0, `${where}: rings off the board or not a knight's move from ${view.at}: ${stray.join()}`);
+    expect(view.haloed === view.rings.length && view.inked === view.rings.length, `${where}: halos ${view.haloed}, inks ${view.inked} for ${view.rings.length} rings`);
+    expect(view.said.join() === view.rings.join(), `${where}: label says [${view.said.join()}], rings are [${view.rings.join()}]`);
+  }
+  /** Wait (up to 3 s) for the rings to be exactly `want`. */
+  async function ringsBecome(want) {
+    for (let i = 0; i < 30; i++) {
+      if ((await knightView()).rings.join() === want.join()) return true;
+      await sleep(100);
+    }
+    return false;
+  }
+
+  await check("M5.1: with no saved settings the knight levels wear the knight and a Pawn-tier level the pawn", async () => {
+    await openLevel("ch01-l01", { fresh: true }); // a page to hold the settings: the first one is blank
+    const saved = await b.evaluate(`localStorage.getItem('rank-and-file:settings')`);
+    try {
+      await b.evaluate(`localStorage.removeItem('rank-and-file:settings')`);
+      await openLevel("practice-11", { fresh: true });
+      const knight = await heroLit(boardEl);
+      await openLevel("ch01-l01", { fresh: true });
+      const pawn = await heroLit(boardEl);
+      expect(knight.heroes === 1 && knight.lit > 0, `practice-11: ${JSON.stringify(knight)}`);
+      expect(pawn.heroes === 1 && pawn.lit === 0, `ch01-l01: ${JSON.stringify(pawn)}`);
+      return `lit details: knight ${knight.lit}, pawn ${pawn.lit}`;
+    } finally {
+      await b.evaluate(
+        saved === null
+          ? `localStorage.removeItem('rank-and-file:settings')`
+          : `localStorage.setItem('rank-and-file:settings', ${JSON.stringify(saved)})`,
+      );
+    }
+  });
+
+  await check("M5.1: at the start the landing rings are knight's moves on the board, and the board's label names the same squares", async () => {
+    await openLevel("practice-11", { fresh: true });
+    const view = await knightView();
+    expect(view.layer && view.piece === "knight", `no landings layer, or not a knight: ${view.label}`);
+    expectRingsAgree(view, "practice-11");
+    await openLevel("ch01-l01", { fresh: true });
+    const pawn = await knightView();
+    expect(pawn.layer && pawn.rings.length === 0 && pawn.said.length === 0 && pawn.piece === "pawn" && !pawn.label.includes("It can land on"), `pawn level: ${pawn.rings.length} rings, ${pawn.label}`);
+    return `${view.at} → ${view.rings.join(" ")}`;
+  });
+
+  await check("M5.1: after one jump the knight, the label and the rings are at the landing, and the start brings the first rings back", async () => {
+    await openLevel("practice-11", { fresh: true });
+    const before = await knightView();
+    const [from, to] = [square(before.at), square(before.rings[0])];
+    await setCode(`knight.jump(${to.x - from.x}, ${to.y - from.y})`);
+    const r = await run();
+    expect(r.head !== "Solved!" && !r.errorLine, brief(r)); // one jump can't solve it, and a legal jump isn't an error
+    const after = await knightView();
+    expect(after.at === before.rings[0], `the label says ${after.at}, not ${before.rings[0]}`);
+    expect(after.rings.join() !== before.rings.join(), `the rings did not change from ${before.rings.join()}`);
+    expectRingsAgree(after, "after the jump");
+    await b.evaluate(`${button(0)}.click()`);
+    expect(await ringsBecome(before.rings), `back at the start the rings are [${(await knightView()).rings.join()}], not [${before.rings.join()}]`);
+    const back = await knightView();
+    expect(back.at === before.at, `back at the start the label says ${back.at}, not ${before.at}`);
+    return `${before.at} → ${after.at}: ${after.rings.join(" ")}`;
+  });
+
+  await check("M5.1: asking the knight to walk stops the run with its own message, on the line, and the board stays put", async () => {
+    await openLevel("practice-11", { fresh: true });
+    const before = await knightView();
+    await setCode("knight.move()");
+    const r = await run();
+    const after = await knightView();
+    expect(r.head === "Python stopped" && r.text.includes("Knights don't walk: they jump.") && r.errorLine, brief(r));
+    expect(after.label === before.label && after.rings.join() === before.rings.join(), `the board changed: ${before.at} → ${after.at}`);
+    return brief(r);
+  });
+
+  await check("M5.1: a jump that isn't an L gets the knight's own friendly error, not a traceback", async () => {
+    await openLevel("practice-11", { fresh: true });
+    await setCode("knight.jump(1, 1)");
+    const r = await run();
+    expect(r.head === "Python stopped" && r.text.includes("isn't a jump a knight can make") && r.errorLine, brief(r));
+    expect(!/Traceback|JumpError|GameArgumentError/.test(r.text), brief(r));
+    return brief(r);
+  });
+
+  // Chosen from the boards (`scripts.show_level`): practice-11's knight starts in the corner a1, so one square left
+  // is off the board; practice-12's wall is the whole d file, so a1 → c2 → (one right, two up) lands on the wall on d4.
+  await check("M5.1: a jump off the board or onto a wall is refused as blocked, in words of landing", async () => {
+    await openLevel("practice-11", { fresh: true });
+    await setCode("knight.jump(-1, 2)");
+    const off = await run();
+    await openLevel("practice-12", { fresh: true });
+    await setCode("knight.jump(2, 1)\nknight.jump(1, 2)");
+    const wall = await run();
+    expect(off.head === "Python stopped" && off.errorLine && off.text.includes("land off the edge of the board"), brief(off));
+    expect(wall.head === "Python stopped" && wall.errorLine && wall.text.includes("can't land on a wall on d4"), brief(wall));
+    for (const r of [off, wall]) expect(!/walk|bumped|Traceback/.test(r.text), `a pawn's words: ${brief(r)}`);
+    return `${brief(off)} | ${brief(wall)}`;
+  });
+
+  await check("M5.1: the variables panel lists the knight first, and the editor's placeholder names the piece", async () => {
+    await openLevel("practice-11", { fresh: true });
+    await setCode("steps = 1");
+    const r = await run();
+    expect(/^knight /.test(r.vars[0] ?? "") && r.vars.some((v) => v.startsWith("steps ")), JSON.stringify(r.vars.map((v) => v.slice(0, 30))));
+    const placeholder = async () => {
+      await b.evaluate(`document.querySelector('.level-right .cm-content').focus()`);
+      await b.key("a", { code: "KeyA", modifiers: 2 }); // Ctrl+A
+      await b.key("Delete", { keyCode: 46 });
+      return b.waitFor(`document.querySelector('.level-right .cm-placeholder')?.textContent`, 5000, "the placeholder");
+    };
+    const knightText = await placeholder();
+    await openLevel("ch01-l01", { fresh: true });
+    const pawnText = await placeholder();
+    expect(knightText.endsWith("Your knight is called knight."), knightText);
+    expect(pawnText.endsWith("Your pawn is called pawn."), pawnText);
+    return r.vars[0];
+  });
+
+  await check("M5.1: hovering jump shows the knight's entry, help() answers, and the Codex tab lists it", async () => {
+    await openLevel("practice-11", { fresh: true });
+    await setCode("knight.jump(1, 2)");
+    await sleep(300);
+    await hover(await wordAt("jump"));
+    await sleep(900);
+    const tip = await b.evaluate(`document.querySelector('.cm-tooltip .codex-card .codex-call')?.textContent ?? null`);
+    await hoverAway();
+    await setCode("help(knight.jump)");
+    const r = await run();
+    const helped = await b.evaluate(`document.querySelector('.console').innerText`);
+    const entries = await codexEntries();
+    expect(tip !== null && tip.startsWith("knight.jump("), `tooltip: ${tip}`);
+    expect(r.head !== "Python stopped" && helped.includes("knight.jump"), `help(): ${brief(r)}`);
+    expect(entries.some((e) => e.name === "knight.jump"), entries.map((e) => e.name).join());
+    return `${tip}; Codex: ${entries.map((e) => e.name).join(",")}`;
+  });
+
+  await check("M5.1: the lesson's first snippet runs a knight on the small board, and the ones that go wrong show their errors in place", async () => {
+    await openLevel("practice-11", { fresh: true });
+    await b.waitFor(`document.querySelectorAll('.lesson .snippet').length >= 3 && ${snippet(0)}.querySelector('.board g.piece')`, 20_000, "the lesson's snippets");
+    const skin = await heroLit(snippet(0));
+    const ran = await runSnippet(0, { settle: true });
+    const skinAfter = await heroLit(snippet(0));
+    expect(skin.heroes === 1 && skin.lit > 0 && skinAfter.lit > 0, `the lesson board's piece: ${JSON.stringify([skin, skinAfter])}`);
+    expect(/Finished/.test(ran.status), `snippet 0: ${ran.status}`);
+    const wrong = await runSnippet(1);
+    const walk = await runSnippet(2);
+    const text = (index) => b.evaluate(`${snippet(index)}.innerText.replace(/\\s+/g, ' ')`);
+    const [wrongText, walkText] = [await text(1), await text(2)];
+    const tracebackShut = await b.evaluate(`[...${snippet(1)}.querySelectorAll('pre.traceback')].every((pre) => pre.closest('details') && !pre.closest('details').open)`); // Python's own traceback is there, but folded away
+    expect(/stopped/.test(wrong.status) && wrongText.includes("isn't a jump a knight can make") && tracebackShut, `snippet 1: ${wrong.status}, traceback folded: ${tracebackShut}`);
+    expect(/stopped/.test(walk.status) && walkText.includes("Knights don't walk: they jump."), `snippet 2: ${walk.status}`);
+    return `${ran.status} / ${wrong.status} / ${walk.status}`;
+  });
 }
