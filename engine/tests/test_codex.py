@@ -93,7 +93,7 @@ def test_taught_so_far_is_the_curriculum_before_a_level_then_its_own_chapter_up_
 
 def test_a_levels_codex_is_its_abilities_then_the_builtins_taught_so_far():
     entries = codex.entries("t1", CHAPTERS)
-    assert [entry.name for entry in entries] == ["pawn.move", "pawn.wait", "print", "range"]
+    assert [entry.name for entry in entries] == ["pawn.move", "pawn.wait", "print", "range", "for"]  # a keyword the lesson uses comes last (M5.2-7)
     introduced = {entry.name: (entry.introduced, entry.new) for entry in entries}
     assert introduced["pawn.move"] == ("c1", False)
     assert introduced["print"] == ("c2", False)  # the snippet that isn't Python is skipped
@@ -103,7 +103,7 @@ def test_a_levels_codex_is_its_abilities_then_the_builtins_taught_so_far():
 
 def test_only_this_levels_abilities_are_listed():
     # An ability unlocked earlier but locked here can't be used, so it isn't listed.
-    assert [entry.name for entry in codex.entries("t2", CHAPTERS)] == ["pawn.move", "print", "range"]  # the built-ins still work
+    assert [entry.name for entry in codex.entries("t2", CHAPTERS)] == ["pawn.move", "print", "range", "for"]  # the built-ins and keywords still work
 
 
 def test_a_lessons_built_ins_are_found_with_ast():
@@ -452,3 +452,90 @@ def test_something_taught_by_nobody_is_ignored_and_the_rest_decides():
 def test_the_latest_of_several_needs_wins():
     assert tags(TIERED, ["turn_left"], ["While"]) == ("bishop", 3)
     assert tags(TIERED, ["wait"], ["For"]) == ("bishop", 3)  # nobody teaches For: only the ability counts
+
+
+# -- keywords (M5.2-7) -------------------------------------------------------------
+
+KEYWORD_NAMES = ["for", "if", "while", "break", "continue", "def", "return"]
+
+
+def test_the_seven_keyword_entries_have_the_approved_words():
+    assert list(codex.KEYWORDS) == KEYWORD_NAMES
+    entries = {name: codex.keyword_entry(name) for name in KEYWORD_NAMES}
+    assert all(entry.kind == "keyword" and entry.name == name and len(entry.calls) == 1 for name, entry in entries.items())
+    assert entries["for"].to_dict() == {
+        "name": "for", "kind": "keyword", "calls": ["for name in things:"],
+        "paragraphs": ["Run the indented lines once for each item, with `name` holding that item. `range(3)` hands out 0, 1 and 2."],
+        "args": [], "returns": "", "example": "for i in range(3):\n    print(i)", "introduced": "", "new": False,
+    }
+    assert entries["if"].calls == ["if condition: … elif other: … else:"]
+    assert "`elif` tries another condition" in entries["if"].paragraphs[0]
+    assert entries["if"].example == 'if steps > 3:\n    print("far")\nelif steps == 3:\n    print("just right")\nelse:\n    print("near")'
+    assert entries["while"].example == "left = 3\nwhile left > 0:\n    left = left - 1"
+    assert entries["break"].calls == ["break"] and entries["break"].example == "while True:\n    if done:\n        break"
+    assert entries["continue"].paragraphs == ["Skip the rest of this lap and go straight on to the next one."]
+    assert entries["def"].calls == ["def name(parameter, other=default):"]
+    assert entries["def"].paragraphs[0].endswith("a docstring) says what the function does, and `help(name)` shows it.")
+    assert entries["def"].example.splitlines()[2] == '        print(f"Go, {name}!")'
+    assert entries["return"].calls == ["return value"] and "`return` gives it to the caller." in entries["return"].paragraphs[0]
+    assert entries["return"].example == "def double(n):\n    return n * 2\nprint(double(4) + 1)"
+
+
+def keyword_chapters() -> list[dict]:
+    return [
+        {"curriculum": True, "levels": [level("k1", ["move"], "pawn.move()"), level("k2", ["move"], "for i in range(2):\n    pass", "this is not Python")]},
+        {"curriculum": True, "levels": [level("k3", ["move"], "def f():\n    return 1\nwhile x:\n    break"), level("k4", ["move"], "if a:\n    pass\nelif b:\n    pass")]},
+    ]
+
+
+def keywords_at(level_id: str) -> list[tuple[str, str, bool]]:
+    return [(entry.name, entry.introduced, entry.new) for entry in codex.entries(level_id, keyword_chapters()) if entry.kind == "keyword"]
+
+
+def test_a_keyword_is_listed_from_the_first_lesson_that_uses_it_and_not_before():
+    assert keywords_at("k1") == []
+    assert keywords_at("k2") == [("for", "k2", True)]
+    assert keywords_at("k3") == [("for", "k2", False), ("while", "k3", True), ("break", "k3", True), ("def", "k3", True), ("return", "k3", True)]
+    assert keywords_at("k4")[1] == ("if", "k4", True)
+    assert [name for name, _, _ in keywords_at("k4")] == ["for", "if", "while", "break", "def", "return"]  # `continue` is taught by nobody here
+
+
+def test_keywords_come_after_the_text_methods():
+    chapters = [{"curriculum": True, "levels": [level("r1", ["move"], "for c in 'a'.upper():\n    print(c)")]}]
+    assert [entry.kind for entry in codex.entries("r1", chapters)] == ["ability", "builtin", "method", "keyword"]
+
+
+def test_help_on_a_keyword_shows_its_entry_on_any_level():
+    output = run_sandbox('help("def")\nhelp("else")\nhelp("elif")\nhelp("continue")', ["move"]).output
+    assert output.count("Help on if:") == 2 and "Help on def:" in output and "Help on continue:" in output
+    assert "def name(parameter, other=default):" in output and "Example:\n        def cheer(name, times=1):" in output
+    assert len(output) < 3000  # not Python's reference manual
+
+
+def test_help_on_other_text_keeps_its_behaviour():
+    assert "There's no help on 'zzz'" in run_sandbox('help("zzz")', ["move"]).output
+
+
+def function_help(code: str) -> str:
+    result = run_sandbox(code, ["move"])
+    assert result.status == "finished"
+    return result.output
+
+
+def test_help_on_the_players_function_with_a_docstring_is_in_the_codex_style():
+    output = function_help('def stride(squares, times=2, *rest):\n    """Walk a few squares.\n\n    Then rest."""\n\nhelp(stride)')
+    assert output.splitlines()[0] == "stride(squares, times=2, *rest)"
+    assert "    Walk a few squares." in output and "    Then rest." in output
+    assert "Help on function" not in output and "__main__" not in output
+
+
+def test_help_on_the_players_function_without_a_docstring_says_how_to_add_one():
+    output = function_help("def stride(squares, times=2):\n    pass\n\nhelp(stride)")
+    assert output.splitlines()[0] == "stride(squares, times=2)"
+    assert "a sentence in quotes as the first line of its" in output and "body would show here" in output
+    assert "Help on function" not in output and "__main__" not in output
+
+
+def test_help_on_a_lambda_does_not_crash():
+    output = function_help("double = lambda n: n * 2\nhelp(double)")
+    assert output.splitlines()[0] == "<lambda>(n)"
