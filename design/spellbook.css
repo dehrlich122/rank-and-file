@@ -1,0 +1,239 @@
+/* M5.2 (design sheet, dev-only): Chapter 7. Pane framing, the stepping-stone boards, the variables takes and the
+   code panel takes. The game's own classes (src/styles.css) draw the board, the Inspector and the highlighted line. */
+
+:root {
+  /* new tokens: the landing ring (the game's cyan over a halo that keeps it readable on a pit), the quiet outlined
+     bar and the return mark of the code panel, a bar down the left of a function's names, and the gutter */
+  --land: var(--accent);
+  --land-halo: light-dark(rgb(248 247 253 / 0.85), rgb(9 4 22 / 0.85));
+  --call-bar: light-dark(rgb(10 127 156 / 0.7), rgb(59 224 255 / 0.6));
+  --scope-bar: var(--accent);
+  --gutter-text: var(--muted);
+}
+
+body {
+  margin: 0;
+  background: #070414;
+}
+
+#sheet {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 16px;
+  display: grid;
+  gap: 20px;
+}
+
+.sheet-head h1 {
+  margin: 0;
+  font: 700 20px "Orbitron", var(--font-ui);
+  letter-spacing: 0.06em;
+  color: #3be0ff;
+}
+
+.sheet-head p {
+  margin: 4px 0 0;
+  max-width: 120ch;
+  color: #a69ed6;
+  font: 15px/1.5 var(--font-ui);
+}
+
+.pane {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 var(--font-ui);
+  padding: 14px;
+  border: 1px solid var(--border);
+}
+
+.pane[data-scheme="dark"] {
+  color-scheme: dark;
+}
+
+.pane[data-scheme="light"] {
+  color-scheme: light;
+}
+
+.pane-name {
+  margin: 0 0 8px;
+  font: 700 12px var(--font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.note,
+.caption {
+  margin: 0 0 10px;
+  max-width: 110ch;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.caption {
+  margin: 0;
+  color: var(--text);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.take {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.take-label {
+  margin: 0;
+  font: 600 12px var(--font-ui);
+  color: var(--muted);
+}
+
+.take-label b {
+  display: inline-block;
+  min-width: 2.2em;
+  margin-right: 4px;
+  padding: 1px 6px;
+  text-align: center;
+  background: var(--accent);
+  color: var(--accent-text);
+  font: 700 13px var(--font-code);
+}
+
+.take .board {
+  max-height: none;
+  width: var(--bw, 560px);
+}
+
+/* the landing ring: a line in the game's cyan over a halo */
+.land {
+  pointer-events: none;
+}
+
+.land circle {
+  fill: none;
+}
+
+.land .halo {
+  stroke: var(--land-halo);
+  stroke-width: 8;
+}
+
+.land .ink {
+  stroke: var(--land);
+  stroke-width: 3.4;
+}
+
+/* a moment: the sample program above the panel it goes with */
+.moment {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  width: 280px;
+}
+
+.moment-name {
+  margin: 0;
+  font: 600 12px var(--font-ui);
+  color: var(--muted);
+}
+
+.code {
+  border: 1px solid var(--border);
+  background: var(--code-bg);
+  font: calc(var(--code-size) - 1.5px) / 1.55 var(--font-code);
+}
+
+.code-row {
+  display: flex;
+  min-height: 1.55em;
+  white-space: pre;
+}
+
+.code-row .gutter {
+  flex: none;
+  width: 3em;
+  box-sizing: border-box;
+  padding: 0 6px;
+  text-align: right;
+  color: var(--gutter-text);
+  border-right: 1px solid var(--border);
+}
+
+.code-row .cm-line {
+  padding: 0 6px;
+}
+
+.code-row.call-line {
+  outline: 1px solid var(--call-bar);
+  outline-offset: -1px;
+}
+
+.code-row .return-mark {
+  color: var(--accent);
+}
+
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.panel-box {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  padding: 4px 0;
+}
+
+/* V1: two groups */
+.group-head {
+  margin: 0;
+  padding: 2px 8px;
+  font: 600 13px var(--font-code);
+  color: var(--text);
+}
+
+.group.quiet {
+  opacity: 0.65;
+}
+
+.group.quiet .group-head {
+  font: 600 11px var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.group + .group {
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+/* V2: one list, the function's names with a bar down their left */
+.scope {
+  border-left: 3px solid var(--scope-bar);
+}
+
+.fold summary {
+  cursor: pointer;
+  padding: 3px 8px;
+  font: 12px var(--font-code);
+  color: var(--muted);
+}
+
+/* V3: one line above the names */
+.context {
+  margin: 0;
+  padding: 2px 8px 4px;
+  font: 12px var(--font-code);
+  color: var(--muted);
+}
