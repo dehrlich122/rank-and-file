@@ -165,7 +165,7 @@ class Enemy:
         ticks = CLOCK_TICKS[self.clock]
         if self.kind in CHESS_LINES:
             lines = "rank and file (straight across, and up and down)" if self.kind == "rook" else "diagonals"
-            onto = "Land on" if piece == "knight" else "Step onto"
+            onto = "Land on" if PIECES[piece].LANDS else "Step onto"
             text = (
                 f"A {self.kind} stands on {start}. It attacks every square along its {lines}, up to the first wall, "
                 f"closed gate or piece. {onto} one of those squares and it takes you: the run is lost."
@@ -253,7 +253,7 @@ class Level:
             else:
                 goals.append(f'Say "{phrase}" (print it).')
         waypoints = names(self.board.squares(Tile.WAYPOINT))
-        jumps = self.piece == "knight"  # a jump flies over what's between: only the square it lands on counts (M5.1)
+        jumps = self.lands  # a jump flies over what's between: only the square it lands on counts (M5.1)
         if len(waypoints) == 1:
             goals.append(
                 f"Land on the waypoint on {waypoints[0]} on the way. A jump flies over it: it only counts where you land."
@@ -287,6 +287,11 @@ class Level:
         return goals
 
     @property
+    def lands(self) -> bool:
+        """Whether the piece lands on squares, rather than steps or walks over them (M5.1)."""
+        return PIECES[self.piece].LANDS
+
+    @property
     def nothing_to_do(self) -> bool:
         """No objectives at all: a run just finishes. (Waypoints on the map are
         always an objective, listed or not. Lesson snippets are never judged.)"""
@@ -312,7 +317,7 @@ class Level:
     def obstacles(self) -> list[str]:
         """The obstacles' rules, one sentence each (M3.1), for the Challenge panel."""
         obstacles = []
-        jumps = self.piece == "knight"  # it lands on squares, it doesn't step or walk (M5.1)
+        jumps = self.lands  # it lands on squares, it doesn't step or walk (M5.1)
         pits = names(self.board.squares(Tile.PIT))
         if pits:
             where = f"A pit on {pits[0]}" if len(pits) == 1 else f"Pits on {and_list(pits)}"

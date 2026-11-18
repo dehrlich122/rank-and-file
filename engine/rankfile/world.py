@@ -114,7 +114,7 @@ class World:
         self.clocked = {timer.clock for timer in self.board.timers.values()} | {enemy.clock for enemy in level.enemies}
         self.code_clocked = sorted(self.clocked & CODE_CLOCKS)  # clocks the code winds, whose counts the board shows (QA-021)
         self.chess = any(enemy.kind in CHESS_LINES for enemy in level.enemies)  # M3.4
-        self.jumps = level.piece == "knight"  # the piece jumps, so the state carries its landing squares (M5.1)
+        self.jumps = level.lands  # the piece jumps, so the state carries its landing squares (M5.1)
         self.lost: Lost | None = None
         self.listeners: list[Callable[[Event], None]] = []
 

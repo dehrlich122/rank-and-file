@@ -29,6 +29,9 @@ class Piece:
     # Other pieces' abilities this piece is asked for by mistake, and the kind
     # answer it gives instead of "doesn't have an ability called" (M5.1).
     CANT: ClassVar[dict[str, str]] = {}
+    # Whether this piece lands on squares rather than steps or walks over them (M5.1): the words of its
+    # levels, and the landings its world's state carries, follow it.
+    LANDS: ClassVar[bool] = False
 
     def __init__(self, world: World, unlocked: list[str]):
         # Pieces refuse normal attribute assignment (see __setattr__), so the
@@ -284,6 +287,7 @@ class Knight(Piece):
     all the same (the direction of the last jump's short leg), for the board to draw."""
 
     NAME = "knight"
+    LANDS = True
     ABILITIES = ("jump", "look", "at_goal", "position", "wait", "read")
     CANT: ClassVar[dict[str, str]] = {
         "move": f"{_WALK} `knight.jump(1, 2)` jumps one square right and two up.",

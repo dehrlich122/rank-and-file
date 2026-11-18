@@ -207,6 +207,27 @@ def test_landing_off_the_board(field):
     assert result.error.friendly == "That jump would land off the edge of the board. Your knight is on e4."
 
 
+def test_a_refused_jump_as_the_first_move_leaves_the_rings_as_they_were(ring):
+    result = run_level(ring, "knight.jump(-1, 2)")  # onto a wall: refused, the knight never leaves c3
+    assert result.error.type == "BlockedError"
+    assert result.final["landings"]
+    assert result.final["landings"] == result.start["landings"]
+
+
+def test_a_refused_jump_off_the_board_leaves_the_rings_where_the_knight_stands(field):
+    result = run_level(field, "knight.jump(2, 1)\nknight.jump(1, 2)")  # lands on e4, then tries to leave the board
+    assert result.error.type == "BlockedError"
+    assert result.final["pos"] == [4, 3]
+    assert result.final["landings"]
+    assert result.final["landings"] == [[2, 2], [2, 4], [3, 1]]  # the three jumps from e4 that stay on the board
+    assert result.final["landings"] != result.start["landings"]
+
+
+def test_only_the_knight_lands_on_squares():
+    assert Knight.LANDS is True
+    assert Pawn.LANDS is False
+
+
 def test_landing_on_an_enemy_takes_it(ring):
     result = run_level(ring, "knight.jump(2, -1)")
     jump = events(result, "jump")[0]
