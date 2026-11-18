@@ -15,7 +15,7 @@ import { squareName } from "../editor/draft";
 import { wornPiece } from "../promotion";
 import { motionReduced, settings } from "../settings";
 import { sound } from "../sound";
-import { soundsForStep } from "../sound/events";
+import { landingSounds, soundsForStep } from "../sound/events";
 import { describeBoard } from "./boardText";
 import { jumpPlan, type JumpPlan, playableEvents } from "./motion";
 import { halftone, litGrid, M, S } from "./sprites/floor";
@@ -159,12 +159,15 @@ export class BoardView {
     const each = totalMs / events.length;
     this.stepMs = Math.round(each * 0.9);
     this.element.style.setProperty("--step-ms", `${this.stepMs}ms`);
-    const sounds = soundsForStep(events, this.last ?? null, settings.get().speed); // only played events sound: jumps and scrubs never come here
+    const sounds = soundsForStep(events, this.last ?? null, settings.get().speed); // only played events sound: scrubs never come here
+    const landing = landingSounds(events, this.last ?? null);
+    const landAfter = motionReduced() ? 0 : this.stepMs / 1000; // a jump's landing sounds when it lands
     events.forEach((event, i) => {
       this.timers.push(
         window.setTimeout(() => {
           this.apply(event);
           for (const name of sounds[i]!) sound.play(name);
+          for (const name of landing[i]!) sound.play(name, landAfter);
         }, i * each),
       );
     });

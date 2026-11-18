@@ -73,6 +73,7 @@ const glide = (from: number, to: number, dur: number, type: OscillatorType = "sq
 export const EFFECTS = {
   // -- on the board ----------------------------------------------------------------------------------------
   move: blip(7, 0.04, "square", 0.25),
+  jump: glide(-5, 12, 0.09, "triangle", 0.3),
   turn_left: run([7, 0], 0.045, "square", 0.06, 0.3),
   turn_right: run([0, 7], 0.045, "square", 0.06, 0.3),
   bump: (ctx, out, t) => { voice(ctx, out, t, { freq: hz(-22), dur: 0.1, type: "sawtooth", gain: 0.35 }); burst(ctx, out, t, 0, 0.05, 1200, 0.25); },
