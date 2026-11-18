@@ -513,8 +513,14 @@ THE_WORDS = [
     row("def gallop(n, m=0, k=0):\n    pass\n", [], f"The examiner called `gallop()` with no values, and your `gallop` takes from 1 to 3. {NEEDS_A_NAME} {FEWER}"),
     row("def gallop(n, *rest):\n    pass\n", [], f"The examiner called `gallop()` with no values, and your `gallop` takes 1 or more. {NEEDS_A_NAME} {FEWER}"),
     row("def gallop(n, *, m):\n    pass\n", [1], f"The examiner called `gallop(1)` with 1 value, and your `gallop` also needs `m`, which can only be given by name. Take it before the `*` in its `def` line, or give it a default value. {FEWER}"),
-    row("def gallop(*, m, k):\n    pass\n", [], f"The examiner called `gallop()` with no values, and your `gallop` also needs `m` and `k`, which can only be given by name. Take it before the `*` in its `def` line, or give it a default value. {FEWER}"),
-    row(f"def count(n):\n    print('hi')\n{MOVES}", [4], "The examiner called `count(4)` and got nothing back (None); it wanted 7. Your function printed, but the examiner doesn't read the screen: `print` shows a value, `return` hands it back. “You showed me the answer. I asked you to hand it to me.”", function="count", returns=7),
+    row("def gallop(*, m, k):\n    pass\n", [], f"The examiner called `gallop()` with no values, and your `gallop` also needs `m` and `k`, which can only be given by name. Take them before the `*` in its `def` line, or give each one a default value. {FEWER}"),
+    row("def gallop(m=0, n=0, k=0):\n    pass\n", [1, 2, 3, 4], f"The examiner called `gallop(1, 2, 3, 4)` with 4 values, and your `gallop` takes up to 3. {NEEDS_A_NAME} {FEWER}"),
+    row("def gallop(m=0):\n    pass\n", [1, 2], f"The examiner called `gallop(1, 2)` with 2 values, and your `gallop` takes none or 1. {NEEDS_A_NAME} {FEWER}"),
+    row(f"def count(n):\n    print(7)\n{MOVES}", [4], "The examiner called `count(4)` and got nothing back (None); it wanted 7. Your function printed its answer, but the examiner doesn't read the screen: `print` shows a value, `return` hands it back. “You showed me the answer. I asked you to hand it to me.”", function="count", returns=7),
+    row(f"def count(n):\n    print('  7  ')\n{MOVES}", [4], "The examiner called `count(4)` and got nothing back (None); it wanted 7. Your function printed its answer, but the examiner doesn't read the screen: `print` shows a value, `return` hands it back. “You showed me the answer. I asked you to hand it to me.”", function="count", returns=7),
+    row(f"def count(n):\n    print('hi')\n{MOVES}", [4], f"The examiner called `count(4)` and got nothing back (None); it wanted 7. A function hands a value back only with `return`: check that every way through `count` reaches one. {NOTHING_PUT}", function="count", returns=7),
+    row(f"def count(n):\n    print('Open sesame')\n{MOVES}", [4], f"The examiner called `count(4)` and got nothing back (None); it wanted 7. A function hands a value back only with `return`: check that every way through `count` reaches one. {NOTHING_PUT}", function="count", returns=7),
+    row(f"def count(n):\n    print(77)\n{MOVES}", [4], f"The examiner called `count(4)` and got nothing back (None); it wanted 7. A function hands a value back only with `return`: check that every way through `count` reaches one. {NOTHING_PUT}", function="count", returns=7),
     row(f"def count(n):\n{MOVES}", [4], f"The examiner called `count(4)` and got nothing back (None); it wanted 7. A function hands a value back only with `return`: check that every way through `count` reaches one. {NOTHING_PUT}", function="count", returns=7),
     row(f"print('before')\ndef count(n):\n{MOVES}", [4], f"The examiner called `count(4)` and got nothing back (None); it wanted 7. A function hands a value back only with `return`: check that every way through `count` reaches one. {NOTHING_PUT}", function="count", returns=7),
     row(f"def count(n):\n{MOVES}    return 8\n", [4], f"The examiner called `count(4)`: it wanted 7 and got 8. {NOT_THE_ANSWER}", function="count", returns=7),
@@ -553,3 +559,56 @@ def test_the_answer_wanted_is_shown_only_where_the_table_shows_it():
     for code in ("x = 1\n", "gallop = 3\n", "def gallop():\n    pass\n", "def gallup(n):\n    pass\n", "def gallop(n, *, m):\n    pass\n"):
         assert str(WANTS) not in call_of({"args": [1], "returns": WANTS}, code=code, constraints=False).summary
     assert str(WANTS) in call_of({"args": [1], "returns": WANTS}, code="def gallop(n):\n    return 1\n", constraints=False).summary
+
+
+# -- M5.2-4c: the review's fixes ------------------------------------------------------------------------------------
+
+DOCTORED = [
+    "gallop.__signature__ = 5\n",  # inspect.signature would follow it, and fail
+    "gallop.__signature__ = 'nonsense'\n",
+    "gallop.__wrapped__ = gallop\n",  # inspect.signature would find a loop
+]
+
+
+@pytest.mark.parametrize("doctor", DOCTORED)
+def test_a_signature_or_wrapped_the_program_sets_is_never_consulted(doctor):
+    code = f"def gallop(n):\n    pawn.move(3)\n{doctor}"
+    fine = call_of({"args": [1]}, code=code, constraints=False)
+    assert fine.status == "solved" and fine.error is None
+    assert 0 < fine.call.first_step < len(fine.steps)  # the program's own lines came first
+    wrong = call_of({"args": [1, 2]}, code=code, constraints=False)
+    assert wrong.status == "incomplete" and wrong.error is None
+    assert wrong.call.first_step == len(wrong.steps) > 0  # the call was never made
+    assert wrong.final == wrong.start
+    assert "and your `gallop` takes 1. " in wrong.summary and wrong.summary.endswith(FEWER)
+
+
+@pytest.mark.parametrize("doctor", DOCTORED)
+def test_execute_checks_a_doctored_function_by_its_own_parameters(doctor):
+    code = f"def gallop(n, m=0, *, k):\n    pass\n{doctor}"
+    run = execute(compile(code, PLAYER_FILENAME, "exec"), code, {}, line_budget=1000, record=True, call=("gallop", [1]))
+    assert run.error is None and run.problem == "arguments" and run.first_step == len(run.tracer.steps) > 0
+    assert list(run.signature.parameters) == ["n", "m", "k"]
+    run = execute(compile(code, PLAYER_FILENAME, "exec"), code, {}, line_budget=1000, call=("gallop", [1, 2, 3]))
+    assert run.problem == "arguments"
+
+
+def test_a_function_whose_defaults_were_replaced_is_read_as_it_now_is():
+    code = "def gallop(n, m):\n    pass\ngallop.__defaults__ = (0,)\n"
+    run = execute(compile(code, PLAYER_FILENAME, "exec"), code, {}, line_budget=1000, call=("gallop", [1]))
+    assert run.problem is None and run.finished and run.error is None
+
+
+@pytest.mark.parametrize(
+    "rules",
+    [{"gallop": {"calls": 1}}, {"gallop": {"params": 1, "calls": 3}}, {"hop": {"calls": 2}, "gallop": {"calls": 2, "returns": True}}],
+)
+def test_the_examiner_makes_the_calls_so_its_function_cannot_be_asked_to_be_called(rules):
+    with pytest.raises(LevelError, match="the examiner makes the calls to 'gallop', so constraints.functions can't ask the program to call it") as raised:
+        examiner({"args": [1]}, constraints={"functions": rules})
+    assert raised.value.at == {"field": "examine"}
+
+
+def test_a_rule_that_asks_for_calls_of_another_function_is_fine_on_an_examiner_level():
+    level = examiner({"args": [1]}, constraints={"functions": {"hop": {"calls": 2}, "gallop": {"params": 1}}})
+    assert level.constraints.functions["hop"].calls == 2

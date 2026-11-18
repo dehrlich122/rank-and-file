@@ -16,6 +16,7 @@ import tokenize
 from collections import Counter
 from dataclasses import dataclass
 
+from .errors import closest
 from .pieces import Piece
 from .words import and_list, count
 
@@ -158,13 +159,13 @@ def _function_problems(tree: ast.Module, constraints, examine) -> list[str]:
     if examine is not None:
         rule = constraints.functions.get(examine.function)
         if examine.function not in defs:
-            problems.append(_missing_function(examine.function, rule.params if rule else None))
+            problems.append(_missing_function(examine.function, rule.params if rule else None, defs))
         problems += _only_defines_problems(tree)
     for name, rule in constraints.functions.items():
         if name in defs:
             problems += _rule_problems(tree, defs[name], rule)
         elif examine is None or name != examine.function:  # the examiner's own function was said above
-            problems.append(_missing_function(name, rule.params))
+            problems.append(_missing_function(name, rule.params, defs))
     if constraints.define:
         problems += _define_problems(tree, defs, constraints.define, examine)
     return problems
@@ -175,7 +176,10 @@ def _top_functions(tree: ast.Module) -> dict[str, ast.FunctionDef | ast.AsyncFun
     return {node.name: node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
 
 
-def _missing_function(name: str, params: int | None) -> str:
+def _missing_function(name: str, params: int | None, defs: dict) -> str:
+    near = closest(name, list(defs))
+    if near:  # a typo in the name: say which one, since the examiner can't (the program is stopped before it can)
+        return f"This level needs a function called `{name}`, and your program has `{near}`: the name has to match letter for letter."
     signature = "()" if params == 0 else "(...)"
     return (
         f"This level needs a function called `{name}`: define it with `def {name}{signature}:`, "
@@ -203,8 +207,8 @@ def _rule_problems(tree: ast.Module, fn: ast.FunctionDef | ast.AsyncFunctionDef,
         )
     called = _calls(tree, fn)
     if rule.calls is not None and called < rule.calls:
-        tail = "never calls it" if called == 0 else f"calls it {count(called, 'time')}"
-        problems.append(f"This level wants your program to call `{name}` at least {count(rule.calls, 'time')}, and it {tail}.")
+        tail = "never calls it" if called == 0 else f"calls it in {count(called, 'place')}"  # places in the code, not calls made
+        problems.append(f"This level wants your program to call `{name}` in at least {count(rule.calls, 'place')}, and it {tail}.")
     if rule.returns and not any(isinstance(n, ast.Return) and not _is_none(n.value) for n in _own_nodes(fn)):
         problems.append(
             f"This level wants `{name}` to hand back a value: put `return` and the value inside it. "
@@ -255,7 +259,7 @@ def _define_problems(tree: ast.Module, defs: dict, wanted: int, examine) -> list
         verb, them = ("is", "it") if len(never) == 1 else ("are", "them")
         message += (
             f" {names} {verb} defined but never called. A `def` only teaches Python the name; "
-            f"the lines inside run when you call {them}: {and_list([_call_text(fn) for fn in never])}"
+            f"the lines inside run when you call {them}: {and_list([_call_text(fn) for fn in never])}."
         )
     if len(defs) < wanted:
         message += f" Your program defines only {count(len(defs), 'function')}."
@@ -265,12 +269,36 @@ def _define_problems(tree: ast.Module, defs: dict, wanted: int, examine) -> list
 def _only_defines_problems(tree: ast.Module) -> list[str]:
     """On an examiner level the program only defines (decision 4): the examiner makes the calls, and a line that
     acts would run before it does. Allowed at the left edge: `def`s, a docstring, `pass`, and a name set to a
-    plain value."""
-    lines = sorted({stmt.lineno for i, stmt in enumerate(tree.body) if not _only_defines(stmt, i == 0)})
-    if not lines:
-        return []
-    where = f"line {lines[0]}" if len(lines) == 1 else f"lines {and_list([str(line) for line in lines])}"
-    return [f"On this level the examiner makes the calls: take out {where}."]
+    plain value. A `def` runs its decorators and its default values when Python reads it, so those must not act
+    either (a nested `def` runs only when called, and isn't judged)."""
+    problems, spans = [], []
+    for i, stmt in enumerate(tree.body):
+        if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            problems += _def_runs_nothing(stmt)
+        elif not _only_defines(stmt, i == 0):
+            spans.append((stmt.lineno, stmt.end_lineno))
+    if not spans:
+        return problems
+    parts = [str(first) if first == last else f"{first} to {last}" for first, last in spans]
+    where = f"line {parts[0]}" if len(parts) == 1 and spans[0][0] == spans[0][1] else f"lines {and_list(parts)}"
+    return [f"On this level the examiner makes the calls: take out {where}."] + problems
+
+
+def _def_runs_nothing(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
+    """What in a top-level `def`'s own line would run before the examiner calls: a decorator, or a default that
+    isn't a plain value. (Annotations are read lazily, so they run nothing.)"""
+    now = "On this level nothing runs until the examiner calls:"
+    problems = [f"{now} take out the `@` line above `def {fn.name}` (line {d.lineno})." for d in fn.decorator_list]
+    args = fn.args
+    positional = args.posonlyargs + args.args
+    defaulted = list(zip(positional[len(positional) - len(args.defaults) :], args.defaults, strict=True))
+    defaulted += [(arg, default) for arg, default in zip(args.kwonlyargs, args.kw_defaults, strict=True) if default is not None]
+    for arg, default in sorted(defaulted, key=lambda pair: pair[1].lineno):
+        if not _plain_value(default):
+            problems.append(
+                f"{now} the default of `{arg.arg}` in `{fn.name}` (line {default.lineno}) has to be a plain value, like `{arg.arg}=1`."
+            )
+    return problems
 
 
 def _only_defines(stmt: ast.stmt, first: bool) -> bool:
@@ -426,19 +454,11 @@ def _function_rules(constraints, examine) -> list[str]:
     """The function rules (M5.2) as sentences, in the order `_function_problems` checks them."""
     rules = []
     if examine is not None:
-        rules.append(f"Define a function called `{examine.function}`.")
+        if not _rule_parts(constraints.functions.get(examine.function)):  # a rule with parts says it, fuller, below
+            rules.append(f"Define a function called `{examine.function}`.")
         rules.append("Your program only defines; the examiner makes the calls. Keep to `def`s, `pass` and names set to plain values.")
     for name, rule in constraints.functions.items():
-        parts = []
-        if rule.params is not None:
-            takes = f"takes {_values(rule.params)}"
-            parts.append(takes if rule.defaults is None else f"{takes} ({_of_them(rule.defaults)} with a default)")
-        elif rule.defaults is not None:
-            parts.append(f"has {_values(rule.defaults)} with a default")
-        if rule.returns:
-            parts.append("hands back a value")
-        if rule.calls is not None:
-            parts.append(f"is called at least {count(rule.calls, 'time')}")
+        parts = _rule_parts(rule)
         if parts:
             rules.append(f"Define a function called `{name}` that {and_list(parts)}.")
         elif examine is None or name != examine.function:
@@ -448,6 +468,23 @@ def _function_rules(constraints, examine) -> list[str]:
     elif constraints.define:
         rules.append(f"Define {constraints.define} functions of your own, and call each one.")
     return rules
+
+
+def _rule_parts(rule) -> list[str]:
+    """What one function's rule asks, as the parts of a sentence ("takes 1 value", "hands back a value"); none when it asks nothing."""
+    parts: list[str] = []
+    if rule is None:
+        return parts
+    if rule.params is not None:
+        takes = f"takes {_values(rule.params)}"
+        parts.append(takes if rule.defaults is None else f"{takes} ({_of_them(rule.defaults)} with a default)")
+    elif rule.defaults is not None:
+        parts.append(f"has {_values(rule.defaults)} with a default")
+    if rule.returns:
+        parts.append("hands back a value")
+    if rule.calls is not None:
+        parts.append(f"is called in at least {count(rule.calls, 'place')}")
+    return parts
 
 
 def _of_them(n: int) -> str:
