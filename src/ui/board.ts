@@ -1,6 +1,7 @@
 // The board, drawn as SVG: squares, tiles (walls, signposts, gates, pits,
 // waypoints, gems, timed gates, planks), the goal, the enemies and their
-// routes (M3.1), the squares chess pieces attack (M3.4) and the piece.
+// routes (M3.1), the squares chess pieces attack (M3.4), the squares a knight could
+// land on (M5.1) and the piece.
 //
 // The board never decides anything. It draws the states the engine reported:
 // `show()` jumps straight to a state, `animate()` plays a step's events in order.
@@ -15,6 +16,7 @@ import { wornPiece } from "../promotion";
 import { motionReduced, settings } from "../settings";
 import { sound } from "../sound";
 import { soundsForStep } from "../sound/events";
+import { describeBoard } from "./boardText";
 import { playableEvents } from "./motion";
 import { halftone, litGrid, M, S } from "./sprites/floor";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite, type Skin, type TileName } from "./sprites";
@@ -33,6 +35,8 @@ export class BoardView {
   private readonly lostMark: SVGGElement; // where the run was lost (M3.1)
   private readonly enemies: SVGGElement[]; // one per level.enemies, moved like the piece
   private attackedKey: string | undefined;
+  private landingKey = "";
+  private readonly landings: SVGGElement; // a ring on each square a knight could land on, as the engine lists them (M5.1)
   private readonly trails: SVGGElement; // fading streaks behind a move: the piece's, and the enemies' (M3.7)
   private last: WorldState | undefined; // the state before this one, to see what moved
   private readonly attacks: SVGGElement; // the squares enemy chess pieces attack, shaded (M3.4)
@@ -53,8 +57,8 @@ export class BoardView {
     private readonly options: { mini?: boolean; spots?: ReadonlyMap<string, boolean>; skin?: Skin } = {},
   ) {
     // without a skin of its own, a board wears the piece chosen in Settings, and follows that choice
-    this.skin = options.skin ?? wornPiece();
-    this.stopSettings = options.skin ? () => {} : settings.subscribe(() => this.setSkin(wornPiece()));
+    this.skin = options.skin ?? wornPiece(level.piece);
+    this.stopSettings = options.skin ? () => {} : settings.subscribe(() => this.setSkin(wornPiece(level.piece)));
     const { width, height } = level;
     this.element = svg("svg", {
       class: this.options.mini ? "board board-mini" : "board",
@@ -100,7 +104,8 @@ export class BoardView {
     this.attacks = svg("g", { class: "attacks", "aria-hidden": "true" });
     this.flash = svg("rect", { class: "bump-flash", width: S, height: S, x: 0, y: 0 });
     this.trails = svg("g", { class: "trails", "aria-hidden": "true" });
-    this.element.append(this.attacks, this.trails, this.flash);
+    this.landings = svg("g", { class: "landings", "aria-hidden": "true" });
+    this.element.append(this.attacks, this.landings, this.trails, this.flash);
 
     this.piece = svg("g", { class: "piece" });
     this.body = svg("g", { class: "piece-body" });
@@ -168,7 +173,7 @@ export class BoardView {
   private place(state: WorldState, animate = false): void {
     const before = this.last;
     this.last = state;
-    this.element.setAttribute("aria-label", this.describe(state));
+    this.element.setAttribute("aria-label", describeBoard(this.level, state));
     this.piece.style.transform = centre(state.pos, this.level.height);
     if (state.facing !== before?.facing) {
       this.pawn.replaceChildren(this.heroArt(state.facing));
@@ -198,6 +203,19 @@ export class BoardView {
         }),
       );
     }
+    // The rings follow the engine's list; a state with none (a pawn level, a lost run) clears them.
+    const landingKey = state.landings?.join(";") ?? "";
+    if (landingKey !== this.landingKey) {
+      this.landingKey = landingKey;
+      this.landings.replaceChildren(
+        ...(state.landings ?? []).map((pos) => {
+          const ring = svg("g", { class: "landing", "data-square": squareName(pos) });
+          ring.style.transform = centre(pos, this.level.height);
+          ring.append(svg("circle", { class: "landing-halo", r: 21 }), svg("circle", { class: "landing-ink", r: 21 }));
+          return ring;
+        }),
+      );
+    }
     (state.enemies ?? []).forEach((pos, i) => {
       const enemy = this.enemies[i];
       if (!enemy) return;
@@ -222,15 +240,6 @@ export class BoardView {
     if (!tiles) return;
     const on = new Set(where.map(([x, y]) => `${x},${y}`));
     for (const [key, art] of tiles) art.classList.toggle(className, on.has(key));
-  }
-
-  /** What the board says to a screen reader: its size, where the piece and the goal are, and a lost run. */
-  private describe(state: WorldState): string {
-    const { width, height, goal, piece } = this.level;
-    const parts = [`${width} by ${height} board`, `Your ${piece} is on ${squareName(state.pos)}, facing ${state.facing}`];
-    if (goal) parts.push(`The goal is on ${squareName(goal)}`);
-    if (state.lost) parts.push(`The run was lost on ${squareName(state.lost)}`);
-    return `${parts.join(". ")}.`;
   }
 
   /**
