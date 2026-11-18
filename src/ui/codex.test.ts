@@ -15,6 +15,14 @@ describe("codexNameAt: what a hover over code looks up", () => {
     expect(at("position")).toBe("pawn.position");
   });
 
+  it("finds a knight's abilities the same way", () => {
+    const text = "knight.jump(1, 2)\nknight.look(1, 2)";
+    const knight = EditorState.create({ doc: text, extensions: [python()] });
+    const name = (word: string) => codexNameAt(knight, text.indexOf(word) + 1, 1, "knight")?.name ?? null;
+    expect(name("jump")).toBe("knight.jump");
+    expect(name("look")).toBe("knight.look");
+  });
+
   it("finds plain names, such as built-ins", () => {
     expect(at("print")).toBe("print");
   });

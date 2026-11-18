@@ -6,10 +6,19 @@ import { h } from "./dom";
 import { icon } from "./icons";
 import type { LogEntry } from "./playback";
 
+/** The variables of the level's piece (whose type is its class, in any case) first; the rest keep their order. */
+export function piecesFirst(vars: Var[], piece: string): Var[] {
+  const isPiece = (v: Var) => v.type.toLowerCase() === piece.toLowerCase();
+  return [...vars.filter(isPiece), ...vars.filter((v) => !isPiece(v))];
+}
+
 /** Shows the player's variables at the current moment of playback. */
 export class Inspector {
   readonly element = h("div", { class: "inspector" });
   private previous = new Map<string, string>();
+
+  /** `piece` is the level's piece, "pawn" or "knight": its variables are listed first. */
+  constructor(private readonly piece: string) {}
 
   show(vars: Var[] | null): void {
     if (!vars || vars.length === 0) {
@@ -20,7 +29,7 @@ export class Inspector {
       return;
     }
     // The piece comes first; the player's own variables follow in the order they were made.
-    const ordered = [...vars.filter((v) => v.type === "Pawn"), ...vars.filter((v) => v.type !== "Pawn")];
+    const ordered = piecesFirst(vars, this.piece);
     const rows = ordered.map((v) => {
       const changed = this.previous.has(v.name) ? this.previous.get(v.name) !== v.value : this.previous.size > 0;
       return h(

@@ -170,7 +170,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const runButton = h("button", { class: "btn btn-primary", disabled: true, onClick: () => void run() }, "Run ▶");
   const stopButton = h("button", { class: "btn", disabled: true, onClick: () => stop() }, "Stop ■");
   const editorHost = h("div", { class: "editor" });
-  const inspector = new Inspector();
+  const inspector = new Inspector(String(source.data.piece ?? "pawn"));
   const consoleView = new Console();
 
   // The Learn/Challenge panel can collapse to a strip (QA-011, QA-013). Only the
@@ -270,7 +270,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       else store.update(source.id, { code });
       if (player && code !== recordedCode) dropRecording();
     },
-    placeholder: `Write your code here, then press Run.\nYour pawn is called ${String(source.data.piece ?? "pawn")}.`,
+    placeholder: `Write your code here, then press Run.\nYour ${String(source.data.piece ?? "pawn")} is called ${String(source.data.piece ?? "pawn")}.`,
   });
   inspector.reset();
   consoleView.show([]);
