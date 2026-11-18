@@ -104,7 +104,9 @@ worker are in `docs/ARCHITECTURE.md`; the Codex's entries are in `docs/Codex.md`
   a solution to offer and stars to show, and where the solved card leads. **A new difference between kinds of
   level is a field on the host; the view never tests `host.kind`.**
 - The Learn panel pages one step per runnable snippet (`splitIntoSteps` in
-  `ui/lesson.ts`, QA-010).
+  `ui/lesson.ts`, QA-010). A fence `python run calls f(1, 2)` is a snippet the examiner calls: the call's text
+  (`snippetCall`) goes to `runSandbox` as `call`, a caption "The examiner calls `f(1, 2)`" sits under the
+  code, and the engine's `summary` shows in the bar after a "finished" or "incomplete" run (`.snippet-summary`).
 - Playback buttons follow `controlStates()` in `ui/playback.ts`. Editing code
   drops the current recording, and Play or the right arrows then run the new
   code. How a recording is replayed is in `docs/ARCHITECTURE.md` ("Playback").
