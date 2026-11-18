@@ -430,24 +430,31 @@ export default async function freeChecks({ browser: b, base, root, check }) {
         how: c.querySelector('.skin-how')?.textContent ?? '', focused: document.activeElement === c,
       };
     })()`);
+  const piece = () => b.evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS)}) ?? '{}').piece ?? 'auto'`);
+  /** Press a card's "Wear it" from the keyboard's position (focus on the button), and wait until that card is the worn one. */
+  const wearFromKeyboard = async (name) => {
+    await b.evaluate(`(() => { const button = document.querySelector('.skin-card[data-piece="${name}"] button'); button.focus(); button.click(); })()`);
+    await b.waitFor(`document.querySelector('.skin-card[data-piece="${name}"]').classList.contains('worn')`, 10_000, `the ${name} card worn`);
+  };
   await check("M4.4: Skins: 'Wear it' on the Charger sets Settings → Piece to the knight, the card says Worn and keeps keyboard focus", async () => {
     await load("#/free/skins", { fresh: true });
     await b.waitFor(`document.querySelector('.skin-card')`, 30_000, "the gallery");
     const before = await card("knight");
     expect(before.locked && !before.worn && !before.button && before.how.startsWith("Locked: "), `the Charger is locked before the tier is cleared: ${JSON.stringify(before)}`);
+    const kept = await b.evaluate(`localStorage.getItem(${JSON.stringify(SETTINGS)})`);
     await setStorage("rank-and-file:progress", SOLVED_CHAPTER_6);
+    await setStorage(SETTINGS, { ...JSON.parse(kept ?? "{}"), piece: "auto" }); // the default, whatever an earlier check left
     await load("#/free/skins");
     await b.waitFor(`document.querySelector('.skin-card[data-piece="knight"]')`, 30_000, "the gallery again");
-    const piece = () => b.evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS)}) ?? '{}').piece ?? 'pawn'`);
     try {
       const unlocked = await card("knight");
       expect(unlocked.name === "Charger", "the knight skin is the Charger");
       expect(!unlocked.locked && !unlocked.worn && unlocked.button === "Wear it", `the Charger can be worn: ${JSON.stringify(unlocked)}`);
+      const auto = await card("auto");
       const pawn = await card("pawn");
-      expect(pawn.worn && !pawn.button && pawn.status.endsWith("Worn"), `the pawn is worn at first, with no button: ${JSON.stringify(pawn)}`);
-      // press the button from the keyboard's position (focus on it), as a keyboard player would
-      await b.evaluate(`document.querySelector('.skin-card[data-piece="knight"] button').focus(); document.querySelector('.skin-card[data-piece="knight"] button').click()`);
-      await b.waitFor(`document.querySelector('.skin-card[data-piece="knight"]').classList.contains('worn')`, 10_000, "the Charger worn");
+      expect(auto.worn && !auto.button && auto.status.endsWith("Worn"), `Auto is worn at first, with no button: ${JSON.stringify(auto)}`);
+      expect(!pawn.worn && pawn.button === "Wear it", `under Auto the pawn is not worn and can be: ${JSON.stringify(pawn)}`);
+      await wearFromKeyboard("knight");
       const now = await card("knight");
       expect(now.worn && !now.locked && !now.button && now.status.endsWith("Worn"), `the card after: ${JSON.stringify(now)}`);
       expect(now.focused, "keyboard focus is on the worn card");
@@ -458,13 +465,40 @@ export default async function freeChecks({ browser: b, base, root, check }) {
       await b.evaluate(`document.querySelector('.settings-dialog').close()`);
       expect(radio, "Settings → Piece shows the knight");
     } finally {
-      // put the piece back to the pawn
-      await b.evaluate(`document.querySelector('.skin-card[data-piece="pawn"] button')?.click()`);
+      // put the piece back to Auto, through the gallery's own button
+      await b.evaluate(`document.querySelector('.skin-card[data-piece="auto"] button')?.click()`);
       await sleep(100);
     }
-    const back = await card("pawn");
-    expect((await piece()) === "pawn" && back.worn, `the pawn is back: ${JSON.stringify(back)}`);
-    return "Charger worn with focus kept; pawn back";
+    const back = await card("auto");
+    expect((await piece()) === "auto" && back.worn, `Auto is back: ${JSON.stringify(back)}`);
+    await b.evaluate(kept === null ? `localStorage.removeItem(${JSON.stringify(SETTINGS)}); true` : `localStorage.setItem(${JSON.stringify(SETTINGS)}, ${JSON.stringify(kept)}); true`);
+    return "Charger worn with focus kept; Auto back";
+  });
+
+  await check("M5.1: Skins: the Auto card comes first and is worn by default; 'Wear it' on the pawn, then on Auto, each moves Worn, the saved setting and keyboard focus to that card", async () => {
+    await load("#/free/skins", { fresh: true });
+    await b.waitFor(`document.querySelector('.skin-card')`, 30_000, "the gallery");
+    const kept = await b.evaluate(`localStorage.getItem(${JSON.stringify(SETTINGS)})`);
+    await setStorage(SETTINGS, { ...JSON.parse(kept ?? "{}"), piece: "auto" });
+    await load("#/free/skins");
+    await b.waitFor(`document.querySelector('.skin-card[data-piece="pawn"]')`, 30_000, "the gallery again");
+    try {
+      const order = await b.evaluate(`[...document.querySelectorAll('.skin-card')].map((c) => c.dataset.piece).join()`);
+      expect(order.startsWith("auto,pawn"), `the cards in order: ${order}`);
+      const wornCards = () => b.evaluate(`[...document.querySelectorAll('.skin-card.worn')].map((c) => c.dataset.piece).join()`);
+      expect((await wornCards()) === "auto", `worn at first: ${await wornCards()}`);
+      for (const name of ["pawn", "auto"]) {
+        const target = await card(name);
+        expect(!target.worn && target.button === "Wear it", `before pressing: the ${name} card ${JSON.stringify(target)}`);
+        await wearFromKeyboard(name);
+        const now = await card(name);
+        expect(now.status.endsWith("Worn") && !now.button && now.focused, `the ${name} card after: ${JSON.stringify(now)}`);
+        expect((await wornCards()) === name && (await piece()) === name, `worn ${await wornCards()}, saved ${await piece()}, after wearing ${name}`);
+      }
+    } finally {
+      await b.evaluate(kept === null ? `localStorage.removeItem(${JSON.stringify(SETTINGS)}); true` : `localStorage.setItem(${JSON.stringify(SETTINGS)}, ${JSON.stringify(kept)}); true`);
+    }
+    return "Auto first and worn; pawn worn with focus; Auto worn again with focus";
   });
 
   // -- Shared with me lives in Free Play -----------------------------------------------------------------------------
@@ -746,12 +780,13 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     return "move shows its entry; a comment word shows nothing";
   });
 
-  await check("QA-059: the Skins page says what it is, its cards are keyboard stops with names, and the Charger is labelled in Settings", async () => {
+  await check("QA-059: the Skins page says what it is, the Auto card comes first, every card is a keyboard stop with a name, and the Charger is labelled in Settings", async () => {
     await load("#/free/skins", { fresh: true });
     await b.waitFor(`document.querySelector('.skin-card[data-piece="knight"]')`, 30_000, "the gallery");
     expect((await text(".skins-intro")) === "Skins change how your piece looks. Promotions unlock them.", "the intro line");
     const cards = await b.evaluate(`[...document.querySelectorAll('.skin-card')].map((c) => ({ piece: c.dataset.piece, tab: c.getAttribute('tabindex'), label: c.getAttribute('aria-label') ?? '' }))`);
-    expect(cards.length >= 2 && cards.every((c) => c.tab === "0" && c.label !== ""), `every card is a tab stop with a label: ${JSON.stringify(cards)}`);
+    expect(cards.length >= 3 && cards.every((c) => c.tab === "0" && c.label !== ""), `every card is a tab stop with a label: ${JSON.stringify(cards)}`);
+    expect(cards[0].piece === "auto" && cards[0].label.startsWith("Auto, "), `the Auto card comes first and is labelled: ${JSON.stringify(cards[0])}`);
     expect(cards.find((c) => c.piece === "knight")?.label.startsWith("Charger, locked: "), "the locked knight's label");
     const stray = await b.evaluate(`({ inCards: document.querySelectorAll('.skin-card.worn button, .skin-card.locked button').length, disabled: document.querySelectorAll('.skins button:disabled').length })`);
     expect(stray.inCards === 0 && stray.disabled === 0, `no button on a worn or locked card, none disabled: ${JSON.stringify(stray)}`);
