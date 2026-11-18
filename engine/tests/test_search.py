@@ -77,6 +77,14 @@ def test_what_a_step_reports_is_counts_and_words_never_a_route():
     assert "actions" not in json.dumps(result) and "move" not in json.dumps(result)
 
 
+def test_a_knight_level_is_beyond_the_walking_search_until_m5_5():
+    level = made(piece="knight", api=["jump"], map="G . .\n. . .\n. P .\n")  # one jump away
+    search = RouteSearch(level)
+    search.run()
+    assert search.status == NO_ROUTE
+    assert [r["status"] for r in finish(Search(level))["results"]] == [NO_ROUTE]
+
+
 def test_the_check_goes_through_the_bridge_in_slices():
     started = json.loads(bridge.solve_start(json.dumps({"id": "x", "title": "x", "map": OPEN, "api": ["move"]})))
     assert started == {"ok": True, "cases": 1}
@@ -97,7 +105,12 @@ def test_every_repo_board_gets_the_same_answer_sliced_or_whole(path):
         one.run()
         whole.append((one.status, one.lines if one.status == ROUTE else None))
     assert [(r["status"], r["lines"]) for r in sliced] == whole
-    assert all(status != NO_ROUTE for status, _ in whole)  # a level in the repo can always be walked, or its clocks are beyond the search
+    if level.piece == "pawn":
+        assert all(status != NO_ROUTE for status, _ in whole)  # a level in the repo can always be walked, or its clocks are beyond the search
+    else:
+        # The search only walks until M5.5, so every board of another piece is NO_ROUTE. When it learns to
+        # jump, this fails: flip this branch then.
+        assert all(status == NO_ROUTE for status, _ in whole)
 
 
 def test_the_lines_counted_are_the_lines_of_the_code_the_scripts_write():

@@ -57,6 +57,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   let disposed = false; // the player left: a late answer from Python must not touch what is on screen now
   let codex: CodexView | null = null; // the Codex tab, and the entries hover tooltips use, once the engine has sent them
 
+  const piece = String(source.data.piece ?? "pawn"); // the level's piece, named in the Inspector and the editor's placeholder
+
   // -- left: Learn / Challenge / Codex ----------------------------------------------
   const learnPanel = h("div", { class: "tab-panel" });
   const challengePanel = h("div", { class: "tab-panel", hidden: true }, h("p", { class: "muted" }, "Loading…"));
@@ -70,6 +72,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     client,
     api: (source.data.api as string[] | undefined) ?? [],
     board: source.data.lesson_board,
+    piece: source.data.piece as string | undefined,
     codex: () => codex,
   });
   learnPanel.append(h("p", { class: "trains" }, h("span", { class: "trains-label" }, "Trains"), source.trains), lesson.element);
@@ -169,7 +172,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   const runButton = h("button", { class: "btn btn-primary", disabled: true, onClick: () => void run() }, "Run ▶");
   const stopButton = h("button", { class: "btn", disabled: true, onClick: () => stop() }, "Stop ■");
   const editorHost = h("div", { class: "editor" });
-  const inspector = new Inspector();
+  const inspector = new Inspector(piece);
   const consoleView = new Console();
 
   // The Learn/Challenge panel can collapse to a strip (QA-011, QA-013). Only the
@@ -269,7 +272,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       else store.update(source.id, { code });
       if (player && code !== recordedCode) dropRecording();
     },
-    placeholder: `Write your code here, then press Run.\nYour pawn is called ${String(source.data.piece ?? "pawn")}.`,
+    placeholder: `Write your code here, then press Run.\nYour ${piece} is called ${piece}.`,
   });
   inspector.reset();
   consoleView.show([]);

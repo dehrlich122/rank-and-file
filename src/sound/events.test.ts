@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GameEvent, LevelResult, WorldState } from "../py/protocol";
-import { outcomeSounds, soundsFor, soundsForStep, Voices } from "./events";
+import { landingSounds, outcomeSounds, soundsFor, soundsForStep, Voices } from "./events";
 
 const state = (changes: Partial<WorldState> = {}): WorldState =>
   ({ pos: [0, 0], facing: "north", opened: [], crossed: [], collected: [], planks: 0, bridged: [], enemies: [], tick: 0, lost: null, ...changes }) as WorldState;
@@ -55,6 +55,49 @@ describe("soundsForStep", () => {
   it("keeps a waypoint's ping when its move is thinned", () => {
     const events = [event("move"), event("move", { crossed: [[1, 1]] }), event("move"), event("move")];
     expect(soundsForStep(events, state(), 4)[1]).toEqual(["waypoint"]);
+  });
+});
+
+describe("jumps", () => {
+  const jump = (changes: Partial<WorldState> = {}, took?: number): GameEvent => ({ ...event("jump", changes), from: [0, 0], via: [0, 2], ...(took === undefined ? {} : { took }) });
+
+  it("takes off with a jump sound, whatever it lands on", () => {
+    expect(soundsFor(jump(), state())).toEqual(["jump"]);
+    expect(soundsFor(jump({ crossed: [[1, 1]] }, 0), state())).toEqual(["jump"]);
+  });
+
+  it("has no landing sound for a plain jump", () => {
+    expect(landingSounds([jump()], state())).toEqual([[]]);
+  });
+
+  it("lands with a capture when it took an enemy, even the first", () => {
+    expect(landingSounds([jump({}, 0)], state())).toEqual([["capture"]]);
+    expect(landingSounds([jump({}, 2)], state())).toEqual([["capture"]]);
+  });
+
+  it("lands with a ping on a waypoint, comparing with the event before", () => {
+    const crossed: WorldState["crossed"] = [[1, 1]];
+    expect(landingSounds([jump({ crossed })], state())).toEqual([["waypoint"]]);
+    expect(landingSounds([jump({ crossed }), jump({ crossed })], state())).toEqual([["waypoint"], []]);
+    expect(landingSounds([jump({ crossed })], state({ crossed }))).toEqual([[]]);
+  });
+
+  it("lands with both when it took an enemy on a waypoint", () => {
+    expect(landingSounds([jump({ crossed: [[1, 1]] }, 0)], state())).toEqual([["capture", "waypoint"]]);
+  });
+
+  it("leaves a lost event's sound as it is, with no landing sound", () => {
+    const events = [jump({}, 0), event("lost")];
+    expect(soundsForStep(events, state(), 1)).toEqual([["jump"], ["lost"]]);
+    expect(landingSounds(events, state())[1]).toEqual([]);
+  });
+
+  it("never thins jumps at 4×", () => {
+    expect(soundsForStep([jump(), jump(), jump()], state(), 4)).toEqual([["jump"], ["jump"], ["jump"]]);
+  });
+
+  it("has no landing sounds for a move", () => {
+    expect(landingSounds([event("move", { crossed: [[1, 1]] })], state())).toEqual([[]]);
   });
 });
 

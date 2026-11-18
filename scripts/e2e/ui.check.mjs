@@ -2,11 +2,12 @@
 // playback controls and autocomplete. Never put editor contents into a check's
 // message (see helpers.mjs).
 import { sleep } from "./cdp.mjs";
-import { BUTTONS, levelHelpers } from "./helpers.mjs";
+import { BUTTONS, levelHelpers, settingsHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 export default async function uiChecks({ browser: b, base, root, check }) {
   const { solution, openLevel, setCode, clickButton, editorText } = levelHelpers(b, base, root);
+  const { keepingSettings } = settingsHelpers(b);
   const dialogOpen = () => b.evaluate(`document.querySelector('.settings-dialog').open`);
   const choose = (key, value) => b.evaluate(`document.querySelector('input[name="setting-${key}"][value="${value}"]').click()`);
   const closeDialog = () => b.evaluate(`document.querySelector('.settings-dialog').close()`);
@@ -981,27 +982,128 @@ export default async function uiChecks({ browser: b, base, root, check }) {
   const pieceRadio = (value) =>
     b.evaluate(`(() => { const r = document.querySelector('input[name="setting-piece"][value="${value}"]'); return { checked: r.checked, disabled: r.disabled }; })()`);
 
-  await check("QA-052: Reset progress puts Settings → Piece back to the pawn, and the open dialog shows it", async () => {
-    await startFresh("#/");
-    const kept = await b.evaluate(`localStorage.getItem(${JSON.stringify(SETTINGS_KEY)})`);
-    try {
+  const storedPiece = () => b.evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS_KEY)}) ?? '{}').piece ?? null`);
+  /** Settings → Piece as the dialog shows it: each radio's value, own label words (without the lock note), state and note, and the hint. */
+  const pieceGroup = () =>
+    b.evaluate(`(() => {
+      const radios = [...document.querySelectorAll('input[name="setting-piece"]')];
+      const own = (r) => { const copy = r.closest('label').cloneNode(true); copy.querySelector('.lock-note')?.remove(); return copy.textContent.trim(); };
+      return {
+        radios: radios.map((r) => ({ value: r.value, label: own(r), checked: r.checked, disabled: r.disabled, note: !!r.closest('label').querySelector('.lock-note') })),
+        hint: radios[0].closest('fieldset').querySelector('p')?.textContent ?? '',
+      };
+    })()`);
+  const openSettings = () => b.evaluate(`document.querySelector('.topbar .settings-button').click()`);
+
+  await check("M5.1: Settings → Piece, with empty storage, lists Auto, Pawn and Knight · Charger in that order, Auto ticked, under the hint's sentence", async () => {
+    await keepingSettings(async () => {
+      await startFresh("#/");
+      await b.evaluate(`localStorage.removeItem(${JSON.stringify(SETTINGS_KEY)}); true`);
+      await reloadAt("#/");
+      await openSettings();
+      const group = await pieceGroup();
+      const shown = group.radios.map((r) => `${r.value}=${r.label}${r.checked ? "*" : ""}`).join(" | ");
+      expect(shown === "auto=Auto* | pawn=Pawn | knight=Knight · Charger", `the radios, in order (* is ticked): ${shown}`);
+      const hint = "How your piece looks. Auto: each level uses the piece it was made for. Or pick a skin, once you have earned its promotion, to wear it on every level.";
+      expect(group.hint === hint, `the hint reads ${JSON.stringify(group.hint)}`);
+    });
+    return "Auto, Pawn, Knight · Charger; Auto ticked; the hint's sentence";
+  });
+
+  await check("M5.1: Settings → Piece: with nothing earned Auto and the pawn are open (no lock note) and the knight is locked; earned, all three are open", async () => {
+    await keepingSettings(async () => {
+      await startFresh("#/");
+      await openSettings();
+      const state = (group) => group.radios.map((r) => `${r.value}:${r.disabled ? "locked" : "open"}${r.note ? "+note" : ""}`).join(" ");
+      const before = state(await pieceGroup());
+      expect(before === "auto:open pawn:open knight:locked+note", `nothing earned: ${before}`);
+      await b.evaluate(`document.querySelector('.settings-dialog').close()`);
+      await setStorage("rank-and-file:progress", SOLVED_CHAPTER_6);
+      await reloadAt("#/");
+      await openSettings();
+      const after = state(await pieceGroup());
+      expect(after === "auto:open pawn:open knight:open", `Chapter 6 solved: ${after}`);
+    });
+    return "locked: auto and pawn open, knight locked with its note; earned: all open";
+  });
+
+  await check("QA-052: Reset progress puts Settings → Piece back to Auto, and the open dialog shows it", async () => {
+    await keepingSettings(async () => {
+      await startFresh("#/");
       await b.evaluate(`localStorage.setItem('rank-and-file:progress', ${JSON.stringify(JSON.stringify(SOLVED_CHAPTER_6))}); localStorage.setItem(${JSON.stringify(SETTINGS_KEY)}, JSON.stringify({ ...JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS_KEY)}) ?? '{}'), piece: 'knight' })); true`);
       await reloadAt("#/");
-      await b.evaluate(`document.querySelector('.topbar .settings-button').click()`);
+      await openSettings();
       const before = await pieceRadio("knight");
       expect(before.checked && !before.disabled, `before: the knight is ticked and open (${JSON.stringify(before)})`);
       await b.evaluate(`document.querySelector('.settings-dialog').close()`);
       await resetProgressViaDialog();
       expect(await b.evaluate(`document.querySelector('.settings-dialog').open`), "the dialog is still open");
-      const pawn = await pieceRadio("pawn");
+      const auto = await pieceRadio("auto");
       const knight = await pieceRadio("knight");
-      expect(pawn.checked && !knight.checked, `after the reset the pawn is ticked, not the knight (${JSON.stringify({ pawn, knight })})`);
+      expect(auto.checked && !auto.disabled && !knight.checked, `after the reset Auto is ticked, not the knight (${JSON.stringify({ auto, knight })})`);
       expect(knight.disabled, "the knight is locked again, in the dialog that stayed open");
-      expect((await b.evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS_KEY)})).piece`)) === "pawn", "the saved setting is the pawn");
-      return "pawn ticked, knight locked and unticked, setting saved as pawn";
-    } finally {
-      await b.evaluate(`document.querySelector('.settings-dialog')?.close(); ${kept === null ? `localStorage.removeItem(${JSON.stringify(SETTINGS_KEY)})` : `localStorage.setItem(${JSON.stringify(SETTINGS_KEY)}, ${JSON.stringify(kept)})`}; true`);
-    }
+      expect((await storedPiece()) === "auto", `the saved setting is ${await storedPiece()}, not auto`);
+    });
+    return "Auto ticked, knight locked and unticked, setting saved as auto";
+  });
+
+  await check("M5.1: the promotion screen's button wears the knight, then switches back to Auto, and the saved setting follows each press", async () => {
+    await keepingSettings(async () => {
+      await startFresh("#/");
+      await b.evaluate(`localStorage.removeItem(${JSON.stringify(SETTINGS_KEY)}); true`);
+      await setStorage("rank-and-file:progress", SOLVED_CHAPTER_6);
+      await reloadAt("#/promotion/pawn");
+      await b.waitFor(`document.querySelector('.promotion .pr-actions button')`, 30_000, "the ceremony");
+      const label = () => b.evaluate(`document.querySelector('.promotion .pr-actions button').textContent`);
+      const press = () => b.evaluate(`document.querySelector('.promotion .pr-actions button').click()`);
+      const start = [await label(), await storedPiece()];
+      expect(start[0] === "Wear the knight skin" && start[1] !== "knight", `at first: ${JSON.stringify(start)}`);
+      await press();
+      const worn = [await label(), await storedPiece()];
+      expect(worn[0] === "Wearing the knight: switch back to Auto" && worn[1] === "knight", `after one press: ${JSON.stringify(worn)}`);
+      await press();
+      const back = [await label(), await storedPiece()];
+      expect(back[0] === "Wear the knight skin" && back[1] === "auto", `after two presses: ${JSON.stringify(back)}`);
+    });
+    return "Wear the knight skin → knight; Wearing the knight: switch back to Auto → auto";
+  });
+
+  // The jump's sound (M5.1-4b-1): a run's notes are counted from the page's oscillators, as in the M4.1 checks above.
+  // The jump is typed from the first landing ring read off the page; no route is written here.
+  const jumpToFirstRing = () =>
+    b.evaluate(`(() => {
+      const board = document.querySelector('.board-host .board');
+      const at = /Your \\w+ is on ([a-z])(\\d+)/.exec(board.getAttribute('aria-label'));
+      const ring = board.querySelector('g.landings g.landing')?.dataset.square;
+      return at && ring ? 'knight.jump(' + (ring.charCodeAt(0) - at[1].charCodeAt(0)) + ', ' + (Number(ring.slice(1)) - Number(at[2])) + ')' : null;
+    })()`);
+  /** Open a knight level with these settings, make a gesture, play one jump (or a program that moves nothing), and count the notes the run made. */
+  const notesOfRun = async (settings, jumping) => {
+    await setStorage(SETTINGS_KEY, settings);
+    await openLevel("practice-11", { reload: true });
+    await countNotes();
+    await gesture();
+    await sleep(300); // the audio context starts on the gesture
+    const code = jumping ? await jumpToFirstRing() : "pass";
+    expect(code !== null, "no landing ring to jump to");
+    await setCode(code);
+    const begin = await notes();
+    await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
+    await b.waitFor(`document.querySelector('.outcome')`, 30_000, "the run's result");
+    await sleep(1500); // the landing's notes and the outcome's come after the last frame; silence can only be waited for
+    return (await notes()) - begin;
+  };
+
+  await check("M5.1: a run of one jump makes more notes than a run that moves nothing; with sound muted it makes none", async () => {
+    return await keepingSettings(async () => {
+      await openLevel("practice-11", { fresh: true });
+      const quiet = await notesOfRun({}, false);
+      const jumped = await notesOfRun({}, true);
+      const muted = await notesOfRun({ muted: true }, true);
+      expect(jumped > quiet, `one jump made ${jumped} notes, the run that moves nothing ${quiet}`);
+      expect(muted === 0, `with sound muted the jump made ${muted} notes`);
+      return `${quiet} notes for no move, ${jumped} for one jump, ${muted} muted`;
+    });
   });
 
   await check("QA-061: Reset progress leaves the Sandbox's board and code alone, and says so", async () => {

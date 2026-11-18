@@ -48,3 +48,19 @@ def test_reset_forgets_everything():
     repl.push("gold = 1")
     repl.reset()
     assert repl.push("gold")["error"]["type"] == "NameError"
+
+
+def test_the_old_stand_in_goes_when_the_level_changes_piece():
+    repl = Repl()
+    repl.push("1", piece="knight", api=["jump"])
+    assert "knight" in repl.namespace
+    repl.push("1", piece="pawn", api=["move"])
+    assert "knight" not in repl.namespace and "pawn" in repl.namespace
+
+
+def test_a_value_the_player_put_under_the_old_name_is_kept():
+    repl = Repl()
+    repl.push("1", piece="knight", api=["jump"])
+    repl.push("knight = 5")
+    repl.push("1", piece="pawn", api=["move"])
+    assert repl.push("knight")["output"] == "5\n"

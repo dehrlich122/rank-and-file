@@ -111,8 +111,9 @@ def third_hint(spec: dict, reference: str) -> str:
 
 
 def folder(spec: dict, chapter: int) -> str:
-    """Where a level's files go under levels/ and solutions/: its chapter's folder, or for a challenge its set's."""
-    return spec.get("set") or f"ch{chapter:02d}"
+    """Where a level's files go under levels/ and solutions/: its chapter's folder (the Testing ground's is
+    `practice`), or for a challenge its set's."""
+    return spec.get("set") or (f"ch{chapter:02d}" if chapter else "practice")
 
 
 def placing(spec: dict, chapter: int) -> list[str]:
@@ -137,7 +138,7 @@ def yaml_text(spec: dict, *, chapter: int, api: list[str], par: int, hints: list
         f"title: {q(spec['title'])}",
         f"trains: {q(spec['trains'])}",
         f"brief: {q(spec['brief'])}",
-        "piece: pawn",
+        f"piece: {spec.get('piece', 'pawn')}",
         "map: |",
         *[f"  {row}" for row in board_text(spec["map"]).splitlines()],
     ]
@@ -148,6 +149,8 @@ def yaml_text(spec: dict, *, chapter: int, api: list[str], par: int, hints: list
         lines += [f"- {q(enemy)}" for enemy in spec["enemies"]]
     start = {"facing": spec["facing"], **({"planks": spec["planks"]} if spec.get("planks") else {})}
     lines.append(f"start: {q(start)}")
+    if spec.get("objectives"):
+        lines.append(f"objectives: {q(spec['objectives'])}")
     lines.append(f"api: {q(api)}")
     rules = {}
     if spec.get("limit"):

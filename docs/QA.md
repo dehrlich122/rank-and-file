@@ -1945,6 +1945,49 @@ looked at; a wrong attempt at 1000×700; Animations full during a run.
   Enter; crumbs, tabs, brief and chips on each challenge; no "undefined" or console errors; a wrong attempt's card
   names the board and gives a cause a learner can act on; ✓, stars and the counts after solving; Lessons' pointer.
 
+## Session 19 — 2026-11-18 · M5.1 QA1, the knight as a piece (`m5-1-knight`, PR #27)
+
+The designer's play-test of the three knight practice levels. **QA1 passed with nothing to fix** *(Designer,
+2026-11-18)*: "All play well and are good levels." His answers to the nine choices made during the build
+(`docs/M5/M5.1.md`, "Hand-test list"):
+
+| # | Choice | Answer |
+|---|---|---|
+| 1 | Decisions 1 to 3, now playable | The levels play well; no objection raised, so the three decisions stand *(the orchestrator's reading)* |
+| 2 | South leans to the same side as north | "This looks good, keep it." |
+| 3 | What a jump changes shows when it lands | Yes |
+| 4 | The jump's sound | "Sounds great." |
+| 5 | Under Auto, the title screen, gallery and editor's palette show the pawn | "Fine for now." |
+| 6 | The promotion button switches back to Auto | Okay |
+| 7 | The rings once a run is lost | **The rule, in his words:** on a lost run the rings go; on a bumped run the rings stay. A lost run has no more moves; a bumped run could continue from the square it bumped from. The first half is tested; the second is pinned in the QA2 pass |
+| 8 | "Your knight is called knight." | Fine |
+| 9 | The 5 px corner cut on a jump that turns first | Not noticed. Left as it is |
+
+**QA2 passed** *(Designer, 2026-11-18)*: after the `/simplify` pass he went through the four-item retest list
+(`docs/M5/M5.1.md`, "Retest list"): "All of the tests passed." No finding. Then "merge 27".
+
+### QA-066 · Look Before You Leap (`practice-13`): the reference writes jumps out; the designer's solve looks before every jump · Closed, left as it is
+
+- **Observed** *(Designer, 2026-11-18)*: the designer solved it with a loop that looks at the preferred landing
+  square before every jump and takes the other jump when that square is a pit, a wall or off the board. The
+  reference is shorter than what he wrote, but it looks only where the three boards differ and writes the other
+  jumps out as plain jumps. "I actually like my solution better because it doesn't rely on hard coding."
+- **Why it happens:** the reference comes from the generator's search for the shortest program that solves every
+  board (6 lines, the par). The boards differ only at the first landing, so the shortest program looks as little
+  as it can. Nothing on the boards asks for a look before each leap, which is what the level's name promises.
+- **Noticed while logging it:** his solve has three branches that make the same jump. Joined into one condition
+  (`or`, Chapter 4), the same idea is 5 lines: shorter than the reference, and inside par.
+- **Options, for the designer:**
+  1. *The reference only:* the level keeps its boards; the reference becomes the loop that looks before every
+     jump, and the comparison note says why (it works whatever is on the landing squares). Par stays 6.
+  2. *The boards too (recommended):* what is on the landing squares also differs later on the route, so a
+     program that looks once fails a board and the loop is what the level needs, not a matter of taste
+     (the rule from QA-023 and QA-029: the code works out what can't be known ahead). The reference and the
+     hints follow from the new boards.
+  3. Leave it: a practice level, and both ways pass.
+- **Decided** *(Designer, 2026-11-18)*: option 3. "It's not a real issue, and also it is a good test case." The
+  level, its boards and its reference stay.
+
 ---
 
 ## Queued work

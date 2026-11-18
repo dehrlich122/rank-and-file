@@ -1,0 +1,34 @@
+id: practice-12
+chapter: 0
+title: "Over and Onto"
+trains: "A jump flies over walls and takes what it lands on"
+brief: "A wall no pawn could pass, an enemy beyond it, and two pits. Take the enemy, then land on the goal."
+piece: knight
+map: |
+  . . . # . . G
+  . . . # . . .
+  . . . # O . .
+  . . . # . O .
+  P . . # . . .
+  
+legend: {"O": "pit"}
+enemies:
+- {"kind": "patrol", "start": "f3"}
+start: {"facing": "north"}
+objectives: ["reach_goal", {"capture": "all"}]
+api: ["jump"]
+par: {"lines": 4}
+hints:
+- "No pawn could pass that wall. A knight doesn't need to: it flies over."
+- "Only the square a jump lands on matters. Land on the enemy to take it, and keep off the pits. The goal counts only once the enemy is taken."
+- "One way to start:\nknight.jump(2, 1)"
+lesson: practice/practice-12.md
+lesson_board:
+  map: |
+    . . . . .
+    # . . . .
+    . # . O .
+    . P . . .
+  legend: {"O": "pit"}
+  enemies: [{"kind": "patrol", "start": "c3"}]
+  start: {"facing": "north"}

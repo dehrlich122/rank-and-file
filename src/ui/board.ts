@@ -1,6 +1,7 @@
 // The board, drawn as SVG: squares, tiles (walls, signposts, gates, pits,
 // waypoints, gems, timed gates, planks), the goal, the enemies and their
-// routes (M3.1), the squares chess pieces attack (M3.4) and the piece.
+// routes (M3.1), the squares chess pieces attack (M3.4), the squares a knight could
+// land on (M5.1) and the piece.
 //
 // The board never decides anything. It draws the states the engine reported:
 // `show()` jumps straight to a state, `animate()` plays a step's events in order.
@@ -14,13 +15,24 @@ import { squareName } from "../editor/draft";
 import { wornPiece } from "../promotion";
 import { motionReduced, settings } from "../settings";
 import { sound } from "../sound";
-import { soundsForStep } from "../sound/events";
-import { playableEvents } from "./motion";
+import { landingSounds, soundsForStep } from "../sound/events";
+import { describeBoard } from "./boardText";
+import { jumpPlan, type JumpPlan, playableEvents } from "./motion";
 import { halftone, litGrid, M, S } from "./sprites/floor";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite, type Skin, type TileName } from "./sprites";
 import { svg } from "./svg";
 
 let trails = 0; // numbers each trail's gradient
+
+const HOP_RISE = 34; // how high the knight's solid is lifted at mid-flight, in board units (the design sheet's)
+
+/** A jump being played: the legs, when it began, and the hop's animations on the art drawn now. */
+interface Flight {
+  state: WorldState; // the state it lands in: drawn when it lands (or at once, if it is cut short)
+  plan: JumpPlan;
+  start: number;
+  hop: Animation[];
+}
 
 export { squareName };
 
@@ -33,12 +45,17 @@ export class BoardView {
   private readonly lostMark: SVGGElement; // where the run was lost (M3.1)
   private readonly enemies: SVGGElement[]; // one per level.enemies, moved like the piece
   private attackedKey: string | undefined;
+  private landingKey = "";
+  private readonly landings: SVGGElement; // a ring on each square a knight could land on, as the engine lists them (M5.1)
   private readonly trails: SVGGElement; // fading streaks behind a move: the piece's, and the enemies' (M3.7)
   private last: WorldState | undefined; // the state before this one, to see what moved
   private readonly attacks: SVGGElement; // the squares enemy chess pieces attack, shaded (M3.4)
   private readonly counters: SVGGElement[]; // badges that count a clock's ticks: clockwork's (QA-021), timed gates' (M3.2)
   private readonly art = new Map<TileKind, Map<string, SVGGElement>>(); // tile kind -> "x,y" -> its art
   private readonly heroes = new Map<Facing, SVGElement>(); // the hero drawn facing each way, made when first needed
+  private drawn: Facing | undefined; // the facing of the art in `pawn`: mid-jump it is not the last state's
+  private flight: Flight | undefined; // the jump in the air, if any
+  private stepMs = 350; // how long a step's move takes, as animate() last set it
   private skin: Skin;
   private readonly stopSettings: () => void;
   private readonly stopHalftone: () => void;
@@ -53,8 +70,8 @@ export class BoardView {
     private readonly options: { mini?: boolean; spots?: ReadonlyMap<string, boolean>; skin?: Skin } = {},
   ) {
     // without a skin of its own, a board wears the piece chosen in Settings, and follows that choice
-    this.skin = options.skin ?? wornPiece();
-    this.stopSettings = options.skin ? () => {} : settings.subscribe(() => this.setSkin(wornPiece()));
+    this.skin = options.skin ?? wornPiece(level.piece);
+    this.stopSettings = options.skin ? () => {} : settings.subscribe(() => this.setSkin(wornPiece(level.piece)));
     const { width, height } = level;
     this.element = svg("svg", {
       class: this.options.mini ? "board board-mini" : "board",
@@ -100,7 +117,8 @@ export class BoardView {
     this.attacks = svg("g", { class: "attacks", "aria-hidden": "true" });
     this.flash = svg("rect", { class: "bump-flash", width: S, height: S, x: 0, y: 0 });
     this.trails = svg("g", { class: "trails", "aria-hidden": "true" });
-    this.element.append(this.attacks, this.trails, this.flash);
+    this.landings = svg("g", { class: "landings", "aria-hidden": "true" });
+    this.element.append(this.attacks, this.landings, this.trails, this.flash);
 
     this.piece = svg("g", { class: "piece" });
     this.body = svg("g", { class: "piece-body" });
@@ -120,12 +138,17 @@ export class BoardView {
   /** Jump straight to a state, with no animation. */
   show(state: WorldState): void {
     this.cancel();
+    this.snap(state);
+    this.setCelebrating(false);
+  }
+
+  /** Draw a state at once: the pieces don't slide to it. */
+  private snap(state: WorldState): void {
     const moving = [this.piece, ...this.enemies];
     for (const element of moving) element.style.transition = "none";
     this.place(state);
     this.element.getBoundingClientRect(); // apply now, before transitions come back
     for (const element of moving) element.style.transition = "";
-    this.setCelebrating(false);
   }
 
   /** Play a step's events one after another, spread over `totalMs`. */
@@ -134,13 +157,17 @@ export class BoardView {
     const events = playableEvents(all, this.level.piece);
     if (events.length === 0) return;
     const each = totalMs / events.length;
-    this.element.style.setProperty("--step-ms", `${Math.round(each * 0.9)}ms`);
-    const sounds = soundsForStep(events, this.last ?? null, settings.get().speed); // only played events sound: jumps and scrubs never come here
+    this.stepMs = Math.round(each * 0.9);
+    this.element.style.setProperty("--step-ms", `${this.stepMs}ms`);
+    const sounds = soundsForStep(events, this.last ?? null, settings.get().speed); // only played events sound: scrubs never come here
+    const landing = landingSounds(events, this.last ?? null);
+    const landAfter = motionReduced() ? 0 : this.stepMs / 1000; // a jump's landing sounds when it lands
     events.forEach((event, i) => {
       this.timers.push(
         window.setTimeout(() => {
           this.apply(event);
           for (const name of sounds[i]!) sound.play(name);
+          for (const name of landing[i]!) sound.play(name, landAfter);
         }, i * each),
       );
     });
@@ -151,6 +178,9 @@ export class BoardView {
   }
 
   private apply(event: GameEvent): void {
+    this.endFlight(false); // a jump still in the air lands before the next event
+    const plan = motionReduced() ? undefined : jumpPlan(event, this.stepMs);
+    if (plan && event.from) return this.fly(event.state, plan, event.from);
     this.place(event.state, true);
     if (event.kind === "lost" && event.by !== undefined && event.at) this.strike(event.by, event.at);
     if (event.kind === "bump" && event.at) this.bump(event.state.pos, event.at);
@@ -164,18 +194,80 @@ export class BoardView {
     }
   }
 
-  /** `animate`: a step of the replay, so a move leaves a trail and a turn plays; a jump to a state does neither. */
-  private place(state: WorldState, animate = false): void {
+  /**
+   * A jump along the L (M5.1): the long leg to the corner, the turn there, the short leg to the square it lands on, the
+   * solid lifting in one arc over the whole of it. Nothing else changes until it lands (`endFlight`).
+   */
+  private fly(state: WorldState, plan: JumpPlan, from: Pos): void {
+    const flight: Flight = { state, plan, start: performance.now(), hop: [] };
+    this.flight = flight;
+    const [long, short] = plan;
+    this.leg(long, from);
+    if (flight.hop.length === 0) this.lift(flight); // the art was already facing the long leg's way
+    const later = [
+      [() => this.leg(short, long.to), long.ms],
+      [() => this.endFlight(true), long.ms + short.ms],
+    ] as const;
+    for (const [step, after] of later) this.timers.push(window.setTimeout(() => this.flight === flight && step(), after));
+  }
+
+  /** One leg: face along it (turning, if that is a change), draw its trail and slide the piece to its end. */
+  private leg(leg: JumpPlan[number], from: Pos): void {
+    this.face(leg.facing, true);
+    this.trail(from, leg.to, "trail-hero", leg.ms);
+    this.piece.style.transition = `transform ${leg.ms}ms ${leg.easing}`;
+    this.piece.style.transform = centre(leg.to, this.level.height);
+  }
+
+  /**
+   * Lift the solid and shrink and fade the shadow on the art drawn now, in the arc's phase at this moment (a
+   * negative delay), so swapping the art at the corner carries on the same arc. The brackets are not touched.
+   */
+  private lift(flight: Flight): void {
+    for (const animation of flight.hop) animation.cancel();
+    const timing = { duration: flight.plan[0].ms + flight.plan[1].ms, delay: flight.start - performance.now() };
+    const art = this.pawn.firstElementChild;
+    flight.hop = [
+      art?.querySelector(":scope > .s")?.animate([{ transform: "translateY(0)", easing: "ease-out" }, { transform: `translateY(${-HOP_RISE}px)`, offset: 0.5, easing: "ease-in" }, { transform: "translateY(0)" }], timing),
+      art?.querySelector(":scope > .s-shadow")?.animate([{ transform: "scale(1)", opacity: 1, easing: "ease-out" }, { transform: "scale(0.7)", opacity: 0.5, offset: 0.5, easing: "ease-in" }, { transform: "scale(1)", opacity: 1 }], timing),
+    ].filter((animation) => animation !== undefined);
+  }
+
+  /**
+   * The jump is over: `landed` (it ran its course) draws its state with what it changed, in step; otherwise it was cut
+   * short (a new state, a new step, a new skin) and its state is drawn at once. Either way nothing is left lifted.
+   */
+  private endFlight(landed: boolean): void {
+    const flight = this.flight;
+    if (!flight) return;
+    this.flight = undefined;
+    for (const animation of flight.hop) animation.cancel();
+    if (!landed) return this.snap(flight.state);
+    this.piece.style.transition = "";
+    this.place(flight.state, true, true);
+  }
+
+  /** The hero turned to face `facing`: redraw it if the art on screen isn't that already, and turn if `turning`. */
+  private face(facing: Facing, turning: boolean): void {
+    if (facing === this.drawn) return;
+    this.drawn = facing;
+    this.pawn.replaceChildren(this.heroArt(facing));
+    if (turning) restartAnimation(this.pawn, "turning");
+    if (this.flight) this.lift(this.flight);
+  }
+
+  /**
+   * `animate`: a step of the replay, so a move leaves a trail and a turn plays; a jump to a state does neither.
+   * `flown`: the piece got here by a jump, whose own legs drew its trail and its turns.
+   */
+  private place(state: WorldState, animate = false, flown = false): void {
     const before = this.last;
     this.last = state;
-    this.element.setAttribute("aria-label", this.describe(state));
+    this.element.setAttribute("aria-label", describeBoard(this.level, state));
     this.piece.style.transform = centre(state.pos, this.level.height);
-    if (state.facing !== before?.facing) {
-      this.pawn.replaceChildren(this.heroArt(state.facing));
-      if (animate && before) restartAnimation(this.pawn, "turning");
-    }
+    this.face(state.facing, animate && before !== undefined);
     if (animate && before) {
-      if (before.pos[0] !== state.pos[0] || before.pos[1] !== state.pos[1]) this.trail(before.pos, state.pos, "trail-hero");
+      if (!flown && (before.pos[0] !== state.pos[0] || before.pos[1] !== state.pos[1])) this.trail(before.pos, state.pos, "trail-hero");
       state.enemies?.forEach((pos, i) => {
         const was = before.enemies?.[i];
         if (pos && was && (pos[0] !== was[0] || pos[1] !== was[1])) this.trail(was, pos, "trail-foe");
@@ -195,6 +287,19 @@ export class BoardView {
         ...state.attacked.map((pos) => {
           const [left, top] = corner(pos, this.level.height);
           return svg("rect", { x: left, y: top, width: S, height: S, class: "attacked" });
+        }),
+      );
+    }
+    // The rings follow the engine's list; a state with none (a pawn level, a lost run) clears them.
+    const landingKey = state.landings?.join(";") ?? "";
+    if (landingKey !== this.landingKey) {
+      this.landingKey = landingKey;
+      this.landings.replaceChildren(
+        ...(state.landings ?? []).map((pos) => {
+          const ring = svg("g", { class: "landing", "data-square": squareName(pos) });
+          ring.style.transform = centre(pos, this.level.height);
+          ring.append(svg("circle", { class: "landing-halo", r: 21 }), svg("circle", { class: "landing-ink", r: 21 }));
+          return ring;
         }),
       );
     }
@@ -224,20 +329,11 @@ export class BoardView {
     for (const [key, art] of tiles) art.classList.toggle(className, on.has(key));
   }
 
-  /** What the board says to a screen reader: its size, where the piece and the goal are, and a lost run. */
-  private describe(state: WorldState): string {
-    const { width, height, goal, piece } = this.level;
-    const parts = [`${width} by ${height} board`, `Your ${piece} is on ${squareName(state.pos)}, facing ${state.facing}`];
-    if (goal) parts.push(`The goal is on ${squareName(goal)}`);
-    if (state.lost) parts.push(`The run was lost on ${squareName(state.lost)}`);
-    return `${parts.join(". ")}.`;
-  }
-
   /**
    * A comet tail behind a moving piece: it is drawn out from the square the piece left at the pace the
    * piece slides, so its head is always the piece, then it fades (it lasts a little longer than the step).
    */
-  private trail(from: Pos, to: Pos, className: string): void {
+  private trail(from: Pos, to: Pos, className: string, ms?: number): void {
     if (motionReduced()) return; // nothing would show, so don't build it
     const [a, b] = [from, to].map((pos) => corner(pos, this.level.height).map((n) => n + S / 2));
     const id = `trail-${++trails}`;
@@ -248,6 +344,7 @@ export class BoardView {
       svg("linearGradient", { id, gradientUnits: "userSpaceOnUse", x1, y1, x2, y2 }, svg("stop", { offset: "0%", class: "trail-tail" }), svg("stop", { offset: "100%", class: "trail-head" })),
       svg("line", { x1, y1, x2, y2, pathLength: 1, stroke: `url(#${id})` }),
     );
+    if (ms !== undefined) group.style.setProperty("--step-ms", `${ms}ms`); // a jump's leg is drawn at its own pace
     this.trails.append(group);
     this.timers.push(window.setTimeout(() => group.remove(), 1500));
   }
@@ -274,6 +371,7 @@ export class BoardView {
     this.timers.forEach((timer) => window.clearTimeout(timer));
     this.timers = [];
     this.trails.replaceChildren();
+    this.endFlight(false); // a jump in the air ends drawn where it lands
   }
 
   dispose(): void {
@@ -287,6 +385,7 @@ export class BoardView {
     if (skin === this.skin) return;
     this.skin = skin;
     this.heroes.clear();
+    this.endFlight(false); // so the art on screen faces the last state's way again
     if (this.last) this.pawn.replaceChildren(this.heroArt(this.last.facing));
   }
 

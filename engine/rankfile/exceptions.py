@@ -51,6 +51,18 @@ class GameArgumentError(GameError, TypeError):
     """An ability was given a value it can't use, e.g. move("3")."""
 
 
+class JumpError(GameArgumentError):
+    """A knight was asked to jump, or look, somewhere that isn't an L, e.g. jump(1, 1) (M5.1)."""
+
+
+class WrongPieceError(GameError, AttributeError):
+    """A piece was asked for another piece's ability, e.g. knight.move() (M5.1). Its text is the piece's `CANT` entry."""
+
+    def __init__(self, message: str, ability: str):
+        super().__init__(message)
+        self.name = ability
+
+
 class CantChangePieceError(GameError, AttributeError):
     """Player code tried to set an attribute on a piece, e.g. pawn.position = (0, 7)."""
 

@@ -2,7 +2,7 @@
 // Solutions are read from solutions/ and typed into the editor; this file never
 // contains solution code, and nothing here prints it.
 import { sleep } from "./cdp.mjs";
-import { BUTTONS, hoverHelpers, levelHelpers } from "./helpers.mjs";
+import { BUTTONS, hoverHelpers, levelHelpers, settingsHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const LEVELS = ["ch01-l01", "ch01-l02", "ch01-l03", "ch01-l04", "ch01-l05"];
@@ -10,6 +10,7 @@ const LEVELS = ["ch01-l01", "ch01-l02", "ch01-l03", "ch01-l04", "ch01-l05"];
 export default async function appChecks({ browser: b, base, root, check }) {
   const { solution, withoutExpectLine, openLevel, setCode, editorText, clickButton, hasButton, challengeTab } = levelHelpers(b, base, root);
   const { wordAt, hover, hoverAway } = hoverHelpers(b);
+  const { keepingSettings } = settingsHelpers(b);
 
   const button = (index) => `document.querySelectorAll('${BUTTONS}')[${index}]`;
 
@@ -1220,5 +1221,521 @@ export default async function appChecks({ browser: b, base, root, check }) {
   await check("no console errors during the app checks", async () => {
     const errors = b.logs.filter((line) => /exception|error/i.test(line));
     expect(errors.length === 0, errors.join(" | "));
+  });
+
+  // -- M5.1: the knight ---------------------------------------------------------------------------
+  // What the screen shows and says around a run on a knight level (the Testing ground's practice-11 to practice-13).
+  // The programs typed are one or two lines that test one thing; none is a level's solution. Labels and counts only.
+  /** Which skin a piece is drawn in, inside the element `root` (a JS expression in the page): the knight's drawing has lit details (its eyes, class s-lit), the pawn's has none. */
+  const heroLit = (root) =>
+    b.evaluate(`(() => {
+      const hero = ${root}.querySelectorAll('g.piece g.pawn > g.hero');
+      return { heroes: hero.length, lit: [...hero].reduce((n, g) => n + g.querySelectorAll('.s-lit').length, 0) };
+    })()`);
+  const boardEl = `document.querySelector('.board-host .board')`;
+  const square = (name) => ({ x: name.charCodeAt(0) - 97, y: Number(name.slice(1)) - 1 });
+  const isKnightMove = (from, to) => {
+    const [a, c] = [square(from), square(to)];
+    return [Math.abs(a.x - c.x), Math.abs(a.y - c.y)].sort().join() === "1,2";
+  };
+  /** The board's label and rings, parsed in Node: size, the piece's square, the "It can land on" squares, the rings' squares. */
+  async function knightView() {
+    const raw = await b.evaluate(`(() => {
+      const board = document.querySelector('.board-host .board');
+      return {
+        label: board.getAttribute('aria-label'),
+        layer: !!board.querySelector('g.landings'),
+        rings: [...board.querySelectorAll('g.landings g.landing')].map((g) => g.dataset.square),
+        haloed: board.querySelectorAll('g.landings g.landing circle.landing-halo').length,
+        inked: board.querySelectorAll('g.landings g.landing circle.landing-ink').length,
+      };
+    })()`);
+    const [, width, height] = /^(\d+) by (\d+) board/.exec(raw.label) ?? [];
+    const sentence = /It can land on ([^.]+)\./.exec(raw.label)?.[1];
+    return {
+      ...raw,
+      width: Number(width),
+      height: Number(height),
+      piece: /Your (\w+) is on/.exec(raw.label)?.[1],
+      at: /Your \w+ is on ([a-z]\d+)/.exec(raw.label)?.[1],
+      said: sentence ? sentence.split(/, | and /) : [],
+    };
+  }
+  /** The rings are on the board, each a knight's move from the piece, drawn whole, and the label's sentence names them in order. */
+  function expectRingsAgree(view, where) {
+    expect(view.at && view.rings.length > 0, `${where}: ${view.rings.length} rings, the piece on ${view.at}`);
+    const onBoard = (name) => square(name).x >= 0 && square(name).x < view.width && square(name).y >= 0 && square(name).y < view.height;
+    const stray = view.rings.filter((ring) => !onBoard(ring) || !isKnightMove(view.at, ring));
+    expect(stray.length === 0, `${where}: rings off the board or not a knight's move from ${view.at}: ${stray.join()}`);
+    expect(view.haloed === view.rings.length && view.inked === view.rings.length, `${where}: halos ${view.haloed}, inks ${view.inked} for ${view.rings.length} rings`);
+    expect(view.said.join() === view.rings.join(), `${where}: label says [${view.said.join()}], rings are [${view.rings.join()}]`);
+  }
+  /** Wait (up to 3 s) for the rings to be exactly `want`. */
+  async function ringsBecome(want) {
+    for (let i = 0; i < 30; i++) {
+      if ((await knightView()).rings.join() === want.join()) return true;
+      await sleep(100);
+    }
+    return false;
+  }
+
+  await check("M5.1: with no saved settings the knight levels wear the knight and a Pawn-tier level the pawn", async () => {
+    await openLevel("ch01-l01", { fresh: true }); // a page to hold the settings: the first one is blank
+    return await keepingSettings(async () => {
+      await b.evaluate(`localStorage.removeItem('rank-and-file:settings')`);
+      await openLevel("practice-11", { fresh: true });
+      const knight = await heroLit(boardEl);
+      await openLevel("ch01-l01", { fresh: true });
+      const pawn = await heroLit(boardEl);
+      expect(knight.heroes === 1 && knight.lit > 0, `practice-11: ${JSON.stringify(knight)}`);
+      expect(pawn.heroes === 1 && pawn.lit === 0, `ch01-l01: ${JSON.stringify(pawn)}`);
+      return `lit details: knight ${knight.lit}, pawn ${pawn.lit}`;
+    });
+  });
+
+  await check("M5.1: at the start the landing rings are knight's moves on the board, and the board's label names the same squares", async () => {
+    await openLevel("practice-11", { fresh: true });
+    const view = await knightView();
+    expect(view.layer && view.piece === "knight", `no landings layer, or not a knight: ${view.label}`);
+    expectRingsAgree(view, "practice-11");
+    await openLevel("ch01-l01", { fresh: true });
+    const pawn = await knightView();
+    expect(pawn.layer && pawn.rings.length === 0 && pawn.said.length === 0 && pawn.piece === "pawn" && !pawn.label.includes("It can land on"), `pawn level: ${pawn.rings.length} rings, ${pawn.label}`);
+    return `${view.at} → ${view.rings.join(" ")}`;
+  });
+
+  await check("M5.1: after one jump the knight, the label and the rings are at the landing, and the start brings the first rings back", async () => {
+    await openLevel("practice-11", { fresh: true });
+    const before = await knightView();
+    const [from, to] = [square(before.at), square(before.rings[0])];
+    await setCode(`knight.jump(${to.x - from.x}, ${to.y - from.y})`);
+    const r = await run();
+    expect(r.head !== "Solved!" && !r.errorLine, brief(r)); // one jump can't solve it, and a legal jump isn't an error
+    const after = await knightView();
+    expect(after.at === before.rings[0], `the label says ${after.at}, not ${before.rings[0]}`);
+    expect(after.rings.join() !== before.rings.join(), `the rings did not change from ${before.rings.join()}`);
+    expectRingsAgree(after, "after the jump");
+    await b.evaluate(`${button(0)}.click()`);
+    expect(await ringsBecome(before.rings), `back at the start the rings are [${(await knightView()).rings.join()}], not [${before.rings.join()}]`);
+    const back = await knightView();
+    expect(back.at === before.at, `back at the start the label says ${back.at}, not ${before.at}`);
+    return `${before.at} → ${after.at}: ${after.rings.join(" ")}`;
+  });
+
+  await check("M5.1: asking the knight to walk stops the run with its own message, on the line, and the board stays put", async () => {
+    await openLevel("practice-11", { fresh: true });
+    const before = await knightView();
+    await setCode("knight.move()");
+    const r = await run();
+    const after = await knightView();
+    expect(r.head === "Python stopped" && r.text.includes("Knights don't walk: they jump.") && r.errorLine, brief(r));
+    expect(after.label === before.label && after.rings.join() === before.rings.join(), `the board changed: ${before.at} → ${after.at}`);
+    return brief(r);
+  });
+
+  await check("M5.1: a jump that isn't an L gets the knight's own friendly error, not a traceback", async () => {
+    await openLevel("practice-11", { fresh: true });
+    await setCode("knight.jump(1, 1)");
+    const r = await run();
+    expect(r.head === "Python stopped" && r.text.includes("isn't a jump a knight can make") && r.errorLine, brief(r));
+    expect(!/Traceback|JumpError|GameArgumentError/.test(r.text), brief(r));
+    return brief(r);
+  });
+
+  // Chosen from the boards (`scripts.show_level`): practice-11's knight starts in the corner a1, so one square left
+  // is off the board; practice-12's wall is the whole d file, so a1 → c2 → (one right, two up) lands on the wall on d4.
+  // The designer's rule: on a bumped run the rings stay (the knight stands where it was), so each board is read after its run.
+  await check("M5.1: a jump off the board or onto a wall is refused as blocked, in words of landing, and the rings stay drawn", async () => {
+    await openLevel("practice-11", { fresh: true });
+    await setCode("knight.jump(-1, 2)");
+    const off = await run();
+    expectRingsAgree(await knightView(), "after the jump off the board");
+    await openLevel("practice-12", { fresh: true });
+    await setCode("knight.jump(2, 1)\nknight.jump(1, 2)");
+    const wall = await run();
+    expectRingsAgree(await knightView(), "after the jump onto the wall");
+    expect(off.head === "Python stopped" && off.errorLine && off.text.includes("land off the edge of the board"), brief(off));
+    expect(wall.head === "Python stopped" && wall.errorLine && wall.text.includes("can't land on a wall on d4"), brief(wall));
+    for (const r of [off, wall]) expect(!/walk|bumped|Traceback/.test(r.text), `a pawn's words: ${brief(r)}`);
+    return `${brief(off)} | ${brief(wall)}`;
+  });
+
+  await check("M5.1: the variables panel lists the knight first, and the editor's placeholder names the piece", async () => {
+    await openLevel("practice-11", { fresh: true });
+    await setCode("steps = 1");
+    const r = await run();
+    expect(/^knight /.test(r.vars[0] ?? "") && r.vars.some((v) => v.startsWith("steps ")), JSON.stringify(r.vars.map((v) => v.slice(0, 30))));
+    const placeholder = async () => {
+      await b.evaluate(`document.querySelector('.level-right .cm-content').focus()`);
+      await b.key("a", { code: "KeyA", modifiers: 2 }); // Ctrl+A
+      await b.key("Delete", { keyCode: 46 });
+      return b.waitFor(`document.querySelector('.level-right .cm-placeholder')?.textContent`, 5000, "the placeholder");
+    };
+    const knightText = await placeholder();
+    await openLevel("ch01-l01", { fresh: true });
+    const pawnText = await placeholder();
+    expect(knightText.endsWith("Your knight is called knight."), knightText);
+    expect(pawnText.endsWith("Your pawn is called pawn."), pawnText);
+    return r.vars[0];
+  });
+
+  await check("M5.1: hovering jump shows the knight's entry, help() answers, and the Codex tab lists it", async () => {
+    await openLevel("practice-11", { fresh: true });
+    await setCode("knight.jump(1, 2)");
+    await sleep(300);
+    await hover(await wordAt("jump"));
+    await sleep(900);
+    const tip = await b.evaluate(`document.querySelector('.cm-tooltip .codex-card .codex-call')?.textContent ?? null`);
+    await hoverAway();
+    await setCode("help(knight.jump)");
+    const r = await run();
+    const helped = await b.evaluate(`document.querySelector('.console').innerText`);
+    const entries = await codexEntries();
+    expect(tip !== null && tip.startsWith("knight.jump("), `tooltip: ${tip}`);
+    expect(r.head !== "Python stopped" && helped.includes("knight.jump"), `help(): ${brief(r)}`);
+    expect(entries.some((e) => e.name === "knight.jump"), entries.map((e) => e.name).join());
+    return `${tip}; Codex: ${entries.map((e) => e.name).join(",")}`;
+  });
+
+  await check("M5.1: the lesson's first snippet runs a knight on the small board, and the ones that go wrong show their errors in place", async () => {
+    await openLevel("practice-11", { fresh: true });
+    await b.waitFor(`document.querySelectorAll('.lesson .snippet').length >= 3 && ${snippet(0)}.querySelector('.board g.piece')`, 20_000, "the lesson's snippets");
+    const skin = await heroLit(snippet(0));
+    const ran = await runSnippet(0, { settle: true });
+    const skinAfter = await heroLit(snippet(0));
+    expect(skin.heroes === 1 && skin.lit > 0 && skinAfter.lit > 0, `the lesson board's piece: ${JSON.stringify([skin, skinAfter])}`);
+    expect(/Finished/.test(ran.status), `snippet 0: ${ran.status}`);
+    const wrong = await runSnippet(1);
+    const walk = await runSnippet(2);
+    const text = (index) => b.evaluate(`${snippet(index)}.innerText.replace(/\\s+/g, ' ')`);
+    const [wrongText, walkText] = [await text(1), await text(2)];
+    const tracebackShut = await b.evaluate(`[...${snippet(1)}.querySelectorAll('pre.traceback')].every((pre) => pre.closest('details') && !pre.closest('details').open)`); // Python's own traceback is there, but folded away
+    expect(/stopped/.test(wrong.status) && wrongText.includes("isn't a jump a knight can make") && tracebackShut, `snippet 1: ${wrong.status}, traceback folded: ${tracebackShut}`);
+    expect(/stopped/.test(walk.status) && walkText.includes("Knights don't walk: they jump."), `snippet 2: ${walk.status}`);
+    return `${ran.status} / ${wrong.status} / ${walk.status}`;
+  });
+
+  // -- M5.1: a jump, watched while it plays ---------------------------------------------------------------
+  // A recorder in the page takes one sample per frame while a jump plays; each check reads the samples back and judges
+  // them in Node (the path, the facing, the lift, the trail, what changes on landing, a jump cut short, reduced motion,
+  // 4x). Positions are in squares (the file and rank, fractional). Only squares and numbers are ever reported. The
+  // jumps are one or two lines read off the first rings; the capture check types practice-12's reference solution and
+  // reports the squares of the knight and the enemy only.
+  const TILE = 64; // S and M of src/ui/sprites/floor.ts: the board's SVG units, to turn a position into squares
+  const MARGIN = 22;
+  const PATH_TOLERANCE = 0.2; // squares off the L. A straight diagonal is 0.67 off it at its worst; a short leg that starts a frame early cuts the corner by under a quarter of that
+  const FACES = { 0: "north", 90: "east", 180: "south", 270: "west" };
+  const SETTINGS_KEY = "rank-and-file:settings";
+
+  /** Runs in the page: one sample per frame until `window.__jumpRec.stop`. With `press` ({ button, minLift }) it clicks that playback button on the first frame the solid is lifted `minLift` or more. */
+  function recorder(press) {
+    const matrix = (element) => {
+      const value = getComputedStyle(element).transform;
+      return value === "none" ? new DOMMatrix() : new DOMMatrix(value);
+    };
+    const rec = (window.__jumpRec = { samples: [], stop: false, pressedAt: null, pressedDisabled: null });
+    const tick = () => {
+      if (rec.stop) return;
+      requestAnimationFrame(tick);
+      const board = document.querySelector(".board-host .board");
+      const piece = board?.querySelector("g.piece");
+      const hero = piece?.querySelector("g.hero");
+      if (!board || !hero) return;
+      const [solid, shadow, brackets] = [":scope > .s", ":scope > .s-shadow", ":scope > .br"].map((selector) => hero.querySelector(selector));
+      const label = board.getAttribute("aria-label") ?? "";
+      const at = matrix(piece);
+      const sample = {
+        t: performance.now(),
+        x: at.e,
+        y: at.f,
+        notch: hero.querySelector(".br-notch")?.getAttribute("transform") ?? "",
+        lift: solid ? -matrix(solid).f : null,
+        shade: shadow ? matrix(shadow).a : null,
+        fade: shadow ? Number(getComputedStyle(shadow).opacity) : null,
+        brLift: brackets ? -matrix(brackets).f : null,
+        brAnims: brackets ? brackets.getAnimations({ subtree: true }).length : null,
+        anims: hero.getAnimations({ subtree: true }).length,
+        tr: piece.style.transition,
+        trans: piece.getAnimations().map((a) => [Math.round(Number(a.currentTime)), Math.round(a.effect.getComputedTiming().duration)]),
+        square: /is on ([a-z]\d+)/.exec(label)?.[1] ?? null,
+        facing: /facing (\w+)/.exec(label)?.[1] ?? null,
+        rings: [...board.querySelectorAll("g.landings g.landing")].map((g) => g.dataset.square).join(),
+        trails: [...board.querySelectorAll("g.trails g.trail-hero line")].map((line) => ["x1", "y1", "x2", "y2"].map((name) => Number(line.getAttribute(name)))),
+        foes: [...board.querySelectorAll(":scope > g.enemy")].map((enemy) => [matrix(enemy).e, matrix(enemy).f, enemy.classList.contains("gone")]),
+      };
+      rec.samples.push(sample);
+      if (press && rec.pressedAt === null && sample.lift !== null && sample.lift >= press.minLift) {
+        const button = document.querySelectorAll(".playback-buttons button")[press.button];
+        rec.pressedDisabled = button.disabled;
+        rec.pressedAt = rec.samples.length - 1;
+        button.click();
+      }
+    };
+    tick();
+  }
+
+  /** The recorder's samples placed on the board: `u`, `v` (file and rank, fractional) for the piece, each enemy and each trail line; `face` is the facing the brackets draw. */
+  function onBoard(samples, height) {
+    const file = (x) => (x - MARGIN - TILE / 2) / TILE;
+    const rank = (y) => height - 1 - (y - TILE / 2) / TILE;
+    return samples.map((s) => ({
+      ...s,
+      u: file(s.x),
+      v: rank(s.y),
+      face: FACES[Number(/rotate\((\d+)\)/.exec(s.notch)?.[1])],
+      foes: s.foes.map(([x, y, gone]) => ({ u: file(x), v: rank(y), gone })),
+      trails: s.trails.map(([x1, y1, x2, y2]) => [file(x1), rank(y1), file(x2), rank(y2)]),
+    }));
+  }
+
+  /**
+   * Play one program on `level` with the given settings while the recorder samples the board, and read it all back.
+   * The settings are put back afterwards; the page is left as it was last loaded.
+   */
+  async function recordRun({ level, program, speed = 0.5, motion = "full", press = null, settleMs = 3500 }) {
+    if ((await b.evaluate(`location.protocol`)) === "about:") await openLevel(level, { fresh: true }); // a page to hold the settings
+    return await keepingSettings(async (saved) => {
+      await b.evaluate(`localStorage.setItem(${JSON.stringify(SETTINGS_KEY)}, ${JSON.stringify(JSON.stringify({ ...JSON.parse(saved ?? "{}"), speed, motion }))})`);
+      await openLevel(level, { fresh: true });
+      const before = await knightView();
+      await setCode(program(before));
+      await b.evaluate(`(${recorder})(${JSON.stringify(press)})`);
+      const result = await run({ jump: false });
+      await sleep(settleMs);
+      const rec = await b.evaluate(`(() => { window.__jumpRec.stop = true; return window.__jumpRec; })()`);
+      expect(!result.errorLine && result.head !== "Python stopped", `the program stopped: ${result.head}`);
+      return { before, after: await knightView(), pressedAt: rec.pressedAt, pressedDisabled: rec.pressedDisabled, samples: onBoard(rec.samples, before.height) };
+    });
+  }
+
+  /** A jump from `fromName` to `toName` as an L: the corner, the facing of the long leg and of the short leg. */
+  function legs(fromName, toName) {
+    const [from, to] = [square(fromName), square(toName)];
+    const corner = Math.abs(to.x - from.x) === 2 ? { x: to.x, y: from.y } : { x: from.x, y: to.y };
+    const facing = (p, q) => (p.x !== q.x ? (q.x > p.x ? "east" : "west") : q.y > p.y ? "north" : "south");
+    return { from, to, corner, longFacing: facing(from, corner), shortFacing: facing(corner, to) };
+  }
+  const squareOf = ({ x, y }) => `${String.fromCharCode(97 + x)}${y + 1}`;
+  const gap = (s, p) => Math.hypot(s.u - p.x, s.v - p.y);
+  function gapToSegment(s, a, c) {
+    const [dx, dy] = [c.x - a.x, c.y - a.y];
+    const t = Math.max(0, Math.min(1, ((s.u - a.x) * dx + (s.v - a.y) * dy) / (dx * dx + dy * dy)));
+    return Math.hypot(s.u - (a.x + t * dx), s.v - (a.y + t * dy));
+  }
+  const offTheL = (s, g) => Math.min(gapToSegment(s, g.from, g.corner), gapToSegment(s, g.corner, g.to));
+  /** Where a jump's samples turn: take-off (the first off the start square), the short leg (the first off the long leg) and landing (the first on the landing square). */
+  function phases(samples, g) {
+    const take = samples.findIndex((s) => gap(s, g.from) > 0.02);
+    const turn = samples.findIndex((s, i) => i > take && gapToSegment(s, g.from, g.corner) > 0.05);
+    const land = samples.findIndex((s, i) => i > turn && gap(s, g.to) < 0.03);
+    return { take, turn, land };
+  }
+  const facingOf = (view) => /facing (\w+)/.exec(view.label)?.[1];
+  const resting = (s) => Math.abs(s.lift) < 0.01 && s.anims === 0 && s.tr === "";
+  const look = (s) => `at ${s.u.toFixed(2)},${s.v.toFixed(2)} lift ${s.lift?.toFixed(1)} animations ${s.anims} transition "${s.tr}" label ${s.square} facing ${s.facing} drawn ${s.face} rings ${s.rings} trails ${s.trails.length}`;
+  /** Every sample of `list` passes `ok`; otherwise fail naming the first that doesn't. */
+  function everySample(list, ok, what) {
+    const bad = list.findIndex((s) => !ok(s));
+    expect(bad < 0, `${what}: sample ${bad} of ${list.length}: ${bad < 0 ? "" : look(list[bad])}`);
+  }
+
+  const flights = new Map();
+  /**
+   * One jump from practice-11's start to its ring number `ring`, recorded (and kept: the checks share it). `back`: then
+   * the jump back; `press`: a playback button to press mid-flight (see `recorder`). `g` is the jump as an L, `home` the way back.
+   */
+  async function flightOf(ring, { speed = 0.5, motion = "full", back = false, press = null, settleMs = 3500 } = {}) {
+    const key = JSON.stringify([ring, speed, motion, back, press, settleMs]);
+    if (!flights.has(key)) {
+      const program = (view) => {
+        const [from, to] = [square(view.at), square(view.rings[ring])];
+        const jump = (sign) => `knight.jump(${sign * (to.x - from.x)}, ${sign * (to.y - from.y)})`;
+        return back ? `${jump(1)}\n${jump(-1)}` : jump(1);
+      };
+      const recorded = await recordRun({ level: "practice-11", program, speed, motion, press, settleMs });
+      const [start, landing] = [recorded.before.at, recorded.before.rings[ring]];
+      flights.set(key, { ...recorded, g: legs(start, landing), home: legs(landing, start), tag: `${start} → ${landing}` });    }
+    return flights.get(key);
+  }
+
+  await check("M5.1: a jump played at half speed goes along the L, the long leg first and never the diagonal, and lands on its square", async () => {
+    const notes = [];
+    for (const ring of [0, 1]) {
+      const { samples, g, tag, after } = await flightOf(ring);
+      const { take, turn, land } = phases(samples, g);
+      expect(take > 0 && turn > take && land > turn, `${tag}: take-off at sample ${take}, the short leg at ${turn}, landing at ${land} of ${samples.length}`);
+      const flying = samples.slice(take, land + 1);
+      expect(flying.filter((s) => gap(s, g.from) > 0.3 && gap(s, g.corner) > 0.3).length >= 3 && flying.length >= 15, `${tag}: only ${flying.length} samples of the flight`);
+      const worst = Math.max(...flying.map((s) => offTheL(s, g)));
+      expect(worst <= PATH_TOLERANCE, `${tag}: ${worst.toFixed(2)} squares off the L at its worst (tolerance ${PATH_TOLERANCE})`);
+      const leftLong = gap(samples[turn - 1], g.corner); // the last sample on the long leg: how near the corner it got
+      expect(leftLong <= 0.35, `${tag}: the piece left the long leg ${leftLong.toFixed(2)} squares short of the corner`);
+      everySample(samples.slice(turn), (s) => gapToSegment(s, g.corner, g.to) <= PATH_TOLERANCE, `${tag}: after the turn, on the short leg`);
+      everySample(samples.slice(land), (s) => gap(s, g.to) < 0.03, `${tag}: after landing, on the landing square`);
+      expect(after.at === squareOf(g.to) && gap(samples.at(-1), g.to) < 0.03, `${tag}: ended on ${after.at}`);
+      notes.push(`${tag}: ${worst.toFixed(2)} off the L, left the long leg ${leftLong.toFixed(2)} short of the corner, ${flying.length} samples`);
+    }
+    return notes.join(" | ");
+  });
+
+  await check("M5.1: while a jump plays the knight is drawn facing along the long leg, then along the short leg, and ends facing the way the board says", async () => {
+    const notes = [];
+    for (const ring of [0, 1]) {
+      const { samples, g, tag } = await flightOf(ring);
+      const { take, turn, land } = phases(samples, g);
+      const longLeg = samples.slice(take, turn).filter((s) => gap(s, g.from) > 0.1 && gap(s, g.corner) > 0.3);
+      const shortLeg = samples.slice(turn, land + 1).filter((s) => gap(s, g.corner) > 0.3);
+      expect(longLeg.length >= 3 && shortLeg.length >= 3, `${tag}: ${longLeg.length} samples on the long leg, ${shortLeg.length} on the short`);
+      everySample(longLeg, (s) => s.face === g.longFacing, `${tag}: on the long leg the brackets should face ${g.longFacing}`);
+      everySample(shortLeg, (s) => s.face === g.shortFacing, `${tag}: on the short leg the brackets should face ${g.shortFacing}`);
+      const last = samples.at(-1);
+      expect(last.face === g.shortFacing && last.facing === g.shortFacing, `${tag}: at the end the brackets face ${last.face} and the label says ${last.facing}, not ${g.shortFacing}`);
+      notes.push(`${tag}: ${g.longFacing} then ${g.shortFacing}`);
+    }
+    return notes.join(" | ");
+  });
+
+  await check("M5.1: a jump hops: the solid lifts in one unbroken arc while the brackets stay put, and nothing is left lifted or in transition after landing", async () => {
+    const notes = [];
+    for (const ring of [0, 1]) {
+      const { samples, tag } = await flightOf(ring);
+      const up = samples.map((s, i) => (s.lift > 1 ? i : -1)).filter((i) => i >= 0);
+      const [a, z] = [up[0], up.at(-1)];
+      expect(a !== undefined && z - a >= 15, `${tag}: the solid was lifted in ${up.length} samples`);
+      const arc = samples.slice(a, z + 1);
+      const [begins, ends] = [samples[a].t, samples[z].t];
+      const middle = arc.filter((s) => s.t >= begins + 0.25 * (ends - begins) && s.t <= begins + 0.75 * (ends - begins));
+      const peak = arc.reduce((best, s) => (s.lift > best.lift ? s : best));
+      const dip = Math.min(...middle.map((s) => s.lift));
+      const steepest = Math.max(...arc.slice(1).map((s, i) => Math.abs(s.lift - arc[i].lift) / (s.t - arc[i].t)));
+      expect(peak.lift >= 28 && peak.lift <= 36, `${tag}: the highest lift was ${peak.lift.toFixed(1)}`);
+      expect(dip >= 12 && steepest <= 0.8, `${tag}: through the middle of the arc the lift fell to ${dip.toFixed(1)}, and changed by up to ${steepest.toFixed(2)} px per ms`);
+      everySample(samples, (s) => Math.abs(s.brLift) < 0.01 && s.brAnims === 0, `${tag}: the brackets should never lift or animate`);
+      expect(peak.brLift === 0 && peak.shade < 0.85 && peak.fade < 0.75, `${tag}: at the top the brackets were lifted ${peak.brLift}, the shadow shrank to ${peak.shade?.toFixed(2)} and faded to ${peak.fade?.toFixed(2)}`);
+      expect(samples.slice(a, z + 1).some((s) => /transform/.test(s.tr)), `${tag}: no inline transition on the piece during the flight`);
+      const settled = samples.findIndex((s, i) => i > z && resting(s));
+      expect(settled > z, `${tag}: the art never came to rest`);
+      everySample(samples.slice(-20), (s) => resting(s) && s.shade === 1 && s.fade === 1, `${tag}: long after landing, nothing lifted, animated or in transition`);
+      notes.push(`${tag}: arc ${(ends - begins).toFixed(0)} ms, peak ${peak.lift.toFixed(1)}, lowest in the middle ${dip.toFixed(1)}, at rest ${(samples[settled].t - begins).toFixed(0)} ms after take-off`);
+    }
+    return notes.join(" | ");
+  });
+
+  await check("M5.1: a jump draws two trail legs, one horizontal and one vertical, meeting at the corner, and they are gone a little later", async () => {
+    const notes = [];
+    for (const ring of [0, 1]) {
+      const { samples, g, tag } = await flightOf(ring);
+      const lines = new Map(); // each distinct trail line: where it runs (in squares), when it was first and last seen
+      for (const s of samples) {
+        for (const line of s.trails) {
+          const key = line.map((n) => n.toFixed(2)).join();
+          lines.set(key, { line, first: lines.get(key)?.first ?? s.t, last: s.t });
+        }
+      }
+      const seen = [...lines.values()].sort((p, q) => p.first - q.first);
+      expect(seen.length === 2, `${tag}: ${seen.length} hero trail lines were drawn, not 2`);
+      const straight = seen.every(({ line: [x1, y1, x2, y2] }) => (Math.abs(x1 - x2) < 0.01) !== (Math.abs(y1 - y2) < 0.01));
+      expect(straight, `${tag}: a trail line that is neither horizontal nor vertical: ${seen.map((e) => e.line.map((n) => n.toFixed(2))).join(" / ")}`);
+      const [long, short] = seen.map((e) => e.line);
+      const near = (line, [from, to]) => Math.hypot(line[0] - from.x, line[1] - from.y) < 0.02 && Math.hypot(line[2] - to.x, line[3] - to.y) < 0.02;
+      expect(near(long, [g.from, g.corner]) && near(short, [g.corner, g.to]), `${tag}: the trail legs run ${long.map((n) => n.toFixed(2))} and ${short.map((n) => n.toFixed(2))}, not start to corner to landing`);
+      expect(samples.some((s) => s.trails.length === 2), `${tag}: the two legs were never on the board together`);
+      const lived = seen.map((e) => e.last - e.first);
+      expect(lived.every((ms) => ms >= 1000 && ms <= 2500), `${tag}: the legs stayed ${lived.map(Math.round)} ms`);
+      expect(samples.at(-1).trails.length === 0, `${tag}: ${samples.at(-1).trails.length} trail lines are still there at the end`);
+      notes.push(`${tag}: two legs, on screen ${lived.map(Math.round)} ms`);
+    }
+    return notes.join(" | ");
+  });
+
+  await check("M5.1: what a jump changes (the landing rings, the board's label) shows when it lands, not before", async () => {
+    const notes = [];
+    for (const ring of [0, 1]) {
+      const { samples, g, tag, before, after } = await flightOf(ring);
+      const { take, land } = phases(samples, g);
+      expectRingsAgree(after, `${tag}: after`);
+      expect(after.rings.join() !== before.rings.join(), `${tag}: the rings did not change: ${after.rings.join()}`);
+      const short = samples.slice(0, land).filter((s) => gap(s, g.to) > 0.35);
+      expect(take > 0 && short.length >= 15, `${tag}: only ${short.length} samples clearly short of the landing`);
+      everySample(short, (s) => s.rings === before.rings.join() && s.square === before.at && s.facing === facingOf(before), `${tag}: before landing the rings, the label's square and facing stay the take-off's (${before.at}, ${facingOf(before)},${before.rings.join()})`);
+      const last = samples.at(-1);
+      expect(last.rings === after.rings.join() && last.square === squareOf(g.to), `${tag}: at the end the rings are [${last.rings}] and the label says ${last.square}`);
+      const changed = samples.findIndex((s) => s.rings !== before.rings.join());
+      expect(gap(samples[changed], g.to) <= 0.35, `${tag}: the rings changed with the knight ${gap(samples[changed], g.to).toFixed(2)} squares from the landing`);
+      notes.push(`${tag}: rings changed ${gap(samples[changed], g.to).toFixed(2)} squares from landing, after ${short.length} samples short of it`);
+    }
+    return notes.join(" | ");
+  });
+
+  await check("M5.1: a jump that takes an enemy keeps it drawn until the knight lands on its square", async () => {
+    const { samples, before } = await recordRun({ level: "practice-12", program: () => solution("practice-12"), settleMs: 3500 });
+    const foes = samples[0].foes;
+    expect(foes.length >= 1 && foes.every((foe) => !foe.gone), `${foes.length} enemies, ${foes.filter((foe) => foe.gone).length} gone before the run`);
+    const notes = foes.map((foe, i) => {
+      const spot = { x: Math.round(foe.u), y: Math.round(foe.v) };
+      const taken = samples.findIndex((s) => s.foes[i].gone);
+      expect(taken > 0, `the enemy on ${squareOf(spot)} was ${taken === 0 ? "gone at the start" : "never taken"}`);
+      const away = samples.slice(0, taken).filter((s) => gap(s, spot) > 1).length;
+      const distance = gap(samples[taken], spot);
+      expect(away >= 5, `the knight was seen away from ${squareOf(spot)} in only ${away} samples before the enemy went`);
+      expect(distance <= 0.5, `the enemy on ${squareOf(spot)} went with the knight ${distance.toFixed(2)} squares from it (at ${samples[taken].u.toFixed(2)},${samples[taken].v.toFixed(2)})`);
+      return `${squareOf(spot)} went with the knight ${distance.toFixed(2)} squares away, after ${away} samples further than 1`;
+    });
+    expect(before.piece === "knight", before.label);
+    return notes.join(" | ");
+  });
+
+  await check("M5.1: a jump cut short by Back to start or Jump to the end shows the state it was last given at once, nothing lifted and no transition left", async () => {
+    const lifted = { button: 0, minLift: 28 }; // near the top of the arc: the knight has left both squares by then (it eases in, so at 15 it has hardly moved)
+    const cut = await flightOf(0, { press: lifted, settleMs: 2500 });
+    const mid = cut.samples[cut.pressedAt];
+    expect(cut.pressedAt !== null && cut.pressedDisabled === false, `Back to start: pressed at sample ${cut.pressedAt}, disabled ${cut.pressedDisabled}`);
+    expect(mid.lift >= 15 && gap(mid, cut.g.from) > 0.3 && gap(mid, cut.g.to) > 0.3, `${cut.tag}: pressed with the knight ${gap(mid, cut.g.from).toFixed(2)} squares from the start, ${gap(mid, cut.g.to).toFixed(2)} from the landing, lifted ${mid.lift.toFixed(1)}`);
+    const atStart = (s) => gap(s, cut.g.from) < 0.02 && resting(s) && s.trails.length === 0 && s.rings === cut.before.rings.join() && s.square === cut.before.at && s.facing === facingOf(cut.before) && s.face === facingOf(cut.before);
+    everySample(cut.samples.slice(cut.pressedAt + 1), atStart, `${cut.tag}: after Back to start the knight is on ${cut.before.at}, facing ${facingOf(cut.before)}, nothing lifted, with the first rings and no trail`);
+    // the same, with Jump to the end: a two-jump program, so that the first jump is still in the air while the recording is at its second line
+    const end = await flightOf(0, { back: true, press: { button: 4, minLift: 28 }, settleMs: 2500 });
+    const midEnd = end.samples[end.pressedAt];
+    expect(end.pressedAt !== null && end.pressedDisabled === false, `Jump to the end: pressed at sample ${end.pressedAt}, disabled ${end.pressedDisabled}`);
+    expect(midEnd.lift >= 15 && gap(midEnd, end.g.from) > 0.3 && gap(midEnd, end.g.to) > 0.3, `${end.tag}: pressed with the knight ${gap(midEnd, end.g.from).toFixed(2)} squares from the start, ${gap(midEnd, end.g.to).toFixed(2)} from the landing`);
+    const atEnd = (s) => gap(s, end.g.from) < 0.02 && resting(s) && s.trails.length === 0 && s.rings === end.before.rings.join() && s.square === end.before.at && s.facing === end.home.shortFacing && s.face === end.home.shortFacing;
+    everySample(end.samples.slice(end.pressedAt + 1), atEnd, `${end.tag}: after Jump to the end the knight is back on ${end.before.at}, facing ${end.home.shortFacing} (the way the jump back ends), nothing lifted`);
+    return `${cut.tag}: back to start at sample ${cut.pressedAt} (lifted ${mid.lift.toFixed(1)}); there and back: jump to end at sample ${end.pressedAt}`;
+  });
+
+  await check("M5.1: with motion reduced a jump is not flown: the knight is on its start or its landing square, nothing animates, and it ends facing the short leg's way", async () => {
+    const notes = [];
+    for (const ring of [0, 1]) {
+      const { samples, g, tag, after } = await flightOf(ring, { motion: "reduced", settleMs: 2500 });
+      expect(await b.evaluate(`document.documentElement.dataset.motion`) === "reduced", `${tag}: the page does not say motion is reduced`);
+      everySample(samples, (s) => gap(s, g.from) < 0.02 || gap(s, g.to) < 0.02, `${tag}: the knight should only ever be on ${squareOf(g.from)} or ${squareOf(g.to)}`);
+      expect(samples.some((s) => gap(s, g.from) < 0.02) && samples.some((s) => gap(s, g.to) < 0.02), `${tag}: the samples never saw both squares`);
+      everySample(samples, (s) => resting(s) && s.trails.length === 0, `${tag}: with motion reduced nothing is lifted, animated or in transition, and no trail is drawn`);
+      const last = samples.at(-1);
+      expect(last.face === g.shortFacing && last.facing === g.shortFacing && after.at === squareOf(g.to), `${tag}: ended on ${after.at} with the brackets facing ${last.face}, label ${last.facing}, not ${g.shortFacing}`);
+      notes.push(`${tag}: ${samples.length} samples, ends facing ${last.face}`);
+    }
+    return notes.join(" | ");
+  });
+
+  await check("M5.1: at 4x a jump still ends on its square facing right, with nothing lifted and no transition left", async () => {
+    const notes = [];
+    for (const ring of [0, 1]) {
+      const { samples, g, tag, after } = await flightOf(ring, { speed: 4, settleMs: 2500 });
+      const moving = samples.filter((s) => gap(s, g.from) > 0.02 && gap(s, g.to) > 0.02);
+      const last = samples.at(-1);
+      expect(moving.length >= 2, `${tag}: only ${moving.length} samples between the squares`);
+      everySample(samples.slice(-10), (s) => gap(s, g.to) < 0.02 && resting(s) && s.face === g.shortFacing && s.facing === g.shortFacing && s.square === squareOf(g.to) && s.rings === after.rings.join(), `${tag}: the end of the jump`);
+      const peak = Math.max(...samples.map((s) => s.lift ?? 0));
+      const tail = moving.slice(-3).map((s) => `${gap(s, g.to).toFixed(2)}/${s.lift.toFixed(1)}`);
+      notes.push(`${tag}: ${moving.length} samples in flight, peak lift ${peak.toFixed(1)}, last in flight (squares from landing / lift) ${tail.join(" ")}, ends ${last.face}`);
+    }
+    // there and back at 4x: is the end of the first jump cut short by the second?
+    const { samples, g, home, tag, before } = await flightOf(0, { speed: 4, back: true, settleMs: 2500 });
+    const reached = Math.min(...samples.map((s) => gap(s, g.to)));
+    const last = samples.at(-1);
+    expect(gap(last, g.from) < 0.02 && resting(last) && last.face === home.shortFacing && last.facing === home.shortFacing && last.rings === before.rings.join(), `${tag} and back: ended ${look(last)}`);
+    notes.push(`there and back: came within ${reached.toFixed(2)} squares of ${squareOf(g.to)} between the jumps`);
+    return notes.join(" | ");
   });
 }

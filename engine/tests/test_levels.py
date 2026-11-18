@@ -171,7 +171,7 @@ def test_lesson_is_short_and_runnable(level_file):
     snippets = codex.SNIPPET.findall(text)
     assert 1 <= len(snippets) <= 3, f"{level.lesson} needs 1-3 runnable snippets"
     for meant, code in snippets:
-        result = run_sandbox(code, level.api, lesson_board=level.lesson_board)
+        result = run_sandbox(code, level.api, piece=level.piece, lesson_board=level.lesson_board)
         if meant:
             assert result.status == meant, f"snippet should end in {meant} on purpose, not {result.status}:\n{code}"
         else:

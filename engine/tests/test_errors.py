@@ -2,6 +2,8 @@
 
 import pytest
 
+from conftest import make_level
+from rankfile.pieces import Knight
 from rankfile.runner import run_level, run_sandbox
 
 
@@ -122,3 +124,82 @@ def test_an_endless_for_loop_gets_no_while_hint(waiting_corridor):
     result = run_level(waiting_corridor, "for i in range(10**9):\n    pawn.wait()", line_budget=500)
     assert result.status == "timeout"
     assert "`while`" not in result.error.friendly
+
+
+# -- a knight level reads in the knight's own words (M5.1) ---------------------------------
+
+
+@pytest.fixture
+def knight_runes():
+    """Knight on a1, a rune on b2 (text "north-3"), the goal on c3, with every knight ability."""
+    return make_level(
+        ". . G\n. R .\nP . .\n",
+        piece="knight",
+        api=list(Knight.ABILITIES),
+        legend={"R": {"tile": "rune", "text": "north-3"}},
+    )
+
+
+@pytest.mark.parametrize(
+    ("code", "friendly", "line"),
+    [
+        ("knight.move()", "Knights don't walk: they jump. `knight.jump(1, 2)` jumps one square right and two up.", 1),
+        ("knight.turn_left()", "Knights don't walk: they jump. A jump can go any way", 1),
+        ("knight.jump(1, 1)", "jump(1, 1) isn't a jump a knight can make. A knight moves two squares one way and one the other", 1),
+        ("jump(1, 2)", "`jump` is one of the knight's abilities, so it needs the knight's name in front of it: knight.jump()", 1),
+        ("move()", "Knights don't walk: they jump. `knight.jump(1, 2)` jumps one square right and two up.", 1),
+        ("knight.jumpp(1, 2)", "The knight doesn't know `jumpp`. Did you mean `jump`?", 1),
+        ("knight.jump()", "`jump()` needs two numbers inside its parentheses: how many squares right, then how many up, like `knight.jump(1, 2)`.", 1),
+        ("knight.jump(1)", "`jump()` needs two numbers inside its parentheses", 1),
+        ("knight.look()", "`look()` needs two numbers inside its parentheses: how many squares right, then how many up, like `knight.look(1, 2)`.", 1),
+        ("knight.jump(1, 2, 3)", "`jump()` takes 2 values inside its parentheses, but got 3.", 1),
+    ],
+)
+def test_knight_friendly_messages(knight_runes, code, friendly, line):
+    result = run_level(knight_runes, code)
+    assert result.status == "error"
+    assert friendly in result.error.friendly
+    assert result.error.line == line
+
+
+def test_a_function_of_the_players_own_keeps_the_general_message(knight_runes):
+    result = run_level(knight_runes, "def hop(dx, dy):\n    pass\nhop()")
+    assert "`hop()` needs more inside its parentheses: a value for `dx` and `dy`." in result.error.friendly
+
+
+@pytest.mark.parametrize(
+    ("code", "friendly"),
+    [
+        ("text = knight.read()\nprint(text[0])", "There's no text here: the value is None. If it came from `read()`, your knight isn't standing on a rune: land on one first."),
+        ("text = knight.read()\nprint(len(text))", "If it came from `read()`, your knight isn't standing on a rune: land on one first."),
+        ("text = knight.read()\nprint(text.upper())", "The value here is None, which has no `upper`. If it came from `read()`, your knight isn't standing on a rune: land on one first."),
+    ],
+)
+def test_reading_off_a_rune_names_the_knight_and_says_land(knight_runes, code, friendly):
+    result = run_level(knight_runes, code)
+    assert result.status == "error"
+    assert friendly in result.error.friendly
+    assert "pawn" not in result.error.friendly and "walk" not in result.error.friendly
+
+
+def test_reading_off_a_rune_on_a_pawn_level_reads_as_before(rune_corridor):
+    result = run_level(rune_corridor, "text = pawn.read()\nprint(text[0])")
+    assert result.error.friendly == (
+        "There's no text here: the value is None. If it came from `read()`, your pawn isn't standing on a rune: walk onto one first."
+    )
+    result = run_level(rune_corridor, "text = pawn.read()\nprint(text.upper())")
+    assert result.error.friendly == (
+        "The value here is None, which has no `upper`. If it came from `read()`, your pawn isn't standing on a rune: walk onto one first."
+    )
+
+
+def test_a_none_message_still_names_the_knight_after_the_player_reuses_its_name(knight_runes):
+    result = run_level(knight_runes, "knight = 3\nvalue = None\nprint(value.upper())")
+    assert "If it came from `read()`, your knight isn't standing on a rune: land on one first." in result.error.friendly
+    assert "pawn" not in result.error.friendly
+
+
+def test_a_pawn_level_does_not_know_the_knights_words(corridor):
+    result = run_level(corridor, "jump(1, 2)")
+    assert "Did you mean" not in result.error.friendly and "Knights" not in result.error.friendly
+    assert "Python doesn't know the name `jump`" in result.error.friendly

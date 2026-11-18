@@ -4,6 +4,7 @@ import pytest
 
 from conftest import events, make_level
 from rankfile.levels import LevelError
+from rankfile.pieces import Knight
 from rankfile.runner import run_level
 from rankfile.world import GUARD_MISCOUNTED, GUARD_NOT_UNDERSTOOD, GUARD_WRONG_YES_NO
 
@@ -169,6 +170,105 @@ def test_a_board_with_only_gems_to_collect():
 def test_pits_are_listed_as_obstacles():
     level = make_level("O . O\n. G .\nO P .\n", legend={"O": "pit"})
     assert level.describe()["obstacles"] == ["Pits on a1, a3 and c3: step in and the run is lost."]
+
+
+# -- a knight level's goals and obstacles say landing, where a pawn's say walking (M5.1) ------------------
+
+
+def knight_level(map_text: str, **overrides):
+    return make_level(map_text, piece="knight", api=list(Knight.ABILITIES), **overrides)
+
+
+def test_an_unmet_waypoint_on_a_knight_level_says_land_not_cross():
+    one = knight_level(". W .\n. . G\nP . .\n", legend={"W": "waypoint"})
+    result = run_level(one, "knight.jump(2, 1)")
+    assert result.status == "incomplete"
+    assert "you didn't land on the waypoint on b3." in result.summary and "cross" not in result.summary
+    two = knight_level("W . .\n. . G\nP . W\n", legend={"W": "waypoint"})
+    assert "you didn't land on the waypoints on c1 and a3." in run_level(two, "knight.jump(2, 1)").summary
+
+
+def test_a_knight_levels_waypoints_must_be_landed_on():
+    one = knight_level(". W G\n. . .\nP . .\n", legend={"W": "waypoint"})
+    assert one.goals()[1] == "Land on the waypoint on b3 on the way. A jump flies over it: it only counts where you land."
+    two = knight_level("W . G\n. . .\nP . W\n", legend={"W": "waypoint"})
+    assert two.goals()[1] == "Land on all 2 waypoints on the way: c1 and a3. A jump flies over them: they only count where you land."
+
+
+def test_a_pawn_levels_waypoints_are_crossed_as_before():
+    one = make_level(". W G\n. . .\nP . .\n", legend={"W": "waypoint"})
+    assert one.goals()[1] == "Cross the waypoint on b3 on the way. Passing over it is enough."
+    two = make_level("W . G\n. . .\nP . W\n", legend={"W": "waypoint"})
+    assert two.goals()[1] == "Cross all 2 waypoints on the way: c1 and a3. Passing over them is enough."
+
+
+def test_a_knight_levels_gems_are_taken_by_landing_on_them():
+    all_gems = knight_level("$ . G\n. . $\nP . .\n", legend={"$": "gem"}, objectives=["reach_goal", {"collect": "all"}])
+    assert all_gems.goals()[1] == "Collect all 2 gems by landing on them."
+    one = knight_level("$ . G\n. . .\nP . .\n", legend={"$": "gem"}, objectives=["reach_goal", {"collect": "all"}])
+    assert one.goals()[1] == "Collect the gem by landing on it."
+    some = knight_level("$ . G\n. . $\nP . .\n", legend={"$": "gem"}, objectives=["reach_goal", {"collect": 1}])
+    assert some.goals()[1] == "Collect at least 1 gem of the 2 by landing on them."
+
+
+def test_a_pawn_levels_gems_are_walked_over_as_before():
+    legend = {"$": "gem"}
+    assert make_level("$ . G\n. . $\nP . .\n", legend=legend, objectives=["reach_goal", {"collect": "all"}]).goals()[1] == "Collect all 2 gems by walking over them."
+    assert make_level("$ . G\n. . .\nP . .\n", legend=legend, objectives=["reach_goal", {"collect": "all"}]).goals()[1] == "Collect the gem by walking over it."
+
+
+def test_a_knight_levels_obstacles_never_say_walk_or_step():
+    ring = knight_level(
+        "O . . . G\n. . . . .\n. . . . .\n. . . . .\nP . . . O\n",
+        legend={"O": "pit"},
+        enemies=[{"kind": "rook", "start": "c3"}],
+    )
+    assert ring.obstacles() == [
+        "Pits on e1 and a5: land on one and the run is lost.",
+        "A rook stands on c3. It attacks every square along its rank and file (straight across, and up and down), "
+        "up to the first wall, closed gate or piece. Land on one of those squares and it takes you: the run is lost.",
+        "If you land on a square an enemy attacks, you're caught and the run is lost.",
+    ]
+
+
+def test_a_knight_level_with_a_single_pit_and_a_patrol():
+    level = knight_level("G . . . .\n. . . . .\n. . O . .\n. . . . .\nP . . . .\n", legend={"O": "pit"}, enemies=[{"kind": "patrol", "start": "e1"}])
+    assert level.obstacles() == [
+        "A pit on c3: land on it and the run is lost.",
+        "A patrol stands guard on e1.",
+        "If an enemy lands on your square, you're caught and the run is lost.",
+    ]
+
+
+def test_a_knight_levels_descriptions_have_no_walking_in_them():
+    level = knight_level(
+        "W . G $ .\n. . . . .\n. . O . .\n. . . . .\nP . . . $\n",
+        legend={"W": "waypoint", "$": "gem", "O": "pit"},
+        objectives=["reach_goal", {"collect": "all"}],
+        enemies=[{"kind": "bishop", "start": "d2"}],
+    )
+    text = " ".join([*level.goals(), *level.obstacles()]).lower()
+    assert "land on" in text
+    for word in ("walk", "passing over", "step", "pawn"):
+        assert word not in text
+
+
+def test_a_pawn_levels_obstacles_read_as_before():
+    level = make_level(
+        "O . . . G\n. . . . .\n. . . . .\n. . . . .\nP . . . .\n",
+        legend={"O": "pit"},
+        enemies=[{"kind": "rook", "start": "c3"}, {"kind": "chaser", "start": "e2"}],
+    )
+    assert level.obstacles() == [
+        "A pit on a5: step in and the run is lost.",
+        "A chaser doesn't see pits: if its step lands on one, it falls in and is gone.",
+        "A rook stands on c3. It attacks every square along its rank and file (straight across, and up and down), "
+        "up to the first wall, closed gate or piece. Step onto one of those squares and it takes you: the run is lost.",
+        "A chaser starts on e2. It steps one square toward you for each square you move, each turn and each wait: along the rank or "
+        "the file, whichever gap is bigger (east or west when they're equal). If that way is blocked "
+        "it tries the other, and if both are blocked it waits.",
+        "If an enemy lands on your square, or you walk into one, you're caught and the run is lost.",
+    ]
 
 
 # -- timed gates ---------------------------------------------------------------------------

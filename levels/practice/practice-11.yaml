@@ -1,0 +1,29 @@
+id: practice-11
+chapter: 0
+title: "First Jumps"
+trains: "The knight's jump: knight.jump(dx, dy)"
+brief: "Your knight starts in the corner. It can't walk a single square: jump to the goal."
+piece: knight
+map: |
+  . . . G .
+  . . . . .
+  . . . . .
+  . . . . .
+  P . . . .
+  
+start: {"facing": "north"}
+api: ["jump"]
+par: {"lines": 3}
+hints:
+- "The goal is too far for one jump. Pick a square on the way there first."
+- "Each jump goes two squares one way and one square the other. The first number is how far right, the second how far up. Count the squares from your knight to the goal, and break that into jumps."
+- "One way to start:\nknight.jump(2, 1)"
+lesson: practice/practice-11.md
+lesson_board:
+  map: |
+    . . . . .
+    . . . . .
+    . . P . .
+    . . . . .
+    . . . . .
+  start: {"facing": "north"}

@@ -222,7 +222,8 @@ def unmet_objectives(level: Level, world: World, output: str) -> list[str]:
         unmet.append(f"your {level.piece} stopped on {square_name(world.pos)}, and the goal is on {square_name(level.goal)}.")
     missed = names([pos for pos in level.board.squares(Tile.WAYPOINT) if pos not in world.crossed])
     if missed:
-        unmet.append(f"you didn't cross the {'waypoint' if len(missed) == 1 else 'waypoints'} on {and_list(missed)}.")
+        verb = "land on" if level.lands else "cross"  # a jump flies over what's between (the goal says so too)
+        unmet.append(f"you didn't {verb} the {'waypoint' if len(missed) == 1 else 'waypoints'} on {and_list(missed)}.")
     captured = sum(foe.captured for foe in world.foes)
     needed = level.captures_needed()
     if captured < needed and needed == level.capturable:

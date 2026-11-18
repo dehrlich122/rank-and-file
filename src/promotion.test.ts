@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { chapters } from "./content";
 import { ProgressStore } from "./progress";
-import { tierCleared, unlockedPieces } from "./promotion";
-import { sanitize } from "./settings";
+import { tierCleared, unlockedPieces, wornPiece } from "./promotion";
+import { sanitize, settings } from "./settings";
 import { memoryStorage } from "./storage.fake";
 
 const tier = (name: string) => chapters.filter((c) => c.curriculum && c.tier === name).at(-1)!.levels; // the tier's last chapter
@@ -56,9 +56,47 @@ describe("what has been shown once", () => {
 });
 
 describe("the piece setting", () => {
-  it("is the pawn unless it names a known skin", () => {
-    expect(sanitize({}).piece).toBe("pawn");
+  it("is auto unless it names a known skin", () => {
+    expect(sanitize({}).piece).toBe("auto");
     expect(sanitize({ piece: "knight" }).piece).toBe("knight");
-    expect(sanitize({ piece: "dragon" }).piece).toBe("pawn");
+    expect(sanitize({ piece: "dragon" }).piece).toBe("auto");
+  });
+});
+
+describe("wornPiece", () => {
+  const earned = () => {
+    const store = new ProgressStore(memoryStorage());
+    solve(store, tier("pawn").filter((l) => !l.mastery).map((l) => l.id));
+    return store;
+  };
+  const fresh = () => new ProgressStore(memoryStorage());
+  afterEach(() => settings.set({ piece: "auto" }));
+
+  it("under auto is the level's own piece, earned or not", () => {
+    settings.set({ piece: "auto" });
+    expect(wornPiece(undefined, fresh())).toBe("pawn");
+    expect(wornPiece("pawn", fresh())).toBe("pawn");
+    expect(wornPiece("knight", fresh())).toBe("knight");
+    expect(wornPiece("dragon", fresh())).toBe("pawn");
+  });
+
+  it("under auto ignores a name only an object's prototype has", () => {
+    settings.set({ piece: "auto" });
+    expect(wornPiece("toString", fresh())).toBe("pawn");
+    expect(wornPiece("constructor", fresh())).toBe("pawn");
+  });
+
+  it("under an explicit knight needs the promotion, on every level", () => {
+    settings.set({ piece: "knight" });
+    expect(wornPiece(undefined, earned())).toBe("knight");
+    expect(wornPiece("pawn", earned())).toBe("knight");
+    expect(wornPiece(undefined, fresh())).toBe("pawn");
+    expect(wornPiece("knight", fresh())).toBe("pawn");
+  });
+
+  it("under an explicit pawn is the pawn everywhere, knight levels too", () => {
+    settings.set({ piece: "pawn" });
+    expect(wornPiece("knight", earned())).toBe("pawn");
+    expect(wornPiece(undefined, earned())).toBe("pawn");
   });
 });

@@ -65,6 +65,8 @@
   --grid-tick: light-dark(rgb(20 96 150 / 0.8), rgb(110 232 255 / 0.7));
   --grid-edge: light-dark(rgb(20 96 150 / 0.65), rgb(80 220 255 / 0.55));
   --halftone-dot: light-dark(rgb(186 18 92 / 0.3), rgb(255 70 150 / 0.24));
+  --land: var(--accent); /* the rings on a knight's landing squares (M5.1), over a halo that keeps them readable on halftone dots */
+  --land-halo: light-dark(rgb(248 247 253 / 0.85), rgb(9 4 22 / 0.85));
   --route: light-dark(rgb(196 20 79 / 0.7), rgb(255 92 134 / 0.7));
   --badge-bg: light-dark(#f8f7fd, #110a24);
   --badge-border: light-dark(#51497f, #6b73b8);
@@ -1354,6 +1356,27 @@ pre {
   pointer-events: none;
 }
 
+/* the knight's landing squares (M5.1): a cyan ring over a halo, never hiding the tooltips of the tiles underneath */
+.landing {
+  pointer-events: none;
+}
+
+.landing circle {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.landing-halo {
+  stroke: var(--land-halo);
+  stroke-width: 8;
+}
+
+.landing-ink {
+  stroke: var(--land);
+  stroke-width: 3.4;
+}
+
 .ht-dot {
   fill: var(--halftone-dot);
 }
@@ -1458,6 +1481,9 @@ pre {
 
 .s-shadow {
   fill: var(--shadow);
+  /* a jump shrinks it about its own centre while the solid lifts (src/ui/board.ts lift()); with motion reduced nothing animates it */
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 /* the glowing edge: every face stroked wide; the faces then cover all but the outline */

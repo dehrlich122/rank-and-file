@@ -39,6 +39,7 @@ export interface WorldState {
   lost: Pos | null; // where the run was lost: a pit, or where the piece was caught
   clock_ticks?: Partial<Record<Clock, number>>; // the code clocks' counts, on levels with clockwork (QA-021)
   attacked?: Pos[]; // the squares enemy chess pieces attack, on levels with any (M3.4)
+  landings?: Pos[]; // the squares a jump from here could land on without an error, on knight levels; empty once lost (M5.1)
 }
 
 /** A level as the engine describes it (levels.Level.describe). */
@@ -132,8 +133,13 @@ export interface SolveProgress {
 }
 
 export interface GameEvent {
-  kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "capture" | "tick" | "lost" | "pick_up" | "bridge" | "fall" | "crush" | "read";
+  kind: "move" | "turn" | "wait" | "bump" | "gate_open" | "guard" | "capture" | "tick" | "lost" | "pick_up" | "bridge" | "fall" | "crush" | "read" | "jump";
   state: WorldState; // the whole world's state after the event
+  // jump (M5.1, World.jump): `from` the square it left; `via` the corner after the long leg, which plays first, then
+  // the short leg to state.pos, whose direction is state.facing; `took` the enemy it landed on and took (its place in level.enemies)
+  from?: Pos;
+  via?: Pos;
+  took?: number;
   by?: number; // lost, when a chess piece took the piece: which enemy (its place in level.enemies)
   at?: Pos; // bump: the square bumped into; gate_open/guard: the gate; capture, fall: the enemy's square; bridge: the pit; pick_up, lost: where; read: the rune
   message?: string; // guard: what the guard said; pick_up, fall, crush, lost: what happened
@@ -244,9 +250,10 @@ export interface Requests {
   solveStart: { args: { level: unknown }; result: { ok: true; cases: number } | { ok: false; error: string } };
   solveStep: { args: { seconds: number }; result: SolveProgress };
   codeLines: { args: { code: string }; result: number }; // lines as par counts them (M4.3: the author's kept solution)
-  loadSandbox: { args: { api: string[]; board?: unknown }; result: LevelInfo }; // board: a level's lesson_board (QA-019)
+  // board: a level's lesson_board (QA-019); piece: the level's piece, which the snippets run (M5.1; left out: the pawn)
+  loadSandbox: { args: { api: string[]; board?: unknown; piece?: string }; result: LevelInfo };
   runLevel: { args: { level: unknown; code: string; hintsUsed: number; solutionSeen: boolean }; result: LevelResult };
-  runSandbox: { args: { code: string; api: string[]; board?: unknown }; result: LevelResult };
+  runSandbox: { args: { code: string; api: string[]; board?: unknown; piece?: string }; result: LevelResult };
   codex: { args: { levelId: string; chapters: CodexChapter[] }; result: CodexEntry[] }; // chapters: all of them, in play order
   levelTags: { args: { level: unknown; chapters: CodexChapter[] }; result: LevelTags }; // M4.4: the tier the engine works out
   // level: the one on screen, for the session's stand-in piece (Scratch Python has no board)

@@ -3,7 +3,8 @@ import { chapters } from "../content";
 import { ProgressStore } from "../progress";
 import { memoryStorage } from "../storage.fake";
 import { type Fake, fakeDocument } from "./dom.fake";
-import { skinCardElement, skinCards, type SkinCard } from "./skinsScreen";
+import { settings } from "../settings";
+import { autoCardElement, skinCardElement, skinCards, type SkinCard } from "./skinsScreen";
 
 // The art is drawn with SVG namespaces the Fake document below doesn't have: stand in plain elements.
 vi.mock("./svg", () => ({ svg: () => document.createElement("svg") }));
@@ -12,9 +13,22 @@ vi.mock("./sprites", () => ({ hero: () => document.createElement("g") }));
 const pawnTier = () => chapters.filter((c) => c.curriculum && c.tier === "pawn").at(-1)!;
 
 describe("skinCards", () => {
-  it("has the pawn always unlocked, and worn by default", () => {
-    const [pawn] = skinCards(new ProgressStore(null));
-    expect(pawn).toMatchObject({ piece: "pawn", name: "Pawn", unlocked: true, worn: true, how: "Yours from the start" });
+  afterEach(() => settings.set({ piece: "auto" }));
+
+  it("has the pawn always unlocked, and not worn under Auto, the default", () => {
+    const cards = skinCards(new ProgressStore(null));
+    expect(cards.map((c) => c.piece)).toEqual(["pawn", "knight"]);
+    expect(cards[0]).toMatchObject({ piece: "pawn", name: "Pawn", unlocked: true, worn: false, how: "Yours from the start" });
+    expect(cards.some((c) => c.worn)).toBe(false);
+  });
+
+  it("marks the chosen skin worn, and only it", () => {
+    const store = new ProgressStore(memoryStorage());
+    settings.set({ piece: "pawn" });
+    expect(skinCards(store).map((c) => c.worn)).toEqual([true, false]);
+    for (const level of pawnTier().levels.filter((l) => !l.mastery)) store.update(level.id, { stars: 1 });
+    settings.set({ piece: "knight" });
+    expect(skinCards(store).map((c) => c.worn)).toEqual([false, true]);
   });
 
   it("locks the knight, naming the chapter to clear, until the tier is cleared", () => {
@@ -62,5 +76,36 @@ describe("skinCardElement", () => {
     expect(open.all("button").map((b) => b.text)).toEqual(["Wear it"]);
     expect(open.find("skin-how")[0]!.text).toBe("Unlocked by the Pawn tier's promotion");
     expect(wore).toBe(0);
+  });
+});
+
+describe("autoCardElement", () => {
+  beforeEach(() => vi.stubGlobal("document", fakeDocument));
+  afterEach(() => vi.unstubAllGlobals());
+
+  const make = (worn: boolean, onWear = () => {}) => autoCardElement(worn, onWear) as unknown as Fake;
+
+  it("is a focusable skin card for \"auto\" that says its state in words", () => {
+    const card = make(true);
+    expect(card.attributes.get("tabindex")).toBe("0");
+    expect(card.attributes.get("data-piece")).toBe("auto");
+    expect(card.attributes.get("aria-label")).toBe("Auto, worn: each level's own piece");
+    expect(make(false).attributes.get("aria-label")).toBe("Auto, not worn: each level's own piece");
+  });
+
+  it("when worn has the class, the Worn mark and no button", () => {
+    const card = make(true);
+    expect(card.find("worn").length).toBe(1);
+    expect(card.find("skin-worn")[0]!.text).toBe("✓ Worn");
+    expect(card.all("button").length).toBe(0);
+  });
+
+  it("when not worn offers Wear it, which calls back", () => {
+    let wore = 0;
+    const card = make(false, () => wore++);
+    expect(card.find("worn").length).toBe(0);
+    expect(card.all("button").map((b) => b.text)).toEqual(["Wear it"]);
+    card.all("button")[0]!.fire("click");
+    expect(wore).toBe(1);
   });
 });

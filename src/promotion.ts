@@ -43,8 +43,12 @@ export function unlockedPieces(store: ProgressStore = progress): Piece[] {
   return ["pawn", ...PROMOTIONS.filter((p) => tierCleared(p.tier, store)).map((p) => p.to)];
 }
 
-/** The skin to draw: the one chosen in Settings → Piece, if its promotion is earned, else the pawn. */
-export function wornPiece(store: ProgressStore = progress): Piece {
+/**
+ * The skin to draw. Under "auto" it is the level's own piece, earned or not; under an explicit skin it is that
+ * skin if its promotion is earned, else the pawn, on every level.
+ */
+export function wornPiece(levelPiece?: string, store: ProgressStore = progress): Piece {
   const chosen = settings.get().piece;
+  if (chosen === "auto") return levelPiece !== undefined && Object.hasOwn(SKIN_NAMES, levelPiece) ? (levelPiece as Piece) : "pawn";
   return unlockedPieces(store).includes(chosen) ? chosen : "pawn";
 }

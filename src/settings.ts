@@ -15,7 +15,7 @@ export interface Settings {
   motion: Motion; // animations
   codePanel: CodePanel; // where a level's code column sits (wide screens only)
   wrapLines: boolean; // long lines of code wrap instead of running off the side
-  piece: Piece; // the skin of the player's piece
+  piece: "auto" | Piece; // the skin of the player's piece; "auto" is each level's own piece
   music: number; // the soundtrack's volume, 0 to 100 (M4.1)
   effects: number; // the sound effects' volume, 0 to 100
   muted: boolean; // everything silenced, from the top bar's button
@@ -23,13 +23,14 @@ export interface Settings {
 
 export const SPEEDS = [0.5, 1, 2, 4] as const;
 export const CODE_SIZES: Record<CodeSize, number> = { small: 13, medium: 15, large: 17, "x-large": 20 };
-export const DEFAULTS: Settings = { speed: 1, theme: "dark", codeSize: "medium", motion: "system", codePanel: "right", wrapLines: true, piece: "pawn", music: 60, effects: 50, muted: false };
+export const DEFAULTS: Settings = { speed: 1, theme: "dark", codeSize: "medium", motion: "system", codePanel: "right", wrapLines: true, piece: "auto", music: 60, effects: 50, muted: false };
 
 const STORAGE_KEY = "rank-and-file:settings";
 const THEMES: readonly Theme[] = ["system", "light", "dark"];
 const MOTIONS: readonly Motion[] = ["system", "full", "reduced"];
 const CODE_PANELS: readonly CodePanel[] = ["right", "bottom", "left"];
-const PIECES: readonly Piece[] = ["pawn", "knight"];
+const PIECES: readonly Settings["piece"][] = ["auto", "pawn", "knight"];
+const PIECE_AUTO_KEY = "rank-and-file:settings-piece-auto"; // present once the one-time move from "pawn" to "auto" has run
 
 export class SettingsStore {
   private value: Settings;
@@ -37,6 +38,14 @@ export class SettingsStore {
 
   constructor(private readonly storage: StorageLike | null = browserStorage()) {
     this.value = sanitize(readJson(storage, STORAGE_KEY));
+    if (readJson(storage, PIECE_AUTO_KEY) === null) {
+      // "pawn" used to be the default, so a saved "pawn" may never have been a choice: move it to "auto" once.
+      if (this.value.piece === "pawn") {
+        this.value = { ...this.value, piece: "auto" };
+        writeJson(storage, STORAGE_KEY, this.value);
+      }
+      writeJson(storage, PIECE_AUTO_KEY, true);
+    }
   }
 
   get(): Settings {

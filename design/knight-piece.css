@@ -1,0 +1,191 @@
+/* M5.1 (design sheet, dev-only): the knight as the piece. Pane framing, the jump and the landing marks.
+   The game's own classes (src/styles.css, src/free.css) draw everything else. */
+
+:root {
+  /* new tokens, for the landing marks and the planned route: the game's cyan, a halo that keeps a mark readable
+     over halftone dots, and a dim line for the route */
+  --land: var(--accent);
+  --land-halo: light-dark(rgb(248 247 253 / 0.85), rgb(9 4 22 / 0.85));
+  --plan: light-dark(rgb(81 73 127 / 0.55), rgb(166 158 214 / 0.5));
+}
+
+body {
+  margin: 0;
+  background: #070414;
+}
+
+#sheet {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 16px;
+  display: grid;
+  gap: 20px;
+}
+
+.sheet-head h1 {
+  margin: 0;
+  font: 700 20px "Orbitron", var(--font-ui);
+  letter-spacing: 0.06em;
+  color: #3be0ff;
+}
+
+.sheet-head p {
+  margin: 4px 0 0;
+  max-width: 120ch;
+  color: #a69ed6;
+  font: 15px/1.5 var(--font-ui);
+}
+
+.pane {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 var(--font-ui);
+  padding: 14px;
+  border: 1px solid var(--border);
+}
+
+.pane[data-scheme="dark"] {
+  color-scheme: dark;
+}
+
+.pane[data-scheme="light"] {
+  color-scheme: light;
+}
+
+.pane-name {
+  margin: 0 0 8px;
+  font: 700 12px var(--font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 13px;
+}
+
+.note {
+  margin: 0 0 10px;
+  max-width: 110ch;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.take {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.take-label {
+  margin: 0;
+  font: 600 12px var(--font-ui);
+  color: var(--muted);
+}
+
+.take-label b {
+  display: inline-block;
+  min-width: 2.2em;
+  margin-right: 4px;
+  padding: 1px 6px;
+  text-align: center;
+  background: var(--accent);
+  color: var(--accent-text);
+  font: 700 13px var(--font-code);
+}
+
+.cell {
+  display: block;
+}
+
+.take .board {
+  max-height: none;
+  width: var(--bw, 360px);
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.grey {
+  filter: grayscale(1);
+}
+
+/* the planned route of the jump pane: a dashed line under the knight, with the landing squares numbered */
+.plan-line {
+  fill: none;
+  stroke: var(--plan);
+  stroke-width: 2;
+  stroke-dasharray: 5 5;
+  pointer-events: none;
+}
+
+.plan-n {
+  fill: var(--plan);
+  font: 700 13px var(--font-code);
+  text-anchor: middle;
+}
+
+/* a trail held still, for the trail pane: the game's own classes, minus the fade */
+.still .trail-hero {
+  opacity: 1;
+  animation: none;
+}
+
+.still .trail-hero line {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+
+/* the landing marks: lines in the game's cyan, over a halo; never the dots of an attacked square */
+.land {
+  pointer-events: none;
+}
+
+.land path,
+.land circle {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.land .halo {
+  stroke: var(--land-halo);
+  stroke-width: 8;
+}
+
+.land .ink {
+  stroke: var(--land);
+  stroke-width: 3.4;
+}
+
+.mock-settings {
+  position: static;
+  width: min(460px, 100%);
+}
+
+.auto-art {
+  display: flex;
+}
+
+.skin-art {
+  display: grid;
+  place-items: center;
+}
