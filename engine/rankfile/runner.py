@@ -15,6 +15,8 @@ scored: up to three stars (see `score`).
 
 import ast
 import contextlib
+import copy
+import inspect
 import io
 import linecache
 import time
@@ -24,9 +26,9 @@ from . import codex
 from .board import Tile, square_name
 from .constraints import check_constraints, code_lines, lint
 from .errors import ErrorInfo, explain
-from .levels import Case, Level, names, sandbox_level
+from .levels import NOT_JUDGED, Case, Level, names, sandbox_level
 from .pieces import PIECES
-from .tracer import PLAYER_FILENAME, StepBudgetExceeded, Tracer
+from .tracer import PLAYER_FILENAME, StepBudgetExceeded, Tracer, safe_repr
 from .words import and_list, count
 from .world import World
 
@@ -180,8 +182,9 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
         if problems:
             return outcome("constraint", problems[0], problems=problems, warnings=warnings, code_lines=counted)
 
-    # 2. Run it, recording every step.
-    run = execute(compiled, code, namespace, line_budget=line_budget, record=True, world=world)
+    # 2. Run it, recording every step. (On an examiner level the examiner then calls the function: same tracer.)
+    call = (level.examine.function, level.call.args) if level.examine and level.call else None
+    run = execute(compiled, code, namespace, line_budget=line_budget, record=True, world=world, call=call)
     recording = {
         "steps": [asdict(step) for step in run.tracer.steps],
         "output": run.output,
@@ -190,6 +193,8 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
         "code_lines": counted,
         "truncated": run.tracer.truncated,
     }
+    if call is not None:
+        recording["call"] = _call_info(level, run)
 
     # 3. Decide how it went. A loss counts even if the player's code caught it.
     if world.lost is not None:
@@ -199,12 +204,70 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
         info = explain(run.error, namespace)
         status = "timeout" if isinstance(run.error, StepBudgetExceeded) else "error"
         return outcome(status, info.friendly, error=info, **recording)
-    if not judge or level.nothing_to_do:
+    if not judge or (level.nothing_to_do and call is None):
         return outcome("finished", "Finished.", **recording)
     unmet = unmet_objectives(level, world, run.output)
+    facts = None
+    if call is not None:  # the function, then the answer, then the board
+        facts = CallFacts(level, call[0], recording["call"].text, [n for n in namespace if not n.startswith("__")], call[1],
+                          run.returned, level.call.returns, run.call_output, unmet)
+        failure = _call_failure(run, facts)
+        if failure is not None:
+            return outcome("incomplete", examiner_words(failure, facts), **recording)
     if unmet:
         return outcome("incomplete", "Your program finished, but " + " Also, ".join(unmet), **recording)
-    return outcome("solved", _solved_summary(level), **recording)
+    return outcome("solved", examiner_words("passed", facts) if facts else _solved_summary(level), **recording)
+
+
+def _call_info(level: Level, run: Execution) -> CallInfo:
+    """The facts of the examiner's call on this case, whether or not it was judged."""
+    wanted = level.call.returns
+    return CallInfo(
+        text=level.call.text(level.examine.function),
+        returned=safe_repr(run.returned) if run.finished else None,
+        wanted=None if wanted is NOT_JUDGED else repr(wanted),
+        first_step=run.first_step,
+    )
+
+
+def _call_failure(run: Execution, facts: CallFacts) -> str | None:
+    """What is wrong with the call, in the examiner's order: the function itself, then the answer. (An error or a
+    lost run was judged before this, and the board is judged after.) None when the call is fine."""
+    if run.problem is not None:
+        return run.problem
+    wanted = facts.wanted
+    if wanted is not NOT_JUDGED and not (type(run.returned) is type(wanted) and run.returned == wanted):
+        return "wrong_answer"  # the same kind of thing and equal: 7 is not "7", True is not 1, 1.0 is not 1
+    return None
+
+
+@dataclass
+class CallFacts:
+    """Everything the examiner's words may need about one call (M5.2-4b-2 writes them from these)."""
+
+    level: Level
+    function: str  # the function's name
+    text: str  # the call as code writes it, "gallop(1, 3)"
+    names: list[str]  # the names in the player's namespace (the program's and the engine's), without the dunder ones
+    args: list  # the arguments the call was made with
+    returned: object  # what came back (None when nothing did)
+    wanted: object  # the answer wanted (NOT_JUDGED when none is)
+    printed: str  # what was printed during the call
+    unmet: list[str]  # the board's goals still unmet, in words
+
+
+def examiner_words(kind: str, facts: CallFacts) -> str:
+    """The examiner's one plain sentence for `kind` of call: "missing", "not_function", "arguments", "wrong_answer"
+    or "passed". The only place these words are written; M5.2-4b-2 replaces them. (Never the answer wanted.)"""
+    if kind == "missing":
+        return f"The examiner looked for a function called {facts.function}, and your program doesn't define one."
+    if kind == "not_function":
+        return f"{facts.function} is there, but it isn't a function, so the examiner can't call it."
+    if kind == "arguments":
+        return f"The examiner needs to call {facts.text}, but {facts.function} can't take those arguments."
+    if kind == "wrong_answer":
+        return f"The examiner called {facts.text}, and it handed back {safe_repr(facts.returned)}, which is not the answer wanted."
+    return _solved_summary(facts.level)
 
 
 def run_sandbox(
@@ -279,7 +342,12 @@ class Execution:
     error: BaseException | None  # None if the program ran to the end
     output: str
     tracer: Tracer
-    returned: object = None  # what the examiner's call handed back (M5.2-4b); only meaningful with a `call` and no error
+    # The examiner's call (M5.2-4b), with a `call` only:
+    returned: object = None  # what the call handed back (None after exit()); only meaningful when `finished`
+    finished: bool = False  # the call was made and ended without an error (it handed back, or ended by exit())
+    problem: str | None = None  # why it wasn't made: "missing", "not_function" or "arguments"
+    first_step: int = 0  # len(tracer.steps) when the call was about to start (or, if it never was, when the run ended)
+    call_output: str = ""  # what was printed during the call
 
 
 def execute(
@@ -293,8 +361,8 @@ def execute(
     call: tuple[str, list] | None = None,
 ) -> Execution:
     """Run compiled player code under the tracer, capturing everything it prints.
-    `call` is (a function's name, its arguments): after the program, the examiner looks the function up and
-    calls it under the same tracer (M5.2-4b). It's ignored until then."""
+    `call` is (a function's name, its arguments): once the program has ended without an error, the examiner checks
+    the function and calls it with a copy of the arguments, under the same tracer, budget and captured output (M5.2-4b)."""
     remember_source(source)
     # The code's own clocks only matter when something keeps time with them.
     keeps_time = world is not None and world.code_clocked
@@ -303,17 +371,46 @@ def execute(
     if world is not None:
         world.listeners.append(tracer.add_event)
     error = None
+    made = Execution(None, "", tracer)  # the call's facts, filled in as it goes
+    reached = False  # the run got as far as the call
+    printed_from = 0
     try:
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output), tracer:
-            exec(compiled, namespace)
-    except SystemExit:
-        pass  # exit() or sys.exit(): the program chose to stop, which is fine
+            with contextlib.suppress(SystemExit):  # exit() or sys.exit(): the program chose to stop, which is fine
+                exec(compiled, namespace)
+            if call is not None:
+                reached = True
+                name, args = call
+                made.problem = _function_problem(namespace, name, args)
+                made.first_step = len(tracer.steps)
+                if made.problem is None:
+                    printed_from = len(output.getvalue())
+                    with contextlib.suppress(SystemExit):  # the call chose to stop: it handed back nothing
+                        made.returned = namespace[name](*copy.deepcopy(args))
+                    made.finished = True
     except BaseException as exc:
         error = exc
     finally:
         output.finish_line()
         tracer.finish()
-    return Execution(error, output.getvalue(), tracer)
+    if call is not None and not reached:
+        made.first_step = len(tracer.steps)  # the program failed first
+    text = output.getvalue()
+    return replace(made, error=error, output=text, call_output=text[printed_from:] if reached else "")
+
+
+def _function_problem(namespace: dict, name: str, args: list) -> str | None:
+    """Why the examiner can't call `name(*args)`, found without calling it; None when it can: "missing" (no such
+    name), "not_function" (a number, text, a class...) or "arguments" (the function can't take them)."""
+    if name not in namespace:
+        return "missing"
+    if not inspect.isfunction(namespace[name]):
+        return "not_function"
+    try:
+        inspect.signature(namespace[name]).bind(*args)
+    except TypeError:
+        return "arguments"
+    return None
 
 
 def remember_source(code: str) -> None:
