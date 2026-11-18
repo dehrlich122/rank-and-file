@@ -52,3 +52,6 @@ runner.LevelResult.call
 tracer.Step.globals  # M5.2-1
 tracer.Step.depth
 tracer.Step.continues
+
+# M5.2-5a: a lesson snippet's fence, read by name; only the level checker unpacks it.
+codex.Snippet.meant

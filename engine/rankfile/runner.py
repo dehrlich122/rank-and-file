@@ -27,7 +27,7 @@ from . import codex
 from .board import Tile, square_name
 from .constraints import check_constraints, code_lines, lint
 from .errors import ErrorInfo, _kind, closest, explain
-from .levels import NOT_JUDGED, Case, Level, names, sandbox_level
+from .levels import NOT_JUDGED, Case, Examine, ExamineCall, Level, names, sandbox_level
 from .pieces import PIECES
 from .tracer import PLAYER_FILENAME, StepBudgetExceeded, Tracer, safe_repr
 from .words import and_list, count
@@ -205,19 +205,36 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
         info = explain(run.error, namespace)
         status = "timeout" if isinstance(run.error, StepBudgetExceeded) else "error"
         return outcome(status, info.friendly, error=info, **recording)
+    if call is not None and not judge:  # a lesson's snippet: only the call itself is looked at (M5.2-5a)
+        facts = _call_facts(level, recording["call"].text, namespace, run, [])
+        if run.problem is not None:
+            return outcome("incomplete", examiner_words(run.problem, facts), **recording)
+        return outcome("finished", _called_words(facts), **recording)
     if not judge or (level.nothing_to_do and call is None):
         return outcome("finished", "Finished.", **recording)
     unmet = unmet_objectives(level, world, run.output)
     if call is not None:  # the function, then the answer, then the board
-        facts = CallFacts(
-            call[0], recording["call"].text, namespace.get(call[0]), _own_functions(namespace), call[1], run.returned,
-            level.call.returns, run.call_output, unmet, run.signature,
-        )  # fmt: skip
+        facts = _call_facts(level, recording["call"].text, namespace, run, unmet)
         kind = _call_failure(run, facts) or _call_ending(facts)
         return outcome("solved" if kind in PASSED else "incomplete", examiner_words(kind, facts), **recording)
     if unmet:
         return outcome("incomplete", "Your program finished, but " + " Also, ".join(unmet), **recording)
     return outcome("solved", _solved_summary(level), **recording)
+
+
+def _call_facts(level: Level, text: str, namespace: dict, run: Execution, unmet: list[str]) -> CallFacts:
+    """What the examiner's words may need about the call this run made."""
+    function, args = level.examine.function, level.call.args
+    return CallFacts(
+        function, text, namespace.get(function), _own_functions(namespace), args, run.returned,
+        level.call.returns, run.call_output, unmet, run.signature,
+    )  # fmt: skip
+
+
+def _called_words(facts: CallFacts) -> str:
+    """A snippet's summary when the examiner made the call and nothing was judged."""
+    called = f"The examiner called `{facts.text}`"
+    return f"{called}." if facts.returned is None else f"{called} and got {safe_repr(facts.returned)} back."
 
 
 def _call_info(level: Level, run: Execution) -> CallInfo:
@@ -387,9 +404,43 @@ def run_sandbox(
 ) -> LevelResult:
     """Run a lesson snippet with the given abilities, on a small open board or the
     level's lesson board. Snippets have no objectives: a run just finishes (or fails, or loses).
-    `call` is a snippet the examiner calls, as the lesson writes it ("gallop(1, 2)"): M5.2-5a makes the call;
-    it's ignored until then."""
-    return run_level(sandbox_level(api, piece, lesson_board), code, enforce_constraints=False, judge=False)
+    `call` (M5.2-5a) is the call the examiner makes after the program, as the lesson writes it ("gallop(1, 2)"): a
+    program that only defines, like an examiner level's. It is made the examiner's way, on a sandbox level that
+    carries the examiner and that one call, and isn't judged: a run that ends well says what was called and got back,
+    and a function the examiner can't call is `incomplete`, in the examiner's words. The text is a lesson author's:
+    one that isn't a plain call raises ValueError, for the level checker, never for a player."""
+    level = sandbox_level(api, piece, lesson_board)
+    if call:
+        name, args = parse_snippet_call(call)
+        level = replace(level, examine=Examine(name, [ExamineCall(args)]), call=ExamineCall(args))
+    return run_level(level, code, enforce_constraints=False, judge=False)
+
+
+def parse_snippet_call(text: str) -> tuple[str, list]:
+    """The function's name and the values of a lesson's `calls` text: one call of a plain name with plain values."""
+    problem = ValueError(
+        f"The lesson's call {text!r} must be one call of a plain function name with plain values, "
+        "like gallop(1, 2): numbers, text, True, False or None."
+    )
+    try:
+        call = ast.parse(text.strip(), mode="eval").body
+    except (SyntaxError, ValueError):
+        raise problem from None
+    if not (isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and not call.keywords):
+        raise problem
+    args = []
+    for arg in call.args:
+        negative = isinstance(arg, ast.UnaryOp) and isinstance(arg.op, ast.USub)
+        value = arg.operand if negative else arg
+        if not isinstance(value, ast.Constant):
+            raise problem
+        plain = value.value
+        if negative and (type(plain) not in (int, float)):
+            raise problem
+        if not negative and not (plain is None or type(plain) in (bool, int, float, str)):
+            raise problem
+        args.append(-plain if negative else plain)
+    return call.func.id, args
 
 
 def score(level: Level, code_lines: int, hints_used: int, solution_seen: bool = False) -> list[Star]:

@@ -47,4 +47,6 @@ def test_a_run_with_no_examiner_has_no_call_and_its_steps_are_at_module_level():
 
 
 def test_a_lesson_snippet_accepts_a_call():
-    assert run_sandbox("pawn.move(1)\n", ["move"], call="gallop(1, 2)").status == "finished"
+    """The examiner calls the function a snippet defines (M5.2-5a); a program with none to call is `incomplete`."""
+    assert run_sandbox("def gallop(a, b):\n    pawn.move(a)\n", ["move"], call="gallop(1, 2)").status == "finished"
+    assert run_sandbox("pawn.move(1)\n", ["move"], call="gallop(1, 2)").status == "incomplete"
