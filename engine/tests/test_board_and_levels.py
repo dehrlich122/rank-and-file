@@ -2,7 +2,7 @@ import pytest
 
 from conftest import basics, make_level
 from rankfile.board import Direction, Tile, square_name, step
-from rankfile.levels import LevelError, parse_level, sandbox_level
+from rankfile.levels import FunctionRule, LevelError, parse_level, sandbox_level
 
 
 def test_square_names_follow_chess():
@@ -81,6 +81,64 @@ def test_describe_is_ready_for_the_ui():
 def test_bad_levels_fail_loudly(overrides, message):
     with pytest.raises(LevelError, match=message):
         make_level("P G\n", **overrides)
+
+
+def test_a_level_reads_function_rules_and_define():
+    level = make_level(
+        "P G\n",
+        constraints={"functions": {"gallop": {"params": 2, "defaults": 1, "calls": 2, "returns": True}, "hop": {}, "trot": None}, "define": 2},
+    )
+    assert level.constraints.functions == {
+        "gallop": FunctionRule(params=2, defaults=1, calls=2, returns=True),
+        "hop": FunctionRule(),
+        "trot": FunctionRule(),
+    }
+    assert level.constraints.define == 2
+    plain = make_level("P G\n", constraints={"max_lines": 3}).constraints
+    assert plain.functions == {} and plain.define == 0
+    assert make_level("P G\n", constraints={"functions": {"zero": {"params": 0, "defaults": 0}}}).constraints.functions["zero"].params == 0
+
+
+@pytest.mark.parametrize(
+    ("rules", "message"),
+    [
+        ({"functions": {"gallop": {"param": 2}}}, "unknown key.*'gallop': param"),
+        ({"functions": {"gallop": {"params": 2, "speed": 1, "colour": 2}}}, "unknown key.*colour, speed"),
+        ({"functions": {"gallop": 2}}, "rules for 'gallop' must be a mapping"),
+        ({"functions": ["gallop"]}, "functions must be a mapping"),
+        ({"functions": None}, "functions must be a mapping"),
+        ({"functions": {"two words": {}}}, "'two words' isn't a name Python can use"),
+        ({"functions": {"2fast": {}}}, "'2fast' isn't a name Python can use"),
+        ({"functions": {3: {}}}, "3 isn't a name Python can use"),
+        ({"functions": {"for": {}}}, "'for' is a Python keyword"),
+        ({"functions": {"None": {}}}, "'None' is a Python keyword"),
+        ({"functions": {"sum": {}}}, "'sum' is the name of a Python built-in"),
+        ({"functions": {"max": {}}}, "'max' is the name of a Python built-in"),
+        ({"functions": {"next": {}}}, "'next' is the name of a Python built-in"),
+        ({"functions": {"print": {}}}, "'print' is the name of a Python built-in"),
+        ({"functions": {"gallop": {"params": -1}}}, "params for 'gallop' must be a whole number of at least 0"),
+        ({"functions": {"gallop": {"params": 1.5}}}, "params for 'gallop' must be a whole number of at least 0"),
+        ({"functions": {"gallop": {"params": "2"}}}, "params for 'gallop' must be a whole number"),
+        ({"functions": {"gallop": {"params": True}}}, "params for 'gallop' must be a whole number"),
+        ({"functions": {"gallop": {"defaults": -1}}}, "defaults for 'gallop' must be a whole number of at least 0"),
+        ({"functions": {"gallop": {"calls": 0}}}, "calls for 'gallop' must be a whole number of at least 1"),
+        ({"functions": {"gallop": {"calls": 2.0}}}, "calls for 'gallop' must be a whole number of at least 1"),
+        ({"functions": {"gallop": {"calls": False}}}, "calls for 'gallop' must be a whole number of at least 1"),
+        ({"functions": {"gallop": {"params": 1, "defaults": 2}}}, "'gallop' can't have more defaults \\(2\\) than params \\(1\\)"),
+        ({"functions": {"gallop": {"returns": "yes"}}}, "returns for 'gallop' must be true or false"),
+        ({"functions": {"gallop": {"returns": 1}}}, "returns for 'gallop' must be true or false"),
+        ({"functions": {"gallop": {"returns": None}}}, "returns for 'gallop' must be true or false"),
+        ({"define": 0}, "constraint define must be a whole number of at least 1"),
+        ({"define": -1}, "constraint define must be a whole number of at least 1"),
+        ({"define": "two"}, "constraint define must be a whole number of at least 1"),
+        ({"define": True}, "constraint define must be a whole number of at least 1"),
+        ({"define": None}, "constraint define must be a whole number of at least 1"),
+    ],
+)
+def test_bad_function_rules_fail_loudly_and_name_the_key(rules, message):
+    with pytest.raises(LevelError, match=message) as caught:
+        make_level("P G\n", constraints=rules)
+    assert caught.value.at == {"field": "constraints"}
 
 
 def test_missing_required_keys():

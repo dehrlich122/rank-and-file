@@ -40,7 +40,7 @@ from dataclasses import asdict, dataclass, field
 
 from .errors import LEVEL_PIECE, piece_class
 from .exceptions import IT_KNOWS
-from .levels import parse_level
+from .levels import NOT_JUDGED, Level, parse_level
 from .pieces import PIECES, Pawn, Piece
 
 SECTIONS = ("Args", "Returns", "Example")
@@ -416,7 +416,7 @@ def level_tags(data: dict, chapters: list[dict]) -> dict:
     Returns {"tier": str | None, "chapter": int | None}.
     """
     level = parse_level(data)
-    abilities, nodes, pieces = set(level.api), set(level.constraints.require_nodes), {level.piece}
+    abilities, nodes, pieces = set(level.api), set(level.constraints.require_nodes) | _rule_nodes(level), {level.piece}
     latest: dict | None = None
     for chapter in chapters:
         if not chapter["curriculum"] or not (abilities or nodes or pieces):
@@ -435,6 +435,17 @@ def level_tags(data: dict, chapters: list[dict]) -> dict:
         if found:
             latest = chapter  # later chapters come later in play order, so the last one found is the latest
     return {"tier": latest["tier"], "chapter": latest["chapter"]} if latest else {"tier": None, "chapter": None}
+
+
+def _rule_nodes(level: Level) -> set[str]:
+    """The syntax a level's function rules and examiner need (M5.2), so the level file needn't repeat them in
+    `require_nodes`: a function rule, `define` or an examiner needs `def`; a rule that a function hands back a value,
+    or an examiner call that judges an answer, needs `return`."""
+    rules, examine = level.constraints, level.examine
+    nodes = {"FunctionDef"} if rules.functions or rules.define or examine is not None else set()
+    if any(rule.returns for rule in rules.functions.values()) or (examine is not None and any(call.returns is not NOT_JUDGED for call in examine.calls)):
+        nodes.add("Return")
+    return nodes
 
 
 @functools.lru_cache(maxsize=256)  # a list asks about every level in it, and the lessons are the same each time

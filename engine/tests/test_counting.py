@@ -3,6 +3,7 @@
 import pytest
 
 from conftest import events, make_level
+from rankfile.constraints import code_lines
 from rankfile.runner import run_level
 
 MOVES = ["move", "turn_left", "turn_right"]
@@ -72,3 +73,72 @@ def test_wait_takes_a_number_of_ticks(code, ticks):
 def test_bad_arguments_to_wait(code, says):
     result = run_level(make_level("G\n.\nP\n", api=[*MOVES, "wait"]), code)
     assert result.status == "error" and says in result.error.friendly
+
+
+# -- a docstring counts for nothing, like a comment (M5.2, decision 8) ---------------------
+
+CORRIDOR = "G\n.\n.\nP\n"
+
+
+@pytest.mark.parametrize(
+    ("code", "lines"),
+    [
+        ('"""A note."""\npawn.move()\n', 1),  # a module's
+        ('"""A note\nover three\nlines."""\npawn.move()\n', 1),
+        ("'''A note.'''\npawn.move()\n", 1),
+        ("'A note.'\npawn.move()\n", 1),
+        ('("A note "\n "in two parts")\npawn.move()\n', 1),
+        ('def f():\n    """What f does."""\n    pawn.move()\n', 2),  # a function's
+        ('def f():\n    """What f does\n\n    in more words.\n    """\n    pawn.move()\n', 2),
+        ('async def f():\n    """What f does."""\n    pawn.move()\n', 2),
+        ('class C:\n    """What C is."""\n    x = 1\n', 2),  # a class's
+        ('class C:\n    """What C is."""\n    def go(self):\n        """What go does."""\n        pass\n', 3),
+        ('def f(): """What f does."""\n', 1),  # on the def's own line: the def still counts
+        ('def f():\n    """Zoë\'s café, é."""\n    pass\n', 2),
+        ('"""A note."""; pawn.move()\n', 1),
+        ('def f():\n    """What f does."""\n    pass\n    pass\n', 3),
+    ],
+)
+def test_a_docstring_counts_for_no_lines(code, lines):
+    assert code_lines(code) == lines
+
+
+@pytest.mark.parametrize(
+    ("code", "lines"),
+    [
+        ("pawn.move()\n'a bare text'\n", 2),  # not the first statement
+        ("def f():\n    pawn.move()\n    'a bare text'\n", 3),
+        ("if x:\n    'a bare text'\n", 2),  # an `if` has no docstring
+        ("for _ in x:\n    'a bare text'\n", 2),
+        ("x = 'text'\n", 1),
+        ("x = 1; 'text'\n", 2),  # squeezed beside a statement, it still counts as one of its own
+        ("f'{x}'\npawn.move()\n", 2),  # an f-string isn't a docstring
+        ("b'bytes'\npawn.move()\n", 2),
+        ("def f():\n    '''One.'''\n    '''Two.'''\n", 2),  # only the first statement is the docstring
+        ("def f():\n    x = 1\n    '''Two.'''\n", 3),
+        ("'''One.'''\n'''Two.'''\n", 1),
+    ],
+)
+def test_a_bare_text_anywhere_else_still_counts(code, lines):
+    assert code_lines(code) == lines
+
+
+def test_a_docstring_does_not_change_how_the_lines_around_it_are_counted():
+    level = make_level(CORRIDOR, constraints={"max_lines": 3})
+    result = run_level(level, 'def f():\n    """Doc."""\n    a = 1; b = 2\n    c = 3\n')
+    assert result.summary == "This level allows at most 3 lines of code, and yours has 4. Two statements on one line count as two."
+    assert code_lines('def f():\n    """Doc."""\n    if x: a()\n') == 3
+
+
+def test_the_line_limit_does_not_count_a_docstring():
+    code = 'def walk():\n    """Walk three squares\n    north.\n    """\n    pawn.move(3)\nwalk()\n'
+    result = run_level(make_level(CORRIDOR, constraints={"max_lines": 3}), code)
+    assert result.status == "solved" and result.code_lines == 3
+    result = run_level(make_level(CORRIDOR, constraints={"max_lines": 2}), code)
+    assert result.status == "constraint" and result.summary.startswith("This level allows at most 2 lines of code, and yours has 3.")
+
+
+def test_par_follows_the_count():
+    result = run_level(make_level(CORRIDOR, par={"lines": 3}), 'def walk():\n    """Walk north."""\n    pawn.move(3)\nwalk()\n')
+    assert result.code_lines == 3
+    assert next(star for star in result.stars if star.kind == "par").earned

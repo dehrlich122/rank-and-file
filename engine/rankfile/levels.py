@@ -8,6 +8,8 @@ checker instead of confusing a player.
 """
 
 import ast
+import builtins
+import keyword
 import re
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, replace
@@ -954,11 +956,15 @@ def _parse_par(data: dict) -> Par:
 
 @_locate(field="constraints")
 def _parse_constraints(data: dict) -> Constraints:
-    allowed = {"max_lines", "min_comments", "require_nodes", "ban_nodes", "max_numbers"}
+    allowed = {"max_lines", "min_comments", "require_nodes", "ban_nodes", "max_numbers", "functions", "define"}
     unknown = set(data) - allowed
     if unknown:
         raise LevelError(f"unknown constraint(s): {', '.join(sorted(unknown))}")
-    constraints = Constraints(**data)
+    data = dict(data)
+    functions = _parse_function_rules(data.pop("functions")) if "functions" in data else {}
+    constraints = Constraints(**data, functions=functions)
+    if "define" in data and not _positive(constraints.define):
+        raise LevelError("constraint define must be a whole number of at least 1")
     if constraints.max_numbers is not None and not _positive(constraints.max_numbers):
         raise LevelError("constraint max_numbers must be a whole number of at least 1")
     for name in constraints.require_nodes + constraints.ban_nodes:
@@ -966,3 +972,45 @@ def _parse_constraints(data: dict) -> Constraints:
         if not (isinstance(node_type, type) and issubclass(node_type, ast.AST)):
             raise LevelError(f"constraint node {name!r} isn't an ast node type")
     return constraints
+
+
+FUNCTION_RULE_KEYS = ("params", "defaults", "calls", "returns")
+
+
+def _parse_function_rules(data) -> dict[str, FunctionRule]:
+    """`constraints.functions` (M5.2-3): a mapping from a function's name to what the level asks of it."""
+    if not isinstance(data, dict):
+        raise LevelError("constraint functions must be a mapping from a function's name to its rules, e.g. {gallop: {params: 2}}")
+    return {name: _parse_function_rule(name, rules) for name, rules in data.items()}
+
+
+def _parse_function_rule(name, rules) -> FunctionRule:
+    if not (isinstance(name, str) and name.isidentifier()):
+        raise LevelError(f"constraint functions: {name!r} isn't a name Python can use for a function")
+    if keyword.iskeyword(name):
+        raise LevelError(f"constraint functions: {name!r} is a Python keyword, so it can't name a function")
+    if hasattr(builtins, name):
+        raise LevelError(
+            f"constraint functions: {name!r} is the name of a Python built-in, and the checker can't tell a call to it "
+            "from a call to the built-in: choose another name"
+        )
+    rules = {} if rules is None else rules
+    if not isinstance(rules, dict):
+        raise LevelError(f"constraint functions: the rules for {name!r} must be a mapping, e.g. {{params: 2}}")
+    unknown = set(rules) - set(FUNCTION_RULE_KEYS)
+    if unknown:
+        raise LevelError(
+            f"constraint functions: unknown key(s) for {name!r}: {', '.join(sorted(map(str, unknown)))} "
+            f"(it takes {', '.join(FUNCTION_RULE_KEYS)})"
+        )
+    rule = FunctionRule(**rules)
+    for key, least in (("params", 0), ("defaults", 0), ("calls", 1)):
+        value = getattr(rule, key)
+        if value is not None and not (isinstance(value, int) and not isinstance(value, bool) and value >= least):
+            raise LevelError(f"constraint functions: {key} for {name!r} must be a whole number of at least {least}")
+    if rule.params is not None and rule.defaults is not None and rule.defaults > rule.params:
+        raise LevelError(f"constraint functions: {name!r} can't have more defaults ({rule.defaults}) than params ({rule.params})")
+    if not isinstance(rule.returns, bool):
+        raise LevelError(f"constraint functions: returns for {name!r} must be true or false")
+    return rule
+

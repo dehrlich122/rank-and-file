@@ -2,10 +2,12 @@
 
 import builtins
 import types
+from dataclasses import replace
 
 import pytest
 
 from rankfile import codex
+from rankfile.levels import Examine, ExamineCall, parse_level
 from rankfile.pieces import PIECES, Knight, Pawn
 from rankfile.repl import Repl
 from rankfile.runner import run_level, run_sandbox, run_snippet
@@ -376,6 +378,38 @@ def test_a_required_construct_is_found_through_a_lessons_snippets():
     prose["lesson"] += "A While loop repeats.\n```python\nwhile True:\n    break\n```\n"
     assert tags([tier_chapter(1, "pawn", prose)], ["move"], ["While"]) == ("pawn", 1)
     assert tags([tier_chapter(1, "pawn", prose), *TIERED[2:]], ["move"], ["While"]) == ("bishop", 3)
+
+
+FUNCTIONAL = [
+    tier_chapter(1, "pawn", taught_level(["move"], "pawn.move()")),
+    tier_chapter(2, "knight", taught_level(["move"], "def hop():\n    pass")),
+    tier_chapter(3, "bishop", taught_level(["move"], "def hop():\n    return 1")),
+]
+
+
+def rules_tags(constraints: dict) -> tuple:
+    data = {**needs(["move"]), "constraints": constraints}
+    answer = codex.level_tags(data, FUNCTIONAL)
+    return answer["tier"], answer["chapter"]
+
+
+def test_function_rules_need_def_and_a_returning_rule_needs_return():
+    assert rules_tags({"max_lines": 3}) == ("pawn", 1)
+    assert rules_tags({"functions": {"hop": {}}}) == ("knight", 2)
+    assert rules_tags({"define": 1}) == ("knight", 2)
+    assert rules_tags({"functions": {"hop": {"returns": False}}}) == ("knight", 2)
+    assert rules_tags({"functions": {"hop": {"returns": True}}}) == ("bishop", 3)
+    assert rules_tags({"functions": {"hop": {}, "skip": {"returns": True}}}) == ("bishop", 3)
+
+
+def test_an_examiner_needs_def_and_a_judged_answer_needs_return():
+    level = parse_level(needs(["move"]))
+    assert codex._rule_nodes(level) == set()
+    assert codex._rule_nodes(replace(level, examine=Examine(function="hop"))) == {"FunctionDef"}
+    only_board = Examine(function="hop", calls=[ExamineCall(args=[1])])
+    assert codex._rule_nodes(replace(level, examine=only_board)) == {"FunctionDef"}
+    judged = Examine(function="hop", calls=[ExamineCall(returns=None), ExamineCall(returns=3)])
+    assert codex._rule_nodes(replace(level, examine=judged)) == {"FunctionDef", "Return"}
 
 
 def test_a_snippet_that_is_not_python_teaches_nothing_and_does_not_stop_the_search():
