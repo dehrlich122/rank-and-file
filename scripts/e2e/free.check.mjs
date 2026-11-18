@@ -7,7 +7,7 @@
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { sleep } from "./cdp.mjs";
-import { BUTTONS, buttonHelpers, hoverHelpers, levelHelpers } from "./helpers.mjs";
+import { BUTTONS, buttonHelpers, hoverHelpers, levelHelpers, settingsHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const SETTINGS = "rank-and-file:settings";
@@ -30,6 +30,7 @@ export default async function freeChecks({ browser: b, base, root, check }) {
   const { setCode, editorText, solution, withoutExpectLine, openLevel } = levelHelpers(b, base, root);
   const { clickButton, hasButton } = buttonHelpers(b);
   const { wordAt, hover, hoverAway } = hoverHelpers(b);
+  const { keepingSettings } = settingsHelpers(b);
   const text = (selector) => b.evaluate(`document.querySelector(${JSON.stringify(selector)})?.textContent ?? ''`);
   const exists = (selector) => b.evaluate(`!!document.querySelector(${JSON.stringify(selector)})`);
   const goto = (hash) => b.evaluate(`location.hash = ${JSON.stringify(hash)}`);
@@ -441,48 +442,47 @@ export default async function freeChecks({ browser: b, base, root, check }) {
     await b.waitFor(`document.querySelector('.skin-card')`, 30_000, "the gallery");
     const before = await card("knight");
     expect(before.locked && !before.worn && !before.button && before.how.startsWith("Locked: "), `the Charger is locked before the tier is cleared: ${JSON.stringify(before)}`);
-    const kept = await b.evaluate(`localStorage.getItem(${JSON.stringify(SETTINGS)})`);
-    await setStorage("rank-and-file:progress", SOLVED_CHAPTER_6);
-    await setStorage(SETTINGS, { ...JSON.parse(kept ?? "{}"), piece: "auto" }); // the default, whatever an earlier check left
-    await load("#/free/skins");
-    await b.waitFor(`document.querySelector('.skin-card[data-piece="knight"]')`, 30_000, "the gallery again");
-    try {
-      const unlocked = await card("knight");
-      expect(unlocked.name === "Charger", "the knight skin is the Charger");
-      expect(!unlocked.locked && !unlocked.worn && unlocked.button === "Wear it", `the Charger can be worn: ${JSON.stringify(unlocked)}`);
-      const auto = await card("auto");
-      const pawn = await card("pawn");
-      expect(auto.worn && !auto.button && auto.status.endsWith("Worn"), `Auto is worn at first, with no button: ${JSON.stringify(auto)}`);
-      expect(!pawn.worn && pawn.button === "Wear it", `under Auto the pawn is not worn and can be: ${JSON.stringify(pawn)}`);
-      await wearFromKeyboard("knight");
-      const now = await card("knight");
-      expect(now.worn && !now.locked && !now.button && now.status.endsWith("Worn"), `the card after: ${JSON.stringify(now)}`);
-      expect(now.focused, "keyboard focus is on the worn card");
-      expect((await piece()) === "knight", `Settings → Piece is ${await piece()}`);
-      // Settings shows the same choice
-      await b.evaluate(`document.querySelector('.topbar .settings-button').click()`);
-      const radio = await b.evaluate(`document.querySelector('input[name="setting-piece"][value="knight"]').checked`);
-      await b.evaluate(`document.querySelector('.settings-dialog').close()`);
-      expect(radio, "Settings → Piece shows the knight");
-    } finally {
-      // put the piece back to Auto, through the gallery's own button
-      await b.evaluate(`document.querySelector('.skin-card[data-piece="auto"] button')?.click()`);
-      await sleep(100);
-    }
-    const back = await card("auto");
-    expect((await piece()) === "auto" && back.worn, `Auto is back: ${JSON.stringify(back)}`);
-    await b.evaluate(kept === null ? `localStorage.removeItem(${JSON.stringify(SETTINGS)}); true` : `localStorage.setItem(${JSON.stringify(SETTINGS)}, ${JSON.stringify(kept)}); true`);
-    return "Charger worn with focus kept; Auto back";
+    return await keepingSettings(async (kept) => {
+      await setStorage("rank-and-file:progress", SOLVED_CHAPTER_6);
+      await setStorage(SETTINGS, { ...JSON.parse(kept ?? "{}"), piece: "auto" }); // the default, whatever an earlier check left
+      await load("#/free/skins");
+      await b.waitFor(`document.querySelector('.skin-card[data-piece="knight"]')`, 30_000, "the gallery again");
+      try {
+        const unlocked = await card("knight");
+        expect(unlocked.name === "Charger", "the knight skin is the Charger");
+        expect(!unlocked.locked && !unlocked.worn && unlocked.button === "Wear it", `the Charger can be worn: ${JSON.stringify(unlocked)}`);
+        const auto = await card("auto");
+        const pawn = await card("pawn");
+        expect(auto.worn && !auto.button && auto.status.endsWith("Worn"), `Auto is worn at first, with no button: ${JSON.stringify(auto)}`);
+        expect(!pawn.worn && pawn.button === "Wear it", `under Auto the pawn is not worn and can be: ${JSON.stringify(pawn)}`);
+        await wearFromKeyboard("knight");
+        const now = await card("knight");
+        expect(now.worn && !now.locked && !now.button && now.status.endsWith("Worn"), `the card after: ${JSON.stringify(now)}`);
+        expect(now.focused, "keyboard focus is on the worn card");
+        expect((await piece()) === "knight", `Settings → Piece is ${await piece()}`);
+        // Settings shows the same choice
+        await b.evaluate(`document.querySelector('.topbar .settings-button').click()`);
+        const radio = await b.evaluate(`document.querySelector('input[name="setting-piece"][value="knight"]').checked`);
+        await b.evaluate(`document.querySelector('.settings-dialog').close()`);
+        expect(radio, "Settings → Piece shows the knight");
+      } finally {
+        // put the piece back to Auto, through the gallery's own button
+        await b.evaluate(`document.querySelector('.skin-card[data-piece="auto"] button')?.click()`);
+        await sleep(100);
+      }
+      const back = await card("auto");
+      expect((await piece()) === "auto" && back.worn, `Auto is back: ${JSON.stringify(back)}`);
+      return "Charger worn with focus kept; Auto back";
+    });
   });
 
   await check("M5.1: Skins: the Auto card comes first and is worn by default; 'Wear it' on the pawn, then on Auto, each moves Worn, the saved setting and keyboard focus to that card", async () => {
     await load("#/free/skins", { fresh: true });
     await b.waitFor(`document.querySelector('.skin-card')`, 30_000, "the gallery");
-    const kept = await b.evaluate(`localStorage.getItem(${JSON.stringify(SETTINGS)})`);
-    await setStorage(SETTINGS, { ...JSON.parse(kept ?? "{}"), piece: "auto" });
-    await load("#/free/skins");
-    await b.waitFor(`document.querySelector('.skin-card[data-piece="pawn"]')`, 30_000, "the gallery again");
-    try {
+    return await keepingSettings(async (kept) => {
+      await setStorage(SETTINGS, { ...JSON.parse(kept ?? "{}"), piece: "auto" });
+      await load("#/free/skins");
+      await b.waitFor(`document.querySelector('.skin-card[data-piece="pawn"]')`, 30_000, "the gallery again");
       const order = await b.evaluate(`[...document.querySelectorAll('.skin-card')].map((c) => c.dataset.piece).join()`);
       expect(order.startsWith("auto,pawn"), `the cards in order: ${order}`);
       const wornCards = () => b.evaluate(`[...document.querySelectorAll('.skin-card.worn')].map((c) => c.dataset.piece).join()`);
@@ -495,10 +495,8 @@ export default async function freeChecks({ browser: b, base, root, check }) {
         expect(now.status.endsWith("Worn") && !now.button && now.focused, `the ${name} card after: ${JSON.stringify(now)}`);
         expect((await wornCards()) === name && (await piece()) === name, `worn ${await wornCards()}, saved ${await piece()}, after wearing ${name}`);
       }
-    } finally {
-      await b.evaluate(kept === null ? `localStorage.removeItem(${JSON.stringify(SETTINGS)}); true` : `localStorage.setItem(${JSON.stringify(SETTINGS)}, ${JSON.stringify(kept)}); true`);
-    }
-    return "Auto first and worn; pawn worn with focus; Auto worn again with focus";
+      return "Auto first and worn; pawn worn with focus; Auto worn again with focus";
+    });
   });
 
   // -- Shared with me lives in Free Play -----------------------------------------------------------------------------
