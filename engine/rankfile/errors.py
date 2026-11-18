@@ -18,7 +18,7 @@ import re
 import traceback
 from dataclasses import dataclass
 
-from .exceptions import IT_KNOWS, GameError, Lost
+from .exceptions import IT_KNOWS, GameArgumentError, GameError, Lost
 from .pieces import Pawn, Piece
 from .tracer import PLAYER_FILENAME, StepBudgetExceeded
 from .words import count
@@ -49,7 +49,10 @@ def explain(exc: BaseException, namespace: dict | None = None) -> ErrorInfo:
 
 def friendly_message(exc: BaseException, namespace: dict, line: int | None = None) -> str:
     if isinstance(exc, (GameError, Lost)):
-        return str(exc)  # the game's own messages are written for the player already
+        text = str(exc)  # the game's own messages are written for the player already
+        if isinstance(exc, GameArgumentError) and text.endswith(", not None.") and (note := _none_from_own_function(line)):
+            text += f" {note}"  # an ability's number that is None: a function of the player's may have handed it back
+        return text
     if isinstance(exc, StepBudgetExceeded):
         return (
             f"Your program never finished. It ran more than {exc.budget:,} lines, "
@@ -105,8 +108,8 @@ def _explain_syntax(exc: SyntaxError) -> str:
         )
     if msg == "'return' outside function":
         return (
-            "`return` only works inside a function, under a `def`. "
-            "Indent it so it sits under the `def` it belongs to."
+            "`return` only works inside a function, in the indented lines under a `def`. "
+            "Out here it has nowhere to hand a value back to."
         )
     if match := re.search(r"'(.)' was never closed", msg):
         opening = match.group(1)
@@ -198,6 +201,16 @@ def _functions(tree: ast.Module) -> list[ast.FunctionDef | ast.AsyncFunctionDef]
     return sorted(found, key=lambda fn: fn.lineno)
 
 
+def _innermost_locals(exc: BaseException) -> list[str]:
+    """The names the innermost player frame holds (a function's parameters and locals), for "did you mean"."""
+    names, tb = [], exc.__traceback__
+    while tb is not None:
+        if tb.tb_frame.f_code.co_filename == PLAYER_FILENAME:
+            names = [key for key in tb.tb_frame.f_locals if not key.startswith("__")]
+        tb = tb.tb_next
+    return names
+
+
 def _raising_function(exc: BaseException) -> str | None:
     """The name of the player's function the error was raised in (innermost), or None."""
     name, tb = None, exc.__traceback__
@@ -229,8 +242,16 @@ def _explain_unbound(exc: UnboundLocalError, namespace: dict) -> str:
     )
 
 
-def _explain_function_name(name: str) -> str:
-    """A NameError for a name the program does set, just not where Python can see it: "" when it isn't one."""
+def _shared_names(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+    """The names a function declares `global` or `nonlocal`: they are not its own."""
+    return {
+        name for node in _own_nodes(fn.body) if isinstance(node, (ast.Global, ast.Nonlocal)) for name in node.names
+    }
+
+
+def _explain_function_name(name: str, exc: BaseException, has_suggestion: bool) -> str:
+    """A NameError for a name the program does set, just not where Python can see it: "" when it isn't one.
+    A close match (`has_suggestion`) comes before a name that lives inside another function."""
     tree = _player_tree()
     if tree is None:
         return ""
@@ -239,14 +260,30 @@ def _explain_function_name(name: str) -> str:
             f"Python reads the program from the top, and `{name}` isn't defined until its `def` has run. "
             f"Move the function above the line that calls it, so the `def` comes before the first call."
         )
-    if name in _bound_names(tree.body):
+    if has_suggestion or name in _bound_names(tree.body):
         return ""
+    here = _raising_function(exc)
     for fn in _functions(tree):
-        if name in _bound_names(fn.body, _param_names(fn)):
+        if name in _shared_names(fn):
+            continue
+        assigned = name in _bound_names(fn.body)
+        if not (assigned or name in _param_names(fn)):
+            continue
+        if here and here != "<module>":
+            what = f"`{name}` lives inside `{fn.name}()`" if assigned else f"`{name}` is what `{fn.name}()` calls the value handed in to it"
+            return (
+                f"{what}, so `{here}()` can't see it. There is no `{name}` inside `{here}()`: "
+                f"give it a value there, or hand one in through the parentheses of `{here}()`."
+            )
+        if assigned:
             return (
                 f"`{name}` lives inside `{fn.name}()`, and it is gone when the function ends. "
                 f"`return` is how a value gets out: end `{fn.name}()` with `return {name}`, and keep what it hands back."
             )
+        return (
+            f"`{name}` is what `{fn.name}()` calls the value handed in to it. Out here there is no `{name}`: "
+            f"give it a value on a line above this one (for example `{name} = 3`), or hand one in through the parentheses of `{fn.name}()`."
+        )
     return ""
 
 
@@ -256,16 +293,19 @@ def _none_from_own_function(line: int | None) -> str:
     if tree is None or line is None:
         return ""
     defs = {fn.name: fn for fn in _functions(tree)}
+    unused = {id(node.value) for node in ast.walk(tree) if isinstance(node, ast.Expr)}  # a whole-statement call: nobody uses its answer
     for node in ast.walk(tree):
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.lineno == line):
             continue
         fn = defs.get(node.func.id)
-        if fn is None:
+        if fn is None or id(node) in unused:
             continue
         inside = list(_own_nodes(fn.body))
         if any(isinstance(n, ast.Return) and not _is_none(n.value) for n in inside):
             continue
-        note = f"`{fn.name}()` handed back nothing (None) because it has no `return`."
+        has_bare = any(isinstance(n, ast.Return) for n in inside)
+        reason = "no `return` with a value" if has_bare else "no `return`"
+        note = f"`{fn.name}()` handed back nothing (None) because it has {reason}."
         if any(isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "print" for n in inside):
             note += " `print` shows a value on the screen, but only `return` hands it back."
         return note
@@ -276,8 +316,10 @@ def _is_none(node: ast.expr | None) -> bool:
     return node is None or (isinstance(node, ast.Constant) and node.value is None)
 
 
-def _explain_keyword(qualified: str, keyword: str, namespace: dict) -> str:
+def _explain_keyword(qualified: str, keyword: str, did_you_mean: str, namespace: dict, line: int | None) -> str:
     name = qualified.rsplit(".", 1)[-1]
+    if name == "sort" and _sorted_called_with(keyword, line):  # Python's message names the list method inside `sorted`
+        name = "sorted"
     head = f"`{name}()` has nothing called `{keyword}` to fill inside its parentheses."
     code = getattr(namespace.get(name), "__code__", None)
     if "." not in qualified and code is not None and code.co_filename == PLAYER_FILENAME:
@@ -285,7 +327,24 @@ def _explain_keyword(qualified: str, keyword: str, namespace: dict) -> str:
         if not params:
             return f"{head} It doesn't take anything inside its parentheses."
         return f"{head} The names it takes are: {', '.join(params)}."
-    return f"{head} Give its values in order, without names."
+    if qualified.split(".")[0] in {cls.__name__ for cls in Piece.__subclasses__()}:
+        return f"{head} Give its values in order, without names."
+    return f"{head} {did_you_mean.replace(chr(39), '`')}".rstrip()
+
+
+def _sorted_called_with(keyword: str, line: int | None) -> bool:
+    """Whether the error's line calls `sorted(...)` with this keyword."""
+    tree = _player_tree()
+    if tree is None or line is None:
+        return False
+    return any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "sorted"
+        and node.func.lineno == line
+        and any(kw.arg == keyword for kw in node.keywords)
+        for node in ast.walk(tree)
+    )
 
 
 # -- names and attributes: usually typos ---------------------------------------
@@ -319,10 +378,11 @@ def _explain_name(exc: NameError, namespace: dict) -> str:
                 )
             if name in type(value).CANT:  # another piece's ability, asked of this one: its kind answer (M5.1)
                 return type(value).CANT[name]
-    if own := _explain_function_name(name):
+    candidates = [*_innermost_locals(exc), *(key for key in namespace if not key.startswith("__")), *COMMON_BUILTINS]
+    suggestion = closest(name, candidates)
+    if own := _explain_function_name(name, exc, suggestion is not None):
         return own
-    candidates = [key for key in namespace if not key.startswith("__")] + COMMON_BUILTINS
-    if suggestion := closest(name, candidates):
+    if suggestion:
         return f"Python doesn't know the name `{name}`. Did you mean `{suggestion}`?"
     return (
         f"Python doesn't know the name `{name}`. A name has to be created (for example `{name} = 3`) "
@@ -404,7 +464,7 @@ def _kind(type_name: str) -> str:
 def _explain_type(exc: TypeError, namespace: dict, line: int | None) -> str:
     text = _explain_type_message(exc, namespace, line)
     if "NoneType" in str(exc) and (note := _none_from_own_function(line)) and note not in text:
-        text += f" {note}"
+        text += f"{'' if text.endswith(('.', '?', '!')) else '.'} {note}"
     return text
 
 
@@ -432,8 +492,8 @@ def _explain_type_message(exc: TypeError, namespace: dict, line: int | None) -> 
                 f"like `knight.{name}(1, 2)`."
             )
         return f"`{name}()` needs more inside its parentheses: a value for {match.group(2).replace(chr(39), '`')}."
-    if match := re.match(r"([\w.]+)\(\) got an unexpected keyword argument '(\w+)'", msg):
-        return _explain_keyword(match.group(1), match.group(2), namespace)
+    if match := re.match(r"([\w.]+)\(\) got an unexpected keyword argument '(\w+)'(?:\. (Did you mean .+))?", msg):
+        return _explain_keyword(match.group(1), match.group(2), match.group(3) or "", namespace, line)
     if match := re.match(r"'(\w+)' object is not callable", msg):
         return (
             f"You used parentheses to call something that isn't a function: it's {_kind(match.group(1))}. "
