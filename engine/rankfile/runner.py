@@ -25,7 +25,7 @@ from dataclasses import asdict, dataclass, field, replace
 from . import codex
 from .board import Tile, square_name
 from .constraints import check_constraints, code_lines, lint
-from .errors import ErrorInfo, explain
+from .errors import ErrorInfo, _kind, closest, explain
 from .levels import NOT_JUDGED, Case, Level, names, sandbox_level
 from .pieces import PIECES
 from .tracer import PLAYER_FILENAME, StepBudgetExceeded, Tracer, safe_repr
@@ -207,16 +207,16 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
     if not judge or (level.nothing_to_do and call is None):
         return outcome("finished", "Finished.", **recording)
     unmet = unmet_objectives(level, world, run.output)
-    facts = None
     if call is not None:  # the function, then the answer, then the board
-        facts = CallFacts(level, call[0], recording["call"].text, [n for n in namespace if not n.startswith("__")], call[1],
-                          run.returned, level.call.returns, run.call_output, unmet)
-        failure = _call_failure(run, facts)
-        if failure is not None:
-            return outcome("incomplete", examiner_words(failure, facts), **recording)
+        facts = CallFacts(
+            call[0], recording["call"].text, namespace.get(call[0]), _own_functions(namespace), call[1], run.returned,
+            level.call.returns, run.call_output, unmet,
+        )  # fmt: skip
+        kind = _call_failure(run, facts) or _call_ending(facts)
+        return outcome("solved" if kind in PASSED else "incomplete", examiner_words(kind, facts), **recording)
     if unmet:
         return outcome("incomplete", "Your program finished, but " + " Also, ".join(unmet), **recording)
-    return outcome("solved", examiner_words("passed", facts) if facts else _solved_summary(level), **recording)
+    return outcome("solved", _solved_summary(level), **recording)
 
 
 def _call_info(level: Level, run: Execution) -> CallInfo:
@@ -232,23 +232,45 @@ def _call_info(level: Level, run: Execution) -> CallInfo:
 
 def _call_failure(run: Execution, facts: CallFacts) -> str | None:
     """What is wrong with the call, in the examiner's order: the function itself, then the answer. (An error or a
-    lost run was judged before this, and the board is judged after.) None when the call is fine."""
+    lost run was judged before this, and the board is judged after.) The kind of the examiner's words, or None when
+    the call is fine."""
     if run.problem is not None:
-        return run.problem
-    wanted = facts.wanted
-    if wanted is not NOT_JUDGED and not (type(run.returned) is type(wanted) and run.returned == wanted):
-        return "wrong_answer"  # the same kind of thing and equal: 7 is not "7", True is not 1, 1.0 is not 1
-    return None
+        return run.problem  # "missing", "not_function" or "arguments"
+    wanted, got = facts.wanted, facts.returned
+    if wanted is NOT_JUDGED or (type(got) is type(wanted) and got == wanted):
+        return None  # the same kind of thing and equal: 7 is not "7", True is not 1, 1.0 is not 1
+    if got is None:
+        return "printed" if facts.printed else "nothing"
+    if wanted is None:
+        return "unexpected"
+    return "wrong_value" if type(got) is type(wanted) else "wrong_kind"
+
+
+PASSED = ("passed", "passed_answered")
+
+
+def _call_ending(facts: CallFacts) -> str:
+    """The call was fine, so the board decides: the kind of the words for its goals met or not, and whether an
+    answer was judged on the way."""
+    judged = facts.wanted is not NOT_JUDGED
+    if facts.unmet:
+        return "board_answered" if judged else "board"
+    return "passed_answered" if judged else "passed"
+
+
+def _own_functions(namespace: dict) -> list[str]:
+    """The names of the functions the player wrote (not the engine's)."""
+    return [name for name, value in namespace.items() if inspect.isfunction(value) and value.__code__.co_filename == PLAYER_FILENAME]
 
 
 @dataclass
 class CallFacts:
-    """Everything the examiner's words may need about one call (M5.2-4b-2 writes them from these)."""
+    """Everything the examiner's words may need about one call."""
 
-    level: Level
     function: str  # the function's name
     text: str  # the call as code writes it, "gallop(1, 3)"
-    names: list[str]  # the names in the player's namespace (the program's and the engine's), without the dunder ones
+    found: object  # what the program calls that name (None when nothing)
+    own: list[str]  # the names of the functions the player wrote
     args: list  # the arguments the call was made with
     returned: object  # what came back (None when nothing did)
     wanted: object  # the answer wanted (NOT_JUDGED when none is)
@@ -256,18 +278,101 @@ class CallFacts:
     unmet: list[str]  # the board's goals still unmet, in words
 
 
+# The examiner's line for each kind of words, in quotes after what happened. (Reachable apart from the rest.)
+_LINES = {
+    "passed": "Correct. I had rather hoped to be disappointed.",
+    "missing": "I called. Nobody answered to that name.",
+    "not_function": "I can call a function. I cannot call that.",
+    "arguments": "I hand over what the task says: no more, no fewer.",
+    "printed": "You showed me the answer. I asked you to hand it to me.",
+    "nothing": "I held out my hand, and nothing was put in it.",
+    "wrong_value": "An answer, certainly. Not the answer.",
+    "wrong_kind": "The right idea in the wrong kind of thing is still the wrong thing.",
+    "board": "The call ended. The task had not.",
+    "board_answered": "The answer is not the whole of the task.",
+}
+_LINES["passed_answered"] = _LINES["passed"]
+_LINES["unexpected"] = _LINES["wrong_value"]
+
+
+def examiner_line(kind: str) -> str:
+    """What the examiner says for `kind` of words (without the quotes)."""
+    return _LINES[kind]
+
+
 def examiner_words(kind: str, facts: CallFacts) -> str:
-    """The examiner's one plain sentence for `kind` of call: "missing", "not_function", "arguments", "wrong_answer"
-    or "passed". The only place these words are written; M5.2-4b-2 replaces them. (Never the answer wanted.)"""
+    """A case's whole summary: what happened, then the examiner's line in curly quotes. `kind` is "passed",
+    "passed_answered", "missing", "not_function", "arguments", "printed", "nothing", "wrong_value", "wrong_kind",
+    "unexpected", "board" or "board_answered"."""
+    return f"{what_happened(kind, facts)} “{examiner_line(kind)}”"
+
+
+def what_happened(kind: str, facts: CallFacts) -> str:
+    """The first part of the words: what the examiner did and found, in plain sentences. The answer wanted shows
+    only where the examiner has judged one and the function was called."""
+    called, name = f"The examiner called `{facts.text}`", facts.function
+    if kind == "passed":
+        return f"{called}, and the board is as it should be."
+    if kind == "passed_answered":
+        return f"{called}: it wanted {facts.wanted!r} and got {safe_repr(facts.returned)}."
     if kind == "missing":
-        return f"The examiner looked for a function called {facts.function}, and your program doesn't define one."
+        near = closest(name, facts.own)
+        tail = f"It has `{near}`: the examiner needs the name letter for letter." if near else f"Define it with `def {name}(...):`."
+        return f"{called}, and your program has no function called `{name}`. {tail}"
     if kind == "not_function":
-        return f"{facts.function} is there, but it isn't a function, so the examiner can't call it."
+        return f"{called}, but `{name}` in your program is {_what_it_is(facts.found)}, not a function. Keep that name for the `def`."
     if kind == "arguments":
-        return f"The examiner needs to call {facts.text}, but {facts.function} can't take those arguments."
-    if kind == "wrong_answer":
-        return f"The examiner called {facts.text}, and it handed back {safe_repr(facts.returned)}, which is not the answer wanted."
-    return _solved_summary(facts.level)
+        return f"{called}{_with_values(len(facts.args))}, and {_what_it_takes(facts.found, len(facts.args))}"
+    if kind == "board":
+        return f"{called}, and when the call ended " + " Also, ".join(facts.unmet)
+    if kind == "board_answered":
+        return f"{called} and got the {facts.wanted!r} it wanted, but when the call ended " + " Also, ".join(facts.unmet)
+    wanted = "nothing back (None)" if facts.wanted is None else repr(facts.wanted)
+    if kind in ("printed", "nothing"):
+        got = f"{called} and got nothing back (None); it wanted {wanted}."
+        if kind == "printed":
+            return f"{got} Your function printed, but the examiner doesn't read the screen: `print` shows a value, `return` hands it back."
+        return f"{got} A function hands a value back only with `return`: check that every way through `{name}` reaches one."
+    got = f"{called}: it wanted {wanted} and got {safe_repr(facts.returned)}"
+    if kind == "wrong_kind":
+        return f"{got}, which is {_kind(type(facts.returned).__name__)}, not {_kind(type(facts.wanted).__name__)}."
+    return got + "."
+
+
+def _what_it_is(value: object) -> str:
+    """A value that was meant to be a function, as the examiner says it: "3, a whole number (an int)"; "a class"."""
+    if isinstance(value, type):
+        return "a class"
+    shown, kind = safe_repr(value), _kind(type(value).__name__)
+    return shown if shown == kind else f"{shown}, {kind}"
+
+
+def _with_values(n: int) -> str:
+    return " with no values" if n == 0 else f" with {count(n, 'value')}"
+
+
+def _what_it_takes(function: object, given: int) -> str:
+    """"your `gallop` takes 1." and what to do about it, for a function that can't take `given` values."""
+    parameters = inspect.signature(function).parameters.values()
+    positional = [p for p in parameters if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
+    least = sum(p.default is p.empty for p in positional)
+    most = None if any(p.kind is p.VAR_POSITIONAL for p in parameters) else len(positional)
+    mine = f"your `{function.__name__}`"
+    if given >= least and (most is None or given <= most):  # the count fits: only a name that can't be given by position is left
+        by_name = [f"`{p.name}`" for p in parameters if p.kind is p.KEYWORD_ONLY and p.default is p.empty]
+        return (
+            f"{mine} also needs {and_list(by_name)}, which can only be given by name. "
+            "Take it before the `*` in its `def` line, or give it a default value."
+        )
+    if most is None:
+        takes = f"{least} or more"
+    elif most == 0:
+        takes = "none"
+    elif least == most:
+        takes = str(most)
+    else:
+        takes = f"{least} or {most}" if most == least + 1 else f"from {least} to {most}"
+    return f"{mine} takes {takes}. Each value needs a name inside the parentheses of its `def` line."
 
 
 def run_sandbox(
