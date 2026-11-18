@@ -11,6 +11,7 @@ import ast
 import re
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, replace
+from enum import Enum
 
 from .board import Board, Direction, Pos, Tile, Timer, sign, square_name
 from .constraints import NODE_NAMES, describe_rules
@@ -117,12 +118,57 @@ LIMITS = {"title": 60, "brief": 600, "trains": 200, "hint": 600, "hints": 5, "te
 
 
 @dataclass
+class FunctionRule:
+    """What a level asks of one function the player defines (M5.2; the file's `constraints.functions`, read by
+    M5.2-3). Every key is optional: None (or False) asks nothing."""
+
+    params: int | None = None  # how many parameters it takes
+    defaults: int | None = None  # how many of them have a default value
+    calls: int | None = None  # how many times the program calls it, at least
+    returns: bool = False  # it hands back a value with `return`
+
+
+@dataclass
 class Constraints:
     max_lines: int | None = None  # lines of code, not counting blanks and comments
     min_comments: int = 0
     require_nodes: list[str] = field(default_factory=list)  # ast node names, e.g. "For"
     ban_nodes: list[str] = field(default_factory=list)
     max_numbers: int | None = None  # numbers written in the code, at most (M3.2, QA-029); 1 means one number, written once
+    functions: dict[str, FunctionRule] = field(default_factory=dict)  # by the function's name (M5.2-3 reads and checks it)
+    define: int = 0  # at least this many functions of the player's own naming, each called (M5.2-3)
+
+
+class _Unset(Enum):
+    NOT_JUDGED = "not judged"
+
+
+# `ExamineCall.returns` when the file leaves `returns` out: only the board is judged. (A file's `returns: null`
+# is None, an answer like any other: the function must hand back None.) An Enum member, so copies keep it.
+NOT_JUDGED = _Unset.NOT_JUDGED
+
+
+@dataclass
+class ExamineCall:
+    """One call the examiner makes (M5.2; the file's `examine.calls`, read by M5.2-4a, made by M5.2-4b).
+    `args` are plain values, given in order: fewer than the function's parameters is how a default is exercised."""
+
+    args: list = field(default_factory=list)
+    board: int = 1  # the board it's made on: 1 is the level's map, n is variants[n - 2]
+    returns: object = NOT_JUDGED  # the answer wanted, a plain value; never in describe()
+
+    def text(self, function: str) -> str:
+        """The call as code writes it, e.g. "gallop(1, 3)": a case's label, and the result's `call.text`."""
+        return f"{function}({', '.join(repr(arg) for arg in self.args)})"
+
+
+@dataclass
+class Examine:
+    """A level's examiner (M5.2, the file's `examine`): the program only defines, and the examiner calls
+    `function` once per call, each on a fresh board (M5.2-4a reads it, M5.2-4b runs it)."""
+
+    function: str
+    calls: list[ExamineCall] = field(default_factory=list)
 
 
 @dataclass
@@ -221,6 +267,7 @@ class Level:
     challenge_set: str = ""  # the Free Play set a challenge belongs to (M4.4; the file's `set`); "" for any other level
     difficulty: int | None = None  # 1 to 5, set by the author (M4.4); required in a challenge, optional elsewhere
     draws_on: list[int] = field(default_factory=list)  # the chapters a challenge mixes, for its "Draws on" chips (M4.4)
+    examine: Examine | None = None  # the examiner (M5.2): parsed by M5.2-4a; until then always None
 
     def cases(self) -> list[Case]:
         """Every situation a solution must handle: one per square a hidden goal
@@ -383,7 +430,7 @@ class Level:
             # What the Challenge panel shows, in words: the engine owns every
             # player-facing description of its rules.
             "goals": self.goals(),
-            "rules": describe_rules(self.constraints),
+            "rules": describe_rules(self.constraints, self.examine),
             "obstacles": self.obstacles(),
             "stars": self.star_goals(),
             # Tiered hints (nudge, concept reminder, partial example); the UI
@@ -396,6 +443,9 @@ class Level:
             "draws_on": self.draws_on,
             # With other maps (M3.2): every board, first to last, shown beside the one on show (QA-032).
             "boards": [case.level.describe() for case in self.cases()] if self.variants else [],
+            # The examiner (M5.2-4a fills it in): {function, calls: [{text, board}]}, or None. The calls it will
+            # make, before the run (decision 3); never the answers it wants.
+            "examine": None,
         }
 
 
@@ -565,6 +615,7 @@ class Case:
     label: str  # "b3" (where a hidden goal is), or "board 1", "board 2", ...
     where: str  # for sentences: "with the goal on b3", "on board 2"
     level: Level  # the level as it is in this case
+    call: ExamineCall | None = None  # on an examiner level, the call this case makes (M5.2-4a sets it; label: its text)
 
 
 def sandbox_level(api: list[str], piece: str = "pawn", lesson_board: dict | None = None) -> Level:

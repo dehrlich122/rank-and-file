@@ -12,6 +12,9 @@ function step(line: number, pos: [number, number] | null, output = ""): Step {
     events: pos ? [{ kind: "move", state: at(pos) }] : [],
     output,
     vars: [],
+    globals: [],
+    depth: 0,
+    continues: false,
   };
 }
 

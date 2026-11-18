@@ -70,6 +70,8 @@ export interface LevelInfo {
     require_nodes: string[];
     ban_nodes: string[];
     max_numbers: number | null; // numbers the code may write (M3.2, QA-029); 1 means one number, written once
+    functions: Record<string, FunctionRule>; // by the function's name (M5.2-3)
+    define: number; // at least this many functions of the player's own naming, each called (M5.2-3)
   };
   par: { lines: number | null };
   starter: string;
@@ -83,6 +85,17 @@ export interface LevelInfo {
   difficulty: number | null; // 1 to 5 (pass, try, raise, assert, while True:), set by the author (M4.4)
   draws_on: number[]; // the chapters a challenge mixes, for its "Draws on" chips (M4.4)
   boards: LevelInfo[]; // a level with other maps (M3.2): every board, first to last, the others shown small beside it (QA-032); otherwise empty
+  // The examiner (M5.2-4a): the function it calls and the calls it will make, each on its board (1 is the map,
+  // 2 the first of the other boards...); never the answers it wants. null on any other level
+  examine: { function: string; calls: Array<{ text: string; board: number }> } | null;
+}
+
+/** What a level asks of one function the player defines (levels.FunctionRule, M5.2-3): null or false asks nothing. */
+interface FunctionRule {
+  params: number | null; // how many parameters it takes
+  defaults: number | null; // how many of them have a default value
+  calls: number | null; // how many times the program calls it, at least
+  returns: boolean; // it hands back a value with `return`
 }
 
 /** A patrol or a chaser (levels.Enemy), as the board draws it. */
@@ -158,6 +171,11 @@ export interface Step {
   events: GameEvent[];
   output: string;
   vars: Var[]; // the variables after the line ran
+  // M5.2-1: inside a function, the program's own names too (empty at module level), and how deep the call is (0 at
+  // module level); `continues`: the rest of a calling line after a function returned to it (not another line run)
+  globals: Var[];
+  depth: number;
+  continues: boolean;
 }
 
 interface LintWarning {
@@ -197,6 +215,15 @@ export interface LevelResult {
   case: number;
   case_note: string;
   duration_ms: number;
+  call: CallInfo | null; // on an examiner level, the call this case made (M5.2-4b); null on any other
+}
+
+/** The examiner's call on one case (runner.CallInfo, M5.2-4b): the facts. The examiner's words are the case's `summary`. */
+interface CallInfo {
+  text: string; // the call as code writes it: "gallop(1, 3)"
+  returned: string | null; // a safe repr of what came back; null when the call didn't finish
+  wanted: string | null; // a repr of the answer wanted; null when only the board is judged
+  first_step: number; // the index in `steps` of the call's first step (steps.length when it recorded none)
 }
 
 /** One case of a level (runner.run_level): its result, what to call it ("b3", "board 2") and its board. */
@@ -214,7 +241,9 @@ interface ReplResult {
 /** One entry of the Codex, the dictionary of functions the player knows (codex.Entry; docs/Codex.md). */
 export interface CodexEntry {
   name: string; // as code writes it: "pawn.move", "print"
-  kind: "ability" | "property" | "builtin" | "method"; // a property is used without parentheses (pawn.position); a method is called on text (str.upper, M3.6)
+  // a property is used without parentheses (pawn.position); a method is called on text (str.upper, M3.6); a keyword
+  // is a word of the language itself (def, return: M5.2-7)
+  kind: "ability" | "property" | "builtin" | "method" | "keyword";
   calls: string[]; // how to use it: ["pawn.move(squares=1)"]; some built-ins have more than one form
   paragraphs: string[]; // what it does; `code` is in backticks
   args: Array<{ name: string; about: string }>;
@@ -253,7 +282,8 @@ export interface Requests {
   // board: a level's lesson_board (QA-019); piece: the level's piece, which the snippets run (M5.1; left out: the pawn)
   loadSandbox: { args: { api: string[]; board?: unknown; piece?: string }; result: LevelInfo };
   runLevel: { args: { level: unknown; code: string; hintsUsed: number; solutionSeen: boolean }; result: LevelResult };
-  runSandbox: { args: { code: string; api: string[]; board?: unknown; piece?: string }; result: LevelResult };
+  // call: a snippet the examiner calls, as the lesson writes it ("gallop(1, 2)"; M5.2-5a and 5b; left out: none)
+  runSandbox: { args: { code: string; api: string[]; board?: unknown; piece?: string; call?: string }; result: LevelResult };
   codex: { args: { levelId: string; chapters: CodexChapter[] }; result: CodexEntry[] }; // chapters: all of them, in play order
   levelTags: { args: { level: unknown; chapters: CodexChapter[] }; result: LevelTags }; // M4.4: the tier the engine works out
   // level: the one on screen, for the session's stand-in piece (Scratch Python has no board)
