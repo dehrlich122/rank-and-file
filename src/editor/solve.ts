@@ -62,6 +62,8 @@ export function solveLines(progress: SolveProgress): Array<{ mark: Mark; text: s
         return { mark: "none", text: `${where}${several ? "no route found" : "No route found"}. Every move, turn, wait, capture and plank was tried.` };
       case "gave_up":
         return { mark: "gave", text: `${where}${several ? "gave up" : "Gave up"} after ${positions} positions. It might be solvable; try fewer gems or enemies.` };
+      case "examiner":
+        return { mark: "skip", text: "Can't judge: on this level the examiner calls your function, and the check only tries plain calls. Your own solution, from test-play, shows it can be solved." };
       default:
         return { mark: "skip", text: `${where}${several ? "can't judge" : "Can't judge"}: some obstacles tick with your code's lines, which depends on how it is written.` };
     }

@@ -10,7 +10,7 @@ import yaml
 from rankfile import bridge
 from rankfile.constraints import code_lines
 from rankfile.levels import parse_level
-from rankfile.search import CLOCKS, GAVE_UP, NO_ROUTE, ROUTE, RouteSearch, Search
+from rankfile.search import CLOCKS, EXAMINER, GAVE_UP, NO_ROUTE, ROUTE, RouteSearch, Search
 
 ROOT = Path(__file__).resolve().parents[2]
 LEVEL_FILES = sorted(path for path in (ROOT / "levels").glob("*/*.yaml") if path.name != "chapters.yaml")
@@ -53,6 +53,22 @@ def test_obstacles_that_tick_with_the_code_cannot_be_judged():
     level = made(enemies=[{"kind": "patrol", "route": ["b2", "b3"], "clock": "line"}])
     search = RouteSearch(level)
     assert search.run() and search.status == CLOCKS and search.positions == 0
+
+
+def test_an_examiner_level_is_declined_at_once_before_any_board_is_searched():
+    level = made(examine={"function": "gallop", "calls": [{"args": [1], "board": 1}, {"args": [2], "board": 2}]}, variants=[{"map": "G .\nP .\n"}])
+    search = RouteSearch(level)
+    assert search.run() and search.status == EXAMINER and search.positions == 0 and search.actions == []
+    clocked = made(examine={"function": "gallop", "calls": [{}]}, enemies=[{"kind": "patrol", "route": ["b2", "b3"], "clock": "line"}])
+    assert RouteSearch(clocked).status == EXAMINER  # not "clocks"
+
+
+def test_the_search_reports_an_examiner_level_as_one_result_not_one_per_call():
+    level = made(examine={"function": "gallop", "calls": [{"args": [1], "board": 1}, {"args": [2], "board": 2}]}, variants=[{"map": "G .\nP .\n"}])
+    search = Search(level)
+    result = search.step(0.05)
+    assert result["done"] and search.done and result["cases"] == 1
+    assert [r["status"] for r in result["results"]] == [EXAMINER]
 
 
 def test_a_slice_stops_after_its_time_and_carries_on_where_it_was():

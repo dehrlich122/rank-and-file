@@ -132,8 +132,8 @@ export interface EditorOptions {
   max_boards: number; // a level and its other boards
 }
 
-/** How the solvability check (M4.3) got on with one board: a route of plain calls, none, a cap reached, or clockwork it can't judge. */
-type SolveStatus = "route" | "no_route" | "gave_up" | "clocks";
+/** How the solvability check (M4.3) got on with one board: a route of plain calls, none, a cap reached, clockwork it can't judge, or an examiner level (M5.2: the examiner calls the player's function, so plain calls say nothing; declined whole). */
+type SolveStatus = "route" | "no_route" | "gave_up" | "clocks" | "examiner";
 
 /** Where the check has got to. Counts and words only: the route is never sent (engine/rankfile/search.py). */
 export interface SolveProgress {
