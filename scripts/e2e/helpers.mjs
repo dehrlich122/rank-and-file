@@ -80,6 +80,27 @@ export function hoverHelpers(browser) {
   };
 }
 
+/** The settings key, for checks that change a setting and must put it back. */
+export function settingsHelpers(browser) {
+  const key = JSON.stringify("rank-and-file:settings");
+  return {
+    /**
+     * Run `fn(kept)` and put the saved settings back afterwards, whatever it changed (a `?fresh=` load keeps them): the
+     * saved string if there was one, no key at all if there was none. `kept` is that saved string, or null. Closes the
+     * Settings dialog if `fn` left it open. Needs a loaded app page; returns what `fn` returns, and restores when it throws.
+     */
+    async keepingSettings(fn) {
+      const kept = await browser.evaluate(`localStorage.getItem(${key})`);
+      try {
+        return await fn(kept);
+      } finally {
+        const put = kept === null ? `localStorage.removeItem(${key})` : `localStorage.setItem(${key}, ${JSON.stringify(kept)})`;
+        await browser.evaluate(`document.querySelector('.settings-dialog')?.close(); ${put}; true`);
+      }
+    },
+  };
+}
+
 /** Find buttons by their label, within a CSS `scope`. */
 export function buttonHelpers(browser) {
   const find = (label, scope) =>

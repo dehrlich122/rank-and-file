@@ -2,7 +2,7 @@
 // Solutions are read from solutions/ and typed into the editor; this file never
 // contains solution code, and nothing here prints it.
 import { sleep } from "./cdp.mjs";
-import { BUTTONS, hoverHelpers, levelHelpers } from "./helpers.mjs";
+import { BUTTONS, hoverHelpers, levelHelpers, settingsHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const LEVELS = ["ch01-l01", "ch01-l02", "ch01-l03", "ch01-l04", "ch01-l05"];
@@ -10,6 +10,7 @@ const LEVELS = ["ch01-l01", "ch01-l02", "ch01-l03", "ch01-l04", "ch01-l05"];
 export default async function appChecks({ browser: b, base, root, check }) {
   const { solution, withoutExpectLine, openLevel, setCode, editorText, clickButton, hasButton, challengeTab } = levelHelpers(b, base, root);
   const { wordAt, hover, hoverAway } = hoverHelpers(b);
+  const { keepingSettings } = settingsHelpers(b);
 
   const button = (index) => `document.querySelectorAll('${BUTTONS}')[${index}]`;
 
@@ -1280,8 +1281,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   await check("M5.1: with no saved settings the knight levels wear the knight and a Pawn-tier level the pawn", async () => {
     await openLevel("ch01-l01", { fresh: true }); // a page to hold the settings: the first one is blank
-    const saved = await b.evaluate(`localStorage.getItem('rank-and-file:settings')`);
-    try {
+    return await keepingSettings(async () => {
       await b.evaluate(`localStorage.removeItem('rank-and-file:settings')`);
       await openLevel("practice-11", { fresh: true });
       const knight = await heroLit(boardEl);
@@ -1290,13 +1290,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
       expect(knight.heroes === 1 && knight.lit > 0, `practice-11: ${JSON.stringify(knight)}`);
       expect(pawn.heroes === 1 && pawn.lit === 0, `ch01-l01: ${JSON.stringify(pawn)}`);
       return `lit details: knight ${knight.lit}, pawn ${pawn.lit}`;
-    } finally {
-      await b.evaluate(
-        saved === null
-          ? `localStorage.removeItem('rank-and-file:settings')`
-          : `localStorage.setItem('rank-and-file:settings', ${JSON.stringify(saved)})`,
-      );
-    }
+    });
   });
 
   await check("M5.1: at the start the landing rings are knight's moves on the board, and the board's label names the same squares", async () => {
@@ -1500,10 +1494,8 @@ export default async function appChecks({ browser: b, base, root, check }) {
    */
   async function recordRun({ level, program, speed = 0.5, motion = "full", press = null, settleMs = 3500 }) {
     if ((await b.evaluate(`location.protocol`)) === "about:") await openLevel(level, { fresh: true }); // a page to hold the settings
-    const saved = await b.evaluate(`localStorage.getItem(${JSON.stringify(SETTINGS_KEY)})`);
-    const store = (text) => b.evaluate(text === null ? `localStorage.removeItem(${JSON.stringify(SETTINGS_KEY)})` : `localStorage.setItem(${JSON.stringify(SETTINGS_KEY)}, ${JSON.stringify(text)})`);
-    try {
-      await store(JSON.stringify({ ...JSON.parse(saved ?? "{}"), speed, motion }));
+    return await keepingSettings(async (saved) => {
+      await b.evaluate(`localStorage.setItem(${JSON.stringify(SETTINGS_KEY)}, ${JSON.stringify(JSON.stringify({ ...JSON.parse(saved ?? "{}"), speed, motion }))})`);
       await openLevel(level, { fresh: true });
       const before = await knightView();
       await setCode(program(before));
@@ -1513,9 +1505,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
       const rec = await b.evaluate(`(() => { window.__jumpRec.stop = true; return window.__jumpRec; })()`);
       expect(!result.errorLine && result.head !== "Python stopped", `the program stopped: ${result.head}`);
       return { before, after: await knightView(), pressedAt: rec.pressedAt, pressedDisabled: rec.pressedDisabled, samples: onBoard(rec.samples, before.height) };
-    } finally {
-      await store(saved);
-    }
+    });
   }
 
   /** A jump from `fromName` to `toName` as an L: the corner, the facing of the long leg and of the short leg. */
