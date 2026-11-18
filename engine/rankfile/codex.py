@@ -36,6 +36,7 @@ import inspect
 import io
 import re
 import textwrap
+import types
 from dataclasses import asdict, dataclass, field
 
 from .errors import LEVEL_PIECE, piece_class
@@ -53,7 +54,7 @@ SNIPPET = re.compile(r"^```python run(?: (error|lost|timeout))?\n(.*?)^```", re.
 class Entry:
     name: str  # as code writes it: "pawn.move", "print"
     # "ability", "property" (used without parentheses), "builtin", "method" (of text, M3.6), or "keyword" (`def`,
-    # `return`, `for`...: a word of the language itself, M5.2; its entries come with M5.2-7)
+    # `return`, `for`...: a word of the language itself, M5.2)
     kind: str
     calls: list[str]  # how to use it: ["pawn.move(squares=1)"]; some built-ins have more than one form
     paragraphs: list[str]  # what it does
@@ -297,6 +298,90 @@ METHODS: dict[str, tuple[list[str], str]] = {
 # Everything the lessons can teach about Python itself, built-ins first.
 PYTHON = {**BUILTINS, **METHODS}
 
+# The words of the language itself (M5.2), in the order the curriculum brings them in. Each is brought in by the
+# first lesson whose snippets use the syntax named in KEYWORD_NODES. `elif` and `else` are part of `if`'s entry.
+KEYWORDS: dict[str, tuple[list[str], str]] = {
+    "for": (
+        ["for name in things:"],
+        """Run the indented lines once for each item, with `name` holding that item. `range(3)` hands out 0, 1 and 2.
+
+        Example:
+            for i in range(3):
+                print(i)
+        """,
+    ),
+    "if": (
+        ["if condition: … elif other: … else:"],
+        """Run the indented lines only if the condition is true. `elif` tries another condition when the ones above it were false; `else` runs when none were true. Both are optional.
+
+        Example:
+            if steps > 3:
+                print("far")
+            elif steps == 3:
+                print("just right")
+            else:
+                print("near")
+        """,
+    ),
+    "while": (
+        ["while condition:"],
+        """Run the indented lines again and again, for as long as the condition is true. It is checked before every lap, so something inside has to change it.
+
+        Example:
+            left = 3
+            while left > 0:
+                left = left - 1
+        """,
+    ),
+    "break": (
+        ["break"],
+        """Leave the loop you are in at once. The laps that were left don't happen.
+
+        Example:
+            while True:
+                if done:
+                    break
+        """,
+    ),
+    "continue": (
+        ["continue"],
+        """Skip the rest of this lap and go straight on to the next one.
+
+        Example:
+            for i in range(5):
+                if i == 2:
+                    continue
+                print(i)
+        """,
+    ),
+    "def": (
+        ["def name(parameter, other=default):"],
+        """Make a function of your own: a name for some lines of code. Nothing runs when Python reads the `def`; the lines run each time the name is called. The names in the parentheses are parameters: blanks that each call fills in, in order. A parameter written with `= value` has a default: leave it out of a call and it holds that value. Parameters with defaults come last. A sentence in quotes as the first line of the body (a docstring) says what the function does, and `help(name)` shows it.
+
+        Example:
+            def cheer(name, times=1):
+                for i in range(times):
+                    print(f"Go, {name}!")
+            cheer("Ada")
+            cheer("Bo", 3)
+        """,
+    ),
+    "return": (
+        ["return value"],
+        """Hand a value back to the line that called the function, and leave the function right there. A function that ends without a `return` hands back `None`. `print` shows a value on the screen; `return` gives it to the caller.
+
+        Example:
+            def double(n):
+                return n * 2
+            print(double(4) + 1)
+        """,
+    ),
+}
+
+# The syntax (`ast` node names) whose first use in a lesson's snippets brings each keyword into the Codex.
+KEYWORD_NODES = {"for": "For", "if": "If", "while": "While", "break": "Break", "continue": "Continue", "def": "FunctionDef", "return": "Return"}
+KEYWORD_ALIASES = {"elif": "if", "else": "if"}  # help("elif") answers with the `if` entry
+
 
 def parse_docstring(doc: str) -> dict:
     """Split a Google-style docstring into its paragraphs, args, returns and example."""
@@ -340,6 +425,12 @@ def ability_entry(piece: type[Piece], name: str) -> Entry:
         parameters = list(inspect.signature(member).parameters.values())[1:]  # all but self
         kind, call, doc = "ability", f"{piece.NAME}.{name}({', '.join(map(str, parameters))})", member.__doc__
     return Entry(f"{piece.NAME}.{name}", kind, [call], **parse_docstring(doc or ""))
+
+
+def keyword_entry(name: str) -> Entry:
+    """The entry for a keyword of Python (`def`, `for`...)."""
+    calls, doc = KEYWORDS[name]
+    return Entry(name, "keyword", calls, **parse_docstring(doc))
 
 
 def python_entry(name: str) -> Entry:
@@ -475,10 +566,15 @@ def entries(level_id: str, chapters: list[dict]) -> list[Entry]:
         level = parse_level(item["data"])
         for name in [f"{level.piece}.{ability}" for ability in level.api] + sorted(taught(item["lesson"])):
             introduced.setdefault(name, item["id"])
+        used = _nodes_used(item["lesson"])
+        for name, node in KEYWORD_NODES.items():
+            if node in used:
+                introduced.setdefault(name, item["id"])
     here = parse_level(counted[-1]["data"])
     piece = PIECES[here.piece]
     found = [ability_entry(piece, name) for name in piece.ABILITIES if name in here.api]
     found += [python_entry(name) for name in PYTHON if name in introduced]
+    found += [keyword_entry(name) for name in KEYWORDS if name in introduced]
     for entry in found:
         entry.introduced = introduced[entry.name]
         entry.new = entry.introduced == level_id
@@ -549,6 +645,8 @@ def describe(thing, piece: type[Piece] = Pawn) -> str:
             f"{thing!r} is a value (a {type(thing).__name__}), and help() explains what things do. "
             f'Try help(print), help({name}) for what your {name} knows, or help("{name}.position") for one of them.'
         )
+    if isinstance(thing, types.FunctionType):
+        return _function_help(thing)
     text = _python_help(thing)
     if isinstance(thing, str) and text.startswith("No Python documentation found"):
         return f"There's no help on {thing!r}. Try help(print), or help({name}) for what your {name} knows."
@@ -566,6 +664,8 @@ def _entry_for(thing, piece: type[Piece] = Pawn) -> Entry | None:
     if isinstance(thing, str):
         if thing in PYTHON:
             return python_entry(thing)
+        if (keyword := KEYWORD_ALIASES.get(thing, thing)) in KEYWORDS:
+            return keyword_entry(keyword)
         piece_name, _, ability = thing.partition(".")
         return ability_entry(piece, ability) if piece_name == piece.NAME and ability in piece.ABILITIES else None
     owner = getattr(thing, "__self__", None)
@@ -591,6 +691,17 @@ def format_entry(entry: Entry) -> str:
         lines += ["    Returns:", *_fill(entry.returns, 8), ""]
     if entry.example:
         lines += ["    Example:", *textwrap.indent(entry.example, " " * 8).splitlines()]
+    return "\n".join(lines).rstrip()
+
+
+def _function_help(function: types.FunctionType) -> str:
+    """help(f) for a function the player wrote, in the Codex's plain style: how to call it, then its docstring."""
+    lines = [f"{function.__name__}{inspect.signature(function)}", ""]
+    doc = inspect.getdoc(function)
+    if not doc:
+        return "\n".join(lines + _fill("It has no description yet: a sentence in quotes as the first line of its body would show here.", 4))
+    for paragraph in doc.split("\n\n"):
+        lines += [*_fill(" ".join(paragraph.split()), 4), ""]
     return "\n".join(lines).rstrip()
 
 
