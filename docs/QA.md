@@ -1945,6 +1945,32 @@ looked at; a wrong attempt at 1000×700; Animations full during a run.
   Enter; crumbs, tabs, brief and chips on each challenge; no "undefined" or console errors; a wrong attempt's card
   names the board and gives a cause a learner can act on; ✓, stars and the counts after solving; Lessons' pointer.
 
+## Session 19 — 2026-11-18 · M5.1 QA1, the knight as a piece (`m5-1-knight`, PR #27)
+
+The designer's play-test of the three knight practice levels. Findings are added as they come.
+
+### QA-066 · Look Before You Leap (`practice-13`): the reference writes jumps out; the designer's solve looks before every jump · Open
+
+- **Observed** *(Designer, 2026-11-18)*: the designer solved it with a loop that looks at the preferred landing
+  square before every jump and takes the other jump when that square is a pit, a wall or off the board. The
+  reference is shorter than what he wrote, but it looks only where the three boards differ and writes the other
+  jumps out as plain jumps. "I actually like my solution better because it doesn't rely on hard coding."
+- **Why it happens:** the reference comes from the generator's search for the shortest program that solves every
+  board (6 lines, the par). The boards differ only at the first landing, so the shortest program looks as little
+  as it can. Nothing on the boards asks for a look before each leap, which is what the level's name promises.
+- **Noticed while logging it:** his solve has three branches that make the same jump. Joined into one condition
+  (`or`, Chapter 4), the same idea is 5 lines: shorter than the reference, and inside par.
+- **Options, for the designer:**
+  1. *The reference only:* the level keeps its boards; the reference becomes the loop that looks before every
+     jump, and the comparison note says why (it works whatever is on the landing squares). Par stays 6.
+  2. *The boards too (recommended):* what is on the landing squares also differs later on the route, so a
+     program that looks once fails a board and the loop is what the level needs, not a matter of taste
+     (the rule from QA-023 and QA-029: the code works out what can't be known ahead). The reference and the
+     hints follow from the new boards.
+  3. Leave it: a practice level, and both ways pass.
+- **Waiting for:** the designer's pick. Fixed with QA1's other findings; level content is written blind by the
+  orchestrator (`scripts/gen_knight.py`).
+
 ---
 
 ## Queued work
