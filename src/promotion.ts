@@ -49,6 +49,6 @@ export function unlockedPieces(store: ProgressStore = progress): Piece[] {
  */
 export function wornPiece(levelPiece?: string, store: ProgressStore = progress): Piece {
   const chosen = settings.get().piece;
-  if (chosen === "auto") return levelPiece === "knight" ? "knight" : "pawn";
+  if (chosen === "auto") return levelPiece !== undefined && Object.hasOwn(SKIN_NAMES, levelPiece) ? (levelPiece as Piece) : "pawn";
   return unlockedPieces(store).includes(chosen) ? chosen : "pawn";
 }
