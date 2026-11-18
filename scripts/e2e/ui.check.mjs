@@ -2,11 +2,12 @@
 // playback controls and autocomplete. Never put editor contents into a check's
 // message (see helpers.mjs).
 import { sleep } from "./cdp.mjs";
-import { BUTTONS, levelHelpers } from "./helpers.mjs";
+import { BUTTONS, levelHelpers, settingsHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 export default async function uiChecks({ browser: b, base, root, check }) {
   const { solution, openLevel, setCode, clickButton, editorText } = levelHelpers(b, base, root);
+  const { keepingSettings } = settingsHelpers(b);
   const dialogOpen = () => b.evaluate(`document.querySelector('.settings-dialog').open`);
   const choose = (key, value) => b.evaluate(`document.querySelector('input[name="setting-${key}"][value="${value}"]').click()`);
   const closeDialog = () => b.evaluate(`document.querySelector('.settings-dialog').close()`);
@@ -981,15 +982,6 @@ export default async function uiChecks({ browser: b, base, root, check }) {
   const pieceRadio = (value) =>
     b.evaluate(`(() => { const r = document.querySelector('input[name="setting-piece"][value="${value}"]'); return { checked: r.checked, disabled: r.disabled }; })()`);
 
-  /** Run `fn` and put the saved settings back afterwards, whatever it changed (a `?fresh=` load keeps them). */
-  const keepingSettings = async (fn) => {
-    const kept = await b.evaluate(`localStorage.getItem(${JSON.stringify(SETTINGS_KEY)})`);
-    try {
-      return await fn();
-    } finally {
-      await b.evaluate(`document.querySelector('.settings-dialog')?.close(); ${kept === null ? `localStorage.removeItem(${JSON.stringify(SETTINGS_KEY)})` : `localStorage.setItem(${JSON.stringify(SETTINGS_KEY)}, ${JSON.stringify(kept)})`}; true`);
-    }
-  };
   const storedPiece = () => b.evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS_KEY)}) ?? '{}').piece ?? null`);
   /** Settings → Piece as the dialog shows it: each radio's value, own label words (without the lock note), state and note, and the hint. */
   const pieceGroup = () =>
