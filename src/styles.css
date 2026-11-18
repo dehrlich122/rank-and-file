@@ -1481,6 +1481,9 @@ pre {
 
 .s-shadow {
   fill: var(--shadow);
+  /* a jump shrinks it about its own centre while the solid lifts (src/ui/board.ts lift()); with motion reduced nothing animates it */
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 /* the glowing edge: every face stroked wide; the faces then cover all but the outline */

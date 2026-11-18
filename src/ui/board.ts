@@ -17,12 +17,22 @@ import { motionReduced, settings } from "../settings";
 import { sound } from "../sound";
 import { soundsForStep } from "../sound/events";
 import { describeBoard } from "./boardText";
-import { playableEvents } from "./motion";
+import { jumpPlan, type JumpPlan, playableEvents } from "./motion";
 import { halftone, litGrid, M, S } from "./sprites/floor";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite, type Skin, type TileName } from "./sprites";
 import { svg } from "./svg";
 
 let trails = 0; // numbers each trail's gradient
+
+const HOP_RISE = 34; // how high the knight's solid is lifted at mid-flight, in board units (the design sheet's)
+
+/** A jump being played: the legs, when it began, and the hop's animations on the art drawn now. */
+interface Flight {
+  state: WorldState; // the state it lands in: drawn when it lands (or at once, if it is cut short)
+  plan: JumpPlan;
+  start: number;
+  hop: Animation[];
+}
 
 export { squareName };
 
@@ -43,6 +53,9 @@ export class BoardView {
   private readonly counters: SVGGElement[]; // badges that count a clock's ticks: clockwork's (QA-021), timed gates' (M3.2)
   private readonly art = new Map<TileKind, Map<string, SVGGElement>>(); // tile kind -> "x,y" -> its art
   private readonly heroes = new Map<Facing, SVGElement>(); // the hero drawn facing each way, made when first needed
+  private drawn: Facing | undefined; // the facing of the art in `pawn`: mid-jump it is not the last state's
+  private flight: Flight | undefined; // the jump in the air, if any
+  private stepMs = 350; // how long a step's move takes, as animate() last set it
   private skin: Skin;
   private readonly stopSettings: () => void;
   private readonly stopHalftone: () => void;
@@ -125,12 +138,17 @@ export class BoardView {
   /** Jump straight to a state, with no animation. */
   show(state: WorldState): void {
     this.cancel();
+    this.snap(state);
+    this.setCelebrating(false);
+  }
+
+  /** Draw a state at once: the pieces don't slide to it. */
+  private snap(state: WorldState): void {
     const moving = [this.piece, ...this.enemies];
     for (const element of moving) element.style.transition = "none";
     this.place(state);
     this.element.getBoundingClientRect(); // apply now, before transitions come back
     for (const element of moving) element.style.transition = "";
-    this.setCelebrating(false);
   }
 
   /** Play a step's events one after another, spread over `totalMs`. */
@@ -139,7 +157,8 @@ export class BoardView {
     const events = playableEvents(all, this.level.piece);
     if (events.length === 0) return;
     const each = totalMs / events.length;
-    this.element.style.setProperty("--step-ms", `${Math.round(each * 0.9)}ms`);
+    this.stepMs = Math.round(each * 0.9);
+    this.element.style.setProperty("--step-ms", `${this.stepMs}ms`);
     const sounds = soundsForStep(events, this.last ?? null, settings.get().speed); // only played events sound: jumps and scrubs never come here
     events.forEach((event, i) => {
       this.timers.push(
@@ -156,6 +175,9 @@ export class BoardView {
   }
 
   private apply(event: GameEvent): void {
+    this.endFlight(false); // a jump still in the air lands before the next event
+    const plan = motionReduced() ? undefined : jumpPlan(event, this.stepMs);
+    if (plan && event.from) return this.fly(event.state, plan, event.from);
     this.place(event.state, true);
     if (event.kind === "lost" && event.by !== undefined && event.at) this.strike(event.by, event.at);
     if (event.kind === "bump" && event.at) this.bump(event.state.pos, event.at);
@@ -169,18 +191,80 @@ export class BoardView {
     }
   }
 
-  /** `animate`: a step of the replay, so a move leaves a trail and a turn plays; a jump to a state does neither. */
-  private place(state: WorldState, animate = false): void {
+  /**
+   * A jump along the L (M5.1): the long leg to the corner, the turn there, the short leg to the square it lands on, the
+   * solid lifting in one arc over the whole of it. Nothing else changes until it lands (`endFlight`).
+   */
+  private fly(state: WorldState, plan: JumpPlan, from: Pos): void {
+    const flight: Flight = { state, plan, start: performance.now(), hop: [] };
+    this.flight = flight;
+    const [long, short] = plan;
+    this.leg(long, from);
+    if (flight.hop.length === 0) this.lift(flight); // the art was already facing the long leg's way
+    const later = [
+      [() => this.leg(short, long.to), long.ms],
+      [() => this.endFlight(true), long.ms + short.ms],
+    ] as const;
+    for (const [step, after] of later) this.timers.push(window.setTimeout(() => this.flight === flight && step(), after));
+  }
+
+  /** One leg: face along it (turning, if that is a change), draw its trail and slide the piece to its end. */
+  private leg(leg: JumpPlan[number], from: Pos): void {
+    this.face(leg.facing, true);
+    this.trail(from, leg.to, "trail-hero", leg.ms);
+    this.piece.style.transition = `transform ${leg.ms}ms ${leg.easing}`;
+    this.piece.style.transform = centre(leg.to, this.level.height);
+  }
+
+  /**
+   * Lift the solid and shrink and fade the shadow on the art drawn now, in the arc's phase at this moment (a
+   * negative delay), so swapping the art at the corner carries on the same arc. The brackets are not touched.
+   */
+  private lift(flight: Flight): void {
+    for (const animation of flight.hop) animation.cancel();
+    const timing = { duration: flight.plan[0].ms + flight.plan[1].ms, delay: flight.start - performance.now() };
+    const art = this.pawn.firstElementChild;
+    flight.hop = [
+      art?.querySelector(":scope > .s")?.animate([{ transform: "translateY(0)", easing: "ease-out" }, { transform: `translateY(${-HOP_RISE}px)`, offset: 0.5, easing: "ease-in" }, { transform: "translateY(0)" }], timing),
+      art?.querySelector(":scope > .s-shadow")?.animate([{ transform: "scale(1)", opacity: 1, easing: "ease-out" }, { transform: "scale(0.7)", opacity: 0.5, offset: 0.5, easing: "ease-in" }, { transform: "scale(1)", opacity: 1 }], timing),
+    ].filter((animation) => animation !== undefined);
+  }
+
+  /**
+   * The jump is over: `landed` (it ran its course) draws its state with what it changed, in step; otherwise it was cut
+   * short (a new state, a new step, a new skin) and its state is drawn at once. Either way nothing is left lifted.
+   */
+  private endFlight(landed: boolean): void {
+    const flight = this.flight;
+    if (!flight) return;
+    this.flight = undefined;
+    for (const animation of flight.hop) animation.cancel();
+    if (!landed) return this.snap(flight.state);
+    this.piece.style.transition = "";
+    this.place(flight.state, true, true);
+  }
+
+  /** The hero turned to face `facing`: redraw it if the art on screen isn't that already, and turn if `turning`. */
+  private face(facing: Facing, turning: boolean): void {
+    if (facing === this.drawn) return;
+    this.drawn = facing;
+    this.pawn.replaceChildren(this.heroArt(facing));
+    if (turning) restartAnimation(this.pawn, "turning");
+    if (this.flight) this.lift(this.flight);
+  }
+
+  /**
+   * `animate`: a step of the replay, so a move leaves a trail and a turn plays; a jump to a state does neither.
+   * `flown`: the piece got here by a jump, whose own legs drew its trail and its turns.
+   */
+  private place(state: WorldState, animate = false, flown = false): void {
     const before = this.last;
     this.last = state;
     this.element.setAttribute("aria-label", describeBoard(this.level, state));
     this.piece.style.transform = centre(state.pos, this.level.height);
-    if (state.facing !== before?.facing) {
-      this.pawn.replaceChildren(this.heroArt(state.facing));
-      if (animate && before) restartAnimation(this.pawn, "turning");
-    }
+    this.face(state.facing, animate && before !== undefined);
     if (animate && before) {
-      if (before.pos[0] !== state.pos[0] || before.pos[1] !== state.pos[1]) this.trail(before.pos, state.pos, "trail-hero");
+      if (!flown && (before.pos[0] !== state.pos[0] || before.pos[1] !== state.pos[1])) this.trail(before.pos, state.pos, "trail-hero");
       state.enemies?.forEach((pos, i) => {
         const was = before.enemies?.[i];
         if (pos && was && (pos[0] !== was[0] || pos[1] !== was[1])) this.trail(was, pos, "trail-foe");
@@ -246,7 +330,7 @@ export class BoardView {
    * A comet tail behind a moving piece: it is drawn out from the square the piece left at the pace the
    * piece slides, so its head is always the piece, then it fades (it lasts a little longer than the step).
    */
-  private trail(from: Pos, to: Pos, className: string): void {
+  private trail(from: Pos, to: Pos, className: string, ms?: number): void {
     if (motionReduced()) return; // nothing would show, so don't build it
     const [a, b] = [from, to].map((pos) => corner(pos, this.level.height).map((n) => n + S / 2));
     const id = `trail-${++trails}`;
@@ -257,6 +341,7 @@ export class BoardView {
       svg("linearGradient", { id, gradientUnits: "userSpaceOnUse", x1, y1, x2, y2 }, svg("stop", { offset: "0%", class: "trail-tail" }), svg("stop", { offset: "100%", class: "trail-head" })),
       svg("line", { x1, y1, x2, y2, pathLength: 1, stroke: `url(#${id})` }),
     );
+    if (ms !== undefined) group.style.setProperty("--step-ms", `${ms}ms`); // a jump's leg is drawn at its own pace
     this.trails.append(group);
     this.timers.push(window.setTimeout(() => group.remove(), 1500));
   }
@@ -283,6 +368,7 @@ export class BoardView {
     this.timers.forEach((timer) => window.clearTimeout(timer));
     this.timers = [];
     this.trails.replaceChildren();
+    this.endFlight(false); // a jump in the air ends drawn where it lands
   }
 
   dispose(): void {
@@ -296,6 +382,7 @@ export class BoardView {
     if (skin === this.skin) return;
     this.skin = skin;
     this.heroes.clear();
+    this.endFlight(false); // so the art on screen faces the last state's way again
     if (this.last) this.pawn.replaceChildren(this.heroArt(this.last.facing));
   }
 
