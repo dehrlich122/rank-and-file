@@ -19,8 +19,9 @@ export type Skin = "pawn" | "knight";
 // The low-poly pawn's visor points here after pawnModel's own turn; each facing turns it there.
 const VISOR = Math.PI / 2 + Math.PI / 8 + 0.25;
 const PAWN_FACING: Record<Facing, number> = { east: 0.35, west: Math.PI - 0.35, south: Math.PI / 2, north: -Math.PI / 2 };
-// The knight's head points along -x; a facing turns it, a little toward us for east and west.
-const KNIGHT_TURN: Record<Facing, number> = { west: -0.3, east: 0.3 - Math.PI, south: -Math.PI / 2, north: Math.PI / 2 };
+// The knight's head points along -x; a facing turns it, a little toward us for east and west. North and south are a
+// three-quarter turn, not straight away or toward us, so one cheek and its eye show (both lean to the same side).
+const KNIGHT_TURN: Record<Facing, number> = { west: -0.3, east: 0.3 - Math.PI, south: -Math.PI / 2 + 0.55, north: Math.PI / 2 - 0.55 };
 
 const turn = (angle: number) => {
   const [c, s] = [Math.cos(angle), Math.sin(angle)];

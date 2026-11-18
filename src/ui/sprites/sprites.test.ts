@@ -109,6 +109,14 @@ describe("the hero", () => {
     expect(new Set(FACINGS.map(bright)).size).toBe(4);
   });
 
+  it("turns the knight three-quarters to north and south: like east and west, a cheek and its eye show", () => {
+    const lit = (node: Node | string): number => (typeof node === "string" ? 0 : (node.attrs.class === "s-lit" ? 1 : 0) + node.children.reduce<number>((n, child) => n + lit(child), 0));
+    const shown = (face: Facing) => lit(draw(hero("knight", face)));
+    // straight away from us no lit detail faces us; straight toward us the eyes show as a mirrored pair
+    expect(shown("north")).toBeGreaterThan(0);
+    expect(shown("south") % 2).toBe(1);
+  });
+
   it("draws both skins differently", () => {
     expect(text(draw(hero("pawn", "east")))).not.toBe(text(draw(hero("knight", "east"))));
   });
