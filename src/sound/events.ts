@@ -13,6 +13,8 @@ export function soundsFor(event: GameEvent, before: WorldState | null): SoundNam
     }
     case "move":
       return before && event.state.crossed.length > before.crossed.length ? ["move", "waypoint"] : ["move"];
+    case "jump":
+      return ["jump"]; // what it lands on sounds when it lands: see landingSounds
     case "bump":
     case "gate_open":
     case "guard":
@@ -29,19 +31,33 @@ export function soundsFor(event: GameEvent, before: WorldState | null): SoundNam
   }
 }
 
+/** The world before each event: `before` for the first, then the previous event's state. */
+const statesBefore = (events: GameEvent[], before: WorldState | null): Array<WorldState | null> => events.map((_, i) => (i === 0 ? before : events[i - 1]!.state));
+
+/** The sounds each event makes on landing, a moment after its take-off sounds: only a jump has any (a capture of what it took, a ping for a waypoint). */
+export function landingSounds(events: GameEvent[], before: WorldState | null): SoundName[][] {
+  const befores = statesBefore(events, before);
+  return events.map((event, i) => {
+    if (event.kind !== "jump") return [];
+    const names: SoundName[] = [];
+    if (event.took !== undefined) names.push("capture");
+    if (befores[i] && event.state.crossed.length > befores[i]!.crossed.length) names.push("waypoint");
+    return names;
+  });
+}
+
 /**
  * The sounds of a step's events, in order. A long walk is thinned at higher speeds so it doesn't turn into a buzz:
  * every second square at 2×, only the first and last of a run of moves at 4×. Other events always sound.
  */
 export function soundsForStep(events: GameEvent[], before: WorldState | null, speed: number): SoundName[][] {
-  let previous = before;
+  const befores = statesBefore(events, before);
   let place = 0; // this event's place in its run of moves, from 1
   return events.map((event, i) => {
     place = event.kind === "move" ? place + 1 : 0;
     const last = event.kind === "move" && events[i + 1]?.kind !== "move"; // the end of its run
     const keep = event.kind !== "move" || speed < 2 || last || (speed < 4 ? place % 2 === 1 : place === 1);
-    const sounds = soundsFor(event, previous);
-    previous = event.state;
+    const sounds = soundsFor(event, befores[i]!);
     return keep ? sounds : sounds.filter((name) => name !== "move");
   });
 }
