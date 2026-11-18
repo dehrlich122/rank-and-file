@@ -1963,6 +1963,9 @@ The designer's play-test of the three knight practice levels. **QA1 passed with 
 | 8 | "Your knight is called knight." | Fine |
 | 9 | The 5 px corner cut on a jump that turns first | Not noticed. Left as it is |
 
+**QA2 passed** *(Designer, 2026-11-18)*: after the `/simplify` pass he went through the four-item retest list
+(`docs/M5/M5.1.md`, "Retest list"): "All of the tests passed." No finding. Then "merge 27".
+
 ### QA-066 · Look Before You Leap (`practice-13`): the reference writes jumps out; the designer's solve looks before every jump · Closed, left as it is
 
 - **Observed** *(Designer, 2026-11-18)*: the designer solved it with a loop that looks at the preferred landing
