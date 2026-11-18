@@ -173,7 +173,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
     except (SyntaxError, ValueError) as exc:
         info = explain(exc)
         return outcome("error", info.friendly, error=info)
-    warnings = [asdict(warning) for warning in lint(tree, namespace)]
+    warnings = [asdict(warning) for warning in lint(tree, namespace, level.examine)]
     counted = code_lines(code, tree)
     if enforce_constraints:
         problems = check_constraints(tree, code, level.constraints, level.examine)
