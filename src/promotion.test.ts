@@ -80,6 +80,12 @@ describe("wornPiece", () => {
     expect(wornPiece("dragon", fresh())).toBe("pawn");
   });
 
+  it("under auto ignores a name only an object's prototype has", () => {
+    settings.set({ piece: "auto" });
+    expect(wornPiece("toString", fresh())).toBe("pawn");
+    expect(wornPiece("constructor", fresh())).toBe("pawn");
+  });
+
   it("under an explicit knight needs the promotion, on every level", () => {
     settings.set({ piece: "knight" });
     expect(wornPiece(undefined, earned())).toBe("knight");
