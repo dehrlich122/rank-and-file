@@ -71,6 +71,11 @@ Example:
   call shown as `text.upper()`. The Codex tab lists them under "Text", and
   hovering `.upper` in code on any value shows the entry once it's taught.
   Indexing and slicing are syntax, so they have no entry.
+- **Keywords** *(M5.2)* (`for`, `if`, `while`, `break`, `continue`, `def`, `return`) are entries of a kind of
+  their own, `keyword`, written in `codex.py`. An entry says how the keyword is written, what it does, and
+  shows a short example that is never on a board, so it is no hint for a level. The words are in
+  `docs/M5/M5.2.md`, "The Codex's keywords". The Codex tab lists them under "Keywords", after "Text", and
+  hovering one in code shows its entry (`elif` and `else` answer as `if`).
 - The level checker fails if an unlocked ability, a built-in or a text method
   called in a lesson has no entry. It also fails if a reference solution
   calls a built-in or method that hasn't been taught by its level.
@@ -91,6 +96,9 @@ disagree.
 - The engine finds the built-ins and text methods each lesson snippet calls
   with `ast`, never by matching strings. A snippet that is meant to be a syntax error is
   skipped.
+- A keyword is taught by the first curriculum lesson whose snippets use its construct: `codex.KEYWORD_NODES`
+  maps each keyword to its `ast` node, so a `for` loop in a snippet unlocks `for`. A level's function rules
+  or examiner count as `def`, and a wanted answer as `return` (`codex._rule_nodes`).
 - The pawn's entries are exactly this level's abilities, since a locked
   ability can't be used.
 - The built-ins' and methods' entries are every documented one taught so
@@ -109,7 +117,9 @@ internals (`rankfile.pieces`), and its interactive mode can't run here.
 | `help(pawn.move)`, `help(print)`, `help("pawn.move")` | That entry, laid out like Python's `help()` |
 | `help(pawn)` | What the pawn knows in this level, one line each |
 | `help(pawn.position)`, or any other plain value | A line saying it's a value, and what to try instead |
-| `help(my_function)` or anything else | Python's own help text (`pydoc`), so your own docstrings show |
+| `help("def")`, `help("for")` and the other keywords *(M5.2)* | That keyword's entry, on any level |
+| `help(my_function)`, a function of your own *(M5.2)* | How to call it (`stride(squares, times=2)`), then its docstring, or a line saying it has no description yet and where one goes |
+| `help(anything else)` | Python's own help text (`pydoc`) |
 | `help("text")` that isn't found | A line saying so, and what to try instead |
 | `help()` | How to use `help()` |
 
