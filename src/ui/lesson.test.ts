@@ -1,6 +1,6 @@
 import { marked } from "marked";
 import { describe, expect, it } from "vitest";
-import { sandboxLoader, splitIntoSteps, type LessonContext } from "./lesson";
+import { sandboxLoader, snippetCall, splitIntoSteps, type LessonContext } from "./lesson";
 
 const FENCE = "```";
 
@@ -39,6 +39,26 @@ describe("splitIntoSteps", () => {
   it("keeps ordinary code blocks inside a step, and a lesson without snippets is one step", () => {
     const lesson = ["Intro.", `${FENCE}python\njust_shown()\n${FENCE}`, "More."].join("\n\n");
     expect(steps(lesson)).toEqual([["Intro.", "just_shown()", "More."]]);
+  });
+});
+
+describe("snippetCall", () => {
+  it.each([
+    ["python run calls f()", "f()"],
+    ["python run error calls f(1)", "f(1)"],
+    ["python run lost calls f(\"a b\", 2)", "f(\"a b\", 2)"],
+    ["python run   calls   gallop(1, 2)   ", "gallop(1, 2)"],
+    ["python run timeout calls spin()", "spin()"],
+    ["python run", ""],
+    ["python run error", ""],
+    [undefined, ""],
+  ])("reads %j as %j", (lang, call) => {
+    expect(snippetCall(lang)).toBe(call);
+  });
+
+  it("leaves the fence's other words alone, call or not", () => {
+    const tokens = marked.lexer(`${FENCE}python run error calls f(1)\nx\n${FENCE}\n\n${FENCE}python run error\nx\n${FENCE}`);
+    expect(splitIntoSteps(tokens)).toHaveLength(2);
   });
 });
 
