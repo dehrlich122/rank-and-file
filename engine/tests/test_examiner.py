@@ -9,7 +9,7 @@ import pytest
 
 from conftest import make_level
 from rankfile.levels import NOT_JUDGED, Examine, ExamineCall, LevelError, parse_level
-from rankfile.runner import execute, run_level
+from rankfile.runner import examiner_line, execute, run_level
 from rankfile.tracer import PLAYER_FILENAME
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "scripts"))
@@ -349,15 +349,14 @@ def test_a_call_that_is_not_judged_ignores_what_comes_back():
 def test_the_answer_and_the_board_are_both_judged(moves, gives, status):
     result = call_of({"args": [1], "returns": WANTS}, code=f"def gallop(n):\n    {moves}\n    return {gives}\n")
     assert result.status == status
-    assert str(WANTS) not in result.summary
 
 
 def test_the_answer_is_judged_before_the_board():
     wrong_answer = call_of({"args": [1], "returns": 2}, code="def gallop(n):\n    pawn.move(3)\n    return 3\n")
     wrong_board = call_of({"args": [1], "returns": 2}, code="def gallop(n):\n    return 2\n")
     both = call_of({"args": [1], "returns": 2}, code="def gallop(n):\n    return 3\n")
-    assert wrong_board.summary.startswith("Your program finished, but")
-    assert not wrong_answer.summary.startswith("Your program finished, but")
+    assert "it wanted 2 and got 3" in wrong_answer.summary and "when the call ended" not in wrong_answer.summary
+    assert "got the 2 it wanted, but when the call ended" in wrong_board.summary
     assert both.summary == wrong_answer.summary != wrong_board.summary
 
 
@@ -466,3 +465,91 @@ def test_each_recorded_case_has_its_own_call_and_the_verdict_shows_the_failing_o
         assert [step["depth"] for step in case["steps"]] == [0] * first + [1] * (len(case["steps"]) - first)
         assert case["call"]["wanted"] is None
     assert result.to_dict()["call"] == recorded[1]["call"]
+
+
+# -- M5.2-4b-2: the examiner's words (what happened, then the examiner's line in curly quotes) ---------------------
+
+MOVES = "    pawn.move(3)\n"  # reaches the goal of ROW
+SAYS = ["reach_goal", {"say": "Open sesame"}]
+CORRECT = "“Correct. I had rather hoped to be disappointed.”"
+NOBODY = "“I called. Nobody answered to that name.”"
+CANNOT = "“I can call a function. I cannot call that.”"
+FEWER = "“I hand over what the task says: no more, no fewer.”"
+WRONG_KIND = "“The right idea in the wrong kind of thing is still the wrong thing.”"
+NOT_THE_ANSWER = "“An answer, certainly. Not the answer.”"
+NOTHING_PUT = "“I held out my hand, and nothing was put in it.”"
+STANDS = "stopped on a1, and the goal is on d1."
+NEEDS_A_NAME = "Each value needs a name inside the parentheses of its `def` line."
+DEFINE_IT = "Define it with `def gallop(...):`."
+LETTER = "It has `gallup`: the examiner needs the name letter for letter."
+NOT_A_FUNCTION = "not a function. Keep that name for the `def`."
+
+
+def row(code, args, said, *, function="gallop", **call):
+    """One case of the table: `code` run on the east-facing row, the examiner's call (`call` may hold `returns`)."""
+    return pytest.param(code, args, call, function, said, id=said[:70])
+
+
+THE_WORDS = [
+    row(f"def gallop(a, b):\n{MOVES}", [1, 3], f"The examiner called `gallop(1, 3)`, and the board is as it should be. {CORRECT}"),
+    row(f"def count(n):\n{MOVES}    return 7\n", [4], f"The examiner called `count(4)`: it wanted 7 and got 7. {CORRECT}", function="count", returns=7),
+    row(f"def count(n):\n{MOVES}", [4], f"The examiner called `count(4)`: it wanted None and got None. {CORRECT}", function="count", returns=None),
+    row("x = 1\n", [1, 3], f"The examiner called `gallop(1, 3)`, and your program has no function called `gallop`. {DEFINE_IT} {NOBODY}"),
+    row("def gallup(a, b):\n    pass\n", [1, 3], f"The examiner called `gallop(1, 3)`, and your program has no function called `gallop`. {LETTER} {NOBODY}"),
+    row("gallup = 3\n", [1, 3], f"The examiner called `gallop(1, 3)`, and your program has no function called `gallop`. {DEFINE_IT} {NOBODY}"),
+    row("x = 1\n", [], f"The examiner called `pwn()`, and your program has no function called `pwn`. Define it with `def pwn(...):`. {NOBODY}", function="pwn"),
+    row("gallop = 3\n", [1, 3], f"The examiner called `gallop(1, 3)`, but `gallop` in your program is 3, a whole number (an int), {NOT_A_FUNCTION} {CANNOT}"),
+    row("gallop = 'hi'\n", [1, 3], f"The examiner called `gallop(1, 3)`, but `gallop` in your program is 'hi', text (a str), {NOT_A_FUNCTION} {CANNOT}"),
+    row("gallop = 2.5\n", [1, 3], f"The examiner called `gallop(1, 3)`, but `gallop` in your program is 2.5, a number with a decimal point (a float), {NOT_A_FUNCTION} {CANNOT}"),
+    row("gallop = [1, 2]\n", [1, 3], f"The examiner called `gallop(1, 3)`, but `gallop` in your program is [1, 2], a list, {NOT_A_FUNCTION} {CANNOT}"),
+    row("gallop = None\n", [1, 3], f"The examiner called `gallop(1, 3)`, but `gallop` in your program is None, {NOT_A_FUNCTION} {CANNOT}"),
+    row("class gallop:\n    pass\n", [1, 3], f"The examiner called `gallop(1, 3)`, but `gallop` in your program is a class, {NOT_A_FUNCTION} {CANNOT}"),
+    row("def gallop(n):\n    pass\n", [1, 3], f"The examiner called `gallop(1, 3)` with 2 values, and your `gallop` takes 1. {NEEDS_A_NAME} {FEWER}"),
+    row("def gallop(n, m):\n    pass\n", [1], f"The examiner called `gallop(1)` with 1 value, and your `gallop` takes 2. {NEEDS_A_NAME} {FEWER}"),
+    row("def gallop(n):\n    pass\n", [], f"The examiner called `gallop()` with no values, and your `gallop` takes 1. {NEEDS_A_NAME} {FEWER}"),
+    row("def gallop():\n    pass\n", [1, 3], f"The examiner called `gallop(1, 3)` with 2 values, and your `gallop` takes none. {NEEDS_A_NAME} {FEWER}"),
+    row("def gallop(n, m=0):\n    pass\n", [], f"The examiner called `gallop()` with no values, and your `gallop` takes 1 or 2. {NEEDS_A_NAME} {FEWER}"),
+    row("def gallop(n, m=0):\n    pass\n", [1, 2, 3], f"The examiner called `gallop(1, 2, 3)` with 3 values, and your `gallop` takes 1 or 2. {NEEDS_A_NAME} {FEWER}"),
+    row("def gallop(n, m=0, k=0):\n    pass\n", [], f"The examiner called `gallop()` with no values, and your `gallop` takes from 1 to 3. {NEEDS_A_NAME} {FEWER}"),
+    row("def gallop(n, *rest):\n    pass\n", [], f"The examiner called `gallop()` with no values, and your `gallop` takes 1 or more. {NEEDS_A_NAME} {FEWER}"),
+    row("def gallop(n, *, m):\n    pass\n", [1], f"The examiner called `gallop(1)` with 1 value, and your `gallop` also needs `m`, which can only be given by name. Take it before the `*` in its `def` line, or give it a default value. {FEWER}"),
+    row("def gallop(*, m, k):\n    pass\n", [], f"The examiner called `gallop()` with no values, and your `gallop` also needs `m` and `k`, which can only be given by name. Take it before the `*` in its `def` line, or give it a default value. {FEWER}"),
+    row(f"def count(n):\n    print('hi')\n{MOVES}", [4], "The examiner called `count(4)` and got nothing back (None); it wanted 7. Your function printed, but the examiner doesn't read the screen: `print` shows a value, `return` hands it back. “You showed me the answer. I asked you to hand it to me.”", function="count", returns=7),
+    row(f"def count(n):\n{MOVES}", [4], f"The examiner called `count(4)` and got nothing back (None); it wanted 7. A function hands a value back only with `return`: check that every way through `count` reaches one. {NOTHING_PUT}", function="count", returns=7),
+    row(f"print('before')\ndef count(n):\n{MOVES}", [4], f"The examiner called `count(4)` and got nothing back (None); it wanted 7. A function hands a value back only with `return`: check that every way through `count` reaches one. {NOTHING_PUT}", function="count", returns=7),
+    row(f"def count(n):\n{MOVES}    return 8\n", [4], f"The examiner called `count(4)`: it wanted 7 and got 8. {NOT_THE_ANSWER}", function="count", returns=7),
+    row(f"def count(n):\n{MOVES}    return '7'\n", [4], f"The examiner called `count(4)`: it wanted 7 and got '7', which is text (a str), not a whole number (an int). {WRONG_KIND}", function="count", returns=7),
+    row(f"def count(n):\n{MOVES}    return True\n", [4], f"The examiner called `count(4)`: it wanted 1 and got True, which is True or False (a bool), not a whole number (an int). {WRONG_KIND}", function="count", returns=1),
+    row(f"def count(n):\n{MOVES}    return 2\n", [4], f"The examiner called `count(4)`: it wanted 2.0 and got 2, which is a whole number (an int), not a number with a decimal point (a float). {WRONG_KIND}", function="count", returns=2.0),
+    row(f"def count(n):\n{MOVES}    return [1]\n", [4], f"The examiner called `count(4)`: it wanted 'a' and got [1], which is a list, not text (a str). {WRONG_KIND}", function="count", returns="a"),
+    row(f"def count(n):\n{MOVES}    return 8\n", [4], f"The examiner called `count(4)`: it wanted nothing back (None) and got 8. {NOT_THE_ANSWER}", function="count", returns=None),
+    row("def gallop(a, b):\n    pass\n", [1, 3], f"The examiner called `gallop(1, 3)`, and when the call ended your pawn {STANDS} “The call ended. The task had not.”"),
+    row("def count(n):\n    return 7\n", [4], f"The examiner called `count(4)` and got the 7 it wanted, but when the call ended your pawn {STANDS} “The answer is not the whole of the task.”", function="count", returns=7),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("code", "args", "call", "function", "said"), THE_WORDS)
+def test_the_examiner_says_what_happened_and_then_its_line(code, args, call, function, said):
+    result = call_of({"args": args, **call}, code=code, constraints=False, function=function)
+    assert result.summary == said
+
+
+@pytest.mark.parametrize(("returns", "said"), [(NOT_JUDGED, "The examiner called `gallop(1)`, and when the call ended "), (7, "The examiner called `gallop(1)` and got the 7 it wanted, but when the call ended ")])
+def test_several_unmet_goals_are_joined_with_also(returns, said):
+    call = {"args": [1]} if returns is NOT_JUDGED else {"args": [1], "returns": returns}
+    result = call_of(call, code="def gallop(n):\n    return 7\n", constraints=False, objectives=SAYS)
+    assert result.status == "incomplete"
+    assert result.summary.startswith(said + f"your pawn {STANDS} Also, nobody heard the phrase \"Open sesame\". Use print() to say it. “")
+
+
+def test_the_examiners_line_is_reachable_apart_from_what_happened():
+    assert examiner_line("missing") == "I called. Nobody answered to that name."
+    assert examiner_line("unexpected") == examiner_line("wrong_value")
+    assert examiner_line("passed_answered") == examiner_line("passed")
+    assert call_of({"args": [1, 3]}, code="x = 1\n", constraints=False).summary.endswith(f"“{examiner_line('missing')}”")
+
+
+def test_the_answer_wanted_is_shown_only_where_the_table_shows_it():
+    for code in ("x = 1\n", "gallop = 3\n", "def gallop():\n    pass\n", "def gallup(n):\n    pass\n", "def gallop(n, *, m):\n    pass\n"):
+        assert str(WANTS) not in call_of({"args": [1], "returns": WANTS}, code=code, constraints=False).summary
+    assert str(WANTS) in call_of({"args": [1], "returns": WANTS}, code="def gallop(n):\n    return 1\n", constraints=False).summary
