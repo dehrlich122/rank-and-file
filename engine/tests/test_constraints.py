@@ -5,7 +5,7 @@ import pytest
 from conftest import make_level
 from rankfile import constraints
 from rankfile.constraints import code_lines, comment_count
-from rankfile.levels import LevelError
+from rankfile.levels import Examine, LevelError
 from rankfile.runner import run_level
 
 
@@ -116,6 +116,77 @@ def test_no_condition_warning_when_the_ability_is_called(waiting_corridor):
 
 def test_no_warnings_for_normal_code(corridor):
     assert run_level(corridor, "pawn.move(3)\nprint('done')").warnings == []
+
+
+def _lint(code, examine=None):
+    return [(w.line, w.message) for w in constraints.lint(ast.parse(code), {}, examine)]
+
+
+NAMED = "This line names `stride` but doesn't call it, so the lines inside it don't run. Add parentheses to call it: "
+UNCALLED = (
+    "`stride` is defined here but never called. A `def` only teaches Python the name; "
+    "the lines inside run when you call it: "
+)
+
+
+@pytest.mark.parametrize("code", ["def stride():\n    pass\nstride\n", "stride\ndef stride():\n    pass\nstride()\n"])
+def test_names_a_function_without_calling_it_above_or_below_its_def(code):
+    line = code.splitlines().index("stride") + 1
+    assert _lint(code) == [(line, NAMED + "stride()")]
+
+
+def test_named_function_with_parameters_shows_a_call_without_values():
+    assert _lint("def stride(n, k=2):\n    pass\nstride\n") == [(3, NAMED + "stride(...)")]
+
+
+def test_other_bare_names_keep_their_old_notes():
+    messages = [message for _, message in _lint("x = 3\nprint\nx\n")]
+    assert messages == [
+        "This line mentions `print` but doesn't call it. Add parentheses: print(...)",
+        "This line mentions `x` but doesn't do anything with it.",
+    ]
+
+
+def test_defined_but_never_called_is_noted_on_the_def_line():
+    assert _lint("x = 1\ndef stride():\n    pass\n") == [(2, UNCALLED + "stride()")]
+    assert _lint("def stride(a):\n    pass\n") == [(1, UNCALLED + "stride(...)")]
+
+
+def test_called_or_handed_on_functions_get_no_never_called_note():
+    assert _lint("def stride():\n    pass\nstride()\n") == []
+    assert _lint("def stride():\n    pass\nrun(stride)\n") == []
+
+
+def test_helper_of_an_uncalled_function_gets_no_note_of_its_own():
+    code = "def helper():\n    pass\ndef outer():\n    helper()\n"
+    assert _lint(code) == [(3, UNCALLED.replace("stride", "outer") + "outer()")]
+
+
+def test_a_function_that_only_calls_itself_is_never_called():
+    assert _lint("def stride(n):\n    stride(n)\n") == [(1, UNCALLED + "stride(...)")]
+
+
+def test_a_named_function_does_not_also_get_the_never_called_note():
+    assert len(_lint("def stride():\n    pass\nstride\n")) == 1
+
+
+def test_examiner_level_drops_never_called_but_keeps_the_named_note():
+    examine = Examine(function="stride")
+    assert _lint("def stride():\n    pass\n", examine) == []
+    assert _lint("def stride():\n    pass\nstride\n", examine) == [(3, NAMED + "stride()")]
+
+
+def test_methods_are_not_judged_and_nested_functions_are_judged_by_name():
+    assert _lint("class A:\n    def go(self):\n        pass\n") == []
+    nested = "def outer():\n    def inner():\n        pass\n    inner()\nouter()\n"
+    assert _lint(nested) == []
+    assert [line for line, _ in _lint("def outer():\n    def inner():\n        pass\nouter()\n")] == [2]
+
+
+def test_function_notes_arrive_with_a_real_run_sorted_by_line(corridor):
+    result = run_level(corridor, "def stride():\n    pawn.move()\nx = 1\nx == 2\n")
+    assert [w["line"] for w in result.warnings] == [1, 4]
+    assert result.warnings[0]["message"] == UNCALLED + "stride()"
 
 
 def test_ast_module_is_what_we_think():

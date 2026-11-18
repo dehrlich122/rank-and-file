@@ -149,10 +149,13 @@ def _number_problems(tree: ast.Module, constraints) -> list[str]:
     return [f"{written} This level allows at most {limit}."]
 
 
-def lint(tree: ast.Module, namespace: dict) -> list[LintWarning]:
-    """Spot lines that are valid Python but almost certainly not what was meant."""
+def lint(tree: ast.Module, namespace: dict, examine=None) -> list[LintWarning]:
+    """Spot lines that are valid Python but almost certainly not what was meant.
+    `examine` is the level's examiner (levels.Examine) or None: the examiner calls the player's function, so
+    on an examiner level "defined but never called" is not said."""
     pieces = {name: type(value) for name, value in namespace.items() if isinstance(value, Piece)}
-    warnings = []
+    defs = _own_functions(tree)
+    warnings = _never_called_warnings(tree, defs) if examine is None else []
     for node in ast.walk(tree):
         if isinstance(node, (ast.While, ast.If)):
             warnings += _condition_warnings(node, pieces)
@@ -162,7 +165,12 @@ def lint(tree: ast.Module, namespace: dict) -> list[LintWarning]:
         if isinstance(value, ast.Attribute) and isinstance(value.value, ast.Name) and value.value.id in pieces:
             warnings.append(LintWarning(node.lineno, _piece_attribute_warning(value.value.id, value.attr, pieces[value.value.id])))
         elif isinstance(value, ast.Name):
-            if value.id == "print":
+            if value.id in defs:
+                message = (
+                    f"This line names `{value.id}` but doesn't call it, so the lines inside it don't run. "
+                    f"Add parentheses to call it: {_call_text(defs[value.id])}"
+                )
+            elif value.id == "print":
                 message = "This line mentions `print` but doesn't call it. Add parentheses: print(...)"
             else:
                 message = f"This line mentions `{value.id}` but doesn't do anything with it."
@@ -172,6 +180,41 @@ def lint(tree: ast.Module, namespace: dict) -> list[LintWarning]:
                 LintWarning(node.lineno, "This line compares with == but doesn't use the answer. To store a value, use a single =.")
             )
     return sorted(warnings, key=lambda warning: warning.line)
+
+
+def _own_functions(tree: ast.Module) -> dict[str, ast.FunctionDef | ast.AsyncFunctionDef]:
+    """The functions the program defines with `def`, by name (a later `def` of a name wins). Methods are left out."""
+    methods = {id(item) for cls in ast.walk(tree) if isinstance(cls, ast.ClassDef) for item in cls.body}
+    return {
+        node.name: node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and id(node) not in methods
+    }
+
+
+def _call_text(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
+    """How to call `fn`, without inventing values: `stride()`, or `stride(...)` when it takes parameters."""
+    args = fn.args
+    takes = args.posonlyargs or args.args or args.vararg or args.kwonlyargs or args.kwarg
+    return f"{fn.name}({'...' if takes else ''})"
+
+
+def _never_called_warnings(tree: ast.Module, defs: dict) -> list[LintWarning]:
+    """A `def` whose name the program never uses outside the function's own lines (M5.2). A call, a bare mention
+    (which has its own note) and handing it on as a value all count as use; a function that only calls itself doesn't."""
+    found = []
+    for fn in defs.values():
+        inside = {id(node) for node in ast.walk(fn)}
+        if any(isinstance(n, ast.Name) and n.id == fn.name and id(n) not in inside for n in ast.walk(tree)):
+            continue
+        found.append(
+            LintWarning(
+                fn.lineno,
+                f"`{fn.name}` is defined here but never called. A `def` only teaches Python the name; "
+                f"the lines inside run when you call it: {_call_text(fn)}",
+            )
+        )
+    return found
 
 
 def _condition_warnings(node: ast.While | ast.If, pieces: dict) -> list[LintWarning]:
