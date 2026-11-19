@@ -45,6 +45,10 @@ export async function launch({ width = 1400, height = 860 } = {}) {
       "--disable-background-networking",
       "--disable-default-apps",
       "--disable-component-extensions-with-background-pages",
+      // Every check loads a new URL, so the back-forward cache kept the last six pages alive, each with its two Python
+      // workers: 14 in one renderer. The renderer died (STATUS_BREAKPOINT) as the first of those pages was evicted, at
+      // the eighth navigation (M5.2-X). The game's own routes are hash changes, which never put a page in that cache.
+      "--disable-features=BackForwardCache",
       "about:blank",
     ],
     { stdio: "ignore" },
@@ -95,6 +99,10 @@ export async function launch({ width = 1400, height = 860 } = {}) {
       else resolve(message.result);
     } else if (message.method) {
       if (message.method === "Inspector.targetCrashed") failAll("the page crashed (Chrome's renderer died)");
+      // Chrome's exit status for the dead page, e.g. 80000003 (STATUS_BREAKPOINT); it arrives just after the above.
+      if (message.method === "Target.targetCrashed" && message.params.targetId === page.id) {
+        dead = `${dead ?? "the page crashed"}, status ${(message.params.errorCode >>> 0).toString(16)} (${message.params.status})`;
+      }
       for (const listener of listeners) listener(message);
     }
   };
@@ -149,6 +157,7 @@ export async function launch({ width = 1400, height = 860 } = {}) {
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Log.enable");
+  await send("Target.setDiscoverTargets", { discover: true }); // for Target.targetCrashed and its exit status
   await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
 
   const key = async (key, { code = key, keyCode, modifiers = 0 } = {}) => {
