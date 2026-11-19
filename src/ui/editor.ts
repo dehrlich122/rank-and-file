@@ -107,7 +107,11 @@ export function createEditor(options: EditorOptions): EditorView {
     syntaxHighlighting(pythonColors),
   ];
   if (options.readOnly) extensions.push(EditorState.readOnly.of(true), EditorView.editable.of(false));
-  else if (!options.compact) extensions.push(lintGutter()); // warnings only appear on code being written
+  else if (!options.compact) {
+    extensions.push(lintGutter()); // warnings only appear on code being written
+    // room for the return arrow (`cm-call-line`) left of the line number, always, so nothing shifts when it comes and goes
+    extensions.push(EditorView.theme({ ".cm-lineNumbers .cm-gutterElement": { paddingLeft: "22px" } }));
+  }
   if (options.placeholder) extensions.push(placeholder(options.placeholder));
   if (options.extensions) extensions.push(...options.extensions);
   return new EditorView({ parent: options.parent, doc: options.code, extensions });
@@ -349,7 +353,7 @@ const themeFromPage = EditorView.theme({
   ".cm-activeLineGutter": { backgroundColor: "var(--active-line)" },
   // the return arrow of the line that made the call: drawn in the line number's own left padding, so no width changes
   ".cm-lineNumbers .cm-gutterElement.cm-call-line": { position: "relative" },
-  ".cm-lineNumbers .cm-gutterElement.cm-call-line::before": { content: '"↩"', position: "absolute", left: "0", fontSize: "0.7em", color: "var(--accent)", pointerEvents: "none" },
+  ".cm-lineNumbers .cm-gutterElement.cm-call-line::before": { content: '"↩"', position: "absolute", left: "5px", fontSize: "0.9em", color: "var(--accent)", pointerEvents: "none" },
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": { backgroundColor: "var(--selection)" },
   ".cm-matchingBracket": { backgroundColor: "var(--selection)", outline: "none" },
   ".cm-tooltip": { backgroundColor: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)" },
