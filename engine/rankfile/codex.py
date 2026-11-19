@@ -157,6 +157,27 @@ BUILTINS: dict[str, tuple[list[str], str]] = {
             print(int("7") + 1)
         """,
     ),
+    "help": (
+        ["help(thing)", "help()"],
+        """Show what something does: its entry in the Codex.
+
+        `help(print)` shows the entry for `print` in the console, and it works
+        the same way on an ability of your piece. Put a word of the language
+        in quotes: `help("def")`. On a function of your own it shows how to
+        call it, and the docstring you wrote under its `def` line.
+
+        Args:
+            thing: what to ask about: an ability, a built-in, a function of
+                your own, or a keyword in quotes. Leave it out to see how
+                `help()` works.
+
+        Returns:
+            Nothing.
+
+        Example:
+            help(print)
+        """,
+    ),
 }
 
 # Methods of text (M3.6): called on a piece of text, `text.upper()`. Named
@@ -650,7 +671,7 @@ def player_namespace(**names) -> dict:
 
 def describe(thing, piece: type[Piece] = Pawn) -> str:
     """What help(thing) shows, on a level whose piece is `piece`."""
-    if thing is _NOTHING or _is_help(thing) or (isinstance(thing, str) and thing in ("help", "modules")):
+    if thing is _NOTHING or thing == "modules":
         return intro(piece)
     entry = _entry_for(thing, piece)
     if entry is not None:
@@ -679,6 +700,8 @@ def _is_help(thing) -> bool:
 def _entry_for(thing, piece: type[Piece] = Pawn) -> Entry | None:
     """The Codex entry for an ability (`pawn.move`), a built-in (`print`), a method of text (`"x".upper`), or any of their names as text.
     A name as text answers for the level's own piece only: help("knight.jump") on a pawn level knows nothing."""
+    if _is_help(thing):
+        return python_entry("help")
     if isinstance(thing, str):
         if thing in PYTHON:
             return python_entry(thing)
