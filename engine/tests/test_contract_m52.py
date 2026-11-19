@@ -50,3 +50,13 @@ def test_a_lesson_snippet_accepts_a_call():
     """The examiner calls the function a snippet defines (M5.2-5a); a program with none to call is `incomplete`."""
     assert run_sandbox("def gallop(a, b):\n    pawn.move(a)\n", ["move"], call="gallop(1, 2)").status == "finished"
     assert run_sandbox("pawn.move(1)\n", ["move"], call="gallop(1, 2)").status == "incomplete"
+
+
+def test_a_calls_json_keys_are_pinned():
+    from dataclasses import asdict
+
+    from rankfile.runner import CallInfo
+
+    call = asdict(CallInfo("f()", None, None, 0))
+    assert list(call) == ["text", "returned", "wanted", "first_step", "happened", "said"]
+    assert call["happened"] is None and call["said"] is None
