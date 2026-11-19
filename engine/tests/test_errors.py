@@ -28,6 +28,7 @@ from rankfile.runner import run_level, run_sandbox
         ("x = 3 - 'a'", "Python can't use - between a whole number (an int) and text (a str).", 1),
         ("x = 3\nx()", "isn't a function: it's a whole number (an int). Is there an extra pair of parentheses?", 2),
         ("x = 1 / 0", "You divided by zero.", 1),
+        ("def f():\n    f()\nf()", "A function kept calling itself and never stopped, so Python gave up.", 2),
         # loops (M3.3)
         ("for step in 3:\n    pawn.move()", "Python can't go through a whole number (an int) one item at a time", 1),
         ("for step in 3:\n    pawn.move()", "give the number to range(): for step in range(5):", 1),
