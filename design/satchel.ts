@@ -13,6 +13,7 @@ import "../src/chrome.css";
 import "./satchel.css";
 import type { Pos } from "../src/py/protocol";
 import { h } from "../src/ui/dom";
+import { callList } from "../src/ui/panels";
 import { goal, hero, tile } from "../src/ui/sprites";
 import { litGrid, M, S } from "../src/ui/sprites/floor";
 import { svg } from "../src/ui/svg";
@@ -328,6 +329,83 @@ function shapesPane(): HTMLElement {
   );
 }
 
+// -- pane 5: the examiner with a list ------------------------------------------------------------------------------------
+
+interface Ask {
+  text: string; // the call as the level writes it
+  count: number; // the items in the list it carries
+  want: string; // the answer wanted
+  got: string; // what the player's function gave back
+  ok: boolean;
+}
+const ASKS: Ask[] = [
+  { text: "climb([1, -1, -1, 1, 1])", count: 5, want: "[3, 5, 4, 6, 8]", got: "[3, 5, 4, 6, 8]", ok: true },
+  { text: "climb([-1, -1, 1])", count: 3, want: "[2, 4]", got: "(2, 4)", ok: false },
+  { text: "climb([1, 1, -1, 1])", count: 4, want: "[2, 4, 5, 7, 9]", got: "[4, 9, 2, 7, 5]", ok: false },
+  { text: "visit([(2, 1), (3, 3), (5, 4), (4, 6)])", count: 4, want: "[(2, 1), (3, 3), (5, 4), (4, 6)]", got: "[(2, 1), (3, 3), (5, 4), (4, 6)]", ok: true },
+];
+const PICKED = 2; // after a run: the wrong list is the call on show
+const callName = (a: Ask) => a.text.slice(0, a.text.indexOf("("));
+const CLIP_AT = 14; // pane 5, T2: a value longer than this is clipped
+
+const challengePanel = () =>
+  h("div", { class: "tab-panel ex-panel" }, h("p", { class: "box-head" }, "Challenge"), ...callList({ function: "climb", calls: ASKS.map((a, i) => ({ text: a.text, board: i + 1 })) }, []));
+
+type Buttons = "X1" | "X2a" | "X2b" | "X3";
+const BUTTON_TEXT: Record<Buttons, (a: Ask, i: number) => string> = {
+  X1: (a) => a.text,
+  X2a: (a) => `${callName(a)}([…${a.count}])`,
+  X2b: (_, i) => `call ${i + 1}`,
+  X3: (a) => a.text,
+};
+
+function beforeRun(look: Buttons): HTMLElement {
+  const buttons = ASKS.map((a, i) => h("button", { class: `btn btn-small btn-toggle${look === "X3" ? " btn-clip" : ""}`, "aria-pressed": String(i === 0), title: a.text }, BUTTON_TEXT[look](a, i)));
+  const { board } = sized(ladder(false), "a stand-in board for the call on show");
+  const host = h("div", { class: "board-host" }, h("div", { class: "case-row", role: "group", "aria-label": "The examiner's calls" }, ...buttons), h("p", { class: "boards-caption" }, `The examiner calls ${ASKS[0]!.text}`), board);
+  return h("div", { class: "mock-ex" }, challengePanel(), host);
+}
+
+const BEFORE_TEXT: Record<Buttons, string> = {
+  X1: "every call written in full: the Challenge panel, the buttons, the caption over the board",
+  X2a: "the buttons shortened to the function and a count; the full call in the panel and the caption over the board (the button's tooltip carries it too)",
+  X2b: "the buttons shortened to \"call 1\", \"call 2\"...; the full call in the panel and the caption (the numbers are the panel's numbers)",
+  X3: "the buttons keep the call but are clipped to one width, so they sit two to a row; the full call in the panel, the caption and the tooltip",
+};
+
+const ellipsed = (text: string, full: string) => h("span", { class: "clip", title: full }, text);
+
+/** The result card's table of calls (src/ui/panels.ts, callsTable), the long values either in full or clipped. */
+function resultCard(clipped: boolean): HTMLElement {
+  const picked = ASKS[PICKED]!;
+  const cell = (text: string) => (clipped ? ellipsed(text, text) : text);
+  const rows = ASKS.flatMap((a, i) => {
+    const long = [a.text, a.want, a.got].some((t) => t.length > CLIP_AT);
+    const row = h("tr", { class: i === PICKED ? "picked" : undefined }, h("td", {}, h("button", { class: `btn btn-small${clipped ? " btn-clip" : ""}`, title: `Replay ${a.text}` }, a.text)), h("td", {}, cell(a.want)), h("td", {}, cell(a.got)), h("td", { class: a.ok ? "ok" : "no" }, a.ok ? "✓" : "✗"));
+    const more = h("tr", { class: "more" }, h("td", { colspan: "4" }, ...(["call", "wanted", "got"] as const).flatMap((k) => [h("span", { class: "more-key" }, k), h("span", { class: "more-val" }, k === "call" ? a.text : k === "wanted" ? a.want : a.got)])));
+    return clipped && long ? [row, more] : [row];
+  });
+  const table = h("table", { class: `calls${clipped ? " calls-clip" : ""}` }, h("thead", {}, h("tr", {}, ...["call", "wanted", "got", ""].map((t) => h("th", {}, t)))), h("tbody", {}, ...rows));
+  return h("div", { class: "outcome outcome-bad card-col" }, h("div", { class: "outcome-head" }, h("strong", {}, "Not there yet")), h("p", {}, `${picked.text} gave back ${picked.got}. The examiner wanted ${picked.want}.`), table);
+}
+
+const AFTER_TEXT = {
+  T1: "the lists in full in the table, with the game's table as it is today: the call button never wraps, so wanted and got are squeezed to a character a line (this is what long values do to it)",
+  T2: "long values clipped to one line; a row with a clipped value has the full call, wanted and got on a second line under it",
+};
+
+function examinerPane(): HTMLElement {
+  const take = (id: string, text: string, mock: HTMLElement) => h("figure", { class: "take" }, tag(id, text), mock);
+  return h(
+    "div",
+    {},
+    h("p", { class: "note" }, "The examiner as the level screen shows it today (the Challenge panel in the Learn column, the buttons and caption above the board, the result card under it), with Chapter 8's calls: they carry lists, and the answer wanted can be a list. All made up: a function climb(jumps) and a function visit(stones). The board is a stand-in, the same for every call. At a 1440 by 900 window the Learn column is 418 px and the result card 428 px wide."),
+    h("div", { class: "column" }, ...(["X1", "X2a", "X2b", "X3"] as Buttons[]).map((id) => take(id, BEFORE_TEXT[id], beforeRun(id)))),
+    h("p", { class: "note" }, "After a run: the table of call, wanted and got. One call passed; one gave a list of the wrong kind ([2, 4] wanted, (2, 4) got); one gave the wrong list; one passed with a list of pairs. The wrong list is the call on show."),
+    h("div", { class: "column" }, take("T1", AFTER_TEXT.T1, resultCard(false)), take("T2", AFTER_TEXT.T2, resultCard(true))),
+  );
+}
+
 // -- the sheet ------------------------------------------------------------------------------------------------------------
 
 const pane = (scheme: "dark" | "light", name: string, child: HTMLElement) => h("div", { class: "pane", "data-scheme": scheme }, h("p", { class: "pane-name" }, name), child);
@@ -339,4 +417,5 @@ document.getElementById("sheet")!.append(
   ...both("2 · The door", doorPane),
   ...both("3 · The satchel", satchelPane),
   ...both("4 · The two board shapes", shapesPane),
+  ...both("5 · The examiner with a list", examinerPane),
 );

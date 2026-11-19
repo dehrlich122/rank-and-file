@@ -15,7 +15,7 @@ const browser = await launch({ width: 1700, height: 900 });
 try {
   await browser.send("Emulation.setScrollbarsHidden", { hidden: true });
   await browser.send("Page.navigate", { url: base });
-  const names = ["key", "door", "satchel", "shapes"];
+  const names = ["key", "door", "satchel", "shapes", "examiner"];
   await browser.waitFor(`document.querySelectorAll(".pane").length === ${names.length * 2} && document.querySelectorAll(".pane .board").length >= 30`, 60_000, "sheet rendered");
   await browser.evaluate(`document.fonts.ready.then(() => true)`);
   await sleep(800);
