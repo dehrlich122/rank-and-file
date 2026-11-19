@@ -137,6 +137,8 @@ and the namespace records which piece the level has (`errors.LEVEL_PIECE`), so t
 when the player reuses the piece's name.
 - On a knight level `help()` introduces the knight, `help(knight)` lists what it knows, and
   `help("knight.jump")` answers; `help("pawn.move")` there is unknown text, and the other way round.
-- The knight's first levels are three in the Testing ground (`practice-11` to `practice-13`, from
-  `scripts/gen_knight.py`): the jump, jumping over and landing on, and `knight.look(dx, dy)`. Their entries
-  are marked as brought in there until Chapter 7 exists.
+- Chapter 7 brings the knight's entries in *(M5.2)*: `knight.jump` on 7.1 and `knight.read` on 7.4, with `def`
+  on 7.2, `return` on 7.4 and `help` on 7.6 (the first lesson to call it). The Testing ground comes after
+  Chapter 7 in play order, so its three knight levels (`practice-11` to `practice-13`, from
+  `scripts/gen_knight.py`: the jump, jumping over and landing on, `knight.look(dx, dy)`) show `knight.jump` as
+  brought in by 7.1; only `knight.look` is still brought in there, by `practice-13`.
