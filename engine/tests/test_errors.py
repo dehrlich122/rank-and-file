@@ -390,3 +390,55 @@ def test_a_keyword_the_knights_ability_does_not_have(knight_runes):
     assert "`jump()` has nothing called `steps` to fill inside its parentheses. Give its values in order, without names." in result.error.friendly
     assert "Knight." not in result.error.friendly
     assert result.error.line == 1
+
+
+# -- None from a list method, and a call that wanted items (M5.3-E1) -------------------
+
+_W1 = "`.{}()` changes the list itself and hands back nothing (None). Call it on a line of its own, and keep using the list's own name."
+
+
+@pytest.mark.parametrize(
+    "code, method",
+    [
+        ("a = [3, 1]\nb = a.sort()\nb[0]", "sort"),
+        ("a = [1]\na = a.append(2)\na.append(4)", "append"),
+        ("a = [3, 1]\nfor x in a.sort():\n    print(x)", "sort"),
+        ("a = [1]\nb = a.append(2)\nlen(b)", "append"),
+        ("a = [3, 1]\nprint(a.sort()[0])", "sort"),
+    ],
+)
+def test_a_none_from_a_list_method_names_the_method(corridor, code, method):
+    friendly = run_level(corridor, code).error.friendly
+    assert friendly.endswith(_W1.format(method))
+    assert "rune" not in friendly and "read()" not in friendly and "range()" not in friendly
+
+
+@pytest.mark.parametrize(
+    "code, friendly",
+    [
+        ("list(5)", "`list()` makes a list out of something that has items in it, like text or a tuple. A whole number (an int) has none."),
+        ("tuple(5)", "`tuple()` makes a tuple out of something that has items in it, like text or a tuple. A whole number (an int) has none."),
+        ("sorted(5)", "`sorted()` needs something that has items in it, like a list, a tuple or text. A whole number (an int) has none."),
+        ("min(5)", "`min()` needs something that has items in it, like a list, a tuple or text. A whole number (an int) has none."),
+        ("max(5)", "`max()` needs something that has items in it, like a list, a tuple or text. A whole number (an int) has none."),
+        ("sum(5)", "`sum()` needs something that has items in it, like a list, a tuple or text. A whole number (an int) has none."),
+    ],
+)
+def test_a_call_given_something_without_items_says_so(corridor, code, friendly):
+    assert run_level(corridor, code).error.friendly == friendly
+
+
+def test_a_for_loop_over_a_number_keeps_the_range_words(corridor):
+    friendly = run_level(corridor, "for x in 5:\n    pass").error.friendly
+    assert friendly == (
+        "Python can't go through a whole number (an int) one item at a time, "
+        "the way a for loop needs. To repeat something a number of times, give the number to range(): "
+        "for step in range(5):"
+    )
+    assert run_level(corridor, "for x in list(5):\n    pass").error.friendly == friendly
+
+
+def test_a_none_from_read_keeps_the_rune_words_next_to_a_list_method(rune_corridor):
+    friendly = run_level(rune_corridor, "a = [1]\na.append(2)\ntext = pawn.read()\nprint(text[0])").error.friendly
+    assert "If it came from `read()`, your pawn isn't standing on a rune" in friendly
+    assert "hands back nothing" not in friendly

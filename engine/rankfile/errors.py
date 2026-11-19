@@ -312,6 +312,42 @@ def _none_from_own_function(line: int | None) -> str:
     return ""
 
 
+_LIST_METHODS = ("append", "sort", "extend", "insert", "remove", "reverse", "clear")
+
+
+def _list_method_of(node: ast.AST) -> str | None:
+    """The method's name where `node` is a call like `x.sort()` of a list method that hands back None."""
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in _LIST_METHODS:
+        return node.func.attr
+    return None
+
+
+def _none_from_list_method(line: int | None) -> str:
+    """Where the error's line uses the answer of a list method (`b = a.sort()`, then `b[0]`), say it hands back None."""
+    tree = _player_tree()
+    if tree is None or line is None:
+        return ""
+    unused = {id(node.value) for node in ast.walk(tree) if isinstance(node, ast.Expr)}
+    assigned = {}  # name -> the list method its value came from
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and (method := _list_method_of(node.value)):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    assigned.setdefault(target.id, method)
+    found = None
+    for node in ast.walk(tree):
+        if getattr(node, "lineno", None) != line:
+            continue
+        if (method := _list_method_of(node)) and id(node) not in unused:
+            found = method
+            break
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id in assigned and found is None:
+            found = assigned[node.id]
+    if found is None:
+        return ""
+    return f"`.{found}()` changes the list itself and hands back nothing (None). Call it on a line of its own, and keep using the list's own name."
+
+
 def _is_none(node: ast.expr | None) -> bool:
     return node is None or (isinstance(node, ast.Constant) and node.value is None)
 
@@ -419,6 +455,8 @@ _GET_ONTO_A_RUNE = {"pawn": "walk onto one", "knight": "land on one"}
 def _none_hint(namespace: dict, line: int | None) -> str:
     if own := _none_from_own_function(line):
         return own
+    if listed := _none_from_list_method(line):
+        return listed
     piece = piece_class(namespace).NAME
     return f"If it came from `read()`, your {piece} isn't standing on a rune: {_GET_ONTO_A_RUNE.get(piece, 'get onto one')} first."
 
@@ -459,6 +497,31 @@ _KINDS = {
 def _kind(type_name: str) -> str:
     """A type's name as a beginner reads it: "text (a str)", or "a list"."""
     return _KINDS.get(type_name, f"a {type_name}")
+
+
+_ITEM_CALLS = {"list": "a list", "tuple": "a tuple"}
+_ITEM_CALLS_OTHER = ("sorted", "min", "max", "sum")
+
+
+def _call_wanting_items(line: int | None) -> str:
+    """The built-in (`list`, `sorted`...) the error's line calls on something without items, unless a `for` on the line goes through it."""
+    tree = _player_tree()
+    if tree is None or line is None:
+        return ""
+    loops = (ast.For, ast.AsyncFor, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+    nodes = [node for node in ast.walk(tree) if getattr(node, "lineno", None) == line]
+    if any(isinstance(node, loops) for node in nodes):
+        return ""
+    for node in nodes:
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in (*_ITEM_CALLS, *_ITEM_CALLS_OTHER):
+            return node.func.id
+    return ""
+
+
+def _explain_no_items(name: str, type_name: str) -> str:
+    if name in _ITEM_CALLS:
+        return f"`{name}()` makes {_ITEM_CALLS[name]} out of something that has items in it, like text or a tuple. {_kind(type_name)[0].upper() + _kind(type_name)[1:]} has none."
+    return f"`{name}()` needs something that has items in it, like a list, a tuple or text. {_kind(type_name)[0].upper() + _kind(type_name)[1:]} has none."
 
 
 def _explain_type(exc: TypeError, namespace: dict, line: int | None) -> str:
@@ -511,8 +574,14 @@ def _explain_type_message(exc: TypeError, namespace: dict, line: int | None) -> 
             "Make a new text instead, with a method like replace() or by joining pieces together."
         )
     if msg in ("'NoneType' object is not subscriptable", "object of type 'NoneType' has no len()"):
+        if listed := _none_from_list_method(line):
+            return f"There's nothing to use here: the value is None. {listed}"
         return f"There's no text here: the value is None. {_none_hint(namespace, line)}"
     if match := re.match(r"'(\w+)' object is not iterable", msg):
+        if match.group(1) == "NoneType" and (listed := _none_from_list_method(line)):
+            return listed
+        if call := _call_wanting_items(line):
+            return _explain_no_items(call, match.group(1))
         return (
             f"Python can't go through {_kind(match.group(1))} one item at a time, "
             "the way a for loop needs. To repeat something a number of times, give the number to range(): "
