@@ -743,6 +743,17 @@ pre {
   padding-left: 20px;
 }
 
+/* the examiner's calls, numbered (M5.2-6b) */
+.tab-panel .call-list {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.call-code {
+  font: 13px var(--font-code);
+  color: var(--accent);
+}
+
 .abilities {
   display: flex;
   flex-wrap: wrap;
@@ -1151,6 +1162,35 @@ pre {
   font-style: normal;
   background: var(--examiner);
   color: var(--accent-text);
+}
+
+/* the examiner's calls, answer wanted against answer got, one row a call (M5.2-6b) */
+.outcome .calls {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font: 13px var(--font-code);
+}
+
+.outcome .calls th,
+.outcome .calls td {
+  padding: 2px 8px;
+  text-align: left;
+  overflow-wrap: anywhere; /* a long value wraps in its cell: the card never scrolls sideways */
+}
+
+.outcome .calls tr.picked {
+  background: var(--panel);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.outcome .calls .ok {
+  color: var(--accent);
+}
+
+.outcome .calls .no {
+  color: var(--examiner);
 }
 
 /* The code changed after this run, so the card describes an older version. */
