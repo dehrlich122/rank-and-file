@@ -4,7 +4,7 @@ import time
 
 from conftest import basics, make_level
 from rankfile import bridge
-from rankfile.runner import run_level, run_sandbox, run_snippet
+from rankfile.runner import CALL_DEPTH, run_level, run_sandbox, run_snippet
 from rankfile.tracer import PLAYER_FILENAME, Tracer
 
 # -- plain snippets ---------------------------------------------------------------
@@ -468,3 +468,126 @@ def test_bridge_sandbox_follows_the_piece():
     named = json.loads(bridge.run_sandbox("pawn.move()\nknight", '["move"]'))  # no piece given: a pawn
     assert named["status"] != "finished" or named["error"] is not None
     assert json.loads(bridge.load_sandbox('["move"]'))["piece"] == "pawn"
+
+
+# -- how deep the player's functions may call each other ---------------------------
+
+KIND_SENTENCE = "A function kept calling itself and never stopped, so Python gave up."
+COUNT_DOWN = "def down(n):\n    if n == 0:\n        return 0\n    return 1 + down(n - 1)\n"
+ENDLESS = "def f():\n    f()\nf()\n"
+
+
+def test_a_function_that_calls_itself_forever_stops_early_and_kindly(corridor):
+    before = sys.getrecursionlimit()
+    result = run_level(corridor, ENDLESS)
+    assert result.status == "error"
+    assert result.error.type == "RecursionError"
+    assert result.error.friendly == KIND_SENTENCE
+    assert result.error.line == 2
+    assert CALL_DEPTH < len(result.steps) < 250  # about a thousand before the player got a limit of their own
+    assert sys.getrecursionlimit() == before
+
+
+def test_two_functions_that_call_each_other_forever_end_the_same_way(corridor):
+    before = sys.getrecursionlimit()
+    result = run_level(corridor, "def ping():\n    pong()\ndef pong():\n    ping()\nping()\n")
+    assert (result.status, result.error.type, result.error.friendly) == ("error", "RecursionError", KIND_SENTENCE)
+    assert result.error.line in (2, 4)
+    assert len(result.steps) < 250
+    assert sys.getrecursionlimit() == before
+
+
+def test_a_snippet_that_calls_itself_forever_ends_the_same_way():
+    before = sys.getrecursionlimit()
+    result = run_snippet(ENDLESS)
+    assert (result.status, result.error.friendly) == ("error", KIND_SENTENCE)
+    assert result.lines_run < 250
+    assert sys.getrecursionlimit() == before
+
+
+def test_honest_recursion_still_works():
+    result = run_snippet(COUNT_DOWN + "print(down(150))\n")
+    assert (result.status, result.output) == ("ok", "150\n")
+    chain = "def a(n):\n    return b(n) + 1\ndef b(n):\n    return c(n) + 1\ndef c(n):\n    return n\nprint(a(5))\n"
+    assert run_snippet(chain).output == "7\n"
+
+
+def test_the_player_may_nest_call_depth_functions():
+    assert run_snippet(COUNT_DOWN + f"print(down({CALL_DEPTH - 2}))\n").output == f"{CALL_DEPTH - 2}\n"  # CALL_DEPTH - 1 frames
+    assert run_snippet(COUNT_DOWN + f"print(down({CALL_DEPTH - 1}))\n").output == f"{CALL_DEPTH - 1}\n"  # CALL_DEPTH frames
+    over = run_snippet(COUNT_DOWN + f"print(down({CALL_DEPTH + 30}))\n")
+    assert (over.status, over.error.friendly) == ("error", KIND_SENTENCE)
+
+
+def test_the_deepest_call_can_still_act_on_the_board(corridor):
+    code = f"def deep(n):\n    if n == 1:\n        pawn.move(3)\n        print('here')\n    else:\n        deep(n - 1)\ndeep({CALL_DEPTH})\n"
+    result = run_level(corridor, code)
+    assert (result.status, result.output) == ("solved", "here\n")
+    assert [event["kind"] for step in result.steps for event in step["events"]].count("move") == 3
+
+
+def test_the_limit_inside_a_run_is_lower_and_is_put_back_afterwards():
+    before = sys.getrecursionlimit()
+    namespace = {"__name__": "__main__", "limit": sys.getrecursionlimit}
+    result = run_snippet("print(limit())", namespace=namespace)
+    assert result.status == "ok"
+    assert int(result.output) < before
+    assert sys.getrecursionlimit() == before
+
+
+def test_the_limit_is_put_back_however_the_run_ends(corridor):
+    before = sys.getrecursionlimit()
+    for code in ("exit()", "1 / 0", "raise KeyboardInterrupt", ENDLESS, "def f():\n    f()\n    f()\nf()\n"):
+        run_level(corridor, code)
+        assert sys.getrecursionlimit() == before, code
+    assert run_level(corridor, "while True:\n    pass\n", line_budget=50).status == "timeout"
+    assert sys.getrecursionlimit() == before
+    assert run_snippet("def f(n):\n    f(n + 1)\nf(0)\n", line_budget=40).status == "timeout"  # the budget comes first
+    assert sys.getrecursionlimit() == before
+
+
+def _depth_here() -> int:
+    depth, frame = 0, sys._getframe(1)
+    while frame is not None:
+        depth, frame = depth + 1, frame.f_back
+    return depth
+
+
+def test_a_limit_that_is_already_lower_is_never_raised():
+    namespace = {"__name__": "__main__", "limit": sys.getrecursionlimit}
+    before = sys.getrecursionlimit()
+    sys.setrecursionlimit(_depth_here() + 80)  # room for the engine's own few frames, but less than the player is given
+    tight = sys.getrecursionlimit()
+    try:
+        result = run_snippet("print(limit())", namespace=namespace)
+        assert (result.status, int(result.output)) == ("ok", tight)
+        assert sys.getrecursionlimit() == tight
+    finally:
+        sys.setrecursionlimit(before)
+
+
+def _recurse_then_run(levels: int, run):
+    return run() if levels == 0 else _recurse_then_run(levels - 1, run)
+
+
+def test_a_run_started_deep_in_other_frames_still_gets_the_whole_allowance(corridor):
+    before = sys.getrecursionlimit()
+    honest = f"{COUNT_DOWN}print(down({CALL_DEPTH - 1}))\n"
+    result = _recurse_then_run(300, lambda: run_level(corridor, honest))
+    assert (result.status, result.output) == ("incomplete", f"{CALL_DEPTH - 1}\n")
+    endless = _recurse_then_run(300, lambda: run_level(corridor, ENDLESS))
+    assert (endless.status, endless.error.friendly) == ("error", KIND_SENTENCE)
+    assert len(endless.steps) < 250
+    assert sys.getrecursionlimit() == before
+
+
+def test_the_examiners_call_gets_the_same_limit():
+    before = sys.getrecursionlimit()
+    level = make_level("P . . G\n", api=["move", "at_goal"], examine={"function": "f", "calls": [{"args": [1]}]})
+    result = run_level(level, "def f(n):\n    return f(n)\n")
+    assert (result.status, result.error.type, result.error.friendly) == ("error", "RecursionError", KIND_SENTENCE)
+    assert result.error.line == 2
+    assert len(result.steps) < 250
+    assert sys.getrecursionlimit() == before
+    honest = run_level(level, COUNT_DOWN.replace("down", "f"))
+    assert honest.status != "error"

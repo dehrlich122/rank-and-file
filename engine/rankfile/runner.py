@@ -19,6 +19,7 @@ import copy
 import inspect
 import io
 import linecache
+import sys
 import time
 import types
 from dataclasses import asdict, dataclass, field, replace
@@ -34,6 +35,14 @@ from .words import and_list, count
 from .world import World
 
 DEFAULT_LINE_BUDGET = 100_000
+
+# How deep a player's functions may call each other. Python's own limit (about a thousand) is far more than any
+# honest program needs; a function that calls itself forever would take the browser's Python that deep, which
+# can kill the page, and leave a recording of hundreds of identical steps nobody can scrub.
+CALL_DEPTH = 200
+# Frames the engine itself adds on top of the player's deepest call (the tracer's callbacks, the output capture, a
+# piece's move and its events), so the engine's own work never hits the limit instead of the player's code.
+ENGINE_FRAMES = 20
 
 
 @dataclass
@@ -546,6 +555,10 @@ def execute(
     made = Execution(None, "", tracer)  # the call's facts, filled in as it goes
     reached = False  # the run got as far as the call
     printed_from = 0
+    # The player's calls get a limit of their own, counted from here (Python counts every frame, ours and the
+    # caller's included, and never raises a limit that is already lower). The module's own frame is one more.
+    normal_limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(min(normal_limit, _stack_depth() + 1 + CALL_DEPTH + ENGINE_FRAMES))
     try:
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output), tracer:
             with contextlib.suppress(SystemExit):  # exit() or sys.exit(): the program chose to stop, which is fine
@@ -563,12 +576,21 @@ def execute(
     except BaseException as exc:
         error = exc
     finally:
+        sys.setrecursionlimit(normal_limit)  # before the engine's own work after the run (and a deep traceback)
         output.finish_line()
         tracer.finish()
     if call is not None and not reached:
         made.first_step = len(tracer.steps)  # the program failed first
     text = output.getvalue()
     return replace(made, error=error, output=text, call_output=text[printed_from:] if reached else "")
+
+
+def _stack_depth() -> int:
+    """How many Python frames are running right now: what Python measures its recursion limit against."""
+    depth, frame = 0, sys._getframe(1)  # the caller on up
+    while frame is not None:
+        depth, frame = depth + 1, frame.f_back
+    return depth
 
 
 def _function_problem(namespace: dict, name: str, args: list) -> tuple[str | None, inspect.Signature | None]:
