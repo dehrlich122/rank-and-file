@@ -115,6 +115,7 @@ internals (`rankfile.pieces`), and its interactive mode can't run here.
 | Call | Shows |
 |---|---|
 | `help(pawn.move)`, `help(print)`, `help("pawn.move")` | That entry, laid out like Python's `help()` |
+| `help(help)`, `help("help")` | The entry for `help` itself; `help()` with nothing is the how-to-use text |
 | `help(pawn)` | What the pawn knows in this level, one line each |
 | `help(pawn.position)`, or any other plain value | A line saying it's a value, and what to try instead |
 | `help("def")`, `help("for")` and the other keywords *(M5.2)* | That keyword's entry, on any level |

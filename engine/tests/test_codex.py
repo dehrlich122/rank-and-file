@@ -215,16 +215,39 @@ def knight_says(code: str) -> str:
     return result.output
 
 
+def test_help_on_help_shows_its_own_entry_however_it_is_asked_for():
+    expected = codex.format_entry(codex.python_entry("help")) + "\n\n"
+    for code in ("help(help)", 'help("help")'):
+        assert run_sandbox(code, ["move"]).output == expected
+        assert knight_says(code) == expected
+    assert run_snippet("help(help)").output == expected
+    assert expected.startswith("Help on help:") and "help(thing) or help()" in expected
+
+
+def test_help_is_the_last_builtin_taught_and_a_full_builtin_entry():
+    entry = codex.python_entry("help")
+    assert list(codex.BUILTINS)[-1] == "help"
+    assert entry.kind == "builtin" and entry.calls[0] == "help(thing)"
+
+
+def test_a_lesson_that_calls_help_brings_its_entry_in_on_its_level_and_not_before():
+    chapters = [{"curriculum": True, "levels": [level("h1", ["move"], "print(1)"), level("h2", ["move"], "help(print)"), level("h3", ["move"])]}]
+    assert "help" not in [entry.name for entry in codex.entries("h1", chapters)]
+    here = {entry.name: entry for entry in codex.entries("h2", chapters)}
+    assert here["help"].new and here["help"].introduced == "h2"
+    later = {entry.name: entry for entry in codex.entries("h3", chapters)}
+    assert later["help"].introduced == "h2" and not later["help"].new
+
+
 def test_help_on_a_pawn_level_with_nothing_is_the_pawns_intro_as_before():
     assert run_sandbox("help()", ["move"]).output == PAWN_INTRO + "\n\n"
-    assert run_sandbox("help(help)", ["move"]).output == PAWN_INTRO + "\n\n"
     assert run_sandbox('help("modules")', ["move"]).output == PAWN_INTRO + "\n\n"
     assert codex.describe(codex._NOTHING) == PAWN_INTRO  # no piece known (a plain snippet): the pawn's words
     assert run_snippet("help()").output == PAWN_INTRO + "\n\n"
 
 
 def test_help_on_a_knight_level_introduces_the_knight():
-    for code in ("help()", "help(help)", 'help("help")'):
+    for code in ("help()", 'help("modules")'):
         output = knight_says(code)
         assert output == (
             "help(something) shows what it does and how to use it. For example:\n\n"
@@ -581,3 +604,12 @@ def test_lesson_snippets_are_still_just_the_codes_in_order():
 def test_what_a_marked_snippet_calls_is_still_taught():
     text = fenced("run calls shout('hi')", "def shout(word):\n    print(word.upper())\n")
     assert codex.taught(text) == {"print", "str.upper"}
+
+
+def test_help_is_brought_in_by_the_lesson_that_calls_it_in_the_real_curriculum():
+    from test_levels import chapters_in_play_order
+
+    chapters = chapters_in_play_order()
+    assert "help" not in [entry.name for entry in codex.entries("ch07-l05", chapters)]
+    here = {entry.name: entry for entry in codex.entries("ch07-l06", chapters)}
+    assert here["help"].new and here["help"].introduced == "ch07-l06"
