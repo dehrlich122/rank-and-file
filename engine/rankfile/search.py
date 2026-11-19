@@ -27,6 +27,8 @@ from .runner import unmet_objectives
 from .world import World
 
 MAX_STATES = 200_000  # positions kept per board before it gives up
+WORK_FACTOR = 8  # queue pushes allowed per position of `max_states`: a cap on work, not only on distinct positions
+RUN_SECONDS = 60.0  # how long `run()` works when it is given no slice of its own, before it gives up
 CALLS = ("move", "turn_left", "turn_right", "wait", "capture_left", "capture_right", "bridge")
 TURNS = ("turn_left", "turn_right")
 
@@ -41,13 +43,18 @@ class RouteSearch:
     so without that the search would sometimes pass time by spinning on the spot (QA-026).
     """
 
-    def __init__(self, level: Level, max_states: int = MAX_STATES):
+    def __init__(self, level: Level, max_states: int = MAX_STATES, max_work: int | None = None):
         self.level = level
         self.max_states = max_states
+        self.max_work = WORK_FACTOR * max_states if max_work is None else max_work  # pushes before it gives up
+        self.work = 0  # entries pushed so far
         self.status: str | None = None  # None while searching; then ROUTE, NO_ROUTE, GAVE_UP, CLOCKS or EXAMINER
         self.actions: list[tuple] = []  # the route, when there is one
         self.lines = 0  # lines of code it takes
-        self._queue: list[tuple] = []  # the frontier; dropped once there is an answer, so a finished board holds no memory
+        # The frontier, dropped once there is an answer, so a finished board holds no memory. An entry is
+        # (cost, tie-break, key, world, route, heard); `route` is a link (the link it came from, the action taken),
+        # so an entry never holds a copy of its route and the route is rebuilt by walking the links.
+        self._queue: list[tuple] = []
         self._best: dict[tuple, tuple[int, int]] = {}  # the cheapest (lines, turns) that reach each state
         self._reached = 0  # positions reached, kept once the frontier is dropped
         if level.examine:
@@ -60,7 +67,7 @@ class RouteSearch:
         self._actions = _actions(level)
         first = _key(start, "", frozenset())
         self._order = count()  # breaks ties between equal costs, so worlds are never compared
-        self._queue.append(((0, 0), next(self._order), first, start, (), frozenset()))
+        self._queue.append(((0, 0), next(self._order), first, start, None, frozenset()))
         self._best[first] = (0, 0)
 
     @property
@@ -76,36 +83,50 @@ class RouteSearch:
         return True
 
     def run(self, seconds: float | None = None) -> bool:
-        """Search for up to `seconds` (no limit if None). True once it has an answer."""
+        """Search for up to `seconds`, then say whether it has an answer. With no `seconds` it works to the end, or
+        gives up after `RUN_SECONDS`. True once it has an answer."""
         if self.status is not None:
             return True
-        deadline = None if seconds is None else time.perf_counter() + seconds
+        sliced = seconds is not None
+        deadline = time.perf_counter() + (seconds if sliced else RUN_SECONDS)
         level, queue, best = self.level, self._queue, self._best
         wanted = set(level.objectives.say)
         while queue:
-            if deadline is not None and time.perf_counter() > deadline:
-                return False
-            (lines, turns), _, key, world, path, heard = heappop(queue)
+            if time.perf_counter() > deadline:
+                return False if sliced else self._finish(GAVE_UP)
+            (lines, turns), _, key, world, route, heard = heappop(queue)
             if best[key] < (lines, turns):
                 continue  # reached more cheaply since
             if not level.nothing_to_do and not unmet_objectives(level, world, "".join(f"{phrase}\n" for phrase in heard)):
-                self.actions, self.lines = list(path), lines
+                self.actions, self.lines = _unlink(route), lines
                 return self._finish(ROUTE)
+            moved = route is not None and route[1][0] == "move"
             for action in self._actions:
                 after = _try(level, world, action)
                 if after is None:
                     continue
                 spoken = heard | {action[1]} if action[0] == "say" and action[1] in wanted else heard
-                free = action[0] == "move" and bool(path) and path[-1][0] == "move"
+                free = action[0] == "move" and moved
                 next_cost = (lines + (0 if free else 1), turns + (action[0] in TURNS))
                 next_key = _key(after, action[0], spoken)
                 if next_key in best and best[next_key] <= next_cost:
                     continue
                 best[next_key] = next_cost
-                if len(best) > self.max_states:
+                self.work += 1
+                if len(best) > self.max_states or self.work > self.max_work:
                     return self._finish(GAVE_UP)
-                heappush(queue, (next_cost, next(self._order), next_key, after, (*path, action), spoken))
+                heappush(queue, (next_cost, next(self._order), next_key, after, (route, action), spoken))
         return self._finish(NO_ROUTE)
+
+
+def _unlink(route: tuple | None) -> list[tuple]:
+    """The actions of a route, first to last, from the links it was built as."""
+    actions = []
+    while route is not None:
+        route, action = route
+        actions.append(action)
+    actions.reverse()
+    return actions
 
 
 class Search:
