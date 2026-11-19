@@ -120,6 +120,12 @@ worker are in `docs/ARCHITECTURE.md`; the Codex's entries are in `docs/Codex.md`
   toggle button per call with ✓ or ✗, and the board of the call on show: no small boards, because calls and
   boards needn't match. The outcome card adds `table.calls` (call, wanted, got, mark; the row on show is
   `picked`; each call a button that replays it) when at least one call wants an answer.
+  While a call's recording plays, a `p.boards-caption` between the buttons and the board reads "The examiner
+  calls `f(1)`" from the call's first step on (a non-breaking space before it, so the board doesn't jump).
+- Inside a function, playback marks the line that made the call: `setCallLine` (`ui/editor.ts`) gives that
+  line's gutter the class `cm-call-line`, and the editor's theme draws a return arrow in the line number's left
+  padding. The line comes from `callingLine` (`ui/playback.ts`), read from the steps' depths; the examiner's own
+  call has none.
 - Playback buttons follow `controlStates()` in `ui/playback.ts`. Editing code
   drops the current recording, and Play or the right arrows then run the new
   code. How a recording is replayed is in `docs/ARCHITECTURE.md` ("Playback").
