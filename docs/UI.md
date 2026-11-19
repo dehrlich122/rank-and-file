@@ -114,6 +114,12 @@ worker are in `docs/ARCHITECTURE.md`; the Codex's entries are in `docs/Codex.md`
   function's against the previous step only when it was the same scope at the same depth.
 - On an examiner level the outcome card shows `call.happened` as its paragraph and the examiner's line apart
   under it (`.examiner-line`, with an `E` mark), instead of the one `summary` paragraph.
+- An examiner level's calls (M5.2-6b): before a run the Challenge panel lists them under the Goal
+  (`callList` in `ui/panels.ts`: `ol.call-list`, each call a `code.call-code`), and the boards are as on any level
+  with other maps. After a run with cases the board host holds a `div.case-row` ("The examiner's calls"), one
+  toggle button per call with ✓ or ✗, and the board of the call on show: no small boards, because calls and
+  boards needn't match. The outcome card adds `table.calls` (call, wanted, got, mark; the row on show is
+  `picked`; each call a button that replays it) when at least one call wants an answer.
 - Playback buttons follow `controlStates()` in `ui/playback.ts`. Editing code
   drops the current recording, and Play or the right arrows then run the new
   code. How a recording is replayed is in `docs/ARCHITECTURE.md` ("Playback").
