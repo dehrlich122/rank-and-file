@@ -58,9 +58,9 @@ class RouteSearch:
             self._finish(CLOCKS)
             return
         self._actions = _actions(level)
-        first = _key(start, "", "")
+        first = _key(start, "", frozenset())
         self._order = count()  # breaks ties between equal costs, so worlds are never compared
-        self._queue.append(((0, 0), next(self._order), first, start, (), ""))
+        self._queue.append(((0, 0), next(self._order), first, start, (), frozenset()))
         self._best[first] = (0, 0)
 
     @property
@@ -81,20 +81,21 @@ class RouteSearch:
             return True
         deadline = None if seconds is None else time.perf_counter() + seconds
         level, queue, best = self.level, self._queue, self._best
+        wanted = set(level.objectives.say)
         while queue:
             if deadline is not None and time.perf_counter() > deadline:
                 return False
-            (lines, turns), _, key, world, path, said = heappop(queue)
+            (lines, turns), _, key, world, path, heard = heappop(queue)
             if best[key] < (lines, turns):
                 continue  # reached more cheaply since
-            if not level.nothing_to_do and not unmet_objectives(level, world, said):
+            if not level.nothing_to_do and not unmet_objectives(level, world, "".join(f"{phrase}\n" for phrase in heard)):
                 self.actions, self.lines = list(path), lines
                 return self._finish(ROUTE)
             for action in self._actions:
                 after = _try(level, world, action)
                 if after is None:
                     continue
-                spoken = said + action[1] + "\n" if action[0] == "say" else said
+                spoken = heard | {action[1]} if action[0] == "say" and action[1] in wanted else heard
                 free = action[0] == "move" and bool(path) and path[-1][0] == "move"
                 next_cost = (lines + (0 if free else 1), turns + (action[0] in TURNS))
                 next_key = _key(after, action[0], spoken)
@@ -162,8 +163,12 @@ def _try(level: Level, world: World, action: tuple) -> World | None:
     return after
 
 
-def _key(world: World, last: str, said: str) -> tuple:
-    """Everything that decides what can happen next (and whether a step is free)."""
+def _key(world: World, last: str, heard: frozenset) -> tuple:
+    """Everything that decides what can happen next (and whether a step is free).
+
+    `heard` is which of the objective's phrases have been said. Nothing else of what was said belongs here: a say
+    that opens no gate and adds no wanted phrase must land on a position already reached, or the search would never
+    end (what a wrong phrase leaves behind only changes the words of a later error, never what can happen)."""
     timers = tuple(world.ticks["action"] % timer.every for timer in world.board.timers.values())
     foes = tuple((foe.pos, foe.index, foe.heading, foe.gone) for foe in world.foes)
-    return (world.pos, world.facing, frozenset(world.opened), frozenset(world.crossed), frozenset(world.collected), frozenset(world.bridged), foes, timers, said, last == "move")
+    return (world.pos, world.facing, frozenset(world.opened), frozenset(world.crossed), frozenset(world.collected), frozenset(world.bridged), foes, timers, heard, last == "move")
