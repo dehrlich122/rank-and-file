@@ -1,16 +1,21 @@
 """The solvability search (M4.3): a route of plain calls per board, found in slices, and never shown."""
 
+import itertools
 import json
 import sys
+import time
 from pathlib import Path
 
 import pytest
 import yaml
 
 from rankfile import bridge
+from rankfile import search as search_module
 from rankfile.constraints import code_lines
 from rankfile.levels import parse_level
-from rankfile.search import CLOCKS, EXAMINER, GAVE_UP, NO_ROUTE, ROUTE, RouteSearch, Search
+from rankfile.runner import unmet_objectives
+from rankfile.search import CLOCKS, EXAMINER, GAVE_UP, MAX_STATES, NO_ROUTE, ROUTE, WORK_FACTOR, RouteSearch, Search
+from rankfile.world import World
 
 ROOT = Path(__file__).resolve().parents[2]
 LEVEL_FILES = sorted(path for path in (ROOT / "levels").glob("*/*.yaml") if path.name != "chapters.yaml")
@@ -187,3 +192,77 @@ def test_the_lines_counted_are_the_lines_of_the_code_the_scripts_write():
             search.run()
             if search.status == ROUTE:
                 assert search.lines == code_lines("\n".join(solve.write_code(case.level, search.actions))), (path.stem, case.label)
+
+
+# The hard limits (M5.3-S): no board may run for ever or eat the machine.
+ENDLESS = "G # . .\n# . . .\n. . . .\nP . . .\n"  # the goal is walled in, so only a limit can end a search that never repeats
+
+
+def endless(monkeypatch) -> list:
+    """Make every step land on a position never seen before; returns the entries pushed onto the frontier."""
+    fresh, pushed = itertools.count(), []
+    monkeypatch.setattr(search_module, "_key", lambda *_: next(fresh))
+    real_push = search_module.heappush
+    monkeypatch.setattr(search_module, "heappush", lambda queue, entry: (pushed.append(entry), real_push(queue, entry))[1])
+    return pushed
+
+
+def test_the_work_a_search_may_do_is_a_multiple_of_its_state_cap():
+    assert RouteSearch(made(), max_states=7).max_work == WORK_FACTOR * 7
+    assert RouteSearch(made()).max_work == WORK_FACTOR * MAX_STATES
+    assert RouteSearch(made(), max_work=5).max_work == 5
+
+
+def test_a_search_that_has_done_its_work_gives_up_on_a_board_that_has_a_route():
+    search = RouteSearch(made(map="G . . . . . . .\n. . . . . . . .\n. . . . . . . .\nP . . . . . . .\n"), max_work=2)
+    assert search.run() is True
+    assert search.status == GAVE_UP and search.actions == [] and search.work == 3
+    assert search.positions <= search.max_states
+
+
+def test_a_search_that_never_repeats_a_position_is_stopped_by_its_work_cap_with_flat_memory(monkeypatch):
+    pushed = endless(monkeypatch)
+    search = RouteSearch(made(map=ENDLESS, api=["move", "turn_left", "turn_right", "wait"]), max_states=10**9, max_work=3000)
+    started = time.perf_counter()
+    assert search.run() is True
+    assert time.perf_counter() - started < 1
+    assert search.status == GAVE_UP and search.work == 3001
+    assert len(pushed) == 3000  # nothing was pushed after the limit
+    assert len({len(entry) for entry in pushed}) == 1  # an entry is the same size at any depth...
+    assert all(entry[4] is None or (len(entry[4]) == 2 and isinstance(entry[4][1], tuple)) for entry in pushed)  # ...a link, not a route
+    assert search._queue == [] and search._best == {}  # the frontier is dropped once it gives up
+
+
+def test_a_route_is_rebuilt_from_its_links_in_order():
+    level = made(map="G . . .\n# # # .\n. . . .\nP . . .\n")
+    search = searched(level)
+    assert search.status == ROUTE and len(search.actions) > 3
+    world = World(level)
+    for action in search.actions:  # played in the order given, the route reaches the goal
+        world = search_module._try(level, world, action)
+        assert world is not None
+    assert not unmet_objectives(level, world, "")
+
+
+def test_run_with_no_slice_gives_up_at_its_default_deadline(monkeypatch):
+    endless(monkeypatch)
+    monkeypatch.setattr(search_module, "RUN_SECONDS", -1.0)  # already past
+    search = RouteSearch(made(map=ENDLESS), max_states=10**9, max_work=10**9)
+    assert search.run() is True and search.status == GAVE_UP
+
+
+def test_the_default_deadline_follows_the_clock(monkeypatch):
+    endless(monkeypatch)
+    now = itertools.count(step=10.0)  # each look at the clock is ten seconds later
+    monkeypatch.setattr(search_module.time, "perf_counter", lambda: next(now))
+    search = RouteSearch(made(map=ENDLESS), max_states=10**9, max_work=10**9)
+    assert search.run() is True and search.status == GAVE_UP
+    assert 0 < search.work <= 20  # about RUN_SECONDS / 10 looks at the clock
+
+
+def test_a_slice_is_not_cut_short_by_the_default_deadline(monkeypatch):
+    monkeypatch.setattr(search_module, "RUN_SECONDS", -1.0)
+    search = RouteSearch(made())
+    assert search.run(5.0) is True and search.status == ROUTE  # a given slice has its own deadline
+    sliced = RouteSearch(made())
+    assert sliced.run(0.0) is False and sliced.status is None  # and is still just a pause
