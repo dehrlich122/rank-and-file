@@ -109,6 +109,11 @@ class Tracer:
         sys.settrace(None)
         return False  # never swallow exceptions
 
+    def is_tracing(self) -> bool:
+        """Python still calls this tracer. CPython drops a trace function that raises, e.g. a RecursionError raised
+        in its own callback, and a program can drop it itself with sys.settrace(None)."""
+        return sys.gettrace() == self._on_new_frame  # a bound method: equal, never identical
+
     # -- things that happen while a step is running --------------------------
 
     def add_event(self, event: dict) -> None:

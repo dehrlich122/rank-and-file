@@ -591,3 +591,96 @@ def test_the_examiners_call_gets_the_same_limit():
     assert sys.getrecursionlimit() == before
     honest = run_level(level, COUNT_DOWN.replace("down", "f"))
     assert honest.status != "error"
+
+
+# -- a run that lost its tracer (M5.2-V) ---------------------------------------------
+
+LOST_TRACK = (
+    "The game lost track of this program partway through, so the run ends here. "
+    "That happens when a function calls itself until Python stops it and the program carries on anyway. "
+    "Give the function a way to stop calling itself."
+)
+CAUGHT = "def f():\n    f()\ntry:\n    f()\nexcept RecursionError:\n    pass\nprint('after')\n"
+CAUGHT_BROADLY = CAUGHT.replace("RecursionError", "Exception")
+SETTRACE = "import sys\nsys.settrace(None)\nprint('after')\n"
+
+
+def _lost_track(error) -> bool:
+    return (error.type, error.friendly, error.line) == ("LostTrackError", LOST_TRACK, None)
+
+
+def test_a_caught_endless_recursion_that_carries_on_is_an_error_run(corridor):
+    for code in (CAUGHT, CAUGHT_BROADLY):
+        result = run_level(corridor, code)
+        assert result.status == "error"
+        assert _lost_track(result.error)
+
+
+def test_the_lost_track_error_has_no_line_of_the_players_in_its_traceback(corridor):
+    result = run_level(corridor, CAUGHT)
+    assert "<player>" not in result.error.traceback
+
+
+def test_a_caught_endless_recursion_ends_the_same_way_in_the_sandbox_and_a_snippet():
+    sandbox = run_sandbox(CAUGHT, ["move"])
+    assert sandbox.status == "error"
+    assert _lost_track(sandbox.error)
+    snippet = run_snippet(CAUGHT)
+    assert snippet.status == "error"
+    assert _lost_track(snippet.error)
+
+
+def test_a_lesson_snippet_with_a_call_ends_the_same_way():
+    result = run_sandbox("def f():\n    g()\ndef g():\n    g()\n", ["move"], call="f()")
+    assert result.status == "error"
+    assert result.error.type == "RecursionError"  # the call's own endless recursion, not caught: its own sentence
+    caught = "def g():\n    g()\ndef f():\n    try:\n        g()\n    except RecursionError:\n        pass\n"
+    result = run_sandbox(caught, ["move"], call="f()")
+    assert result.status == "error"
+    assert _lost_track(result.error)
+
+
+def test_a_catch_inside_the_examiners_call_is_an_error_run():
+    level = make_level("P . . G\n", api=["move", "at_goal"], examine={"function": "f", "calls": [{"args": [1]}]})
+    code = "def g():\n    g()\ndef f(n):\n    try:\n        g()\n    except RecursionError:\n        pass\n    return n\n"
+    result = run_level(level, code)
+    assert result.status == "error"
+    assert _lost_track(result.error)
+
+
+def test_a_program_that_turns_the_trace_off_is_an_error_run(corridor):
+    result = run_level(corridor, SETTRACE)
+    assert result.status == "error"
+    assert _lost_track(result.error)
+    assert run_sandbox(SETTRACE, ["move"]).error.friendly == LOST_TRACK
+
+
+def test_a_run_with_an_error_of_its_own_keeps_it_after_the_tracer_was_lost(corridor):
+    result = run_level(corridor, "import sys\nsys.settrace(None)\n1 / 0\n")
+    assert (result.status, result.error.type) == ("error", "ZeroDivisionError")
+    after_recursion = run_level(corridor, CAUGHT.replace("print('after')", "1 / 0"))
+    assert (after_recursion.status, after_recursion.error.type) == ("error", "ZeroDivisionError")
+
+
+def test_an_uncaught_endless_recursion_keeps_its_own_sentence(corridor):
+    result = run_level(corridor, ENDLESS)
+    assert (result.error.type, result.error.friendly, result.error.line) == ("RecursionError", KIND_SENTENCE, 2)
+
+
+def test_a_caught_error_with_the_tracer_alive_is_an_ordinary_run(corridor):
+    result = run_level(corridor, "try:\n    1 / 0\nexcept Exception:\n    print('caught')\npawn.move(3)\n")
+    assert (result.status, result.output, result.error) == ("solved", "caught\n", None)
+    retry = run_snippet("def other():\n    print('other')\ntry:\n    1 / 0\nexcept Exception:\n    other()\n")
+    assert (retry.status, retry.output) == ("ok", "other\n")
+    assert run_snippet("print('a')\nexit()\nprint('b')").status == "ok"
+
+
+def test_the_run_after_a_lost_track_is_traced_and_budgeted_as_usual(corridor):
+    before = sys.getrecursionlimit()
+    for code in (CAUGHT, SETTRACE):
+        assert run_level(corridor, code).status == "error"
+        assert sys.getrecursionlimit() == before
+        counted = run_snippet("for i in range(3):\n    x = i\n")
+        assert (counted.status, counted.lines_run) == ("ok", 7)
+        assert run_snippet("while True:\n    pass\n", line_budget=50).status == "timeout"
+        assert run_level(corridor, ENDLESS).error.friendly == KIND_SENTENCE

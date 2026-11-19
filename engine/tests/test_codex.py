@@ -613,3 +613,16 @@ def test_help_is_brought_in_by_the_lesson_that_calls_it_in_the_real_curriculum()
     assert "help" not in [entry.name for entry in codex.entries("ch07-l05", chapters)]
     here = {entry.name: entry for entry in codex.entries("ch07-l06", chapters)}
     assert here["help"].new and here["help"].introduced == "ch07-l06"
+
+
+def test_help_without_a_builtins_help_still_looks_things_up(monkeypatch):
+    # `builtins.help` exists only once `site` has run (M5.2-V); help(None) must not match the builtin that is missing.
+    monkeypatch.delattr(builtins, "help")
+    assert not hasattr(builtins, "help")
+    assert codex._entry_for(print).name == "print"
+    assert [codex._entry_for(thing) for thing in (None, 42, lambda: 0)] == [None, None, None]
+    for code in ("help(None)", "help(42)", "def f():\n    pass\nhelp(f)"):
+        result = run_snippet(code)
+        assert result.status == "ok", code
+        assert "Help on" not in result.output, code
+    assert "Help on print:" in run_snippet("help(print)").output
