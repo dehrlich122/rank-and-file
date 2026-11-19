@@ -392,7 +392,7 @@ def tolls(spec: dict, rng: random.Random) -> dict | None:
 
 # -- 7.6: functions that call functions -----------------------------------------------------------------
 
-PAIR, LONG, SHORT = said("cnve"), said("ybat"), said("fubeg")  # the reference's names for its three functions
+PAIR, LONG = said("cnve"), said("ybat")  # the reference's names for its two functions
 
 
 def flat(route: list[str]) -> int:
@@ -423,35 +423,48 @@ def flat(route: list[str]) -> int:
     return min([len(looped(route)), *map(lines, tried)])
 
 
+def layered(route: list[str]) -> int:
+    """The fewest lines found for the route with one function that the others may call: every piece of the route
+    that comes more than once is tried as that function, and `flat` writes the rest around its calls."""
+    seq, best = tuple(route), len(route)
+    for size in range(2, len(seq) // 2 + 1):
+        for piece in sorted({seq[at : at + size] for at in range(len(seq) - size + 1)}):
+            tokens, at = [], 0
+            while at < len(seq):
+                found = seq[at : at + size] == piece
+                tokens.append("inner()" if found else seq[at])
+                at += size if found else 1
+            if tokens.count("inner()") > 1:
+                best = min(best, 1 + len(looped(list(piece))) + flat(tokens))
+    return best
+
+
 def nested(spec: dict, rng: random.Random) -> dict | None:
-    """A small figure of two jumps inside two bigger figures (three of it with two jumps between, two of it with
-    one), which follow each other twice, joined by single jumps that differ."""
+    """A small figure of two jumps, alone at first; then a bigger figure (three of the small one, with a jump
+    between each two) twice over. Single jumps join them. A longer plan has no board of 12 by 12 (M5.2, "As
+    built"): this is the shortest one where a function calling a function is the only way under the limit."""
     small = ["s0", "s1"]
-    longer, shorter = [*small, "x", *small, "y", *small], [*small, "z", *small]
-    plan = [*longer, "c0", *shorter, "c1", *longer, "c2", *shorter]
-    tried = 0
-    for chosen, squares in routes(rng, plan, spec["size"], (("s0", "s1"), ("x", "y"), ("c0", "c1", "c2"))):
-        tried += 1
-        if tried > spec["tries"]:
-            break
+    bigger = [*small, "x", *small, "y", *small]
+    plan = [*small, "c0", *bigger, "c1", *bigger]
+    for chosen, squares in routes(rng, plan, spec["size"], (("s0", "s1"), ("x", "y"), ("c0", "c1"))):
         jump = {name: JUMP(*chosen[name]) for name in chosen}
-        joins = [jump["c0"], jump["c1"], jump["c2"]]
         reference = [
             *[f"def {PAIR}():", *indented([jump["s0"], jump["s1"]])],
             *[f"def {LONG}():", *indented([f"{PAIR}()", jump["x"], f"{PAIR}()", jump["y"], f"{PAIR}()"])],
-            *[f"def {SHORT}():", *indented([f"{PAIR}()", jump["z"], f"{PAIR}()"])],
-            *[f"{LONG}()", joins[0], f"{SHORT}()", joins[1], f"{LONG}()", joins[2], f"{SHORT}()"],
+            *[f"{PAIR}()", jump["c0"], f"{LONG}()", jump["c1"], f"{LONG}()"],
         ]
         route = [jump[name] for name in plan]
         limit = len(reference) + spec["slack"]
-        if len(looped(route)) <= limit or (fewest := flat(route)) <= limit:
+        if len(looped(route)) <= limit or (fewest := flat(route)) <= limit or (deep := layered(route)) < len(reference):
             continue
-        one_layer = [f"def {PAIR}():", *indented([jump["s0"], jump["s1"]]), *[f"{PAIR}()" if name == "s0" else jump[name] for name in plan if name != "s1"]]
+        # the tempting one: the bigger figure named and written out, jump by jump
+        one_layer = [f"def {LONG}():", *indented([jump[name] for name in bigger]), jump["s0"], jump["s1"], jump["c0"], f"{LONG}()", jump["c1"], f"{LONG}()"]
         return {
             "level": {"map": board(placed(squares, spec["size"], rng), spec["size"]), "legend": {"O": "pit"}},
             "reference": reference,
             "wrong": {"written": route, "loops": looped(route), "flat": one_layer},
-            "shape": f"{len(route) + 1} stones, {len(route)} jumps written out, {len(looped(route))} lines with loops alone, {fewest} at best with functions that never call each other, the limit {limit}",
+            "shape": f"{len(route) + 1} stones, {len(route)} jumps written out, {len(looped(route))} lines with loops alone, {fewest} at best with functions that never call each other, "
+            f"{deep} at best with one function the others call, the limit {limit}",
             "fills": {},
             "lengths": [len(route)],
         }
@@ -644,17 +657,16 @@ LEVELS = [
         "brief": "The longest road yet, and the shortest spellbook you can write for it. Small spells, and bigger spells made of them.",
         "api": ["jump"],
         "size": (12, 12),
-        "slack": 1,
-        "tries": 400,
-        "lesson_board": {"map": ". . . . .\n. . . . .\nP . . . .", **OPEN},
+        "slack": 0,
+        "lesson_board": {"map": ". . . . . . .\n. . . . . . .\n. . . . . . .\nP . . . . . .", **OPEN},
         "hint3": ["said", "N shapgvba gung pnyyf nabgure:\nqrs cnve():\n    xavtug.whzc(...)\n    xavtug.whzc(...)\n\nqrs ybat():\n    cnve()\n    xavtug.whzc(...)\n    cnve()"],
         "wrong": ["written", "loops", "flat"],
         "hints": [
-            "Ybbx sbe gur fznyyrfg svther gung ercrngf, gura sbe gur ovttre svtherf gung ner znqr bs vg.",
-            "N shapgvba pna pnyy nabgure shapgvba. Anzr gur fznyy svther svefg. Gura anzr rnpu ovttre svther, naq va vgf obql pnyy gur fznyy bar "
+            "Ybbx sbe gur fznyyrfg svther gung ercrngf, gura sbe gur ovttre svther gung vf znqr bs vg.",
+            "N shapgvba pna pnyy nabgure shapgvba. Anzr gur fznyy svther svefg. Gura anzr gur ovttre svther, naq va vgf obql pnyy gur fznyy bar "
             "vafgrnq bs jevgvat vgf whzcf ntnva. Gur cebtenz vgfrys vf gura n srj pnyyf naq gur whzcf va orgjrra.",
         ],
-        "note": "Gur ersrerapr anzrf gur fznyy svther bapr, naq ohvyqf gur gjb ovttre svtherf bhg bs pnyyf gb vg. "
+        "note": "Gur ersrerapr anzrf gur fznyy svther bapr, naq ohvyqf gur ovttre svther bhg bs pnyyf gb vg. "
         "Jevggra bhg, gur ebhgr vf {jevggra} yvarf, naq jvgu shapgvbaf gung arire pnyy rnpu bgure vg vf {syng}; gur ersrerapr vf {yvarf}.",
     },
     {
