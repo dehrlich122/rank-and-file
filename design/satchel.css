@@ -1,0 +1,386 @@
+/* M5.3 (design sheet, dev-only): Chapter 8. Pane framing, the key, the door and the satchel. The game's own classes
+   (src/styles.css) draw the board; the new art is drawn here, with the game's wire colours. */
+
+:root {
+  /* new tokens: the fill of a key and of a name plate (a floor square shows through nothing), the door's slab and the
+     dark doorway behind an open one */
+  --key-fill: light-dark(#fff3dc, #2b1d06);
+  --plate-fill: light-dark(#fff8e8, #1a1206);
+  --slab-fill: light-dark(#e4e0f8, #1a1240);
+  --doorway: var(--void);
+  --name-halo: light-dark(rgb(248 247 253 / 0.92), rgb(9 4 22 / 0.92));
+  --slot-line: var(--border);
+}
+
+body {
+  margin: 0;
+  background: #070414;
+}
+
+#sheet {
+  max-width: 1700px;
+  margin: 0 auto;
+  padding: 16px;
+  display: grid;
+  gap: 20px;
+}
+
+.sheet-head h1 {
+  margin: 0;
+  font: 700 20px "Orbitron", var(--font-ui);
+  letter-spacing: 0.06em;
+  color: #3be0ff;
+}
+
+.sheet-head p {
+  margin: 4px 0 0;
+  max-width: 120ch;
+  color: #a69ed6;
+  font: 15px/1.5 var(--font-ui);
+}
+
+.pane {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 var(--font-ui);
+  padding: 14px;
+  border: 1px solid var(--border);
+}
+
+.pane[data-scheme="dark"] {
+  color-scheme: dark;
+}
+
+.pane[data-scheme="light"] {
+  color-scheme: light;
+}
+
+.pane-name {
+  margin: 0 0 8px;
+  font: 700 12px var(--font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.note,
+.caption {
+  margin: 0 0 10px;
+  max-width: 120ch;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.note code {
+  font: 13px var(--font-code);
+  color: var(--accent);
+}
+
+.caption {
+  margin: 4px 0 0;
+  color: var(--text);
+}
+
+.column {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.grid-two {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 16px 24px;
+  justify-content: start;
+}
+
+.take {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.take-label {
+  margin: 0;
+  font: 600 12px var(--font-ui);
+  color: var(--muted);
+}
+
+.take-label b {
+  display: inline-block;
+  min-width: 2.2em;
+  margin-right: 4px;
+  padding: 1px 6px;
+  text-align: center;
+  background: var(--accent);
+  color: var(--accent-text);
+  font: 700 13px var(--font-code);
+}
+
+.shot > .caption {
+  max-width: 440px;
+}
+
+.take .board {
+  max-height: none;
+  width: 440px;
+}
+
+/* the landing ring: a line in the game's cyan over a halo */
+.land {
+  pointer-events: none;
+}
+
+.land circle {
+  fill: none;
+}
+
+.land .halo {
+  stroke: var(--land-halo);
+  stroke-width: 8;
+}
+
+.land .ink {
+  stroke: var(--land);
+  stroke-width: 3.4;
+}
+
+/* the new art: lit amber line work for the key (a thing to act on), violet for the door's structure; names are plain
+   text on a plate or a halo and carry no glow */
+.k-line,
+.d-line,
+.tag,
+.edge-rule {
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.k-line {
+  fill: var(--key-fill);
+  stroke: var(--wire-amber);
+  filter: drop-shadow(0 0 1.8px var(--glow-amber));
+}
+
+.tag {
+  fill: var(--plate-fill);
+  stroke: var(--wire-amber);
+  filter: drop-shadow(0 0 1.8px var(--glow-amber));
+}
+
+.d-line {
+  stroke: var(--wire-wall);
+  filter: drop-shadow(0 0 1.8px var(--glow-wall, transparent));
+}
+
+.d-slab {
+  fill: var(--slab-fill);
+}
+
+.d-void {
+  fill: var(--doorway);
+}
+
+.d-grain {
+  fill: none;
+  stroke: var(--wire-wall);
+  stroke-width: 1.4;
+  opacity: 0.7;
+}
+
+.edge-rule {
+  fill: none;
+  stroke: var(--wire-amber);
+  opacity: 0.8;
+}
+
+.name {
+  fill: var(--text);
+  font-family: var(--font-code);
+  font-weight: 700;
+}
+
+.name.edge-name {
+  paint-order: stroke;
+  stroke: var(--name-halo);
+  stroke-width: 4px;
+}
+
+/* pane 3: the level screen's layout, the side panels as stand-ins */
+.frame {
+  display: grid;
+  grid-template-columns: 62px max-content 176px;
+  gap: 10px;
+  align-items: start;
+}
+
+.frame .board {
+  width: 280px;
+}
+
+.stub {
+  border: 1px dashed var(--border);
+  padding: 6px;
+  min-height: 120px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.stub-head {
+  margin: 0 0 6px;
+  font: 700 10px var(--font-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.stub-bar {
+  margin: 0 0 5px;
+  height: 5px;
+  background: var(--border);
+}
+
+.stub-bar.short {
+  width: 60%;
+}
+
+.stub-code {
+  margin: 0 0 4px;
+  font: 10px/1.3 var(--font-code);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.stage {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.stage-S2 {
+  grid-template-columns: auto auto;
+  align-items: start;
+}
+
+.satchel-box {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  min-width: 0;
+}
+
+.satchel-head {
+  margin: 0;
+  display: flex;
+  gap: 8px;
+  font: 700 11px var(--font-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.satchel-head span {
+  font: 11px var(--font-code);
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+.satchel {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  gap: 4px;
+}
+
+.satchel-S1,
+.satchel-S3 {
+  flex-wrap: wrap;
+  max-width: 280px;
+}
+
+.satchel-S2 {
+  flex-direction: column;
+}
+
+.chip,
+.slot {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid var(--slot-line);
+  background: var(--panel);
+}
+
+.slot {
+  border-style: dashed;
+}
+
+.satchel-S1 .chip,
+.satchel-S1 .slot {
+  width: 72px;
+  height: 26px;
+  padding: 0 4px;
+}
+
+.satchel-S2 .chip,
+.satchel-S2 .slot {
+  width: 96px;
+  height: 26px;
+  padding: 0 4px;
+}
+
+.satchel-S3 .chip {
+  height: 26px;
+  padding: 0 6px 0 4px;
+  border-color: var(--wire-amber);
+}
+
+.glyph {
+  flex: none;
+  width: 24px;
+  height: 15px;
+}
+
+.glyph .k-line {
+  stroke-width: 2.6;
+}
+
+.chip-name {
+  font: 700 13px var(--font-code);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.chip-index {
+  font: 11px var(--font-code);
+  color: var(--muted);
+}
+
+.python {
+  margin: 4px 0 0;
+  display: grid;
+  gap: 2px;
+  font: 12px var(--font-code);
+}
+
+.py-say {
+  color: var(--muted);
+}
+
+.py-out {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
