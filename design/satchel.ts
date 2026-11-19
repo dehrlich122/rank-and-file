@@ -1,6 +1,7 @@
 // M5.3 (design sheet): Chapter 8 (The Satchel), before any of it goes into the game.
 //   /design/satchel.html
-// Pane 1 the key (K1 to K3), pane 2 the door (D1, D2), pane 3 the satchel (S1 to S3), each in both themes. Every board is
+// Pane 1 the key (K1 to K3), pane 2 the door (D1, D2), pane 3 the satchel (S1 to S3), pane 4 the two board shapes (L1,
+// L2, H1), pane 5 the examiner with a list (X1 to X3, T1, T2), each in both themes. Every board is
 // drawn with the game's real sprites and classes on a made-up 6 by 5 board; the key, the door and the satchel are drawn
 // here, in this file, because the real sprites come after the designer picks. Dev-only; nothing here is in the game.
 // The only new colours are tokens in satchel.css.
@@ -12,7 +13,7 @@ import "../src/chrome.css";
 import "./satchel.css";
 import type { Pos } from "../src/py/protocol";
 import { h } from "../src/ui/dom";
-import { hero, tile } from "../src/ui/sprites";
+import { goal, hero, tile } from "../src/ui/sprites";
 import { litGrid, M, S } from "../src/ui/sprites/floor";
 import { svg } from "../src/ui/svg";
 
@@ -21,8 +22,6 @@ const tag = (id: string, text: string) => h("p", { class: "take-label" }, h("b",
 
 // -- the made-up board: 6 by 5, stepping stones over a chasm -----------------------------------------------------------
 
-const W = 6;
-const H = 5;
 const KNIGHT: Pos = [1, 1];
 const THING: Pos = [2, 3]; // the stone a key lies on, or a door stands on: a jump from the knight
 const STONES: Pos[] = [KNIGHT, THING, [0, 3], [3, 1], [4, 3], [5, 1], [3, 4], [2, 0]];
@@ -44,18 +43,30 @@ interface Thing {
   blocks?: boolean; // a locked door is not a landing square
 }
 
+/** Everything about a board's shape: panes 1 to 3 use the 6 by 5 one, pane 4 its own. */
+interface Geo {
+  w: number;
+  h: number;
+  knight: Pos;
+  stones: Pos[];
+  goal?: Pos;
+}
+const SHEET: Geo = { w: 6, h: 5, knight: KNIGHT, stones: STONES };
+
 interface Spec {
   things: Thing[];
   label: string;
+  geo?: Geo;
 }
 
 /** A jump from the knight lands where it is on the board and not a locked door (a pit is a legal, deadly landing). */
-function landings(things: Thing[]): Pos[] {
+function landings(things: Thing[], { w, h: rows, knight }: Geo): Pos[] {
   const blocked = things.filter((t) => t.blocks).map((t) => t.at);
-  return JUMPS.map((j): Pos => [KNIGHT[0] + j[0], KNIGHT[1] + j[1]]).filter(([x, y]) => x >= 0 && x < W && y >= 0 && y < H && !has(blocked, [x, y]));
+  return JUMPS.map((j): Pos => [knight[0] + j[0], knight[1] + j[1]]).filter(([x, y]) => x >= 0 && x < w && y >= 0 && y < rows && !has(blocked, [x, y]));
 }
 
-function drawBoard({ things, label }: Spec): SVGSVGElement {
+function drawBoard({ things, label, geo = SHEET }: Spec): SVGSVGElement {
+  const { w: W, h: H, knight, stones } = geo;
   const at = ([x, y]: Pos) => `translate(${M + x * S + S / 2} ${(H - 1 - y) * S + S / 2})`;
   const place = (cls: string, pos: Pos, art: SVGElement) => svg("g", { class: cls, transform: at(pos) }, art);
   const cells = Array.from({ length: W * H }, (_, i): Pos => [i % W, Math.floor(i / W)]);
@@ -64,13 +75,14 @@ function drawBoard({ things, label }: Spec): SVGSVGElement {
     { class: "squares" },
     ...cells.flatMap(([x, y]) => {
       const rect = svg("rect", { x: M + x * S, y: (H - 1 - y) * S, width: S, height: S, class: (x + y) % 2 === 1 ? "sq-light" : "sq-dark" });
-      return has(STONES, [x, y]) ? [rect] : [rect, place("spr", [x, y], tile("pit"))];
+      return has(stones, [x, y]) ? [rect] : [rect, place("spr", [x, y], tile("pit"))];
     }),
   );
-  const rings = landings(things).map((p) => svg("g", { class: "land", transform: at(p) }, svg("circle", { r: 21, class: "halo" }), svg("circle", { r: 21, class: "ink" })));
+  const rings = landings(things, geo).map((p) => svg("g", { class: "land", transform: at(p) }, svg("circle", { r: 21, class: "halo" }), svg("circle", { r: 21, class: "ink" })));
   const board = svg("svg", { class: "board", viewBox: `0 0 ${M + W * S} ${H * S}`, role: "img", "aria-label": label });
+  if (geo.goal) squares.append(place("spr", geo.goal, goal()));
   board.append(squares, litGrid(W, H), svg("g", { "aria-hidden": "true" }, ...rings), ...things.map((t) => place("thing", t.at, t.art)));
-  board.append(place("", KNIGHT, hero("knight", "east")));
+  board.append(place("", knight, hero("knight", "east")));
   return board;
 }
 
@@ -142,6 +154,7 @@ const keyGlyph = () => svg("svg", { class: "glyph", viewBox: "0 0 34 20", "aria-
 const keyThing = (look: KeyLook, name: Name, at: Pos = THING): Thing => ({ at, art: keyArt(look, name) });
 const doorThing = (look: DoorLook, name: Name, open: boolean): Thing => ({ at: THING, art: doorArt(look, name, open), blocks: !open });
 const boardOf = (label: string, ...things: Thing[]) => node(drawBoard({ things, label }));
+const boardOn = (geo: Geo, label: string, ...things: Thing[]) => drawBoard({ things, label, geo });
 const boardFigure = (caption: string, board: Node) => h("div", { class: "shot" }, board, h("p", { class: "caption" }, caption));
 
 // -- pane 1: the key ---------------------------------------------------------------------------------------------------
@@ -242,14 +255,88 @@ function satchelPane(): HTMLElement {
   return h("div", {}, h("p", { class: "note" }, "The level screen's layout (learn panel, board, code panel) with the side panels as plain stand-ins; the board is the real drawing. The satchel belongs to the board, not to the variables panel, and is drawn from the same state as the board, so it is right at every step. In the player's code it is ", h("code", {}, "knight.inventory"), ", a list of the names in the order they were picked up. Eight slots is a made-up size, to show a full satchel."), h("div", { class: "column" }, ...(["S1", "S2", "S3"] as Where[]).map(take)));
 }
 
+// -- pane 4: the two board shapes ----------------------------------------------------------------------------------------
+
+// The level screen at a 1440 by 900 window (src/styles.css, .level): the Learn column 29vw (418px), the code column a
+// quarter wider (522px), the middle column what is left less its padding (428px), and the board's height held to
+// max(240px, 100vh - 330px) (570px). A board keeps its shape, so it is drawn at the smaller of the two scales.
+const SCREEN = { learn: 418, middle: 428, code: 522, maxHeight: 570 };
+
+/** The board drawn at the size the level screen gives it: pixels across, and the pixels one square gets. */
+function fitted(geo: Geo): { width: number; square: number; heldBy: string } {
+  const across = M + geo.w * S;
+  const down = geo.h * S;
+  const byWidth = SCREEN.middle / across;
+  const byHeight = SCREEN.maxHeight / down;
+  const scale = Math.min(byWidth, byHeight);
+  return { width: Math.round(across * scale), square: Math.round(S * scale * 10) / 10, heldBy: byHeight < byWidth ? "height" : "width" };
+}
+
+function sized(geo: Geo, label: string, ...things: Thing[]): { board: Node; note: string } {
+  const board = boardOn(geo, label, ...things);
+  const { width, square, heldBy } = fitted(geo);
+  board.style.width = `${width}px`;
+  return { board: node(board), note: `${square} px a square (the board ${width} px across, held by the ${heldBy})` };
+}
+
+/** A climb of five jumps: each two squares along `along` and one to either side of it (the sides in `sides`). */
+function ladder(standing: boolean): Geo {
+  const sides = [1, -1, -1, 1, 1];
+  const start = 2;
+  const stones = [[start, 0] as Pos];
+  for (const side of sides) {
+    const [x, y] = stones[stones.length - 1]!;
+    stones.push([x + side, y + 2]);
+  }
+  const lie = (p: Pos): Pos => (standing ? p : [p[1], p[0]]);
+  const placed = stones.map(lie);
+  return { w: standing ? 6 : 11, h: standing ? 11 : 6, knight: placed[0]!, stones: placed, goal: placed[placed.length - 1]! };
+}
+
+/** The level screen's frame, side panels as stand-ins, the middle column holding what is given (a board, or a mock of the examiner). */
+function levelFrame(...middle: Node[]): HTMLElement {
+  const bars = [h("p", { class: "stub-bar" }), h("p", { class: "stub-bar" }), h("p", { class: "stub-bar short" })];
+  return h("div", { class: "level-frame" }, stub("stub-learn", "Learn", ...bars), h("div", { class: "frame-mid" }, ...middle), stub("stub-code-pane", "Code", h("p", { class: "stub-code" }, "...")));
+}
+
+const LADDER_TEXT: Record<"L1" | "L2", string> = {
+  L1: "the ladder standing up: each jump two squares up and one square left or right; a board 6 wide and 11 tall",
+  L2: "the same ladder lying down: each jump two squares right and one square up or down; a board 11 wide and 6 tall",
+};
+
+const HUB: Geo = { w: 5, h: 5, knight: [2, 2], stones: [[2, 2], ...JUMPS.map(([dx, dy]): Pos => [2 + dx, 2 + dy])] };
+const FOUR: Array<[Name, Pos]> = [["brass", [3, 4]], ["iron", [0, 1]], ["gold", [4, 1]], ["jade", [1, 0]]];
+const EIGHT_KEYS: Array<[Name, Pos]> = [["3", [3, 4]], ["7", [1, 4]], ["12", [4, 3]], ["18", [0, 3]], ["21", [4, 1]], ["5", [0, 1]], ["9", [3, 0]], ["14", [1, 0]]];
+
+function shapesPane(): HTMLElement {
+  const ladderTake = (id: "L1" | "L2") => {
+    const geo = ladder(id === "L1");
+    const { board, note } = sized(geo, `the ${id === "L1" ? "standing" : "lying"} ladder`);
+    return h("figure", { class: "take" }, tag(id, LADDER_TEXT[id]), levelFrame(board), h("p", { class: "caption" }, `At a 1440 by 900 window the level screen gives this board ${note}.`));
+  };
+  const hubBoard = (keys: Array<[Name, Pos]>, label: string) => {
+    const { board, note } = sized(HUB, label, ...keys.map(([name, at]) => keyThing("K1", name, at)));
+    return boardFigure(`${label}: ${note}`, board);
+  };
+  return h(
+    "div",
+    {},
+    h("p", { class: "note" }, "Two made-up shapes of board, no code. The knight stands on the first stone, the goal is on the last, the rings are the squares a jump from the knight could land on. The level screen is drawn as the game lays it out (learn panel, board, code panel) at a 1440 by 900 window, the side panels as plain stand-ins; the board is sized as the screen sizes it: as wide as its column, but no taller than 570 px."),
+    h("div", { class: "column" }, ladderTake("L1"), ladderTake("L2")),
+    h("p", { class: "note" }, "The hub: a stone with the eight squares a jump away from it as stones, keys on some of them."),
+    h("figure", { class: "take" }, tag("H1", "the hub, the knight on it with its eight rings; shown with four keys and with eight. The key is pane 1's take K1 (the tag), standing in for whichever key is picked"), h("div", { class: "row" }, hubBoard(FOUR, "four keys, named"), hubBoard(EIGHT_KEYS, "eight keys, numbered"))),
+  );
+}
+
 // -- the sheet ------------------------------------------------------------------------------------------------------------
 
 const pane = (scheme: "dark" | "light", name: string, child: HTMLElement) => h("div", { class: "pane", "data-scheme": scheme }, h("p", { class: "pane-name" }, name), child);
 const both = (name: string, build: () => HTMLElement) => (["dark", "light"] as const).map((scheme) => pane(scheme, `${name} · ${scheme}`, build()));
 
 document.getElementById("sheet")!.append(
-  h("header", { class: "sheet-head" }, h("h1", {}, "Chapter 8 · The Satchel"), h("p", {}, "M5.3 design sheet. Choose between the labelled takes: K1 to K3 (how a key carries its name), D1 or D2 (the door, locked and open), S1 to S3 (where the satchel sits and what it shows). Each pane is shown in the dark and the light theme.")),
+  h("header", { class: "sheet-head" }, h("h1", {}, "Chapter 8 · The Satchel"), h("p", {}, "M5.3 design sheet. Choose between the labelled takes: K1 to K3 (how a key carries its name), D1 or D2 (the door, locked and open), S1 to S3 (where the satchel sits and what it shows), L1 or L2 (which way the ladder board lies), H1 (the hub), X1 to X3 (the examiner's buttons before a run) and T1 or T2 (its table after one). Each pane is shown in the dark and the light theme.")),
   ...both("1 · The key", keyPane),
   ...both("2 · The door", doorPane),
   ...both("3 · The satchel", satchelPane),
+  ...both("4 · The two board shapes", shapesPane),
 );

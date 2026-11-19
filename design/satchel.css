@@ -261,6 +261,29 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* pane 4: the level screen at a 1440 by 900 window (the columns as src/styles.css gives them) */
+.level-frame {
+  display: grid;
+  grid-template-columns: 418px 452px 522px;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.level-frame .stub {
+  min-height: 0;
+}
+
+.frame-mid {
+  padding: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.frame-mid .board {
+  flex: none;
+}
+
 .stage {
   display: grid;
   gap: 8px;

@@ -15,11 +15,11 @@ const browser = await launch({ width: 1700, height: 900 });
 try {
   await browser.send("Emulation.setScrollbarsHidden", { hidden: true });
   await browser.send("Page.navigate", { url: base });
-  await browser.waitFor(`document.querySelectorAll(".pane").length === 6 && document.querySelectorAll(".pane .board").length >= 20`, 60_000, "sheet rendered");
+  const names = ["key", "door", "satchel", "shapes"];
+  await browser.waitFor(`document.querySelectorAll(".pane").length === ${names.length * 2} && document.querySelectorAll(".pane .board").length >= 30`, 60_000, "sheet rendered");
   await browser.evaluate(`document.fonts.ready.then(() => true)`);
   await sleep(800);
 
-  const names = ["key", "door", "satchel"];
   for (const [i, name] of names.entries()) {
     for (const [j, theme] of ["dark", "light"].entries()) {
       const rect = await browser.evaluate(`(() => { const r = document.querySelectorAll('.pane')[${i * 2 + j}].getBoundingClientRect(); return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height }; })()`);
