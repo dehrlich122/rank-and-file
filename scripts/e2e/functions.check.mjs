@@ -1,7 +1,9 @@
 // End-to-end checks for a player's own functions (Chapter 7): stepping into a function and back out, the return arrow
-// in the gutter, the variables panel inside a function, the friendly errors, a function that never stops.
-// Every program typed here is made up, on the Testing ground's practice-11 (a knight level with no rule against `def`);
-// none is a level's solution. Checks report facts (lines, counts, squares), never the editor's contents.
+// in the gutter, the variables panel inside a function, the friendly errors, a function that never stops; then the
+// examiner (the level screen's calls, the lesson snippet it calls, the cards' code spans) and the Codex's keywords.
+// Every program typed here is made up, on the Testing ground's practice-11 (a knight level with no rule against `def`)
+// or the examiner levels (a do-nothing function); none is a level's solution. Checks report facts (lines, counts,
+// squares), never the editor's contents.
 import { sleep } from "./cdp.mjs";
 import { BUTTONS, levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
@@ -10,7 +12,7 @@ const LEVEL = "practice-11";
 const ARROW = "↩";
 
 export default async function functionsChecks({ browser: b, base, root, check }) {
-  const { openLevel, setCode, run, brief, solution } = levelHelpers(b, base, root);
+  const { openLevel, setCode, run, brief, solution, challengeTab } = levelHelpers(b, base, root);
 
   const button = (index) => `document.querySelectorAll('${BUTTONS}')[${index}]`;
   const press = (index) => b.evaluate(`${button(index)}.click()`);
@@ -338,7 +340,10 @@ export default async function functionsChecks({ browser: b, base, root, check })
     expect(names[0] !== "" && names.every((name) => name === names[0]) && seen.calls.every((call) => call.endsWith(")")), "the calls are not all one function's");
     expect(seen.calls.every((call) => !/on board/i.test(call)), "an item says which board it is on");
     expect(seen.caption.startsWith("Board 1 of"), `the main board's caption starts "${seen.caption.slice(0, 12)}"`);
-    return `${seen.calls.length} calls, ${seen.thumbs} small boards`;
+    await challengeTab(); // the list sits in the Challenge panel, which has no size while the lesson is on show
+    const gap = await b.evaluate(`document.querySelector('ol.call-list').getBoundingClientRect().top - document.querySelector('p.call-intro').getBoundingClientRect().bottom`);
+    expect(gap >= 5 && gap <= 7, `the call list is ${gap}px under its sentence, not 5 to 7`);
+    return `${seen.calls.length} calls, ${seen.thumbs} small boards; the list is ${gap}px under its sentence`;
   });
 
   await check("M5.2: a failed run shows a button per call, each ✗, the first pressed, no small boards, the examiner's line and no table", async () => {
@@ -353,7 +358,14 @@ export default async function functionsChecks({ browser: b, base, root, check })
     expect(card.line && card.mark === "E", `the examiner's line: ${card.line}, its mark: ${card.mark}`);
     expect(card.table === null, "a table of calls on a level that wants no answer");
     expect(new RegExp(`worked for 0 of the ${view.calls.length} calls`).test(r.note ?? ""), `the case note: ${(r.note ?? "").slice(0, 60)}`);
-    return `${view.calls.length} calls, all ✗`;
+    // The card's sentences show the call as code, with no backtick left in the text.
+    const spans = await b.evaluate(`(() => {
+      const card = document.querySelector('.outcome-host .outcome');
+      return { codes: [...card.querySelectorAll('p code')].map((e) => e.textContent), text: card.textContent };
+    })()`);
+    expect(spans.codes.includes(view.calls[view.pressed[0]]), `no paragraph holds the pressed call in code (${spans.codes.length} code elements in paragraphs)`);
+    expect(!spans.text.includes("`"), "a backtick shows in the card's text");
+    return `${view.calls.length} calls, all ✗; the pressed call is code in the card`;
   });
 
   await check("M5.2: a call's button replays that call: it becomes the pressed one, the card speaks of it, another board is on show", async () => {
@@ -455,5 +467,145 @@ export default async function functionsChecks({ browser: b, base, root, check })
     expect(card.table.rows.every((row) => row.mark === MARK.ok && row.markClass === "ok"), "a row is not a ✓ with class ok");
     expect(card.table.rows.every((row) => row.same && row.wanted), "a got cell differs from its wanted cell");
     return `${view.calls.length} and ${answered.calls.length} calls, all ✓`;
+  });
+
+  // ---- Code spans in the cards ----
+  await check("M5.2: a misspelt ability's error card has its sentence with the line tag first, code spans and no backtick", async () => {
+    await openLevel(LEVEL, { fresh: true });
+    await setCode("knight.jum(1, 2)");
+    const r = await run();
+    expect(r.head === "Python stopped", brief(r));
+    const detail = await b.evaluate(`(() => {
+      const p = document.querySelector('.outcome-host .error-detail p');
+      return p && { first: p.firstElementChild?.className ?? null, codes: p.querySelectorAll('code').length, text: p.textContent };
+    })()`);
+    expect(detail, "the card has no .error-detail p");
+    expect(detail.first === "line-tag", `the sentence starts with ${detail.first}, not the line tag`);
+    expect(detail.codes >= 1, "the sentence holds no code element");
+    expect(!detail.text.includes("`"), "a backtick shows in the sentence");
+    return `${detail.codes} code elements, the line tag first`;
+  });
+
+  // ---- The lesson snippet the examiner calls (ch07-l03: the board only; ch07-l04: an answer back) ----
+  // Lessons are not spoilers, but the answer the examiner wants is: only its shape is read ("and got ... back"), never the value.
+  const lessonSnippets = () =>
+    b.evaluate(`[...document.querySelectorAll('.lesson .snippet')].map((s) => ({
+      call: s.querySelector('.snippet-call')?.textContent ?? null,
+      code: s.querySelector('.snippet-call code')?.textContent ?? null,
+    }))`);
+  /** Open a lesson and page to the step holding snippet `index` (a step ends with its snippet, so step N holds snippet N). */
+  async function lessonAt(id, index) {
+    await openLevel(id, { fresh: true });
+    for (let i = 0; i < index; i++) await b.evaluate(`document.querySelector('.lesson-pager .btn-primary').click()`);
+    await b.waitFor(`document.querySelectorAll('.lesson .lesson-step')[${index}]?.hidden === false`, 5000, `lesson step ${index} on show`);
+  }
+  /** Press Run on snippet `index` (its step on show) and wait for its ending status, which starts with a mark. */
+  async function runSnippet(index) {
+    const snippet = `document.querySelectorAll('.lesson .lesson-step')[${index}].querySelector('.snippet')`;
+    await b.evaluate(`${snippet}.querySelector('.btn').click()`);
+    await b.waitFor(`/^[✓✗⏱]/.test(${snippet}.querySelector('.snippet-status').textContent)`, 30_000, "the snippet's ending status");
+    return b.evaluate(`(() => {
+      const s = ${snippet};
+      const summary = s.querySelector('.snippet-summary');
+      return { status: s.querySelector('.snippet-status').textContent, summary: summary.textContent, codes: [...summary.querySelectorAll('code')].map((e) => e.textContent), caption: s.querySelector('.snippet-call code')?.textContent ?? null };
+    })()`);
+  }
+  /** Where the lesson's one caption is, and what a run of the called snippet says (A1 and A2, and A3's first half). */
+  async function calledSnippet(id, index, total) {
+    await lessonAt(id, index);
+    const all = await lessonSnippets();
+    expect(all.length === total, `${all.length} snippets, not ${total}`);
+    const withCall = all.flatMap((s, i) => (s.call === null ? [] : [i]));
+    expect(withCall.join() === String(index), `snippets with a call: [${withCall}], not [${index}]`);
+    expect(all[index].call.startsWith("The examiner calls") && /^\w+\(.*\)$/.test(all[index].code), "the caption is not 'The examiner calls' and a call in code");
+    const ran = await runSnippet(index);
+    expect(ran.status === "✓ Finished", `the status reads "${ran.status}"`);
+    expect(ran.summary.trim() !== "" && !ran.summary.includes("`"), `the summary is ${ran.summary.length} characters, backtick: ${ran.summary.includes("`")}`);
+    expect(ran.codes.includes(ran.caption), `no code element in the summary equals the caption's call (${ran.codes.length} code elements)`);
+    return ran;
+  }
+
+  await check("M5.2: ch07-l03's lesson captions only the snippet with a call, and running it reports the call in code", async () => {
+    await calledSnippet(BOARD_ONLY, 1, 3);
+    return "one caption, on the second snippet; Finished, and the summary names the call in code";
+  });
+
+  await check('M5.2: ch07-l04\'s lesson snippet with a call also says "and got ... back" after its run', async () => {
+    const ran = await calledSnippet(ANSWER, 2, 3);
+    expect(/and got .+ back/.test(ran.summary), "the summary does not say it got something back");
+    return "one caption, on the third snippet; Finished, and the summary says something came back";
+  });
+
+  await check("M5.2: a lesson snippet whose function is missing from its code ends as Not called", async () => {
+    await lessonAt(BOARD_ONLY, 1);
+    const name = (await lessonSnippets())[1].code.split("(")[0];
+    await setCode(`def ${name}_missing(*args, **kwargs):\n    pass`, ".lesson-step:not([hidden]) .snippet-editor .cm-content");
+    const ran = await runSnippet(1);
+    expect(ran.status === "✗ Not called", `the status reads "${ran.status}"`);
+    expect(!ran.summary.includes("`"), "a backtick shows in the summary");
+    return `status ${ran.status}`;
+  });
+
+  // ---- The Codex's keywords, and help() ----
+  const codexTab = () => b.evaluate(`[...document.querySelectorAll('.tab')].find((t) => t.textContent === 'Codex').click()`);
+  /** The Codex tab's "Keywords" group on a level: whether it is there, and its entries' names. */
+  async function keywords(id) {
+    await openLevel(id, { fresh: true });
+    await codexTab();
+    await b.waitFor(`document.querySelector('.codex .codex-entry')`, 20_000, "the Codex's entries");
+    return b.evaluate(`(() => {
+      let group = '';
+      const names = [];
+      for (const el of document.querySelector('.codex').children) {
+        if (el.tagName === 'H3') group = el.textContent;
+        else if (group === 'Keywords' && el.classList.contains('codex-entry')) names.push(el.dataset.codex);
+      }
+      return { group: [...document.querySelectorAll('.codex h3')].some((e) => e.textContent === 'Keywords'), names };
+    })()`);
+  }
+
+  await check("M5.2: the Codex's keywords: def comes with ch07-l02, return with ch07-l04 (not before)", async () => {
+    const seen = {};
+    for (const id of ["ch07-l01", "ch07-l02", "ch07-l03", "ch07-l04"]) seen[id] = await keywords(id);
+    const has = (id, word) => seen[id].names.includes(word);
+    expect(seen["ch07-l01"].group, "ch07-l01's Codex has no Keywords group");
+    expect(!has("ch07-l01", "def") && !has("ch07-l01", "return"), `ch07-l01 lists [${seen["ch07-l01"].names}]`);
+    expect(has("ch07-l02", "def") && !has("ch07-l02", "return"), `ch07-l02 lists [${seen["ch07-l02"].names}]`);
+    expect(has("ch07-l03", "def") && !has("ch07-l03", "return"), `ch07-l03 lists [${seen["ch07-l03"].names}]`);
+    expect(has("ch07-l04", "def") && has("ch07-l04", "return"), `ch07-l04 lists [${seen["ch07-l04"].names}]`);
+    return Object.entries(seen).map(([id, k]) => `${id}: ${k.names.length}`).join(", ");
+  });
+
+  await check("M5.2: help(\"def\") in Scratch Python prints the entry the Codex tab shows for def, on the same level", async () => {
+    await openLevel("ch07-l02", { fresh: true });
+    await codexTab();
+    await b.waitFor(`document.querySelector('.codex-entry[data-codex="def"]')`, 20_000, "the def entry");
+    // The entry's own words (its call, its summary and its paragraphs), with no backticks or spacing, to match the wrapped help text.
+    const squash = (text) => text.replace(/[`\s]/g, "");
+    const words = await b.evaluate(`(() => {
+      const e = document.querySelector('.codex-entry[data-codex="def"]');
+      return [...e.querySelectorAll('.codex-call, .codex-gist, .codex-body > p:not(.muted)')].map((p) => p.textContent);
+    })()`);
+    expect(words.length >= 2 && words.every((w) => w.trim() !== ""), `${words.length} parts found in the def entry`);
+    await b.evaluate(`document.querySelector('.repl-drawer').open = true`);
+    await b.evaluate(`document.querySelector('.repl-editor .cm-content').focus()`);
+    await b.send("Input.insertText", { text: 'help("def")' });
+    await b.key("Enter");
+    await b.waitFor(`document.querySelector('.repl-log').textContent.includes('Help on def')`, 10_000, "help's text in the log");
+    const log = squash(await b.evaluate(`document.querySelector('.repl-log').textContent`));
+    const missing = words.filter((w) => !log.includes(squash(w)));
+    expect(missing.length === 0, `${missing.length} of ${words.length} parts of the entry are not in help's text`);
+    return `${words.length} parts of the entry are in help's text`;
+  });
+
+  await check("M5.2: help() on the player's own functions prints the signature and the docstring, or says it has no description yet", async () => {
+    await openLevel(LEVEL, { fresh: true });
+    await setCode(`def stride(squares, times=2):\n    "Takes some squares, some times."\n    return squares * times\n\ndef plain(a):\n    return a\n\nhelp(stride)\nhelp(plain)`);
+    const r = await run();
+    const lines = r.console.split("\n").map((l) => l.trim());
+    const at = (start) => lines.findIndex((l) => l.startsWith(start));
+    const [sig, doc, sig2, none] = [at("stride(squares, times=2)"), at("Takes some squares, some times."), at("plain(a)"), at("It has no description yet")];
+    expect(sig >= 0 && doc > sig && sig2 > doc && none > sig2, `lines found at ${[sig, doc, sig2, none]} of ${lines.length}`);
+    return `${lines.length} console lines, signature and docstring, then signature and "no description yet"`;
   });
 }
