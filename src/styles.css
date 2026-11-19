@@ -25,6 +25,9 @@
   --step-line: light-dark(rgb(10 127 156 / 0.18), rgb(59 224 255 / 0.17));
   --selection: light-dark(rgb(10 127 156 / 0.25), rgb(59 224 255 / 0.3));
   --active-line: light-dark(rgb(10 127 156 / 0.05), rgb(255 255 255 / 0.04));
+  /* the function's names (the bar beside them) and the examiner's mark and line */
+  --scope-bar: var(--accent);
+  --examiner: light-dark(#a8610a, #ffb454);
 
   /* hostile: magenta / red, and only that */
   --bad: light-dark(#c4144f, #ff5c86);
@@ -1133,6 +1136,23 @@ pre {
   margin: 6px 0 0;
 }
 
+/* the examiner's line, apart from what happened */
+.outcome .examiner-line {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-style: italic;
+}
+
+.outcome .examiner-mark {
+  flex: none;
+  padding: 0 6px;
+  font: 700 11px var(--font-code);
+  font-style: normal;
+  background: var(--examiner);
+  color: var(--accent-text);
+}
+
 /* The code changed after this run, so the card describes an older version. */
 .outcome.stale > :not(.stale-note) {
   opacity: 0.55;
@@ -1254,6 +1274,30 @@ pre {
 
 .inspector tr.changed td {
   animation: changed 1s ease-out;
+}
+
+/* inside a function: its own names with a bar down their left, the program's names folded underneath */
+.inspector .scope {
+  border-left: 3px solid var(--scope-bar);
+}
+
+.inspector .group-head {
+  margin: 0;
+  padding: 2px 8px;
+  font: 600 13px var(--font-code);
+  color: var(--text);
+}
+
+.inspector .scope > .muted {
+  margin: 0;
+  padding: 3px 8px;
+}
+
+.inspector .fold summary {
+  cursor: pointer;
+  padding: 3px 8px;
+  font: 12px var(--font-code);
+  color: var(--muted);
 }
 
 @keyframes changed {

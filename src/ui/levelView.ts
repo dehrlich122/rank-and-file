@@ -395,7 +395,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         else shownBoard()!.show(frame.state);
         setActiveLine(editor, frame.step?.line ?? null);
         setErrorLine(editor, null);
-        inspector.show(frame.step?.vars ?? null);
+        const { step } = frame;
+        inspector.show(step?.vars ?? null, step && step.depth > 0 ? { scope: step.scope, depth: step.depth, globals: step.globals } : undefined);
         consoleView.show(consoleAt(frame));
         if (index === last) finish(result, animate ? durationMs : 0);
         else outcomeHost.replaceChildren();
