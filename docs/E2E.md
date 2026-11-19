@@ -7,9 +7,9 @@ How the browser checks work, how to write one, and what bites. Read this before 
 
 - `npm run e2e` (`scripts/e2e/`) drives the real app over the Chrome DevTools
   protocol. It needs `npm run dev` running.
-- The suites are `harness.check.mjs`, `app.check.mjs` and
-  `ui.check.mjs`, with shared helpers (`openLevel`, `setCode`, `solution`) in
-  `helpers.mjs`.
+- The suites are `harness`, `app`, `ui`, `editor`, `share`, `free` and `functions` (Chapter 7: the player's
+  own functions and the examiner; about 40 s), one `<name>.check.mjs` each; `--only=<name>` runs one. The shared
+  helpers (`openLevel`, `setCode`, `solution`, `run`, `outcome`) are in `helpers.mjs`.
 - Each check is `check(label, fn)`, where `fn` throws via
   `expect`.
 - It writes
