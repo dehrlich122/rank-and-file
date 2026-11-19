@@ -8,39 +8,12 @@ import { expect } from "./suite.mjs";
 const LEVELS = ["ch01-l01", "ch01-l02", "ch01-l03", "ch01-l04", "ch01-l05"];
 
 export default async function appChecks({ browser: b, base, root, check }) {
-  const { solution, withoutExpectLine, openLevel, setCode, editorText, clickButton, hasButton, challengeTab } = levelHelpers(b, base, root);
+  const { solution, withoutExpectLine, openLevel, setCode, editorText, clickButton, hasButton, challengeTab, run, outcome, brief } = levelHelpers(b, base, root);
   const { wordAt, hover, hoverAway } = hoverHelpers(b);
   const { keepingSettings } = settingsHelpers(b);
 
   const button = (index) => `document.querySelectorAll('${BUTTONS}')[${index}]`;
 
-  /** Press Run, optionally jump to the end, and describe the outcome. */
-  async function run({ jump = true } = {}) {
-    await b.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
-    await b.waitFor(`!document.querySelector('.outcome-host').textContent.includes('Running')`, 20_000, "run finished");
-    return outcome({ jump });
-  }
-
-  /** Once a recording is playing: optionally jump to its end, then describe the outcome card. */
-  async function outcome({ jump = true } = {}) {
-    if (jump) await b.evaluate(`(() => { const e = ${button(4)}; if (!e.disabled) e.click(); })()`);
-    await b.waitFor(`document.querySelector('.outcome-host .outcome')`, 30_000, "outcome card");
-    return b.evaluate(`({
-      head: document.querySelector('.outcome-head strong').textContent,
-      tone: document.querySelector('.outcome-host .outcome').className,
-      buttons: [...document.querySelectorAll('.outcome-host .outcome-head a, .outcome-host .outcome-head button')].map((e) => e.textContent),
-      note: document.querySelector('.outcome-host .case-note')?.textContent ?? null,
-      text: document.querySelector('.outcome-host .outcome').innerText.replace(/\\s+/g, ' '),
-      errorLine: !!document.querySelector('.level-right .cm-error-line'),
-      warnMarks: document.querySelectorAll('.level-right .cm-lint-marker-warning').length,
-      step: document.querySelector('.step-label').textContent,
-      vars: [...document.querySelectorAll('.inspector tr')].map((r) => r.innerText.replace(/\\s+/g, ' ')),
-      console: document.querySelector('.console').innerText,
-      next: document.querySelector('.outcome-host a')?.textContent ?? null,
-      stars: document.querySelectorAll('.outcome-host .stars li.earned').length,
-    })`);
-  }
-  const brief = (r) => `${r.head}: ${r.text.slice(0, 110)}`;
   /** What the game said in the console (guards, pick-ups, falls). Check it in Node; never report it: it can give a solution away. */
   const gameMessages = () => b.evaluate(`[...document.querySelectorAll('.console .game-message')].map((e) => e.textContent)`);
 
