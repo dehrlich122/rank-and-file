@@ -86,11 +86,12 @@ try {
     for (;;) {
       result = await runSuite(name, run, browser);
       if (!result.diedAt) break;
+      const why = browser.crashed();
       await browser.close();
       browser = await startBrowser();
       if (restarts === ATTEMPTS - 1) break;
       restarts++;
-      console.log(`RESTART  ${name}: Chrome died at ${result.diedAt}; new Chrome, attempt ${restarts + 1} of ${ATTEMPTS}`);
+      console.log(`RESTART  ${name}: Chrome died at ${result.diedAt} (${why}); new Chrome, attempt ${restarts + 1} of ${ATTEMPTS}`);
     }
     const { suite, diedAt } = result;
     if (diedAt) {
