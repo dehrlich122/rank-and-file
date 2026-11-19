@@ -2,7 +2,7 @@
 // and the outcome of a run.
 import { VOICE } from "./voice";
 import type { ErrorInfo, LevelInfo, LevelResult, Star, Var } from "../py/protocol";
-import { h } from "./dom";
+import { h, withCode } from "./dom";
 import { icon } from "./icons";
 import type { LogEntry } from "./playback";
 
@@ -132,7 +132,7 @@ export function errorCard(error: ErrorInfo): HTMLElement {
   return h(
     "div",
     { class: "error-detail" },
-    h("p", {}, error.line ? h("span", { class: "line-tag" }, `Line ${error.line}`) : null, error.friendly),
+    h("p", {}, error.line ? h("span", { class: "line-tag" }, `Line ${error.line}`) : null, ...withCode(error.friendly)),
     error.traceback
       ? h("details", {}, h("summary", {}, "Show Python's traceback"), h("pre", { class: "traceback" }, error.traceback))
       : null,
@@ -172,19 +172,19 @@ export function outcomeCard(run: LevelResult, shown: LevelResult, actions: HTMLE
   if (result.error) {
     body.push(errorCard(result.error));
   } else if (result.problems.length > 0) {
-    body.push(h("ul", { class: "problems" }, ...result.problems.map((problem) => h("li", {}, problem))));
+    body.push(h("ul", { class: "problems" }, ...result.problems.map((problem) => h("li", {}, ...withCode(problem)))));
   } else {
     // an examiner's case: what happened, then its line in its own voice (`happened` never carries "Solved! ")
     const happened = result.call?.happened;
     const said = result.call?.said;
     if (happened && said) {
       body.push(
-        h("p", {}, happened),
+        h("p", {}, ...withCode(happened)),
         h("p", { class: "examiner-line" }, h("span", { class: "examiner-mark", title: "the examiner" }, "E"), `“${said}”`),
       );
     } else {
       const summary = result.status === "solved" ? result.summary.replace(/^Solved! /, "") : result.summary;
-      body.push(h("p", {}, summary));
+      body.push(h("p", {}, ...withCode(summary)));
     }
   }
   const table = callsTable(run, shown, replay);
@@ -228,7 +228,7 @@ function callsTable(run: LevelResult, shown: LevelResult, replay?: (index: numbe
 export function callList(examine: NonNullable<LevelInfo["examine"]>, boards: LevelInfo[]): HTMLElement[] {
   const plain = boards.length === 0 || examine.calls.every((c, i) => c.board === i + 1);
   return [
-    h("p", {}, "The examiner will call:"),
+    h("p", { class: "call-intro" }, "The examiner will call:"),
     h("ol", { class: "call-list" }, ...examine.calls.map((c) => h("li", {}, h("code", { class: "call-code" }, c.text), plain ? null : h("span", { class: "muted small" }, ` on board ${c.board}`)))),
   ];
 }

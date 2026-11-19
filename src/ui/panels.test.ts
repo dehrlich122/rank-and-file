@@ -116,6 +116,7 @@ describe("outcomeCard on an examiner level", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   const whole = "The examiner called `f(1)`, and the board is as it should be.";
+  const plain = whole.replaceAll("`", ""); // the backticks become a code element, which adds no characters
   const result = (over: Partial<LevelResult>): LevelResult =>
     ({ status: "solved", summary: `Solved! ${whole} “Fine.”`, error: null, problems: [], stars: [], case_note: "", truncated: false, call: null, cases: [], ...over }) as LevelResult;
   const call = { text: "f(1)", returned: null, wanted: null, first_step: 0, happened: whole, said: "Fine." };
@@ -124,7 +125,7 @@ describe("outcomeCard on an examiner level", () => {
   it("shows what happened, then the examiner's line apart with its mark", () => {
     const c = card(result({ call }));
     const paras = c.all("p").map((p) => p.text);
-    expect(paras).toContain(whole);
+    expect(paras).toContain(plain);
     const line = c.find("examiner-line")[0]!;
     expect(line.text).toBe("E“Fine.”");
     expect(line.find("examiner-mark")[0]!.attributes.get("title")).toBe("the examiner");
@@ -133,8 +134,46 @@ describe("outcomeCard on an examiner level", () => {
 
   it("is as before with no happened, or with a problem", () => {
     expect(card(result({ call: { ...call, happened: null, said: null } })).find("examiner-line").length).toBe(0);
-    expect(card(result({ call: null })).all("p").map((p) => p.text)).toContain(`${whole} “Fine.”`);
+    expect(card(result({ call: null })).all("p").map((p) => p.text)).toContain(`${plain} “Fine.”`);
     expect(card(result({ call, problems: ["no"] })).find("examiner-line").length).toBe(0);
+  });
+});
+
+describe("the result card shows `code` spans as code", () => {
+  beforeEach(() => vi.stubGlobal("document", fakeDocument));
+  afterEach(() => vi.unstubAllGlobals());
+
+  const base = { status: "lost", summary: "", error: null, problems: [], stars: [], case_note: "", truncated: false, call: null, cases: [] };
+  const card = (over: Partial<LevelResult>) => {
+    const run = { ...base, ...over } as LevelResult;
+    return asFake(outcomeCard(run, run));
+  };
+  const codes = (f: Fake) => f.all("code").map((c) => c.text);
+
+  it("an error's friendly text, with the Line tag first and the second line kept", () => {
+    const c = card({ status: "error", error: { line: 3, friendly: "Did you mean `move`?\nTry again.", traceback: "" } as LevelResult["error"] });
+    const p = c.all("p")[0]!;
+    expect((p.children[0] as Fake).attributes.get("class")).toBe("line-tag");
+    expect(codes(c)).toEqual(["move"]);
+    expect(p.text).toBe("Line 3Did you mean move?\nTry again.");
+  });
+
+  it("each problem", () => {
+    const c = card({ status: "incomplete", problems: ["Use `for` here.", "Plain."] });
+    expect(codes(c)).toEqual(["for"]);
+    expect(c.all("li").map((li) => li.text)).toEqual(["Use for here.", "Plain."]);
+  });
+
+  it("what happened on an examiner's call", () => {
+    const c = card({ status: "solved", call: { text: "f(1)", returned: null, wanted: null, first_step: 0, happened: "It called `f(1)`.", said: "Fine." } });
+    expect(codes(c)).toEqual(["f(1)"]);
+    expect(c.all("p")[0]!.text).toBe("It called f(1).");
+  });
+
+  it("a plain summary, with Solved! stripped", () => {
+    const c = card({ status: "solved", summary: "Solved! A `while` loop ran." });
+    expect(codes(c)).toEqual(["while"]);
+    expect(c.all("p")[0]!.text).toBe("A while loop ran.");
   });
 });
 

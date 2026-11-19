@@ -648,9 +648,9 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   // -- mistakes get plain-language explanations (all deliberately wrong code) ----------
   const mistakes = [
-    ["typo in an ability", "pawn.mvoe()", (r) => r.head === "Python stopped" && r.text.includes("Did you mean `move`") && r.errorLine],
-    ["typo in pawn", "pwan.move()", (r) => r.text.includes("Did you mean `pawn`")],
-    ["locked ability", "pawn.turn_left()", (r) => r.text.includes("hasn't learned `turn_left` yet")],
+    ["typo in an ability", "pawn.mvoe()", (r) => r.head === "Python stopped" && r.text.includes("Did you mean move") && r.errorLine],
+    ["typo in pawn", "pwan.move()", (r) => r.text.includes("Did you mean pawn")],
+    ["locked ability", "pawn.turn_left()", (r) => r.text.includes("hasn't learned turn_left yet")],
     ["text instead of a number", 'pawn.move("3")', (r) => r.text.includes("Numbers don't have quote marks")],
     ["missing bracket", "pawn.move(\npawn.move()", (r) => r.text.includes("never closed") && r.errorLine],
     ["bad indentation", "pawn.move()\n    pawn.move()", (r) => r.text.includes("starts with spaces")],
@@ -766,7 +766,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
       await sleep(300);
     }
     const log = await b.evaluate(`document.querySelector('.repl-log').innerText.replace(/\\s+/g, ' ')`);
-    expect(log.includes("40") && log.includes("Did you mean `gold`"), log);
+    expect(log.includes("40") && log.includes("Did you mean gold"), log);
     return log.slice(0, 120);
   });
 
@@ -976,7 +976,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await setCode("for step in range(2):\n    print(stpe)\n");
     const typo = await run();
     expect(noRange.head === "Python stopped" && noRange.text.includes("give the number to range(): for step in range(5):"), brief(noRange));
-    expect(typo.head === "Python stopped" && typo.text.includes("Did you mean `step`?"), brief(typo));
+    expect(typo.head === "Python stopped" && typo.text.includes("Did you mean step?"), brief(typo));
   });
 
   await check("M3.3: range()'s Codex entry counts in steps, and it's New in 3.1", async () => {
@@ -1076,7 +1076,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await openLevel("ch05-l01", { fresh: true });
     const stopped = await runSnippet(1);
     const message = await b.evaluate(`${snippet(1)}.innerText.replace(/\\s+/g, ' ')`);
-    expect(/stopped/i.test(stopped.status) && message.includes("A `while` repeats as long as its condition is True"), `${stopped.status} | ${message.slice(0, 120)}`);
+    expect(/stopped/i.test(stopped.status) && message.includes("A while repeats as long as its condition is True"), `${stopped.status} | ${message.slice(0, 120)}`);
   });
 
   await check("M3.5: an ability without parentheses in a while condition gets a warning on its line", async () => {

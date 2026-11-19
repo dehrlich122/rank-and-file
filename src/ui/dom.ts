@@ -25,7 +25,12 @@ export function h<K extends keyof HTMLElementTagNameMap>(
   return element;
 }
 
-/** Text with `backtick` spans shown as code (hints, Codex entries). Always text nodes, never HTML. */
+/** Text with `backtick` spans shown as code (hints, Codex entries). Always text nodes, never HTML. An odd, last backtick (one the player typed) stays in the text, and what follows it stays plain. */
 export function withCode(text: string): Array<string | HTMLElement> {
-  return text.split("`").map((part, i) => (i % 2 === 1 ? h("code", {}, part) : part));
+  const parts = text.split("`");
+  if (parts.length % 2 === 0) {
+    const last = parts.pop()!;
+    parts[parts.length - 1] += "`" + last;
+  }
+  return parts.map((part, i) => (i % 2 === 1 ? h("code", {}, part) : part));
 }
