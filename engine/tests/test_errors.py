@@ -89,6 +89,19 @@ def test_lesson_snippets_say_in_this_level_like_levels(code, friendly):
     assert "Here it knows" not in result.error.friendly
 
 
+def test_a_run_that_lost_its_tracer_says_so_without_a_line(corridor):
+    caught = "def f():\n    f()\ntry:\n    f()\nexcept RecursionError:\n    pass\n"
+    for code in (caught, "import sys\nsys.settrace(None)\n"):
+        result = run_level(corridor, code)
+        assert result.status == "error"
+        assert result.error.friendly == (
+            "The game lost track of this program partway through, so the run ends here. "
+            "That happens when a function calls itself until Python stops it and the program carries on anyway. "
+            "Give the function a way to stop calling itself."
+        )
+        assert result.error.line is None
+
+
 def test_a_real_level_keeps_in_this_level(corridor):
     result = run_level(corridor, "pawn.wait()")
     assert "Your pawn hasn't learned `wait` yet. In this level it knows: move" in result.error.friendly

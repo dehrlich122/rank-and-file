@@ -715,7 +715,8 @@ def _entry_for(thing, piece: type[Piece] = Pawn) -> Entry | None:
     method = f"str.{getattr(thing, '__name__', '')}"
     if method in METHODS and (isinstance(owner, str) or thing is getattr(str, thing.__name__)):  # "x".upper, or str.upper
         return python_entry(method)
-    return next((python_entry(name) for name in BUILTINS if thing is getattr(builtins, name)), None)
+    # `help` is in `builtins` only once `site` has run; a missing one is None, which must not match help(None)
+    return next((python_entry(name) for name in BUILTINS if thing is not None and thing is getattr(builtins, name, None)), None)
 
 
 def format_entry(entry: Entry) -> str:

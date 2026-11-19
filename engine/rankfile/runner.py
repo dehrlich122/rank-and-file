@@ -28,6 +28,7 @@ from . import codex
 from .board import Tile, square_name
 from .constraints import check_constraints, code_lines, lint
 from .errors import ErrorInfo, _kind, closest, explain
+from .exceptions import LostTrackError
 from .levels import NOT_JUDGED, Case, Examine, ExamineCall, Level, names, sandbox_level
 from .pieces import PIECES
 from .tracer import PLAYER_FILENAME, StepBudgetExceeded, Tracer, safe_repr
@@ -40,8 +41,10 @@ DEFAULT_LINE_BUDGET = 100_000
 # honest program needs; a function that calls itself forever would take the browser's Python that deep, which
 # can kill the page, and leave a recording of hundreds of identical steps nobody can scrub.
 CALL_DEPTH = 200
-# Frames the engine itself adds on top of the player's deepest call (the tracer's callbacks, the output capture, a
-# piece's move and its events), so the engine's own work never hits the limit instead of the player's code.
+# Frames added to the limit for the engine's own work (the tracer's callbacks, the output capture, a piece's move and
+# its events). They reserve nothing: they only raise the limit, and the player's frames can use them too. At the last
+# frames before the limit an ability can be cut short between the world's change and its event, so the final state
+# and the recording disagree (seen at depths 212-213); left as it is.
 ENGINE_FRAMES = 20
 
 
@@ -563,6 +566,7 @@ def execute(
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output), tracer:
             with contextlib.suppress(SystemExit):  # exit() or sys.exit(): the program chose to stop, which is fine
                 exec(compiled, namespace)
+            _check_tracing(tracer)
             if call is not None:
                 reached = True
                 name, args = call
@@ -573,6 +577,7 @@ def execute(
                     with contextlib.suppress(SystemExit):  # the call chose to stop: it handed back nothing
                         made.returned = namespace[name](*copy.deepcopy(args))
                     made.finished = True
+                    _check_tracing(tracer)
     except BaseException as exc:
         error = exc
     finally:
@@ -583,6 +588,13 @@ def execute(
         made.first_step = len(tracer.steps)  # the program failed first
     text = output.getvalue()
     return replace(made, error=error, output=text, call_output=text[printed_from:] if reached else "")
+
+
+def _check_tracing(tracer: Tracer) -> None:
+    """A run whose tracer was dropped (a RecursionError raised in its own callback, which the program caught; or
+    sys.settrace(None)) went on unwatched: no budget, no recording, no line clocks. It is never judged on its board."""
+    if not tracer.is_tracing():
+        raise LostTrackError
 
 
 def _stack_depth() -> int:
