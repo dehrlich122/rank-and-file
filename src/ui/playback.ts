@@ -40,6 +40,22 @@ export function buildFrames(result: Pick<LevelResult, "start" | "steps">): Frame
   return frames;
 }
 
+/**
+ * The line that made the call `steps[at]` runs inside: the line of the nearest earlier step at a lower depth
+ * (the caller; deeper steps and `continues` steps in between don't matter). Null at module level and out of range.
+ * The examiner's own call (`firstStep`, from `LevelResult.call`) has no calling line: from there on, never look
+ * back past it, because the steps before it are the program's `def`s, not a caller.
+ */
+export function callingLine(steps: readonly Step[], at: number, firstStep?: number): number | null {
+  const depth = steps[at]?.depth ?? 0;
+  if (depth === 0) return null;
+  const floor = firstStep !== undefined && at >= firstStep ? firstStep : 0;
+  for (let i = at - 1; i >= floor; i--) {
+    if (steps[i]!.depth < depth) return steps[i]!.line;
+  }
+  return null;
+}
+
 /** The console as it stands at `frame`. */
 export function consoleAt(frame: Frame): LogEntry[] {
   return frame.log.slice(0, frame.logLength);

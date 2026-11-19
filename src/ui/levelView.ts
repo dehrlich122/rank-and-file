@@ -9,14 +9,14 @@ import { levelTagsRow } from "./challengeTags";
 import { askTier } from "./tierTags";
 import { ChipTooltip, codexHover, renderCodex, type CodexLookup, type CodexView } from "./codex";
 import { h, withCode } from "./dom";
-import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
+import { clearMarks, createEditor, getCode, setActiveLine, setCallLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
 import { masteryTag } from "./lessonsMenu";
 import { Console, Inspector, callList, noticeCard, outcomeCard } from "./panels";
 import { callCompletion, KnownCalls } from "./completion";
 import { HelpPanel, type HelpFocus } from "./help";
 import { icon, type IconName } from "./icons";
-import { Player, buildFrames, consoleAt, controlStates } from "./playback";
+import { Player, buildFrames, callingLine, consoleAt, controlStates } from "./playback";
 import type { ReplPanel } from "./repl";
 import type { SettingsDialog } from "./settingsDialog";
 import { lessonHost, type LevelHost } from "./levelHost";
@@ -45,6 +45,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   let level: LevelInfo | null = null;
   let board: BoardView | null = null;
   let caseBoard: BoardView | null = null; // the board of the case being replayed (M2), shown instead
+  let callCaption: HTMLElement | null = null; // an examiner level's "The examiner calls ..." line, above the board on show
   let thumbs: BoardView[] = []; // a level's other boards, small, beside the one on show (QA-032)
   const shownBoard = () => caseBoard ?? board;
   let runResult: LevelResult | null = null; // the last run as a whole: its verdict, stars and cases
@@ -394,7 +395,12 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         if (animate && frame.step) shownBoard()!.animate(frame.step.events, durationMs);
         else shownBoard()!.show(frame.state);
         setActiveLine(editor, frame.step?.line ?? null);
+        setCallLine(editor, callingLine(result.steps, index - 1, result.call?.first_step));
         setErrorLine(editor, null);
+        if (callCaption) {
+          const call = result.call;
+          callCaption.replaceChildren(...(call && index - 1 >= call.first_step ? ["The examiner calls ", h("code", {}, call.text)] : [" "]));
+        }
         const { step } = frame;
         inspector.show(step?.vars ?? null, step && step.depth > 0 ? { scope: step.scope, depth: step.depth, globals: step.globals } : undefined);
         consoleView.show(consoleAt(frame));
@@ -415,6 +421,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   function finish(result: LevelResult, afterMs: number): void {
     if (result.error) {
       setActiveLine(editor, null);
+      setCallLine(editor, null);
       setErrorLine(editor, result.error.line);
     }
     // The verdict and what's on offer follow the run as a whole; the details
@@ -462,7 +469,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     const buttons = run.cases.map((c, i) =>
       h("button", { class: "btn btn-small btn-toggle", "aria-pressed": String(i === index), onClick: () => showCase(i, "play") }, `${c.label} ${verdict(c)}`),
     );
-    boardHost.replaceChildren(h("div", { class: "case-row", role: "group", "aria-label": title }, examiner ? null : h("span", { class: "muted small" }, `${title}:`), ...buttons), caseBoard.element);
+    callCaption = examiner ? h("p", { class: "boards-caption" }, " ") : null; // the words come with the playback: they start at the call's first step
+    boardHost.replaceChildren(h("div", { class: "case-row", role: "group", "aria-label": title }, examiner ? null : h("span", { class: "muted small" }, `${title}:`), ...buttons), ...(callCaption ? [callCaption] : []), caseBoard.element);
   }
 
   // -- other maps (M3.2, QA-032) ---------------------------------------------------------
@@ -471,6 +479,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   // Clicking a small board puts it on show, and replays it after a run.
   function showBoards(shown: number, run: LevelResult | null): void {
     if (!level || !board) return;
+    callCaption = null;
     caseBoard?.dispose();
     for (const thumb of thumbs) thumb.dispose();
     const boards = level.boards; // the same boards a run's cases come back with
@@ -508,6 +517,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   function resetStage(): void {
     player?.dispose();
     player = null;
+    callCaption = null;
     if (level?.boards.length) showBoards(0, null);
     else if (caseBoard && board) {
       caseBoard.dispose();
