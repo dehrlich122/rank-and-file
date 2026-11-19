@@ -18,6 +18,7 @@ The lessons (lessons/ch07/) are written by hand: they are what the player reads 
 
 import random
 from functools import cache
+from itertools import combinations
 
 import yaml
 from gen_knight import shortest
@@ -87,14 +88,16 @@ def named(square: Pos) -> str:
     return f"{chr(97 + square[0])}{square[1] + 1}"
 
 
-def routes(rng: random.Random, plan: list[str], size: tuple[int, int]):
+def routes(rng: random.Random, plan: list[str], size: tuple[int, int], differ: tuple[tuple[str, ...], ...] = ()):
     """Every choice of a jump for each name in `plan` whose stones are a snake that fits a board of `size`, in the
-    seed's order: the choice (name to jump) and the squares, from the origin."""
+    seed's order: the choice (name to jump) and the squares, from the origin. The names in each group of
+    `differ` get jumps that all differ (checked as each is chosen, so a bad start is dropped at once)."""
     order = list(dict.fromkeys(plan))
 
     def go(chosen: dict):
         squares = laid([chosen[name] for name in plan[: next((i for i, name in enumerate(plan) if name not in chosen), len(plan))]])
-        if not snake(squares) or not fits(squares, size):
+        same = any(len({chosen[name] for name in group if name in chosen}) < sum(name in chosen for name in group) for group in differ)
+        if same or not snake(squares) or not fits(squares, size):
             return
         if len(chosen) == len(order):
             yield dict(chosen), squares
@@ -314,7 +317,206 @@ def answers(_spec: dict, rng: random.Random) -> dict:
     }
 
 
-MAKERS = {"stepping": stepping, "figure": named_figure, "orders": orders, "answers": answers}
+# -- 7.5: scope -----------------------------------------------------------------------------------------
+
+QUESTION = "Halt! What did the three crossings cost you in all? Answer with the number."
+RUNES = "abcdefhijkmnqrstuvwyz"  # a board's rune stones, in the path's order
+TOLL = {  # 7.5's fixed lines
+    "head": "qrs pebff(fgbarf):",
+    "zero": "gbyy = 0",
+    "loop": "sbe v va enatr(fgbarf):",
+    "pay": "gbyy += vag(xavtug.ernq())",
+    "back": "erghea gbyy",
+    "first": "gbgny = pebff({})",
+    "more": "gbgny += pebff({})",
+    "say": "cevag(gbgny)",
+    "outer": "gbgny = 0",
+    "leak": "gbgny += vag(xavtug.ernq())",
+    "plain": "pebff({})",
+    "show": "cevag(gbyy)",
+    "typed": "cevag({})",
+    "after": "gbgny = gbyy",
+}
+
+
+def runes(squares: list[Pos], rng: random.Random) -> tuple[dict[Pos, str], dict, int]:
+    """Rune stones with a number each: their marks on the map, their legend, and what they come to."""
+    numbers = [rng.randint(1, 9) for _ in squares]
+    legend = {RUNES[n]: {"tile": "rune", "text": str(number)} for n, number in enumerate(numbers)}
+    return {square: RUNES[n] for n, square in enumerate(squares)}, legend, sum(numbers)
+
+
+def tolls(spec: dict, rng: random.Random) -> dict | None:
+    """Three bridges of rune stones, each crossed by one jump over and over, joined by single jumps; then the
+    stone beside a guard's gate, and three jumps round onto the gate itself, with the goal one jump beyond."""
+    lengths = rng.sample(spec["bridges"], 3)
+    plan = [name for n, length in enumerate(lengths) for name in [*["a"] * length, f"c{n}"]] + ["g0", "g1", "g2", "f"]
+    for chosen, squares in routes(rng, plan, spec["size"], (("a", "c0"), ("a", "c1"))):
+        beside, gate = squares[-5], squares[-2]
+        if abs(beside[0] - gate[0]) + abs(beside[1] - gate[1]) != 1:
+            continue
+        squares = placed(squares, spec["size"], rng)
+        stones = [squares[at] for at, name in enumerate(plan, start=1) if name == "a"]
+        boards = [runes(stones, rng) for _ in range(3)]
+        if len({total for _, _, total in boards}) < 3:
+            continue
+        drawn = board(squares, spec["size"], {**boards[0][0], squares[-2]: "X"})
+        guard = lambda total: {"X": {"tile": "gate", "question": QUESTION, "passphrase": str(total)}}  # noqa: E731
+        line = {key: said(value) for key, value in TOLL.items()}
+        step, joins, home = JUMP(*chosen["a"]), jumping([chosen[f"c{n}"] for n in range(3)]), jumping([chosen[name] for name in plan[-4:]])
+
+        def program(head: list[str], first: str, more: str, say: str, step=step, joins=joins, home=home, line=line) -> list[str]:
+            crossings = [line[first].format(lengths[0]), *[line[more].format(length) for length in lengths[1:]]]
+            return [*head, *[code for pair in zip(crossings, joins, strict=True) for code in pair], say, *home]
+
+        walk = [line["loop"], *indented([step])]
+        own = [line["zero"], line["loop"], *indented([step, line["pay"]])]
+        loops = [code for length, join in zip(lengths, joins, strict=True) for code in [FOR.format("i", length), *indented([step, line["leak"]]), join]]
+        return {
+            "level": {"map": drawn, "legend": {"O": "pit", **boards[0][1], **guard(boards[0][2])}, "variants": [{"map": drawn, "legend": {**legend, **guard(total)}} for _, legend, total in boards[1:]]},
+            "open": {"map": drawn, "legend": {"O": "pit", **boards[0][1], "X": {"tile": "floor"}}},
+            "reference": program([line["head"], *indented([*own, line["back"]])], "first", "more", line["say"]),
+            "wrong": {
+                "typed": program([line["head"], *indented(walk)], "plain", "plain", line["typed"].format(boards[0][2])),
+                "outside": program([line["outer"], line["head"], *indented([line["loop"], *indented([step, line["leak"]])])], "plain", "plain", line["say"]),
+                "printed": program([line["head"], *indented([*own, line["show"]])], "first", "more", line["say"]),
+                "gone": [line["head"], *indented(own), line["plain"].format(lengths[0]), line["after"]],
+                "loops": [line["outer"], *loops, line["say"], *home],
+            },
+            "shape": f"{len(squares)} stones, bridges of {sorted(lengths)} runes, 3 boards",
+            "fills": {},
+            "lengths": [len(plan)],
+        }
+    return None
+
+
+# -- 7.6: functions that call functions -----------------------------------------------------------------
+
+PAIR, LONG, SHORT = said("cnve"), said("ybat"), said("fubeg")  # the reference's names for its three functions
+
+
+def flat(route: list[str]) -> int:
+    """The fewest lines found for the route with functions that never call each other: each holds jumps (and
+    loops) only. Every one function is tried, every two of the 40 best, every three of the 12 best."""
+    seq, spots = tuple(route), {}
+    for size in range(2, len(seq) // 2 + 1):
+        for at in range(len(seq) - size + 1):
+            spots.setdefault(seq[at : at + size], []).append(at)
+    pieces = [piece for piece, at in spots.items() if at[-1] - at[0] >= len(piece)]
+
+    def lines(chosen: tuple) -> int:
+        best, back = [0] + [len(seq)] * len(seq), [(0, "")] * (len(seq) + 1)
+        for end in range(1, len(seq) + 1):
+            best[end], back[end] = best[end - 1] + 1, (end - 1, seq[end - 1])
+            for number, piece in enumerate(chosen):
+                start = end - len(piece)
+                if start >= 0 and seq[start:end] == piece and best[start] + 1 < best[end]:
+                    best[end], back[end] = best[start] + 1, (start, f"f{number}()")
+        tokens, end = [], len(seq)
+        while end:
+            end, token = back[end]
+            tokens.append(token)
+        return sum(1 + len(looped(list(piece))) for piece in chosen) + len(looped(tokens[::-1]))
+
+    ranked = sorted(pieces, key=lambda piece: lines((piece,)))
+    tried = [(piece,) for piece in ranked] + list(combinations(ranked[:40], 2)) + list(combinations(ranked[:12], 3))
+    return min([len(looped(route)), *map(lines, tried)])
+
+
+def nested(spec: dict, rng: random.Random) -> dict | None:
+    """A small figure of two jumps inside two bigger figures (three of it with two jumps between, two of it with
+    one), which follow each other twice, joined by single jumps that differ."""
+    small = ["s0", "s1"]
+    longer, shorter = [*small, "x", *small, "y", *small], [*small, "z", *small]
+    plan = [*longer, "c0", *shorter, "c1", *longer, "c2", *shorter]
+    tried = 0
+    for chosen, squares in routes(rng, plan, spec["size"], (("s0", "s1"), ("x", "y"), ("c0", "c1", "c2"))):
+        tried += 1
+        if tried > spec["tries"]:
+            break
+        jump = {name: JUMP(*chosen[name]) for name in chosen}
+        joins = [jump["c0"], jump["c1"], jump["c2"]]
+        reference = [
+            *[f"def {PAIR}():", *indented([jump["s0"], jump["s1"]])],
+            *[f"def {LONG}():", *indented([f"{PAIR}()", jump["x"], f"{PAIR}()", jump["y"], f"{PAIR}()"])],
+            *[f"def {SHORT}():", *indented([f"{PAIR}()", jump["z"], f"{PAIR}()"])],
+            *[f"{LONG}()", joins[0], f"{SHORT}()", joins[1], f"{LONG}()", joins[2], f"{SHORT}()"],
+        ]
+        route = [jump[name] for name in plan]
+        limit = len(reference) + spec["slack"]
+        if len(looped(route)) <= limit or (fewest := flat(route)) <= limit:
+            continue
+        one_layer = [f"def {PAIR}():", *indented([jump["s0"], jump["s1"]]), *[f"{PAIR}()" if name == "s0" else jump[name] for name in plan if name != "s1"]]
+        return {
+            "level": {"map": board(placed(squares, spec["size"], rng), spec["size"]), "legend": {"O": "pit"}},
+            "reference": reference,
+            "wrong": {"written": route, "loops": looped(route), "flat": one_layer},
+            "shape": f"{len(route) + 1} stones, {len(route)} jumps written out, {len(looped(route))} lines with loops alone, {fewest} at best with functions that never call each other, the limit {limit}",
+            "fills": {},
+            "lengths": [len(route)],
+        }
+    return None
+
+
+# -- 7.7: the mastery -------------------------------------------------------------------------------------
+
+RIDE = {  # 7.7's fixed lines
+    "head": "qrs evqr(oevqtrf, fgbarf={}):",
+    "bare": "qrs evqr(oevqtrf, fgbarf):",
+    "zero": "gbgny = 0",
+    "outer": "sbe v va enatr(oevqtrf):",
+    "sized": "sbe v va enatr({}):",
+    "inner": "sbe w va enatr(fgbarf):",
+    "pay": "gbgny += vag(xavtug.ernq())",
+    "back": "erghea gbgny",
+    "typed": "erghea {}",
+}
+
+
+def round_of(_spec: dict, rng: random.Random) -> dict:
+    """The examiner calls with a number of bridges and the stones on each, once leaving the stones out. A bridge
+    is one jump over and over onto rune stones; another jump joins it to the next, or to the goal."""
+    usual = 2
+    calls = rng.sample([(3, None), (2, 3), (1, 4), (1, 3)], 4)  # what fits a board: every bridge runs the same way
+    laps = [[(bridges, stones or usual)] for bridges, stones in calls]
+    path = lambda a, c, bridges, stones: laid(([a] * stones + [c]) * bridges)  # noqa: E731
+    good = lambda a, c: all(snake(path(a, c, *lap)) and fits(path(a, c, *lap), (SIDE, SIDE)) for [lap] in laps)  # noqa: E731
+    a, c = rng.choice([(a, c) for a in KNIGHT_JUMPS for c in KNIGHT_JUMPS if a != c and good(a, c)])
+    boards, totals = [], []
+    for [(bridges, stones)] in laps:
+        squares, size = tight(path(a, c, bridges, stones))
+        marks, legend, total = runes([square for at, square in enumerate(squares) if at % (stones + 1)], rng)
+        boards.append({"map": board(squares, size, marks), "legend": legend})
+        totals.append(total)
+    line = {key: said(value) for key, value in RIDE.items()}
+
+    def spell(head: str, outer: str, back: str) -> list[str]:
+        return [head, *indented([line["zero"], outer, *indented([line["inner"], *indented([JUMP(*a), line["pay"]]), JUMP(*c)]), back])]
+
+    head = line["head"].format(usual)
+    return {
+        "level": {
+            "map": boards[0]["map"],
+            "legend": {"O": "pit", **boards[0]["legend"]},
+            "variants": boards[1:],
+            "examine": {
+                "function": "ride",
+                "calls": [{"args": [bridges, stones] if stones else [bridges], "board": n, "returns": total} for n, ((bridges, stones), total) in enumerate(zip(calls, totals, strict=True), start=1)],
+            },
+        },
+        "reference": spell(head, line["outer"], line["back"]),
+        "wrong": {
+            "typed": spell(head, line["outer"], line["typed"].format(totals[0])),
+            "sized": spell(head, line["sized"].format(calls[0][0]), line["back"]),
+            "nodefault": spell(line["bare"], line["outer"], line["back"]),
+        },
+        "shape": f"4 boards of {[bridges * ((stones or usual) + 1) + 1 for bridges, stones in calls]} stones",
+        "fills": {},
+        "lengths": [bridges * ((stones or usual) + 1) for bridges, stones in calls],
+    }
+
+
+MAKERS = {"stepping": stepping, "figure": named_figure, "orders": orders, "answers": answers, "tolls": tolls, "nested": nested, "round": round_of}
 
 # -- the levels -----------------------------------------------------------------------------------------
 
@@ -404,6 +606,77 @@ LEVELS = [
         "note": "Gur ersrerapr whzcf vgf fgevqrf, ernqf gur ehar naq gheaf vgf grkg vagb n ahzore jvgu vag(), znxrf gur ynfg whzc gb gur tbny, "
         "naq bayl gura ergheaf gur ahzore: erghea raqf gur shapgvba, fb vg unf gb pbzr ynfg.",
     },
+    {
+        "id": "ch07-l05",
+        "kind": "tolls",
+        "seed": 7501,
+        "title": "What Happens in the Spell",
+        "trains": "Scope: a function's own names, and why values go in through parameters and come out through return",
+        "brief": "Three toll bridges. Every stone on a bridge names its toll. At the gate the guard asks what the three crossings cost you in all.",
+        "api": ["jump", "read"],
+        "size": (12, 12),
+        "bridges": [1, 2, 3],  # every bridge runs the same way, so longer ones don't fit a board
+        "slack": 0,
+        "rules": {"define": 1},
+        "lesson_board": {
+            "map": ". R . . .\n. . . . X\nP . . . .",
+            "legend": {"R": {"tile": "rune", "text": "4"}, "X": {"tile": "gate", "question": "What did the crossing cost you?", "passphrase": "4"}},
+            **OPEN,
+        },
+        "hint3": ["said", "Gur shapgvba ergheaf vgf bja fhz, naq gur cebtenz nqqf vg gb gur gbgny:\ngbgny = pebff(...)\ngbgny += pebff(...)"],
+        "wrong": ["typed", "outside", "printed", "gone", "loops"],
+        "hints": [
+            "Bar shapgvba pna pebff nal bs gur guerr oevqtrf, vs vg vf gbyq ubj znal fgbarf gur oevqtr unf. Jung fubhyq vg unaq onpx?",
+            "N anzr znqr vafvqr n shapgvba yvirf bayl gurer, naq fgnegf serfu ba rirel pnyy. N shapgvba pna ernq n anzr sebz bhgfvqr, ohg vg pnaabg punatr bar: "
+            "nqqvat gb na bhgfvqr gbgny sebz vafvqr vf na reebe. Fb nqq rnpu gbyy gb n anzr bs gur shapgvba'f bja, erghea vg, naq xrrc gur gbgny bhgfvqr. "
+            "Cevag gur gbgny ba gur fgbar orfvqr gur tngr.",
+        ],
+        "note": "Gur ersrerapr unf bar shapgvba gung pebffrf n oevqtr bs nal yratgu: vg nqqf rnpu gbyy gb n anzr bs vgf bja naq ergheaf gur fhz. "
+        "Gur cebtenz xrrcf gur gbgny bhgfvqr, nqqf rnpu pebffvat gb vg, naq cevagf vg orfvqr gur tngr. "
+        "Guerr ybbcf jevggra bhg pbzr gb {ybbcf} yvarf, bar bire gur yvzvg bs {yvarf}.",
+    },
+    {
+        "id": "ch07-l06",
+        "kind": "nested",
+        "seed": 7601,
+        "title": "Spells That Cast Spells",
+        "trains": "Functions that call functions: a long job taken apart into small named pieces",
+        "brief": "The longest road yet, and the shortest spellbook you can write for it. Small spells, and bigger spells made of them.",
+        "api": ["jump"],
+        "size": (12, 12),
+        "slack": 1,
+        "tries": 400,
+        "lesson_board": {"map": ". . . . .\n. . . . .\nP . . . .", **OPEN},
+        "hint3": ["said", "N shapgvba gung pnyyf nabgure:\nqrs cnve():\n    xavtug.whzc(...)\n    xavtug.whzc(...)\n\nqrs ybat():\n    cnve()\n    xavtug.whzc(...)\n    cnve()"],
+        "wrong": ["written", "loops", "flat"],
+        "hints": [
+            "Ybbx sbe gur fznyyrfg svther gung ercrngf, gura sbe gur ovttre svtherf gung ner znqr bs vg.",
+            "N shapgvba pna pnyy nabgure shapgvba. Anzr gur fznyy svther svefg. Gura anzr rnpu ovttre svther, naq va vgf obql pnyy gur fznyy bar "
+            "vafgrnq bs jevgvat vgf whzcf ntnva. Gur cebtenz vgfrys vf gura n srj pnyyf naq gur whzcf va orgjrra.",
+        ],
+        "note": "Gur ersrerapr anzrf gur fznyy svther bapr, naq ohvyqf gur gjb ovttre svtherf bhg bs pnyyf gb vg. "
+        "Jevggra bhg, gur ebhgr vf {jevggra} yvarf, naq jvgu shapgvbaf gung arire pnyy rnpu bgure vg vf {syng}; gur ersrerapr vf {yvarf}.",
+    },
+    {
+        "id": "ch07-l07",
+        "kind": "round",
+        "seed": 7701,
+        "title": "The Examiner's Round",
+        "trains": "Mastery: a function with parameters and a default, a total kept inside it and returned",
+        "brief": "The examiner's last test: several toll bridges in one ride, and it wants the whole bill.",
+        "api": ["jump", "read"],
+        "mastery": True,
+        "lesson_board": {"map": ". . . . .\n. . . . .\nP . . . .", **OPEN},
+        "hint3": ["said", "N ybbc vafvqr n ybbc, naq n gbgny gung vf erghearq:\n    gbgny = 0\n    sbe v va enatr(oevqtrf):\n        sbe w va enatr(fgbarf):\n            ...\n    erghea gbgny"],
+        "wrong": ["typed", "sized", "nodefault"],
+        "hints": [
+            "Rirel pnyy fnlf ubj znal oevqtrf, naq ubj znal fgbarf ba rnpu. Jura vg yrnirf gur frpbaq bhg, pbhag gur fgbarf ba gung obneq.",
+            "Bar ybbc pebffrf n oevqtr, ernqvat rirel ehar naq nqqvat vg gb n gbgny. Nabgure ybbc ehaf gung bapr sbe rnpu oevqtr, "
+            "jvgu gur whzc gung wbvaf gur oevqtrf nsgre vg. Gur gbgny yvirf vafvqr gur shapgvba naq vf erghearq ng gur raq.",
+        ],
+        "note": "Gur ersrerapr vf bar shapgvba: n ybbc bire gur oevqtrf, naq vafvqr vg n ybbc bire gur fgbarf bs bar oevqtr, nqqvat rnpu ehar gb n gbgny "
+        "gung vf erghearq ng gur raq. Gur frpbaq cnenzrgre unf n qrsnhyg sbe gur pnyy gung yrnirf vg bhg.",
+    },
 ]
 
 # -- writing a level ------------------------------------------------------------------------------------
@@ -428,7 +701,9 @@ def drawn(spec: dict, made: dict) -> dict:
 
 def confirmed(spec: dict, made: dict) -> list[str]:
     """The engine's own count of the fewest jumps on each board, against the stones'."""
-    level = parse_level(yaml.safe_load(yaml_text(drawn(spec, made), chapter=CHAPTER, api=spec["api"], par=99, hints=["", "", ""])))
+    # a guard's gate can't be passed without the answer, so a board with one is counted with the gate left open
+    opened = {key: value for key, value in spec.items() if key != "rules"} if "open" in made else spec
+    level = parse_level(yaml.safe_load(yaml_text(drawn(opened, {**made, "level": made.get("open", made["level"])}), chapter=CHAPTER, api=spec["api"], par=99, hints=["", "", ""])))
     fewest = [len(route) if (route := shortest(case.level, looks=False)) else None for case in level.cases()]
     print(f"  {made['shape']}; fewest jumps on each board, by the engine: {fewest}; along the stones: {made['lengths']}")
     return [] if fewest == made["lengths"] else [f"{spec['id']}: a board has another way than along its stones"]
