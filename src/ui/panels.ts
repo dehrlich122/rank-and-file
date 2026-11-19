@@ -1,7 +1,7 @@
 // The small read-only panels around the board: variables, console output,
 // and the outcome of a run.
 import { VOICE } from "./voice";
-import type { ErrorInfo, LevelResult, Star, Var } from "../py/protocol";
+import type { ErrorInfo, LevelInfo, LevelResult, Star, Var } from "../py/protocol";
 import { h } from "./dom";
 import { icon } from "./icons";
 import type { LogEntry } from "./playback";
@@ -164,7 +164,7 @@ const HEADLINE: Record<LevelResult["status"], string> = {
  * run: its headline, colour and stars. `shown` is the recording being played:
  * the run itself, or one of its cases (M2), which supplies the details.
  */
-export function outcomeCard(run: LevelResult, shown: LevelResult, actions: HTMLElement[] = [], showStars = true): HTMLElement {
+export function outcomeCard(run: LevelResult, shown: LevelResult, actions: HTMLElement[] = [], showStars = true, replay?: (index: number) => void): HTMLElement {
   const result = shown;
   const body: HTMLElement[] = [];
   const note = [run.case_note, shown === run ? "" : shown.case_note].filter(Boolean).join(" ");
@@ -187,6 +187,8 @@ export function outcomeCard(run: LevelResult, shown: LevelResult, actions: HTMLE
       body.push(h("p", {}, summary));
     }
   }
+  const table = callsTable(run, shown, replay);
+  if (table) body.push(table);
   if (showStars && run.stars.length) body.push(starList(run.stars));
   if (result.truncated) {
     body.push(h("p", { class: "muted small" }, "This run was very long, so only its beginning was recorded for playback."));
@@ -200,6 +202,35 @@ export function outcomeCard(run: LevelResult, shown: LevelResult, actions: HTMLE
     ...body,
   );
   return run.status === "solved" ? h("div", { class: "complete-wrap" }, h("div", { class: "complete-banner play", "aria-hidden": "true" }, h("span", { class: "complete-text", "data-text": VOICE.complete }, VOICE.complete)), card) : card;
+}
+
+/** On an examiner level, each call's answer wanted and got, a row each; a click replays that call. Nothing when only the board was judged (the buttons say as much). */
+function callsTable(run: LevelResult, shown: LevelResult, replay?: (index: number) => void): HTMLElement | null {
+  if (!run.cases.some((c) => c.call?.wanted != null)) return null;
+  const picked = run.cases.findIndex((c) => c === shown);
+  const rows = run.cases.map((c, i) => {
+    const wanted = c.call?.wanted ?? null; // a call with no answer wanted leaves both cells empty
+    const got = wanted === null ? null : (c.call?.returned ?? h("span", { class: "muted" }, "no answer"));
+    const ok = c.status === "solved";
+    return h(
+      "tr",
+      { class: i === picked ? "picked" : undefined },
+      h("td", {}, h("button", { class: "btn btn-small", title: `Replay ${c.label}`, onClick: () => replay?.(i) }, c.label)),
+      h("td", {}, wanted),
+      h("td", {}, got),
+      h("td", { class: ok ? "ok" : "no" }, ok ? "✓" : "✗"),
+    );
+  });
+  return h("table", { class: "calls" }, h("thead", {}, h("tr", {}, ...["call", "wanted", "got", ""].map((t) => h("th", {}, t)))), h("tbody", {}, ...rows));
+}
+
+/** The calls an examiner will make, numbered, for the Challenge panel (M5.2-6b). A call names its board only when calls and boards don't match one to one. */
+export function callList(examine: NonNullable<LevelInfo["examine"]>, boards: LevelInfo[]): HTMLElement[] {
+  const plain = boards.length === 0 || examine.calls.every((c, i) => c.board === i + 1);
+  return [
+    h("p", {}, "The examiner will call:"),
+    h("ol", { class: "call-list" }, ...examine.calls.map((c) => h("li", {}, h("code", { class: "call-code" }, c.text), plain ? null : h("span", { class: "muted small" }, ` on board ${c.board}`)))),
+  ];
 }
 
 /** A solved run's stars, each with what it's for (M2). */

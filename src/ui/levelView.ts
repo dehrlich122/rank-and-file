@@ -12,7 +12,7 @@ import { h, withCode } from "./dom";
 import { clearMarks, createEditor, getCode, setActiveLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
 import { masteryTag } from "./lessonsMenu";
-import { Console, Inspector, noticeCard, outcomeCard } from "./panels";
+import { Console, Inspector, callList, noticeCard, outcomeCard } from "./panels";
 import { callCompletion, KnownCalls } from "./completion";
 import { HelpPanel, type HelpFocus } from "./help";
 import { icon, type IconName } from "./icons";
@@ -441,24 +441,28 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         }
       }
     }
-    outcomeHost.replaceChildren(outcomeCard(whole, result, actions, host.stars));
+    outcomeHost.replaceChildren(outcomeCard(whole, result, actions, host.stars, (i) => showCase(i, "play")));
   }
 
   // -- several cases (M2): a hidden goal's ? squares ----------------------------------------
   // A run comes back with every case's result. The board shows the case being
   // replayed (its goal, and ✓ or ✗ on each ? square), and a row of buttons
-  // above it replays any other case.
+  // above it replays any other case. An examiner's calls (M5.2-6b) are cases too, one per
+  // call: calls and boards needn't match, so its row has no small boards and no ? squares.
   function showCaseBoard(run: LevelResult, index: number): void {
-    if (level?.boards.length) return showBoards(index, run);
+    const examiner = !!level?.examine;
+    if (level?.boards.length && !examiner) return showBoards(index, run);
     caseBoard?.dispose();
+    for (const thumb of thumbs) thumb.dispose(); // the small boards of an examiner level, from before the run
+    thumbs = [];
     // ✓ or ✗ on each ? square: whether the code reached a goal hidden there.
-    const spots = new Map(run.cases.flatMap((c) => (c.level.goal ? [[squareName(c.level.goal), c.status === "solved"] as const] : [])));
+    const spots = examiner ? undefined : new Map(run.cases.flatMap((c) => (c.level.goal ? [[squareName(c.level.goal), c.status === "solved"] as const] : [])));
     caseBoard = new BoardView(run.cases[index]!.level, { spots });
-    const title = level?.case_title ?? "";
+    const title = examiner ? "The examiner's calls" : (level?.case_title ?? "");
     const buttons = run.cases.map((c, i) =>
       h("button", { class: "btn btn-small btn-toggle", "aria-pressed": String(i === index), onClick: () => showCase(i, "play") }, `${c.label} ${verdict(c)}`),
     );
-    boardHost.replaceChildren(h("div", { class: "case-row", role: "group", "aria-label": title }, h("span", { class: "muted small" }, `${title}:`), ...buttons), caseBoard.element);
+    boardHost.replaceChildren(h("div", { class: "case-row", role: "group", "aria-label": title }, examiner ? null : h("span", { class: "muted small" }, `${title}:`), ...buttons), caseBoard.element);
   }
 
   // -- other maps (M3.2, QA-032) ---------------------------------------------------------
@@ -594,6 +598,7 @@ function describeChallenge(level: LevelInfo, tags: HTMLElement, openEntry: (name
   // every player-facing description of the game's rules.
   const list = (className: string, items: string[]) => h("ul", { class: className }, ...items.map((item) => h("li", {}, ...withCode(item)))); // `code` spans in a sentence show as code (QA-065)
   if (level.goals.length) parts.push(h("h3", {}, "Goal"), list("objectives", level.goals));
+  if (level.examine) parts.push(...callList(level.examine, level.boards));
   for (const [label, writings] of [["Signpost", level.signs], ["Rune", level.runes]] as const) {
     for (const writing of writings) {
       parts.push(h("blockquote", { class: "sign-text" }, h("span", { class: "muted small" }, `${label} on ${squareName(writing.pos)}`), writing.text));

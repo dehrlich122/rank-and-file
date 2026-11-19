@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LevelResult, Var } from "../py/protocol";
+import type { LevelInfo, LevelResult, Var } from "../py/protocol";
 import { type Fake, asFake, fakeDocument } from "./dom.fake";
-import { Inspector, outcomeCard, piecesFirst } from "./panels";
+import { Inspector, callList, outcomeCard, piecesFirst } from "./panels";
 
 const v = (name: string, type: string): Var => ({ name, value: "0", type });
 const names = (vars: Var[]) => vars.map((x) => x.name).join(",");
@@ -117,7 +117,7 @@ describe("outcomeCard on an examiner level", () => {
 
   const whole = "The examiner called `f(1)`, and the board is as it should be.";
   const result = (over: Partial<LevelResult>): LevelResult =>
-    ({ status: "solved", summary: `Solved! ${whole} “Fine.”`, error: null, problems: [], stars: [], case_note: "", truncated: false, call: null, ...over }) as LevelResult;
+    ({ status: "solved", summary: `Solved! ${whole} “Fine.”`, error: null, problems: [], stars: [], case_note: "", truncated: false, call: null, cases: [], ...over }) as LevelResult;
   const call = { text: "f(1)", returned: null, wanted: null, first_step: 0, happened: whole, said: "Fine." };
   const card = (run: LevelResult) => asFake(outcomeCard(run, run));
 
@@ -135,5 +135,119 @@ describe("outcomeCard on an examiner level", () => {
     expect(card(result({ call: { ...call, happened: null, said: null } })).find("examiner-line").length).toBe(0);
     expect(card(result({ call: null })).all("p").map((p) => p.text)).toContain(`${whole} “Fine.”`);
     expect(card(result({ call, problems: ["no"] })).find("examiner-line").length).toBe(0);
+  });
+});
+
+describe("callList: the examiner's calls in the Challenge panel", () => {
+  beforeEach(() => vi.stubGlobal("document", fakeDocument));
+  afterEach(() => vi.unstubAllGlobals());
+
+  const calls = (...boards: number[]) => ({ function: "f", calls: boards.map((board, i) => ({ text: `f(${i})`, board })) });
+  const boards = (n: number) => Array.from({ length: n }, () => ({})) as unknown as LevelInfo["boards"];
+  const items = (nodes: HTMLElement[]) => asFake(nodes[1]!).all("li");
+
+  it("is a sentence and a numbered list, one item per call in order", () => {
+    const nodes = callList(calls(1, 2, 3), boards(3));
+    expect(nodes.map((n) => asFake(n).tag)).toEqual(["p", "ol"]);
+    expect(asFake(nodes[0]!).text).toBe("The examiner will call:");
+    expect(asFake(nodes[1]!).attributes.get("class")).toBe("call-list");
+    expect(items(nodes).map((li) => li.text)).toEqual(["f(0)", "f(1)", "f(2)"]);
+    expect(items(nodes).every((li) => li.find("call-code").length === 1)).toBe(true);
+  });
+
+  it("names no board when there are no other boards, or each call has its own", () => {
+    expect(items(callList(calls(1, 1, 1), boards(0))).map((li) => li.text)).toEqual(["f(0)", "f(1)", "f(2)"]);
+    expect(items(callList(calls(1, 2), boards(2))).every((li) => li.find("muted").length === 0)).toBe(true);
+  });
+
+  it("names the board on every item when calls and boards differ", () => {
+    expect(items(callList(calls(1, 1, 2), boards(2))).map((li) => li.text)).toEqual(["f(0) on board 1", "f(1) on board 1", "f(2) on board 2"]);
+    expect(items(callList(calls(2, 1), boards(2))).map((li) => li.find("muted").length)).toEqual([1, 1]);
+  });
+});
+
+describe("outcomeCard: the examiner's table of calls", () => {
+  beforeEach(() => vi.stubGlobal("document", { ...fakeDocument, createElementNS: (_ns: string, tag: string) => fakeDocument.createElement(tag) })); // the star list draws svg icons
+  afterEach(() => vi.unstubAllGlobals());
+
+  type Call = { returned: string | null; wanted: string | null };
+  const make = (over: Partial<LevelResult>): LevelResult =>
+    ({ status: "solved", summary: "Solved! ok", error: null, problems: [], stars: [], case_note: "", truncated: false, call: null, cases: [], ...over }) as LevelResult;
+  const aCase = (label: string, status: LevelResult["status"], call: Call | null) =>
+    make({ status, label, call: call && { text: label, first_step: 0, happened: null, said: null, ...call } } as Partial<LevelResult>) as LevelResult["cases"][number];
+  const three = [
+    aCase("f(1)", "solved", { wanted: "2", returned: "2" }),
+    aCase("f(2)", "lost", { wanted: "4", returned: "'4'" }),
+    aCase("f(3)", "lost", { wanted: "6", returned: null }),
+  ];
+  const card = (run: LevelResult, shown: LevelResult = run, replay?: (i: number) => void) => asFake(outcomeCard(run, shown, [], true, replay));
+  const rows = (c: Fake) => c.all("tbody")[0]!.all("tr");
+  const cells = (row: Fake) => row.all("td").map((td) => td.text);
+
+  it("has the head and one row per case, in order, after the details and before the stars", () => {
+    const run = make({ status: "lost", cases: three, stars: [{ kind: "solved", earned: false, label: "s" }] });
+    const c = card(run, three[1]);
+    const table = c.find("calls")[0]!;
+    expect(table.tag).toBe("table");
+    expect(table.all("th").map((th) => th.text)).toEqual(["call", "wanted", "got", ""]);
+    expect(rows(c).length).toBe(3);
+    expect(rows(c).map((r) => r.all("button")[0]!.text)).toEqual(["f(1)", "f(2)", "f(3)"]);
+    expect(cells(rows(c)[0]!).slice(1)).toEqual(["2", "2", "✓"]);
+    expect(cells(rows(c)[1]!).slice(1)).toEqual(["4", "'4'", "✗"]);
+    const order = c.children.map((child) => (typeof child === "string" ? "" : (child.attributes.get("class") ?? "")));
+    expect(order.indexOf("calls")).toBeGreaterThan(-1);
+    expect(order.indexOf("calls")).toBeLessThan(order.indexOf("stars"));
+  });
+
+  it("marks the case on show, the tick and the cross by the case's status", () => {
+    const run = make({ cases: three });
+    const c = card(run, three[2]);
+    expect(rows(c).map((r) => r.attributes.get("class") ?? "")).toEqual(["", "", "picked"]);
+    expect(rows(c).map((r) => r.all("td")[3]!.attributes.get("class"))).toEqual(["ok", "no", "no"]);
+    expect(card(run).find("picked").length).toBe(0); // the run itself on show: no row picked
+  });
+
+  it("says no answer, in muted type, where a call did not finish; never None", () => {
+    const c = card(make({ cases: three }), three[2]);
+    const got = rows(c)[2]!.all("td")[2]!;
+    expect(got.text).toBe("no answer");
+    expect(got.find("muted").length).toBe(1);
+  });
+
+  it("leaves wanted and got empty where nothing is wanted or the case never ran", () => {
+    const run = make({ cases: [three[0]!, aCase("f(2)", "lost", { wanted: null, returned: "3" }), aCase("f(3)", "lost", null)] });
+    const c = card(run);
+    expect(cells(rows(c)[1]!)).toEqual(["f(2)", "", "", "✗"]);
+    expect(cells(rows(c)[2]!)).toEqual(["f(3)", "", "", "✗"]);
+  });
+
+  it("is not there with no cases, or when no case has an answer wanted", () => {
+    expect(card(make({})).find("calls").length).toBe(0);
+    const boardOnly = [aCase("f(1)", "solved", { wanted: null, returned: null }), aCase("f(2)", "lost", null)];
+    expect(card(make({ cases: boardOnly })).find("calls").length).toBe(0);
+  });
+
+  it("shows on a solved run, on a failed one, and beside an error", () => {
+    expect(card(make({ cases: three })).find("calls").length).toBe(1);
+    expect(card(make({ status: "lost", cases: three })).find("calls").length).toBe(1);
+    const error = { friendly: "oops", line: 1, traceback: "" } as LevelResult["error"];
+    const c = card(make({ status: "error", error, cases: three }), make({ status: "error", error }));
+    expect(c.find("error-detail").length).toBe(1);
+    expect(c.find("calls").length).toBe(1);
+  });
+
+  it("replays the case whose button is clicked, and takes no replay without breaking", () => {
+    const seen: number[] = [];
+    const c = card(make({ cases: three }), three[0]!, (i) => seen.push(i));
+    rows(c)[2]!.all("button")[0]!.fire("click");
+    rows(c)[0]!.all("button")[0]!.fire("click");
+    expect(seen).toEqual([2, 0]);
+    expect(rows(c)[1]!.all("button")[0]!.attributes.get("title")).toBe("Replay f(2)");
+    expect(() => rows(card(make({ cases: three })))[1]!.all("button")[0]!.fire("click")).not.toThrow();
+  });
+
+  it("still takes the two arguments alone", () => {
+    const run = make({});
+    expect(asFake(outcomeCard(run, run)).find("outcome-head").length).toBe(1);
   });
 });
