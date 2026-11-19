@@ -744,8 +744,12 @@ pre {
 }
 
 /* the examiner's calls, numbered (M5.2-6b) */
+.tab-panel .call-intro {
+  margin-bottom: 0;
+}
+
 .tab-panel .call-list {
-  margin: 0;
+  margin: 6px 0 0;
   padding-left: 22px;
 }
 
