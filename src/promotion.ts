@@ -21,7 +21,7 @@ export const PROMOTIONS: Promotion[] = [
     from: "pawn",
     to: "knight",
     headline: "Promoted: pawn to knight",
-    teaser: "The knight moves in an L, over anything in its way. Its levels aren't built yet; wear its armour in Settings → Piece while you wait.",
+    teaser: "The knight moves in an L, over anything in its way. Chapter 7 is waiting.",
   },
 ];
 
