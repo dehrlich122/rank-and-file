@@ -101,6 +101,47 @@ def test_a_knight_level_is_beyond_the_walking_search_until_m5_5():
     assert [r["status"] for r in finish(Search(level))["results"]] == [NO_ROUTE]
 
 
+GATE = {"D": {"tile": "gate", "passphrase": "open"}}
+WALLED_GATE = "G # . .\n# . . .\n. . D .\nP . . .\n"  # the goal is walled in, and a gate stands where it doesn't help
+KNIGHT_GATE = "G . . .\n. . . .\n. . D .\nP . . .\n"
+
+
+def searched(level, cap=400_000) -> RouteSearch:
+    search = RouteSearch(level, cap)
+    search.run()
+    return search
+
+
+def test_a_phrase_that_opens_nothing_does_not_keep_a_walled_in_pawn_board_searching():
+    plain = searched(made(map="G # . .\n# . . .\n. . . .\nP . . .\n"))
+    gated = searched(made(map=WALLED_GATE, legend=GATE), cap=2000)
+    assert plain.status == gated.status == NO_ROUTE
+    assert gated.positions < 4 * plain.positions  # not near the cap
+
+
+@pytest.mark.parametrize("legend, say", [(GATE, ""), ({"D": {"tile": "gate", "passphrase": "open", "question": "What opens a door?"}}, ""), ({}, "open")], ids=["a gate", "a gate that asks", "an objective phrase"])
+def test_a_knight_board_with_a_phrase_to_say_ends_at_once_with_no_route(legend, say):
+    level = made(piece="knight", api=["jump"], map=KNIGHT_GATE if legend else OPEN, legend=legend, objectives=["reach_goal", {"say": say}] if say else ["reach_goal"])
+    search = searched(level)
+    assert search.status == NO_ROUTE and search.positions < 10
+
+
+def test_a_phrase_that_opens_the_only_way_to_the_goal_is_still_a_route_with_the_say_counted():
+    walled = "G . . .\n# # D #\n. . . .\nP . . .\n"
+    shut = searched(made(map=walled.replace("D", "#")))
+    through = searched(made(map=walled, legend=GATE))
+    assert shut.status == NO_ROUTE
+    assert through.status == ROUTE and ("say", "open") in through.actions
+    assert through.lines > 1  # the walk, the say and the walk on are separate lines
+
+
+def test_a_phrase_an_objective_asks_for_is_said_on_the_route_and_counted():
+    without = searched(made())
+    asked = searched(made(objectives=["reach_goal", {"say": "hello"}]))
+    assert asked.status == ROUTE and ("say", "hello") in asked.actions
+    assert asked.lines == without.lines + 1
+
+
 def test_the_check_goes_through_the_bridge_in_slices():
     started = json.loads(bridge.solve_start(json.dumps({"id": "x", "title": "x", "map": OPEN, "api": ["move"]})))
     assert started == {"ok": True, "cases": 1}
