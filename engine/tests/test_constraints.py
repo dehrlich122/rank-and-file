@@ -6,6 +6,7 @@ from conftest import make_level
 from rankfile import constraints
 from rankfile.constraints import code_lines, comment_count
 from rankfile.levels import Examine, LevelError
+from rankfile.pieces import Knight
 from rankfile.runner import run_level
 
 
@@ -120,6 +121,61 @@ def test_no_warnings_for_normal_code(corridor):
 
 def _lint(code, examine=None):
     return [(w.line, w.message) for w in constraints.lint(ast.parse(code), {}, examine)]
+
+
+def _satchel_lint(code, name="knight"):
+    knight = Knight.__new__(Knight)
+    return [(w.line, w.message) for w in constraints.lint(ast.parse(code), {name: knight, "other": object()})]
+
+
+def _satchel_note(name="knight"):
+    return f"Your knight's satchel fills only with `pick_up()`. Changing `{name}.inventory` changes a copy."
+
+
+@pytest.mark.parametrize("method", ["append", "extend", "insert", "remove", "pop", "clear", "sort", "reverse"])
+def test_changing_the_satchel_by_a_list_method_is_noted(method):
+    assert _satchel_lint(f"knight.inventory.{method}()\n") == [(1, _satchel_note())]
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["knight.inventory[0] = 'a'", "knight.inventory[0] += 'a'", "knight.inventory[0:1] = ['a']", "del knight.inventory[0]"],
+)
+def test_changing_an_item_of_the_satchel_is_noted(line):
+    assert _satchel_lint(f"{line}\n") == [(1, _satchel_note())]
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "len(knight.inventory)\n",
+        "x = 'brass' in knight.inventory\n",
+        "for key in knight.inventory:\n    pass\n",
+        "x = knight.inventory[0]\n",
+        "x = sorted(knight.inventory)\n",
+        "print(knight.inventory)\n",
+        "knight.inventory.index('a')\n",
+        "knight.inventory.count('a')\n",
+        "keys = knight.inventory\nkeys.append('a')\n",
+        "knight.inventory = []\n",
+        "knight.inventory += []\n",
+        "knight.position.append(1)\n",
+        "other.inventory.append(1)\n",
+        "stuff.append(1)\n",
+    ],
+)
+def test_reading_the_satchel_and_other_lists_get_no_satchel_note(code):
+    assert [m for _, m in _satchel_lint(code) if "satchel" in m] == []
+
+
+def test_the_satchel_note_works_in_blocks_and_uses_the_pieces_name():
+    code = "def go():\n    for i in range(2):\n        if i:\n            hero.inventory.append(i)\ngo()\n"
+    assert _satchel_lint(code, "hero") == [(4, _satchel_note("hero"))]
+
+
+def test_one_satchel_note_per_line_and_in_line_order():
+    code = "knight.inventory.append(1); knight.inventory.pop()\nprint\nknight.inventory.clear()\n"
+    assert [line for line, _ in _satchel_lint(code)] == [1, 2, 3]
 
 
 NAMED = "This line names `stride` but doesn't call it, so the lines inside it don't run. Add parentheses to call it: "
