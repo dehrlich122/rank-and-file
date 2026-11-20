@@ -1,8 +1,10 @@
-"""M5.2's examiner, as a level file gives it (M5.2-4a): reading and checking `examine`, one case per call, what the
+"""M5.2's examiner, as a level file gives it: reading and checking `examine`, one case per call, what the
 player is told about it, and the examiner's calls and words."""
 
+import copy
 import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -10,7 +12,7 @@ import pytest
 from conftest import make_level
 from rankfile import bridge
 from rankfile.levels import NOT_JUDGED, Examine, ExamineCall, LevelError, parse_level
-from rankfile.runner import examiner_line, execute, parse_snippet_call, run_level, run_sandbox
+from rankfile.runner import CallInfo, examiner_line, execute, parse_snippet_call, run_level, run_sandbox
 from rankfile.tracer import PLAYER_FILENAME
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "scripts"))
@@ -49,6 +51,20 @@ def test_a_missing_returns_is_not_judged_and_returns_null_wants_none():
 
 def test_a_level_with_no_examiner_has_none():
     assert make_level(ROW).examine is None
+
+
+def test_a_plain_level_describes_no_function_rules():
+    constraints = make_level(ROW).describe()["constraints"]
+    assert constraints["functions"] == {}
+    assert constraints["define"] == 0
+
+
+def test_a_call_that_says_nothing_of_its_answer_keeps_that_through_a_copy():
+    assert copy.deepcopy(ExamineCall()).returns is NOT_JUDGED  # why the sentinel is an Enum member, not a bare object()
+
+
+def test_a_calls_json_keys_are_in_the_order_the_ui_reads_them():
+    assert list(asdict(CallInfo("gallop(1)", None, None, 0))) == ["text", "returned", "wanted", "first_step", "happened", "said"]
 
 
 @pytest.mark.parametrize(
