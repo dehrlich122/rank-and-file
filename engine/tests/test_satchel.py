@@ -3,12 +3,11 @@ level, and how the world behaves (picking up a key, landing on a door, the Chall
 
 import pytest
 
-from conftest import make_level
+from conftest import events, make_level
 from rankfile.board import Direction, Tile
 from rankfile.exceptions import BlockedError, DoorLockedError, GameError, Lost, PickUpError
 from rankfile.levels import LevelError, editor_options
 from rankfile.pieces import Knight, Piece
-from rankfile.repl import NoBoard
 from rankfile.runner import run_level
 from rankfile.world import World
 
@@ -108,30 +107,9 @@ def test_the_two_errors_are_the_games():
     assert DoorLockedError("shut", at=(3, 1)).at == (3, 1)
 
 
-@pytest.mark.parametrize("name", ["pick_up", "inventory"])
-def test_the_unbuilt_abilities_are_not_there_for_a_player(name):
-    assert Knight.UNBUILT == ("pick_up", "inventory") and Piece.UNBUILT == ()
-    assert name not in Knight.ABILITIES
-    knight = Knight(NoBoard("knight"), KNIGHT_API)
-    with pytest.raises(AttributeError) as raised:
-        getattr(knight, name)
-    assert not isinstance(raised.value, GameError)  # Python's own error, as for any made-up name
-    assert not hasattr(knight, name)
-    assert name not in dir(knight)
-
-
-@pytest.mark.parametrize("name", ["pick_up", "inventory"])
-def test_typing_an_unbuilt_name_reads_as_it_always_did(name):
-    level = vault()
-    unbuilt = run_level(level, f"knight.{name}")
-    made_up = run_level(level, "knight.fetch")
-    assert unbuilt.error.type == "AttributeError"
-    assert unbuilt.error.friendly == made_up.error.friendly.replace("fetch", name)
-    assert "doesn't have an ability called" in unbuilt.error.friendly
-
-
-def test_the_bridge_and_the_piece_methods_still_exist_for_the_next_package():
-    assert callable(Knight.pick_up) and isinstance(Knight.inventory, property)
+def test_pick_up_and_inventory_are_the_knights_last_two_abilities():
+    assert Knight.ABILITIES[-2:] == ("pick_up", "inventory")
+    assert not hasattr(Piece, "UNBUILT") and not hasattr(Knight, "UNBUILT")
 
 
 def test_neither_tile_is_a_special_case_for_the_editors_options():
@@ -403,3 +381,96 @@ def test_keys_and_doors_are_for_the_knight():
     assert refused.value.at == {"field": "piece"}
     with pytest.raises(LevelError, match="keys and doors are for the knight"):
         make_level(VAULT.replace("D", "."), legend=key)
+
+
+# -- the abilities, through a run (M5.3-3a) ---------------------------------------------------
+#
+# The knight starts on c1. The key is on d3 (jump(1, 2)), the doors on a2 and e2 (jump(2, 1)), the goal on c3.
+
+CROSSING = """
+. . G K .
+D . . . D
+. . P . .
+"""
+WALK_THROUGH = "knight.jump(1, 2)\nknight.pick_up()\nknight.jump(-1, -2)\nknight.jump(2, 1)\nknight.jump(-2, 1)"
+
+
+def crossing(api=KNIGHT_API):
+    legend = {"K": {"tile": "key", "name": "brass"}, "D": {"tile": "door", "key": "brass"}}
+    return make_level(CROSSING, piece="knight", api=api, legend=legend)
+
+
+def test_a_run_picks_up_a_key_and_lands_on_its_door():
+    result = run_level(crossing(), WALK_THROUGH)
+    assert result.status == "solved"
+    (step,) = [step for step in result.steps if any(event["kind"] == "pick_up" for event in step["events"])]
+    assert step["line"] == 2  # the line that called pick_up()
+    assert [event["at"] for event in step["events"]] == [[3, 2]]
+    before, after = events(result, "jump")[0]["state"], events(result, "pick_up")[0]["state"]
+    assert (before["inventory"], before["opened"]) == ([], [])  # landing on the key's stone took nothing
+    assert (after["inventory"], after["opened"]) == (["brass"], [[0, 1], [4, 1]])
+    assert result.final["inventory"] == ["brass"] and result.final["opened"] == [[0, 1], [4, 1]]
+    assert result.start["inventory"] == [] and result.start["opened"] == []
+
+
+INVENTORY_AS_A_LIST = """
+print(knight.inventory, len(knight.inventory))
+knight.jump(1, 2)
+knight.pick_up()
+a = knight.inventory
+b = knight.inventory
+print(a == b, a is b, len(a), "brass" in a, a == ["brass"], a)
+for name in a:
+    print(name)
+a.append("iron")
+print(knight.inventory, a)
+"""
+
+
+def test_the_inventory_in_player_code_is_a_list_of_its_own():
+    result = run_level(crossing(), INVENTORY_AS_A_LIST)
+    assert result.error is None
+    assert result.output == "[] 0\nTrue False 1 True True ['brass']\nbrass\n['brass'] ['brass', 'iron']\n"
+    assert result.final["inventory"] == ["brass"]  # the copy's append changed nothing on the board
+    assert all(event["state"]["inventory"] == ["brass"] for event in events(result, "pick_up"))
+
+
+def test_pick_up_with_no_key_on_the_square_is_an_error_not_a_lost_run():
+    result = run_level(crossing(), "knight.pick_up()")
+    assert result.status == "error" and result.error.type == "PickUpError" and result.error.line == 1
+    assert result.error.friendly == "There is nothing to pick up on c1."
+    assert result.final["inventory"] == [] and not events(result, "pick_up")
+
+
+def test_jumping_onto_a_locked_door_is_an_error_in_the_doors_own_words():
+    result = run_level(crossing(), "knight.wait()\nknight.jump(2, 1)")
+    assert result.status == "error" and result.error.type == "DoorLockedError" and result.error.line == 2
+    assert result.error.friendly == "The door on e2 is locked: it wants the brass key, and your satchel is empty."
+    assert [event["at"] for event in events(result, "bump")] == [[4, 1]]
+    assert result.final["pos"] == [2, 0]
+
+
+@pytest.mark.parametrize("name", ["pick_up", "inventory"])
+def test_a_level_that_does_not_list_them_keeps_them_locked(name):
+    level = crossing(api=["jump"])
+    locked = run_level(level, f"knight.{name}")
+    other = run_level(level, "knight.read")
+    assert locked.error.type == "LockedAbilityError"
+    assert locked.error.friendly == other.error.friendly.replace("read", name)
+    assert name in locked.error.friendly and "knows: jump" in locked.error.friendly
+
+
+@pytest.mark.parametrize("api", [["jump"], KNIGHT_API])
+def test_the_satchel_cannot_be_assigned(api):
+    result = run_level(crossing(api), "knight.inventory = []")
+    assert result.error.type == "CantChangePieceError"
+    assert result.error.friendly == "You can't change the knight's `inventory` directly. The knight has to use its own abilities."
+
+
+@pytest.mark.parametrize("name", ["pick_up", "inventory"])
+def test_the_pawn_still_reads_them_as_made_up_names(name):
+    level = make_level(". . G\nP . .\n")
+    mine = run_level(level, f"pawn.{name}")
+    made_up = run_level(level, "pawn.fetch")
+    assert mine.error.type == "AttributeError"
+    assert mine.error.friendly == made_up.error.friendly.replace("fetch", name)

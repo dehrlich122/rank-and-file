@@ -32,9 +32,6 @@ class Piece:
     # Whether this piece lands on squares rather than steps or walks over them (M5.1): the words of its
     # levels, and the landings its world's state carries, follow it.
     LANDS: ClassVar[bool] = False
-    # Abilities that exist in the code but are not built yet (M5.3): as far as the player can tell the piece doesn't
-    # have them, so typing one reads what it read before the contract. M5.3-3 empties it.
-    UNBUILT: ClassVar[tuple[str, ...]] = ()
 
     def __init__(self, world: World, unlocked: list[str]):
         # Pieces refuse normal attribute assignment (see __setattr__), so the
@@ -45,8 +42,6 @@ class Piece:
     def __getattribute__(self, name: str):
         # Called for every `piece.something` lookup, before the normal rules.
         cls = type(self)
-        if name in cls.UNBUILT:
-            raise AttributeError(f"{cls.NAME!r} object has no attribute {name!r}", name=name, obj=self)
         if name in cls.ABILITIES and name not in object.__getattribute__(self, "_unlocked"):
             raise LockedAbilityError(cls.NAME, name, list(object.__getattribute__(self, "_unlocked")))
         if name in cls.CANT:
@@ -293,7 +288,7 @@ class Knight(Piece):
 
     NAME = "knight"
     LANDS = True
-    ABILITIES = ("jump", "look", "at_goal", "position", "wait", "read")
+    ABILITIES = ("jump", "look", "at_goal", "position", "wait", "read", "pick_up", "inventory")
     CANT: ClassVar[dict[str, str]] = {
         "move": f"{_WALK} `knight.jump(1, 2)` jumps one square right and two up.",
         "turn_left": f"{_WALK} A jump can go any way from where the knight stands, so it never needs to turn.",
@@ -304,7 +299,6 @@ class Knight(Piece):
         "capture_right": f"{_WALK} A knight takes an enemy by landing on it: jump onto the enemy's square.",
         "bridge": f"{_WALK} A jump flies over a pit, so a knight never needs a bridge.",
     }
-    UNBUILT = ("pick_up", "inventory")  # M5.3-3 moves both into ABILITIES
 
     # These docstrings are the Codex's entries for the knight (codex.py), as the pawn's are for the pawn.
 
@@ -345,8 +339,8 @@ class Knight(Piece):
 
         Returns:
             What's there, as a word (a str): "wall", "edge", "pit", "gate",
-            "portcullis", "signpost", "rune", "gem", "plank", or an enemy
-            such as "rook". None if the square is empty.
+            "portcullis", "signpost", "rune", "gem", "plank", "key", "door",
+            or an enemy such as "rook". None if the square is empty.
 
         Example:
             print(knight.look(1, 2))
@@ -417,7 +411,12 @@ class Knight(Piece):
         return self._world.read()
 
     def pick_up(self):
-        """Pick up the key on the square your knight stands on.
+        """Pick up the key on the stone your knight is standing on.
+
+        Land on a key's stone first, then call `knight.pick_up()`. The key's
+        name goes into your knight's satchel, `knight.inventory`, after the
+        ones already there. Picking up takes a tick. With no key on the
+        square, it stops your program with an error.
 
         Returns:
             Nothing.
@@ -429,10 +428,20 @@ class Knight(Piece):
 
     @property
     def inventory(self) -> list:
-        """The names of the keys your knight carries, in the order it picked them up.
+        """What's in your knight's satchel: the names of the keys it carries.
+
+        No parentheses, like `position`. It's a list, in the order the keys
+        were picked up, so what works on a list works on it:
+        `"brass" in knight.inventory`, `len(knight.inventory)`, a `for` loop.
+        A door lets your knight land on it while its key is in the satchel,
+        and the key stays there.
+
+        Each time you ask, you get a fresh copy. Changing the copy changes
+        nothing on the board: the satchel fills only with `pick_up()`.
 
         Returns:
-            A list (a copy: changing it changes nothing).
+            A list of the keys' names: text like "brass", or whole numbers
+            like 12. An empty list, [], before the first key.
 
         Example:
             print(knight.inventory)

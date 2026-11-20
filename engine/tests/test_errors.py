@@ -176,6 +176,31 @@ def test_knight_friendly_messages(knight_runes, code, friendly, line):
     assert result.error.line == line
 
 
+@pytest.fixture
+def knight_vault():
+    """Knight on a1, a brass key on a2, its door on c2, the goal on c3, with every knight ability."""
+    return make_level(
+        ". . G\nK . D\nP . .\n",
+        piece="knight",
+        api=list(Knight.ABILITIES),
+        legend={"K": {"tile": "key", "name": "brass"}, "D": {"tile": "door", "key": "brass"}},
+    )
+
+
+@pytest.mark.parametrize(
+    ("code", "friendly", "line"),
+    [
+        ("knight.pick_up()", "There is nothing to pick up on a1.", 1),
+        ("knight.wait()\nknight.jump(2, 1)", "The door on c2 is locked: it wants the brass key, and your satchel is empty.", 2),
+    ],
+)
+def test_the_satchels_errors_reach_the_card_in_the_worlds_words(knight_vault, code, friendly, line):
+    result = run_level(knight_vault, code)
+    assert result.status == "error"
+    assert result.error.friendly == friendly
+    assert result.error.line == line
+
+
 def test_a_function_of_the_players_own_keeps_the_general_message(knight_runes):
     result = run_level(knight_runes, "def hop(dx, dy):\n    pass\nhop()")
     assert "`hop()` needs more inside its parentheses: a value for `dx` and `dy`." in result.error.friendly

@@ -51,10 +51,10 @@ def ring():
 # -- the piece -----------------------------------------------------------------------
 
 
-def test_the_knight_is_a_piece_with_six_abilities():
+def test_the_knight_is_a_piece_with_eight_abilities():
     assert PIECES["knight"] is Knight
     assert Knight.NAME == "knight"
-    assert Knight.ABILITIES == ("jump", "look", "at_goal", "position", "wait", "read")
+    assert Knight.ABILITIES == ("jump", "look", "at_goal", "position", "wait", "read", "pick_up", "inventory")
 
 
 def test_the_eight_jumps_are_the_l_shapes():
