@@ -16,6 +16,7 @@ import difflib
 import linecache
 import re
 import traceback
+import types
 from dataclasses import dataclass
 
 from .exceptions import IT_KNOWS, GameArgumentError, GameError, Lost
@@ -210,24 +211,26 @@ def _functions(tree: ast.Module) -> list[ast.FunctionDef | ast.AsyncFunctionDef]
     return sorted(found, key=lambda fn: fn.lineno)
 
 
-def _innermost_locals(exc: BaseException) -> list[str]:
-    """The names the innermost player frame holds (a function's parameters and locals), for "did you mean"."""
-    names, tb = [], exc.__traceback__
+def _innermost_player_frame(exc: BaseException) -> types.FrameType | None:
+    """The innermost frame of the error's traceback that is the player's own code, or None."""
+    frame, tb = None, exc.__traceback__
     while tb is not None:
         if tb.tb_frame.f_code.co_filename == PLAYER_FILENAME:
-            names = [key for key in tb.tb_frame.f_locals if not key.startswith("__")]
+            frame = tb.tb_frame
         tb = tb.tb_next
-    return names
+    return frame
+
+
+def _innermost_locals(exc: BaseException) -> list[str]:
+    """The names the innermost player frame holds (a function's parameters and locals), for "did you mean"."""
+    frame = _innermost_player_frame(exc)
+    return [key for key in frame.f_locals if not key.startswith("__")] if frame else []
 
 
 def _raising_function(exc: BaseException) -> str | None:
     """The name of the player's function the error was raised in (innermost), or None."""
-    name, tb = None, exc.__traceback__
-    while tb is not None:
-        if tb.tb_frame.f_code.co_filename == PLAYER_FILENAME:
-            name = tb.tb_frame.f_code.co_name
-        tb = tb.tb_next
-    return name
+    frame = _innermost_player_frame(exc)
+    return frame.f_code.co_name if frame else None
 
 
 # -- functions: what goes wrong around `def`, parameters and `return` (M5.2) ------------
