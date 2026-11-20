@@ -49,7 +49,7 @@ describe("codexNameAt: what a hover over code looks up", () => {
     expect(["for", "if", "continue", "elif", "break", "else", "while", "def", "return"].map(name)).toEqual(
       ["for", "if", "continue", "if", "break", "if", "while", "def", "return"],
     );
-    expect(name("pass")).toBeNull();
+    expect(name("pass")).toBe("pass"); // a candidate like any keyword: the lookup finds no entry for it
     expect(name("range")).toBe("range");
   });
 });
