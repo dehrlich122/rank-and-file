@@ -13,7 +13,8 @@ watchdog, and a big board (many gems, an enemy) can be cancelled by not asking a
 
 Code clocks (`line`, `new_line`) depend on how the code is written, not just on the route, so levels with
 clockwork obstacles are beyond it. So are examiner levels (M5.2): there the player's program only defines a function
-and the examiner calls it, so a route of plain calls says nothing; the whole level is declined, once.
+and the examiner calls it, so a route of plain calls says nothing; the whole level is declined, once. So are levels with keys or doors (M5.3): the search doesn't pick up keys or
+open doors yet, and declines them whole until M5.5 teaches it.
 """
 
 import time
@@ -32,7 +33,7 @@ RUN_SECONDS = 60.0  # how long `run()` works when it is given no slice of its ow
 CALLS = ("move", "turn_left", "turn_right", "wait", "capture_left", "capture_right", "bridge")
 TURNS = ("turn_left", "turn_right")
 
-ROUTE, NO_ROUTE, GAVE_UP, CLOCKS, EXAMINER = "route", "no_route", "gave_up", "clocks", "examiner"
+ROUTE, NO_ROUTE, GAVE_UP, CLOCKS, EXAMINER, KEYS = "route", "no_route", "gave_up", "clocks", "examiner", "keys"
 
 
 class RouteSearch:
@@ -48,7 +49,7 @@ class RouteSearch:
         self.max_states = max_states
         self.max_work = WORK_FACTOR * max_states if max_work is None else max_work  # pushes before it gives up
         self.work = 0  # entries pushed so far
-        self.status: str | None = None  # None while searching; then ROUTE, NO_ROUTE, GAVE_UP, CLOCKS or EXAMINER
+        self.status: str | None = None  # None while searching; then ROUTE, NO_ROUTE, GAVE_UP, CLOCKS, EXAMINER or KEYS
         self.actions: list[tuple] = []  # the route, when there is one
         self.lines = 0  # lines of code it takes
         # The frontier, dropped once there is an answer, so a finished board holds no memory. An entry is
@@ -59,6 +60,9 @@ class RouteSearch:
         self._reached = 0  # positions reached, kept once the frontier is dropped
         if level.examine:
             self._finish(EXAMINER)
+            return
+        if _has_keys(level):
+            self._finish(KEYS)
             return
         start = World(level)
         if start.code_clocked:
@@ -133,8 +137,9 @@ class Search:
     """Every case of a level in turn (each place a hidden goal could be, or each board), in slices."""
 
     def __init__(self, level: Level, max_states: int = MAX_STATES):
-        # An examiner level is declined whole, so it is one case, not one per call the examiner makes.
-        self.cases: list[Case] = [Case("level", "on this level", level)] if level.examine else level.cases()
+        # An examiner level, or one with keys or doors, is declined whole: one case, not one per call or board.
+        declined = level.examine or _has_keys(level)
+        self.cases: list[Case] = [Case("level", "on this level", level)] if declined else level.cases()
         self._unit = "place" if level.goal_spots else "board"  # what a case is, for the words around the answer
         self._searches = [RouteSearch(case.level, max_states) for case in self.cases]
         self._current = 0
@@ -163,6 +168,11 @@ class Search:
     def _result(self, index: int) -> dict:
         case, search = self.cases[index], self._searches[index]
         return {"label": case.label, "where": case.where, "status": search.status, "lines": search.lines if search.status == ROUTE else None, "positions": search.positions}
+
+
+def _has_keys(level: Level) -> bool:
+    """Whether any board of the level has a key or a door (the search doesn't follow them yet, M5.5)."""
+    return any(board.board.keys or board.board.doors for board in (level, *level.variants))
 
 
 def _actions(level: Level) -> list[tuple]:
