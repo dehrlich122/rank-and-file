@@ -243,10 +243,7 @@ def _define_problems(tree: ast.Module, defs: dict, wanted: int, examine) -> list
     if never:
         names = and_list([f"`{fn.name}`" for fn in never])
         verb, them = ("is", "it") if len(never) == 1 else ("are", "them")
-        message += (
-            f" {names} {verb} defined but never called. A `def` only teaches Python the name; "
-            f"the lines inside run when you call {them}: {and_list([_call_text(fn) for fn in never])}."
-        )
+        message += f" {names} {verb} defined but never called. {_def_needs_a_call(them, and_list([_call_text(fn) for fn in never]))}."
     if len(defs) < wanted:
         message += f" Your program defines only {count(len(defs), 'function')}."
     return [message]
@@ -375,6 +372,11 @@ def _call_text(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
     return f"{fn.name}({'...' if _param_names(fn) else ''})"
 
 
+def _def_needs_a_call(them: str, calls: str) -> str:
+    """The lesson a function defined but never called teaches (the two notes on it end the same way)."""
+    return f"A `def` only teaches Python the name; the lines inside run when you call {them}: {calls}"
+
+
 def _never_called_warnings(tree: ast.Module, defs: dict) -> list[LintWarning]:
     """A `def` whose name the program never uses outside the function's own lines (M5.2). A call, a bare mention
     (which has its own note) and handing it on as a value all count as use; a function that only calls itself doesn't."""
@@ -383,11 +385,7 @@ def _never_called_warnings(tree: ast.Module, defs: dict) -> list[LintWarning]:
         if any(isinstance(n, ast.Name) and n.id == fn.name for n in _outside(tree, fn)):
             continue
         found.append(
-            LintWarning(
-                fn.lineno,
-                f"`{fn.name}` is defined here but never called. A `def` only teaches Python the name; "
-                f"the lines inside run when you call it: {_call_text(fn)}",
-            )
+            LintWarning(fn.lineno, f"`{fn.name}` is defined here but never called. {_def_needs_a_call('it', _call_text(fn))}")
         )
     return found
 
