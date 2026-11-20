@@ -200,6 +200,12 @@ export function outcomeCard(run: LevelResult, shown: LevelResult, actions: HTMLE
   return run.status === "solved" ? h("div", { class: "complete-wrap" }, h("div", { class: "complete-banner play", "aria-hidden": "true" }, h("span", { class: "complete-text", "data-text": VOICE.complete }, VOICE.complete)), card) : card;
 }
 
+/** ✓ or ✗: how one case of a run ended. */
+export const verdict = (c: LevelResult) => (c.status === "solved" ? "✓" : "✗");
+
+/** "The examiner calls `call`": the words above a board and under a lesson snippet. */
+export const examinerCalls = (call: string) => ["The examiner calls ", h("code", {}, call)];
+
 /** On an examiner level, each call's answer wanted and got, a row each; a click replays that call. Nothing when only the board was judged (the buttons say as much). */
 function callsTable(run: LevelResult, shown: LevelResult, replay?: (index: number) => void): HTMLElement | null {
   if (!run.cases.some((c) => c.call?.wanted != null)) return null;
@@ -207,14 +213,14 @@ function callsTable(run: LevelResult, shown: LevelResult, replay?: (index: numbe
   const rows = run.cases.map((c, i) => {
     const wanted = c.call?.wanted ?? null; // a call with no answer wanted leaves both cells empty
     const got = wanted === null ? null : (c.call?.returned ?? h("span", { class: "muted" }, "no answer"));
-    const ok = c.status === "solved";
+    const mark = verdict(c);
     return h(
       "tr",
       { class: i === picked ? "picked" : undefined },
       h("td", {}, h("button", { class: "btn btn-small", title: `Replay ${c.label}`, onClick: () => replay?.(i) }, c.label)),
       h("td", {}, wanted),
       h("td", {}, got),
-      h("td", { class: ok ? "ok" : "no" }, ok ? "✓" : "✗"),
+      h("td", { class: mark === "✓" ? "ok" : "no" }, mark),
     );
   });
   return h("table", { class: "calls" }, h("thead", {}, h("tr", {}, ...["call", "wanted", "got", ""].map((t) => h("th", {}, t)))), h("tbody", {}, ...rows));

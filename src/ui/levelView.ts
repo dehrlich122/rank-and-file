@@ -12,7 +12,7 @@ import { h, withCode } from "./dom";
 import { clearMarks, createEditor, getCode, setActiveLine, setCallLine, setErrorLine, setMarks, type Mark } from "./editor";
 import { renderLesson, type Lesson } from "./lesson";
 import { masteryTag } from "./lessonsMenu";
-import { Console, Inspector, callList, noticeCard, outcomeCard } from "./panels";
+import { Console, Inspector, callList, examinerCalls, noticeCard, outcomeCard, verdict } from "./panels";
 import { callCompletion, KnownCalls } from "./completion";
 import { HelpPanel, type HelpFocus } from "./help";
 import { icon, type IconName } from "./icons";
@@ -35,8 +35,6 @@ export interface LevelContext {
 
 const AUTOPLAY_LIMIT = 150; // longer runs open at the end instead of playing
 
-/** ✓ or ✗: how one case of a run ended. */
-const verdict = (c: LevelResult) => (c.status === "solved" ? "✓" : "✗");
 
 /** The level screen. How this level is opened (its progress, lesson, solution, frame and links) is the `host`'s to say (levelHost.ts). */
 export function mountLevel(root: HTMLElement, context: LevelContext, source: LevelSource, host: LevelHost = lessonHost()): () => void {
@@ -399,7 +397,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
         setErrorLine(editor, null);
         if (callCaption) {
           const call = result.call;
-          callCaption.replaceChildren(...(call && index - 1 >= call.first_step ? ["The examiner calls ", h("code", {}, call.text)] : [" "]));
+          callCaption.replaceChildren(...(call && index - 1 >= call.first_step ? examinerCalls(call.text) : [" "]));
         }
         const { step } = frame;
         inspector.show(step?.vars ?? null, step ?? undefined);
