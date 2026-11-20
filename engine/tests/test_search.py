@@ -14,7 +14,18 @@ from rankfile import search as search_module
 from rankfile.constraints import code_lines
 from rankfile.levels import parse_level
 from rankfile.runner import unmet_objectives
-from rankfile.search import CLOCKS, EXAMINER, GAVE_UP, MAX_STATES, NO_ROUTE, ROUTE, WORK_FACTOR, RouteSearch, Search
+from rankfile.search import (
+    CLOCKS,
+    EXAMINER,
+    GAVE_UP,
+    KEYS,
+    MAX_STATES,
+    NO_ROUTE,
+    ROUTE,
+    WORK_FACTOR,
+    RouteSearch,
+    Search,
+)
 from rankfile.world import World
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -74,6 +85,33 @@ def test_the_search_reports_an_examiner_level_as_one_result_not_one_per_call():
     result = search.step(0.05)
     assert result["done"] and search.done and result["cases"] == 1
     assert [r["status"] for r in result["results"]] == [EXAMINER]
+
+
+VAULT = {"map": "G . D .\nK . . .\nP . . .\n", "legend": {"K": {"tile": "key", "name": "brass"}, "D": {"tile": "door", "key": "brass"}}}
+KNIGHT = {"piece": "knight", "api": ["jump", "pick_up"]}
+
+
+def test_a_level_with_a_key_and_a_door_is_declined_at_once():
+    search = RouteSearch(made(**KNIGHT, **VAULT))
+    assert search.run() and search.status == KEYS and search.positions == 0 and search.actions == []
+    result = Search(made(**KNIGHT, **VAULT)).step(0.05)
+    assert result["done"] and result["cases"] == 1 and [r["status"] for r in result["results"]] == [KEYS]
+
+
+def test_a_key_only_on_a_variant_makes_the_level_one_declined_case():
+    other = {"map": ". . . .\n. K . G\n. . P .\n", "legend": {"K": {"tile": "key", "name": "brass"}}}
+    level = made(**KNIGHT, map="G D\n. P\n", legend={"D": {"tile": "door", "key": "brass"}}, variants=[other])
+    result = finish(Search(level))
+    assert result["cases"] == 1 and [r["status"] for r in result["results"]] == [KEYS]
+
+
+def test_an_examiner_level_with_a_key_stays_an_examiner_level():
+    level = made(**KNIGHT, **VAULT, examine={"function": "gallop", "calls": [{}]})
+    assert RouteSearch(level).status == EXAMINER
+
+
+def test_a_level_without_keys_or_doors_is_still_searched():
+    assert RouteSearch(made()).run() and finish(Search(made()))["results"][0]["status"] == ROUTE
 
 
 def test_a_slice_stops_after_its_time_and_carries_on_where_it_was():
