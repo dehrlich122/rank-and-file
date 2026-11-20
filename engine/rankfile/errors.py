@@ -190,9 +190,9 @@ def _param_names(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
     return named + [arg.arg for arg in (args.vararg, args.kwarg) if arg]
 
 
-def _bound_names(body: list[ast.stmt], params: list[str] | None = None) -> set[str]:
-    """The names a scope sets itself: parameters, assignments, loop variables, `def`s, imports."""
-    names = set(params or [])
+def _bound_names(body: list[ast.stmt]) -> set[str]:
+    """The names a scope sets itself: assignments, loop variables, `def`s, imports."""
+    names = set()
     for node in _own_nodes(body):
         if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
             names.add(node.id)
