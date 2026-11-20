@@ -275,13 +275,30 @@ def _call_failure(run: Execution, facts: CallFacts) -> str | None:
     if run.problem is not None:
         return run.problem  # "missing", "not_function" or "arguments"
     wanted, got = facts.wanted, facts.returned
-    if wanted is NOT_JUDGED or (type(got) is type(wanted) and got == wanted):
-        return None  # the same kind of thing and equal: 7 is not "7", True is not 1, 1.0 is not 1
+    if wanted is NOT_JUDGED or (_same_kind(got, wanted) and got == wanted):
+        return None  # the same kind of thing and equal: 7 is not "7", True is not 1, 1.0 is not 1, [(1, 2)] is not [[1, 2]]
     if got is None:  # "printed" only when one of the lines printed in the call is the answer
         return "printed" if any(line.strip() == str(wanted) for line in facts.printed.splitlines()) else "nothing"
     if wanted is None:
         return "unexpected"
-    return "wrong_value" if type(got) is type(wanted) else "wrong_kind"
+    return "wrong_value" if _same_kind(got, wanted) else "wrong_kind"
+
+
+def _same_kind(got: object, wanted: object) -> bool:
+    """Whether two values are the same kind of thing all the way down: a list of pairs is not a list of lists. (Only
+    the items both have are compared: a list that is shorter or longer is a different value, not a different kind.)"""
+    if type(got) is not type(wanted):
+        return False
+    return not isinstance(got, list | tuple) or all(_same_kind(item, other) for item, other in zip(got, wanted, strict=False))
+
+
+def _misplaced(got: object, wanted: object) -> tuple[object, object]:
+    """The first items, as deep as the kinds differ, that are not the same kind: (what came, what was wanted there)."""
+    if type(got) is type(wanted) and isinstance(got, list | tuple):
+        for item, other in zip(got, wanted, strict=False):
+            if not _same_kind(item, other):
+                return _misplaced(item, other)
+    return got, wanted
 
 
 PASSED = ("passed", "passed_answered")
@@ -374,7 +391,11 @@ def what_happened(kind: str, facts: CallFacts) -> str:
         return f"{got} A function hands a value back only with `return`: check that every way through `{name}` reaches one."
     got = f"{called}: it wanted {wanted} and got {safe_repr(facts.returned)}"
     if kind == "wrong_kind":
-        return f"{got}, which is {_kind(type(facts.returned).__name__)}, not {_kind(type(facts.wanted).__name__)}."
+        came, there = _misplaced(facts.returned, facts.wanted)
+        came_kind, there_kind = _kind(type(came).__name__), _kind(type(there).__name__)
+        if came is facts.returned:  # the whole answer is the wrong kind
+            return f"{got}, which is {came_kind}, not {there_kind}."
+        return f"{got}, which has {came_kind} in it where {there_kind} was wanted."  # an item of a list or a pair is
     return got + "."
 
 
@@ -437,10 +458,11 @@ def run_sandbox(
 
 
 def parse_snippet_call(text: str) -> tuple[str, list]:
-    """The function's name and the values of a lesson's `calls` text: one call of a plain name with plain values."""
+    """The function's name and the values of a lesson's `calls` text: one call of a plain name with constants, lists
+    and tuples of constants, and lists of pairs of constants (as far as a level file's examiner goes)."""
     problem = ValueError(
         f"The lesson's call {text!r} must be one call of a plain function name with plain values, "
-        "like gallop(1, 2): numbers, text, True, False or None."
+        "like gallop(1, 2): numbers, text, True, False or None, or a list or tuple of them, or a list of pairs of them."
     )
     try:
         call = ast.parse(text.strip(), mode="eval").body
@@ -448,19 +470,36 @@ def parse_snippet_call(text: str) -> tuple[str, list]:
         raise problem from None
     if not (isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and not call.keywords):
         raise problem
-    args = []
-    for arg in call.args:
-        negative = isinstance(arg, ast.UnaryOp) and isinstance(arg.op, ast.USub)
-        value = arg.operand if negative else arg
-        if not isinstance(value, ast.Constant):
-            raise problem
-        plain = value.value
-        if negative and (type(plain) not in (int, float)):
-            raise problem
-        if not negative and not (plain is None or type(plain) in (bool, int, float, str)):
-            raise problem
-        args.append(-plain if negative else plain)
-    return call.func.id, args
+    return call.func.id, [_snippet_value(arg, problem) for arg in call.args]
+
+
+def _snippet_value(node: ast.expr, problem: ValueError, inside: str = "") -> object:
+    """A call's argument: a constant, a list (of constants and pairs), or a tuple (of constants). `inside` is what
+    holds `node` ("list" or "tuple"), which decides what may stand here: nothing goes deeper than a pair in a list."""
+    if isinstance(node, ast.List | ast.Tuple) and not inside:
+        return _snippet_items(node, problem)
+    if isinstance(node, ast.Tuple) and inside == "list":
+        return _snippet_items(node, problem)
+    negative = isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub)
+    value = node.operand if negative else node
+    if not isinstance(value, ast.Constant):
+        raise problem
+    plain = value.value
+    if negative and (type(plain) not in (int, float)):
+        raise problem
+    if not negative and not (plain is None or type(plain) in (bool, int, float, str)):
+        raise problem
+    return -plain if negative else plain
+
+
+def _snippet_items(node: ast.List | ast.Tuple, problem: ValueError) -> list | tuple:
+    kind = "list" if isinstance(node, ast.List) else "tuple"
+    items = [_snippet_value(item, problem, kind) for item in node.elts]
+    if kind == "tuple":
+        if not items:
+            raise problem  # a pair holds a value at least, as in a level file
+        return tuple(items)
+    return items
 
 
 def score(level: Level, code_lines: int, hints_used: int, solution_seen: bool = False) -> list[Star]:
