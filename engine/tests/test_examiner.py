@@ -668,6 +668,130 @@ def test_the_answer_wanted_is_shown_only_where_the_table_shows_it():
     assert str(WANTS) in call_of({"args": [1], "returns": WANTS}, code="def gallop(n):\n    return 1\n", constraints=False).summary
 
 
+# -- M5.3-4: lists and pairs, judged and said ---------------------------------------------------------------------
+
+PAIRS = [[2, 1], [3, 3]]  # a list of two pairs, as a level file writes it
+
+
+def answer(returns, gives, args=(1,), function="visit"):
+    """Run `function` handing back `gives` (code) on a call wanting `returns`: the result, whose summary has the words."""
+    code = f"def {function}(*given):\n{MOVES}    return {gives}\n"
+    return call_of({"args": list(args), "returns": returns}, code=code, constraints=False, function=function)
+
+
+@pytest.mark.parametrize(
+    ("returns", "gives"),
+    [([4, 9], "[4, 9]"), ([], "[]"), ([[1, 2]], "[(1, 2)]"), (PAIRS, "[(2, 1), (3, 3)]"), ({"tuple": [4, 9]}, "(4, 9)"), ({"tuple": [4]}, "(4,)"),
+     ([["a", True], [None, 2.5]], "[('a', True), (None, 2.5)]")],
+)  # fmt: skip
+def test_a_list_of_pairs_or_a_tuple_that_is_the_same_kind_and_equal_passes(returns, gives):
+    result = answer(returns, gives)
+    assert result.status == "solved" and "it wanted" in result.summary and CORRECT in result.summary
+
+
+@pytest.mark.parametrize(
+    ("returns", "gives", "got", "wanted"),
+    [
+        ([4, 9], "[9, 4]", "[9, 4]", "[4, 9]"),  # the order is part of the value
+        ([4, 9], "[4]", "[4]", "[4, 9]"),  # shorter
+        ([4], "[4, 9]", "[4, 9]", "[4]"),  # longer
+        ([4], "[]", "[]", "[4]"),
+        ([], "[4]", "[4]", "[]"),
+        (PAIRS, "[(3, 3), (2, 1)]", "[(3, 3), (2, 1)]", "[(2, 1), (3, 3)]"),
+        (PAIRS, "[(2, 1), (3, 4)]", "[(2, 1), (3, 4)]", "[(2, 1), (3, 3)]"),
+        ({"tuple": [4, 9]}, "(9, 4)", "(9, 4)", "(4, 9)"),
+        ([[1, 2]], "[(1, 2), (3, 4)]", "[(1, 2), (3, 4)]", "[(1, 2)]"),
+    ],
+)  # fmt: skip
+def test_the_right_kinds_with_another_value_or_order_are_a_wrong_value(returns, gives, got, wanted):
+    result = answer(returns, gives)
+    assert result.status == "incomplete"
+    assert result.summary == f"The examiner called `visit(1)`: it wanted {wanted} and got {got}. {NOT_THE_ANSWER}"
+
+
+@pytest.mark.parametrize(
+    ("returns", "gives", "said"),
+    [
+        ({"tuple": [4, 9]}, "[4, 9]", "it wanted (4, 9) and got [4, 9], which is a list, not a tuple."),
+        ([4, 9], "(4, 9)", "it wanted [4, 9] and got (4, 9), which is a tuple, not a list."),
+        ([], "()", "it wanted [] and got (), which is a tuple, not a list."),
+        (PAIRS, "[[2, 1], [3, 3]]", "it wanted [(2, 1), (3, 3)] and got [[2, 1], [3, 3]], which has a list in it where a tuple was wanted."),
+        (PAIRS, "[(2, 1), [3, 3]]", "it wanted [(2, 1), (3, 3)] and got [(2, 1), [3, 3]], which has a list in it where a tuple was wanted."),
+        ([[2, 1]], "[(2.0, 1)]", "it wanted [(2, 1)] and got [(2.0, 1)], which has a number with a decimal point (a float) in it where a whole number (an int) was wanted."),
+        ([1, 2], "[1, True]", "it wanted [1, 2] and got [1, True], which has True or False (a bool) in it where a whole number (an int) was wanted."),
+        ([4, 9], "[4, '9']", "it wanted [4, 9] and got [4, '9'], which has text (a str) in it where a whole number (an int) was wanted."),
+        ([[1, 2]], "[1]", "it wanted [(1, 2)] and got [1], which has a whole number (an int) in it where a tuple was wanted."),
+        ([4, 9], "7", "it wanted [4, 9] and got 7, which is a whole number (an int), not a list."),
+        (7, "[7]", "it wanted 7 and got [7], which is a list, not a whole number (an int)."),
+        ({"tuple": [7]}, "7", "it wanted (7,) and got 7, which is a whole number (an int), not a tuple."),
+        ([4, 9], "'49'", "it wanted [4, 9] and got '49', which is text (a str), not a list."),
+        ([[1, 2]], "[(1, 2.5), 7]", "it wanted [(1, 2)] and got [(1, 2.5), 7], which has a number with a decimal point (a float) in it where a whole number (an int) was wanted."),
+    ],
+)  # fmt: skip
+def test_the_kinds_are_compared_all_the_way_down_and_the_words_name_them(returns, gives, said):
+    result = answer(returns, gives)
+    assert result.status == "incomplete"
+    assert result.summary == f"The examiner called `visit(1)`: {said} {WRONG_KIND}"
+
+
+def test_a_function_that_hands_back_nothing_where_a_list_was_wanted_says_so():
+    result = call_of({"args": [[1, 2]], "returns": [3]}, code=f"def visit(items):\n{MOVES}", constraints=False, function="visit")
+    assert result.status == "incomplete" and result.call.returned == "None" and result.call.wanted == "[3]"
+    assert result.summary == (
+        "The examiner called `visit([1, 2])` and got nothing back (None); it wanted [3]. A function hands a value back only "
+        f"with `return`: check that every way through `visit` reaches one. {NOTHING_PUT}"
+    )
+
+
+def test_a_list_printed_instead_of_handed_back_is_the_printed_words():
+    code = f"def visit(items):\n    print([4, 9])\n{MOVES}"
+    result = call_of({"args": [[1]], "returns": [4, 9]}, code=code, constraints=False, function="visit")
+    assert result.summary.startswith("The examiner called `visit([1])` and got nothing back (None); it wanted [4, 9]. Your function printed its answer")
+
+
+def test_nothing_wanted_but_a_list_handed_back_is_the_wrong_value():
+    result = answer(None, "[]")
+    assert result.summary == f"The examiner called `visit(1)`: it wanted nothing back (None) and got []. {NOT_THE_ANSWER}"
+
+
+def test_an_empty_list_is_handed_over_and_an_empty_list_is_handed_back():
+    code = f"def visit(items):\n{MOVES}    return items\n"
+    result = call_of({"args": [[]], "returns": []}, code=code, constraints=False, function="visit")
+    assert result.status == "solved" and result.call.text == "visit([])"
+    assert (result.call.returned, result.call.wanted) == ("[]", "[]")
+
+
+def test_the_function_gets_real_lists_and_tuples():
+    code = f"def visit(items, pair, spots, whole):\n{MOVES}    return [type(items).__name__, type(pair).__name__, type(spots[0]).__name__, type(whole).__name__]\n"
+    args = [[1, 2], {"tuple": [3, 4]}, [[1, 2]], 5]
+    result = call_of({"args": args, "returns": ["list", "tuple", "tuple", "int"]}, code=code, constraints=False, function="visit")
+    assert result.status == "solved" and result.call.text == "visit([1, 2], (3, 4), [(1, 2)], 5)"
+
+
+def test_what_the_function_does_to_its_list_changes_neither_the_next_call_nor_the_answer_wanted():
+    code = f"def visit(items, spots):\n{MOVES}    items.append(9)\n    spots.clear()\n    n = len(items)\n    items.clear()\n    return [n]\n"
+    call = {"args": [[1, 2], [[1, 2]]], "returns": [3]}
+    level = examiner(call, call, start=EAST, function="visit")
+    for _ in range(2):  # two calls on one level, and the level run again
+        result = run_level(level, code, enforce_constraints=False)
+        assert result.status == "solved"
+    assert [call.args for call in level.examine.calls] == [[[1, 2], [(1, 2)]]] * 2
+    assert [call.returns for call in level.examine.calls] == [[3], [3]]
+
+
+def test_a_function_that_hands_back_its_own_list_cannot_reach_the_answer_wanted():
+    code = f"def visit(items):\n{MOVES}    items.append(9)\n    return items\n"
+    level = examiner({"args": [[1]], "returns": [1, 9]}, start=EAST, function="visit")
+    assert run_level(level, code, enforce_constraints=False).status == "solved"
+    assert level.examine.calls[0].args == [[1]] and level.examine.calls[0].returns == [1, 9]
+
+
+def test_a_level_of_plain_values_is_read_and_judged_as_before():
+    level = examiner({"args": [1, "a", None, 2.5, True], "returns": "x"}, {"args": [], "returns": None}, {})
+    assert [(call.args, call.returns) for call in level.examine.calls[:2]] == [([1, "a", None, 2.5, True], "x"), ([], None)]
+    assert level.examine.calls[2].returns is NOT_JUDGED
+
+
 # -- M5.2-4c: the review's fixes ------------------------------------------------------------------------------------
 
 DOCTORED = [
@@ -748,7 +872,7 @@ def test_a_snippets_call_is_read_with_ast(text, parsed):
 @pytest.mark.parametrize(
     "text",
     ["pawn.move(1)", "gallop(a=1)", "gallop(x)", "gallop(1 + 2)", "gallop(-True)", "gallop(-'a')", "gallop(--1)", "gallop(+1)",
-     "gallop([1])", "gallop(b'a')", "gallop(1j)", "gallop(*args)", "gallop(1)(2)", "gallop", "gallop(1); gallop(2)", "gallop(",
+     "gallop(b'a')", "gallop(1j)", "gallop(*args)", "gallop(1)(2)", "gallop", "gallop(1); gallop(2)", "gallop(",
      "gallop(1)\ngallop(2)", "", "x = gallop(1)"],
 )  # fmt: skip
 def test_a_snippets_call_that_is_not_one_plain_call_is_a_lesson_authors_mistake(text):
@@ -758,6 +882,41 @@ def test_a_snippets_call_that_is_not_one_plain_call_is_a_lesson_authors_mistake(
     if text:  # run_sandbox refuses it the same way, before anything runs
         with pytest.raises(ValueError, match="plain function name"):
             sandbox(DEFINES, call=text)
+
+
+@pytest.mark.parametrize(
+    ("text", "shown"),
+    [
+        ("visit([1, -2, 3])", ("visit", "[[1, -2, 3]]")),
+        ("visit([])", ("visit", "[[]]")),
+        ("visit([True, None, 2.5, 'a', -0.5])", ("visit", "[[True, None, 2.5, 'a', -0.5]]")),
+        ("visit([(2, 1), (3, -3)], 5)", ("visit", "[[(2, 1), (3, -3)], 5]")),
+        ("visit([(7,)])", ("visit", "[[(7,)]]")),
+        ("visit((1, 'a'))", ("visit", "[(1, 'a')]")),
+        ("visit([1, 2], (3, 4), 'x')", ("visit", "[[1, 2], (3, 4), 'x']")),
+    ],
+)
+def test_a_snippets_call_may_hand_lists_tuples_and_lists_of_pairs(text, shown):
+    name, args = parse_snippet_call(text)
+    assert (name, repr(args)) == shown  # repr tells a list from a tuple, and True from 1
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["visit([[1]])", "visit([(1, (2,))])", "visit([(1, [2])])", "visit(((1, 2), 3))", "visit(([1], 2))", "visit([[(1, 2)]])", "visit([x])",
+     "visit([1, *a])", "visit([i for i in (1,)])", "visit(list(1))", "visit([1 + 2])", "visit({1})", "visit({'a': 1})", "visit(())",
+     "visit([()])", "visit([1][0])", "visit([-True])", "visit([b'a'])", "visit(x, [1])", "visit((1, 2)[0])", "visit(sorted([1]))"],
+)  # fmt: skip
+def test_a_snippets_call_with_anything_else_in_it_is_refused_in_the_widened_sentence(text):
+    with pytest.raises(ValueError, match="must be one call of a plain function name with plain values") as raised:
+        parse_snippet_call(text)
+    assert repr(text) in str(raised.value) and "a list or tuple of them, or a list of pairs of them" in str(raised.value)
+
+
+def test_a_snippets_list_reaches_the_function_as_a_list_and_is_named_in_the_words():
+    result = sandbox("def visit(items, pair):\n    return [len(items), type(pair).__name__]\n", call="visit([1, 2, 3], (4, 5))")
+    assert (result.status, result.summary) == ("finished", "The examiner called `visit([1, 2, 3], (4, 5))` and got [3, 'tuple'] back.")
+    assert result.call.text == "visit([1, 2, 3], (4, 5))" and result.call.returned == "[3, 'tuple']"
 
 
 def test_a_call_that_is_made_is_a_finished_run_that_says_so():
