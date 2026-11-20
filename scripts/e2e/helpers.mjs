@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { sleep } from "./cdp.mjs";
 
 export const BUTTONS = ".playback-buttons button"; // back to start, step back, play, step forward, jump to end
+const playbackButton = (index) => `document.querySelectorAll('${BUTTONS}')[${index}]`;
 
 export function levelHelpers(browser, base, root) {
   return {
@@ -50,6 +51,8 @@ export function levelHelpers(browser, base, root) {
 
     /** Show the level's Challenge tab. */
     challengeTab: () => buttonHelpers(browser).clickButton("Challenge", ".tabs"),
+    /** Show the level's Codex tab. */
+    codexTab: () => buttonHelpers(browser).clickButton("Codex", ".tabs"),
   };
 }
 
@@ -123,7 +126,7 @@ export function buttonHelpers(browser) {
 function runHelpers(browser) {
   /** Once a recording is playing: optionally jump to its end, then describe the outcome card. */
   async function outcome({ jump = true } = {}) {
-    if (jump) await browser.evaluate(`(() => { const e = document.querySelectorAll('${BUTTONS}')[4]; if (!e.disabled) e.click(); })()`);
+    if (jump) await browser.evaluate(`(() => { const e = ${playbackButton(4)}; if (!e.disabled) e.click(); })()`);
     await browser.waitFor(`document.querySelector('.outcome-host .outcome')`, 30_000, "outcome card");
     return browser.evaluate(`({
       head: document.querySelector('.outcome-head strong').textContent,
@@ -142,6 +145,10 @@ function runHelpers(browser) {
   }
   return {
     outcome,
+    /** The playback button `index` (see BUTTONS), as a JS expression for `evaluate`. */
+    button: playbackButton,
+    /** Click the playback button `index`. */
+    press: (index) => browser.evaluate(`${playbackButton(index)}.click()`),
     /** Press Run, optionally jump to the end, and describe the outcome. */
     async run({ jump = true } = {}) {
       await browser.evaluate(`document.querySelector('.level-right .btn-primary').click()`);

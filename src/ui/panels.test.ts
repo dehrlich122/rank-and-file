@@ -6,6 +6,13 @@ import { Inspector, callList, outcomeCard, piecesFirst } from "./panels";
 const v = (name: string, type: string): Var => ({ name, value: "0", type });
 const names = (vars: Var[]) => vars.map((x) => x.name).join(",");
 
+beforeEach(() => vi.stubGlobal("document", fakeDocument));
+afterEach(() => vi.unstubAllGlobals());
+
+/** A solved run with nothing in it; a test overrides what it is about. */
+const result = (over: Partial<LevelResult> = {}): LevelResult =>
+  ({ status: "solved", summary: "Solved! ok", error: null, problems: [], stars: [], case_note: "", truncated: false, call: null, cases: [], ...over }) as LevelResult;
+
 describe("piecesFirst: the variables panel's order", () => {
   it("puts the knight first on a knight level, then the player's variables in order", () => {
     const vars = [v("steps", "int"), v("knight", "Knight"), v("me", "Knight"), v("tag", "str")];
@@ -24,9 +31,6 @@ describe("piecesFirst: the variables panel's order", () => {
 });
 
 describe("Inspector", () => {
-  beforeEach(() => vi.stubGlobal("document", fakeDocument));
-  afterEach(() => vi.unstubAllGlobals());
-
   const val = (name: string, value: string): Var => ({ name, value, type: "int" });
   const make = () => new Inspector("pawn");
   const root = (i: Inspector): Fake => asFake(i.element);
@@ -112,18 +116,14 @@ describe("Inspector", () => {
 });
 
 describe("outcomeCard on an examiner level", () => {
-  beforeEach(() => vi.stubGlobal("document", fakeDocument));
-  afterEach(() => vi.unstubAllGlobals());
-
   const whole = "The examiner called `f(1)`, and the board is as it should be.";
   const plain = whole.replaceAll("`", ""); // the backticks become a code element, which adds no characters
-  const result = (over: Partial<LevelResult>): LevelResult =>
-    ({ status: "solved", summary: `Solved! ${whole} “Fine.”`, error: null, problems: [], stars: [], case_note: "", truncated: false, call: null, cases: [], ...over }) as LevelResult;
+  const examined = (over: Partial<LevelResult>) => result({ summary: `Solved! ${whole} “Fine.”`, ...over });
   const call = { text: "f(1)", returned: null, wanted: null, first_step: 0, happened: whole, said: "Fine." };
   const card = (run: LevelResult) => asFake(outcomeCard(run, run));
 
   it("shows what happened, then the examiner's line apart with its mark", () => {
-    const c = card(result({ call }));
+    const c = card(examined({ call }));
     const paras = c.all("p").map((p) => p.text);
     expect(paras).toContain(plain);
     const line = c.find("examiner-line")[0]!;
@@ -133,19 +133,15 @@ describe("outcomeCard on an examiner level", () => {
   });
 
   it("is as before with no happened, or with a problem", () => {
-    expect(card(result({ call: { ...call, happened: null, said: null } })).find("examiner-line").length).toBe(0);
-    expect(card(result({ call: null })).all("p").map((p) => p.text)).toContain(`${plain} “Fine.”`);
-    expect(card(result({ call, problems: ["no"] })).find("examiner-line").length).toBe(0);
+    expect(card(examined({ call: { ...call, happened: null, said: null } })).find("examiner-line").length).toBe(0);
+    expect(card(examined({ call: null })).all("p").map((p) => p.text)).toContain(`${plain} “Fine.”`);
+    expect(card(examined({ call, problems: ["no"] })).find("examiner-line").length).toBe(0);
   });
 });
 
 describe("the result card shows `code` spans as code", () => {
-  beforeEach(() => vi.stubGlobal("document", fakeDocument));
-  afterEach(() => vi.unstubAllGlobals());
-
-  const base = { status: "lost", summary: "", error: null, problems: [], stars: [], case_note: "", truncated: false, call: null, cases: [] };
   const card = (over: Partial<LevelResult>) => {
-    const run = { ...base, ...over } as LevelResult;
+    const run = result({ status: "lost", summary: "", ...over });
     return asFake(outcomeCard(run, run));
   };
   const codes = (f: Fake) => f.all("code").map((c) => c.text);
@@ -178,9 +174,6 @@ describe("the result card shows `code` spans as code", () => {
 });
 
 describe("callList: the examiner's calls in the Challenge panel", () => {
-  beforeEach(() => vi.stubGlobal("document", fakeDocument));
-  afterEach(() => vi.unstubAllGlobals());
-
   const calls = (...boards: number[]) => ({ function: "f", calls: boards.map((board, i) => ({ text: `f(${i})`, board })) });
   const boards = (n: number) => Array.from({ length: n }, () => ({})) as unknown as LevelInfo["boards"];
   const items = (nodes: HTMLElement[]) => asFake(nodes[1]!).all("li");
@@ -206,14 +199,9 @@ describe("callList: the examiner's calls in the Challenge panel", () => {
 });
 
 describe("outcomeCard: the examiner's table of calls", () => {
-  beforeEach(() => vi.stubGlobal("document", { ...fakeDocument, createElementNS: (_ns: string, tag: string) => fakeDocument.createElement(tag) })); // the star list draws svg icons
-  afterEach(() => vi.unstubAllGlobals());
-
   type Call = { returned: string | null; wanted: string | null };
-  const make = (over: Partial<LevelResult>): LevelResult =>
-    ({ status: "solved", summary: "Solved! ok", error: null, problems: [], stars: [], case_note: "", truncated: false, call: null, cases: [], ...over }) as LevelResult;
   const aCase = (label: string, status: LevelResult["status"], call: Call | null) =>
-    make({ status, label, call: call && { text: label, first_step: 0, happened: null, said: null, ...call } } as Partial<LevelResult>) as LevelResult["cases"][number];
+    result({ status, label, call: call && { text: label, first_step: 0, happened: null, said: null, ...call } } as Partial<LevelResult>) as LevelResult["cases"][number];
   const three = [
     aCase("f(1)", "solved", { wanted: "2", returned: "2" }),
     aCase("f(2)", "lost", { wanted: "4", returned: "'4'" }),
@@ -224,7 +212,7 @@ describe("outcomeCard: the examiner's table of calls", () => {
   const cells = (row: Fake) => row.all("td").map((td) => td.text);
 
   it("has the head and one row per case, in order, after the details and before the stars", () => {
-    const run = make({ status: "lost", cases: three, stars: [{ kind: "solved", earned: false, label: "s" }] });
+    const run = result({ status: "lost", cases: three, stars: [{ kind: "solved", earned: false, label: "s" }] });
     const c = card(run, three[1]);
     const table = c.find("calls")[0]!;
     expect(table.tag).toBe("table");
@@ -239,7 +227,7 @@ describe("outcomeCard: the examiner's table of calls", () => {
   });
 
   it("marks the case on show, the tick and the cross by the case's status", () => {
-    const run = make({ cases: three });
+    const run = result({ cases: three });
     const c = card(run, three[2]);
     expect(rows(c).map((r) => r.attributes.get("class") ?? "")).toEqual(["", "", "picked"]);
     expect(rows(c).map((r) => r.all("td")[3]!.attributes.get("class"))).toEqual(["ok", "no", "no"]);
@@ -247,46 +235,46 @@ describe("outcomeCard: the examiner's table of calls", () => {
   });
 
   it("says no answer, in muted type, where a call did not finish; never None", () => {
-    const c = card(make({ cases: three }), three[2]);
+    const c = card(result({ cases: three }), three[2]);
     const got = rows(c)[2]!.all("td")[2]!;
     expect(got.text).toBe("no answer");
     expect(got.find("muted").length).toBe(1);
   });
 
   it("leaves wanted and got empty where nothing is wanted or the case never ran", () => {
-    const run = make({ cases: [three[0]!, aCase("f(2)", "lost", { wanted: null, returned: "3" }), aCase("f(3)", "lost", null)] });
+    const run = result({ cases: [three[0]!, aCase("f(2)", "lost", { wanted: null, returned: "3" }), aCase("f(3)", "lost", null)] });
     const c = card(run);
     expect(cells(rows(c)[1]!)).toEqual(["f(2)", "", "", "✗"]);
     expect(cells(rows(c)[2]!)).toEqual(["f(3)", "", "", "✗"]);
   });
 
   it("is not there with no cases, or when no case has an answer wanted", () => {
-    expect(card(make({})).find("calls").length).toBe(0);
+    expect(card(result({})).find("calls").length).toBe(0);
     const boardOnly = [aCase("f(1)", "solved", { wanted: null, returned: null }), aCase("f(2)", "lost", null)];
-    expect(card(make({ cases: boardOnly })).find("calls").length).toBe(0);
+    expect(card(result({ cases: boardOnly })).find("calls").length).toBe(0);
   });
 
   it("shows on a solved run, on a failed one, and beside an error", () => {
-    expect(card(make({ cases: three })).find("calls").length).toBe(1);
-    expect(card(make({ status: "lost", cases: three })).find("calls").length).toBe(1);
+    expect(card(result({ cases: three })).find("calls").length).toBe(1);
+    expect(card(result({ status: "lost", cases: three })).find("calls").length).toBe(1);
     const error = { friendly: "oops", line: 1, traceback: "" } as LevelResult["error"];
-    const c = card(make({ status: "error", error, cases: three }), make({ status: "error", error }));
+    const c = card(result({ status: "error", error, cases: three }), result({ status: "error", error }));
     expect(c.find("error-detail").length).toBe(1);
     expect(c.find("calls").length).toBe(1);
   });
 
   it("replays the case whose button is clicked, and takes no replay without breaking", () => {
     const seen: number[] = [];
-    const c = card(make({ cases: three }), three[0]!, (i) => seen.push(i));
+    const c = card(result({ cases: three }), three[0]!, (i) => seen.push(i));
     rows(c)[2]!.all("button")[0]!.fire("click");
     rows(c)[0]!.all("button")[0]!.fire("click");
     expect(seen).toEqual([2, 0]);
     expect(rows(c)[1]!.all("button")[0]!.attributes.get("title")).toBe("Replay f(2)");
-    expect(() => rows(card(make({ cases: three })))[1]!.all("button")[0]!.fire("click")).not.toThrow();
+    expect(() => rows(card(result({ cases: three })))[1]!.all("button")[0]!.fire("click")).not.toThrow();
   });
 
   it("still takes the two arguments alone", () => {
-    const run = make({});
+    const run = result({});
     expect(asFake(outcomeCard(run, run)).find("outcome-head").length).toBe(1);
   });
 });

@@ -122,11 +122,10 @@ export function codexNameAt(state: EditorState, pos: number, side: -1 | 1, piece
   }
   if (node.name === "VariableName") return { name: state.sliceDoc(node.from, node.to), from: node.from, to: node.to };
   // A keyword's node is named by its own text ("for", "def"); `elif` and `else` share the entry of `if`.
-  const keyword = node.name === "elif" || node.name === "else" ? "if" : node.name;
-  return KEYWORDS.has(keyword) ? { name: keyword, from: node.from, to: node.to } : null;
+  // The grammar names its keyword nodes in lower case ("pass" too); the lookup finds nothing for one with no entry.
+  if (!/^[a-z]+$/.test(node.name)) return null;
+  return { name: node.name === "elif" || node.name === "else" ? "if" : node.name, from: node.from, to: node.to };
 }
-
-const KEYWORDS: ReadonlySet<string> = new Set(["for", "if", "while", "break", "continue", "def", "return"]);
 
 /** Hovering a function in code shows its Codex entry. `current` is null until the level's Codex has loaded. */
 export function codexHover(current: () => CodexLookup | null): Extension {

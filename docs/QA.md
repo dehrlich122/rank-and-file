@@ -1988,6 +1988,15 @@ The designer's play-test of the three knight practice levels. **QA1 passed with 
 - **Decided** *(Designer, 2026-11-18)*: option 3. "It's not a real issue, and also it is a good test case." The
   level, its boards and its reference stay.
 
+## Session 20 — 2026-11-20 · M5.2 QA1, Chapter 7, Spellbook (`m5-2-chapter-7`, PR #28)
+
+The designer's play-test of Chapter 7's seven levels. **QA1 passed with nothing to fix** *(Designer,
+2026-11-20)*: "I've completed the chapter 07 levels. They are excellent and can ship."
+
+No finding, so no QA item. He overruled none of the choices the build made (`docs/M5/M5.2.md`, "As built", every
+"for QA1"): they stand *(the orchestrator's reading: he raised no objection; the wordings were not answered one
+by one)*. The pass started the `/simplify` pass on the M5.2 diff.
+
 ---
 
 ## Queued work

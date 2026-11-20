@@ -26,7 +26,7 @@ from dataclasses import asdict, dataclass, field, replace
 
 from . import codex
 from .board import Tile, square_name
-from .constraints import check_constraints, code_lines, lint
+from .constraints import _values, check_constraints, code_lines, lint
 from .errors import ErrorInfo, _kind, closest, explain
 from .exceptions import LostTrackError
 from .levels import NOT_JUDGED, Case, Examine, ExamineCall, Level, names, sandbox_level
@@ -69,7 +69,7 @@ class Star:
 
 @dataclass
 class CallInfo:
-    """The examiner's call on one case of an examiner level (M5.2-4b fills it in): only the facts.
+    """The examiner's call on one case of an examiner level (M5.2): only the facts.
 
     The examiner's own words about the call (decision 5), passed or failed, are the case's `summary`, as any
     run's verdict is: a case is judged in order (an error, a lost run, a problem with the function itself, the
@@ -112,7 +112,7 @@ class LevelResult:
     case: int = 0
     case_note: str = ""  # the run: how many cases it worked for; a case: which one it is
     duration_ms: float = 0.0
-    call: CallInfo | None = None  # on an examiner level, the call this case made (M5.2-4b); None on any other
+    call: CallInfo | None = None  # on an examiner level, the call this case made (M5.2); None on any other
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -220,7 +220,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
         status = "timeout" if isinstance(run.error, StepBudgetExceeded) else "error"
         return outcome(status, info.friendly, error=info, **recording)
     if call is not None and not judge:  # a lesson's snippet: only the call itself is looked at (M5.2-5a)
-        facts = _call_facts(level, recording["call"].text, namespace, run, [])
+        facts = _call_facts(level, namespace, run, [])
         if run.problem is not None:
             return outcome("incomplete", _examiner_summary(recording["call"], run.problem, facts), **recording)
         return outcome("finished", _called_words(facts), **recording)
@@ -228,7 +228,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
         return outcome("finished", "Finished.", **recording)
     unmet = unmet_objectives(level, world, run.output)
     if call is not None:  # the function, then the answer, then the board
-        facts = _call_facts(level, recording["call"].text, namespace, run, unmet)
+        facts = _call_facts(level, namespace, run, unmet)
         kind = _call_failure(run, facts) or _call_ending(facts)
         return outcome("solved" if kind in PASSED else "incomplete", _examiner_summary(recording["call"], kind, facts), **recording)
     if unmet:
@@ -236,11 +236,11 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
     return outcome("solved", _solved_summary(level), **recording)
 
 
-def _call_facts(level: Level, text: str, namespace: dict, run: Execution, unmet: list[str]) -> CallFacts:
+def _call_facts(level: Level, namespace: dict, run: Execution, unmet: list[str]) -> CallFacts:
     """What the examiner's words may need about the call this run made."""
     function, args = level.examine.function, level.call.args
     return CallFacts(
-        function, text, namespace.get(function), _own_functions(namespace), args, run.returned,
+        function, level.call.text(function), namespace.get(function), _own_functions(namespace), args, run.returned,
         level.call.returns, run.call_output, unmet, run.signature,
     )  # fmt: skip
 
@@ -248,7 +248,7 @@ def _call_facts(level: Level, text: str, namespace: dict, run: Execution, unmet:
 def _examiner_summary(info: CallInfo, kind: str, facts: CallFacts) -> str:
     """The case's summary in the examiner's words, keeping its two parts apart on `info` for the UI."""
     info.happened, info.said = what_happened(kind, facts), examiner_line(kind)
-    return examiner_words(kind, facts)
+    return f"{info.happened} “{info.said}”"
 
 
 def _called_words(facts: CallFacts) -> str:
@@ -356,16 +356,11 @@ def examiner_line(kind: str) -> str:
     return _LINES[kind]
 
 
-def examiner_words(kind: str, facts: CallFacts) -> str:
-    """A case's whole summary: what happened, then the examiner's line in curly quotes. `kind` is "passed",
-    "passed_answered", "missing", "not_function", "arguments", "printed", "nothing", "wrong_value", "wrong_kind",
-    "unexpected", "board" or "board_answered"."""
-    return f"{what_happened(kind, facts)} “{examiner_line(kind)}”"
-
-
 def what_happened(kind: str, facts: CallFacts) -> str:
     """The first part of the words: what the examiner did and found, in plain sentences. The answer wanted shows
-    only where the examiner has judged one and the function was called."""
+    only where the examiner has judged one and the function was called. `kind` is "passed", "passed_answered",
+    "missing", "not_function", "arguments", "printed", "nothing", "wrong_value", "wrong_kind", "unexpected", "board"
+    or "board_answered"."""
     called, name = f"The examiner called `{facts.text}`", facts.function
     if kind == "passed":
         return f"{called}, and the board is as it should be."
@@ -378,7 +373,7 @@ def what_happened(kind: str, facts: CallFacts) -> str:
     if kind == "not_function":
         return f"{called}, but `{name}` in your program is {_what_it_is(facts.found)}, not a function. Keep that name for the `def`."
     if kind == "arguments":
-        return f"{called}{_with_values(len(facts.args))}, and {_what_it_takes(facts.found, facts.signature, len(facts.args))}"
+        return f"{called} with {_values(len(facts.args))}, and {_what_it_takes(facts.found, facts.signature, len(facts.args))}"
     if kind == "board":
         return f"{called}, and when the call ended " + " Also, ".join(facts.unmet)
     if kind == "board_answered":
@@ -405,10 +400,6 @@ def _what_it_is(value: object) -> str:
         return "a class"
     shown, kind = safe_repr(value), _kind(type(value).__name__)
     return shown if shown == kind else f"{shown}, {kind}"
-
-
-def _with_values(n: int) -> str:
-    return " with no values" if n == 0 else f" with {count(n, 'value')}"
 
 
 def _what_it_takes(function: object, signature: inspect.Signature | None, given: int) -> str:
@@ -453,7 +444,8 @@ def run_sandbox(
     level = sandbox_level(api, piece, lesson_board)
     if call:
         name, args = parse_snippet_call(call)
-        level = replace(level, examine=Examine(name, [ExamineCall(args)]), call=ExamineCall(args))
+        examiner_call = ExamineCall(args)
+        level = replace(level, examine=Examine(name, [examiner_call]), call=examiner_call)
     return run_level(level, code, enforce_constraints=False, judge=False)
 
 
@@ -564,7 +556,7 @@ class Execution:
     error: BaseException | None  # None if the program ran to the end
     output: str
     tracer: Tracer
-    # The examiner's call (M5.2-4b), with a `call` only:
+    # The examiner's call (M5.2), with a `call` only:
     returned: object = None  # what the call handed back (None after exit()); only meaningful when `finished`
     finished: bool = False  # the call was made and ended without an error (it handed back, or ended by exit())
     problem: str | None = None  # why it wasn't made: "missing", "not_function" or "arguments"
@@ -585,7 +577,7 @@ def execute(
 ) -> Execution:
     """Run compiled player code under the tracer, capturing everything it prints.
     `call` is (a function's name, its arguments): once the program has ended without an error, the examiner checks
-    the function and calls it with a copy of the arguments, under the same tracer, budget and captured output (M5.2-4b)."""
+    the function and calls it with a copy of the arguments, under the same tracer, budget and captured output."""
     remember_source(source)
     # The code's own clocks only matter when something keeps time with them.
     keeps_time = world is not None and world.code_clocked

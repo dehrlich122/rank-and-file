@@ -16,6 +16,7 @@ import difflib
 import linecache
 import re
 import traceback
+import types
 from dataclasses import dataclass
 
 from .exceptions import IT_KNOWS, GameArgumentError, GameError, Lost
@@ -174,15 +175,24 @@ def _own_nodes(body: list[ast.stmt]):
             stack.extend(ast.iter_child_nodes(node))
 
 
+def _is_none(node: ast.expr | None) -> bool:
+    return node is None or (isinstance(node, ast.Constant) and node.value is None)
+
+
+def _returns_value(nodes) -> bool:
+    """Whether any of these nodes (a function's own, from `_own_nodes`) is a `return` that hands back a value."""
+    return any(isinstance(n, ast.Return) and not _is_none(n.value) for n in nodes)
+
+
 def _param_names(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
     args = fn.args
     named = [arg.arg for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs)]
     return named + [arg.arg for arg in (args.vararg, args.kwarg) if arg]
 
 
-def _bound_names(body: list[ast.stmt], params: list[str] | None = None) -> set[str]:
-    """The names a scope sets itself: parameters, assignments, loop variables, `def`s, imports."""
-    names = set(params or [])
+def _bound_names(body: list[ast.stmt]) -> set[str]:
+    """The names a scope sets itself: assignments, loop variables, `def`s, imports."""
+    names = set()
     for node in _own_nodes(body):
         if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
             names.add(node.id)
@@ -201,24 +211,26 @@ def _functions(tree: ast.Module) -> list[ast.FunctionDef | ast.AsyncFunctionDef]
     return sorted(found, key=lambda fn: fn.lineno)
 
 
-def _innermost_locals(exc: BaseException) -> list[str]:
-    """The names the innermost player frame holds (a function's parameters and locals), for "did you mean"."""
-    names, tb = [], exc.__traceback__
+def _innermost_player_frame(exc: BaseException) -> types.FrameType | None:
+    """The innermost frame of the error's traceback that is the player's own code, or None."""
+    frame, tb = None, exc.__traceback__
     while tb is not None:
         if tb.tb_frame.f_code.co_filename == PLAYER_FILENAME:
-            names = [key for key in tb.tb_frame.f_locals if not key.startswith("__")]
+            frame = tb.tb_frame
         tb = tb.tb_next
-    return names
+    return frame
+
+
+def _innermost_locals(exc: BaseException) -> list[str]:
+    """The names the innermost player frame holds (a function's parameters and locals), for "did you mean"."""
+    frame = _innermost_player_frame(exc)
+    return [key for key in frame.f_locals if not key.startswith("__")] if frame else []
 
 
 def _raising_function(exc: BaseException) -> str | None:
     """The name of the player's function the error was raised in (innermost), or None."""
-    name, tb = None, exc.__traceback__
-    while tb is not None:
-        if tb.tb_frame.f_code.co_filename == PLAYER_FILENAME:
-            name = tb.tb_frame.f_code.co_name
-        tb = tb.tb_next
-    return name
+    frame = _innermost_player_frame(exc)
+    return frame.f_code.co_name if frame else None
 
 
 # -- functions: what goes wrong around `def`, parameters and `return` (M5.2) ------------
@@ -301,7 +313,7 @@ def _none_from_own_function(line: int | None) -> str:
         if fn is None or id(node) in unused:
             continue
         inside = list(_own_nodes(fn.body))
-        if any(isinstance(n, ast.Return) and not _is_none(n.value) for n in inside):
+        if _returns_value(inside):
             continue
         has_bare = any(isinstance(n, ast.Return) for n in inside)
         reason = "no `return` with a value" if has_bare else "no `return`"
@@ -346,10 +358,6 @@ def _none_from_list_method(line: int | None) -> str:
     if found is None:
         return ""
     return f"`.{found}()` changes the list itself and hands back nothing (None). Call it on a line of its own, and keep using the list's own name."
-
-
-def _is_none(node: ast.expr | None) -> bool:
-    return node is None or (isinstance(node, ast.Constant) and node.value is None)
 
 
 def _explain_keyword(qualified: str, keyword: str, did_you_mean: str, namespace: dict, line: int | None) -> str:
