@@ -16,7 +16,7 @@ import tokenize
 from collections import Counter
 from dataclasses import dataclass
 
-from .errors import _DEFS, _own_nodes, _returns_value, closest
+from .errors import _DEFS, _own_nodes, _param_names, _returns_value, closest
 from .pieces import Piece
 from .words import and_list, count
 
@@ -194,7 +194,7 @@ def _values(n: int) -> str:
 def _rule_problems(tree: ast.Module, fn: ast.FunctionDef | ast.AsyncFunctionDef, rule) -> list[str]:
     """What a level asks of one function the program defines, and where the program falls short."""
     args, name, problems = fn.args, fn.name, []
-    takes = len(args.posonlyargs) + len(args.args) + len(args.kwonlyargs) + (args.vararg is not None) + (args.kwarg is not None)
+    takes = len(_param_names(fn))
     defaulted = len(args.defaults) + sum(default is not None for default in args.kw_defaults)
     if rule.params is not None and takes != rule.params:
         problems.append(
@@ -372,9 +372,7 @@ def _own_functions(tree: ast.Module) -> dict[str, ast.FunctionDef | ast.AsyncFun
 
 def _call_text(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
     """How to call `fn`, without inventing values: `stride()`, or `stride(...)` when it takes parameters."""
-    args = fn.args
-    takes = args.posonlyargs or args.args or args.vararg or args.kwonlyargs or args.kwarg
-    return f"{fn.name}({'...' if takes else ''})"
+    return f"{fn.name}({'...' if _param_names(fn) else ''})"
 
 
 def _never_called_warnings(tree: ast.Module, defs: dict) -> list[LintWarning]:
