@@ -156,14 +156,16 @@ NOT_JUDGED = _Unset.NOT_JUDGED
 @dataclass
 class ExamineCall:
     """One call the examiner makes (M5.2; the file's `examine.calls`, read by M5.2-4a, made by M5.2-4b).
-    `args` are plain values, given in order: fewer than the function's parameters is how a default is exercised."""
+    `args` are plain values, lists and tuples (a list of pairs too, the file's convention is `_examine_value`'s),
+    given in order: fewer than the function's parameters is how a default is exercised."""
 
     args: list = field(default_factory=list)
     board: int = 1  # the board it's made on: 1 is the level's map, n is variants[n - 2]
-    returns: object = NOT_JUDGED  # the answer wanted, a plain value; never in describe()
+    returns: object = NOT_JUDGED  # the answer wanted: a plain value, a list or a tuple; never in describe()
 
     def text(self, function: str) -> str:
-        """The call as code writes it, e.g. "gallop(1, 3)": a case's label, and the result's `call.text`."""
+        """The call as code writes it, e.g. "gallop(1, 3)" or "visit([(2, 1), (3, 3)])" (lists in square brackets,
+        pairs in round ones, as Python prints them): a case's label, and the result's `call.text`."""
         return f"{function}({', '.join(repr(arg) for arg in self.args)})"
 
 
@@ -1145,16 +1147,49 @@ def _parse_examine_call(number: int, call, boards: int) -> ExamineCall:
     args = call.get("args", [])
     if not isinstance(args, list):
         raise LevelError(f"examine call {number}: args must be a list of the values the function is called with")
-    if not all(_plain(arg) for arg in args):
-        raise LevelError(f"examine call {number}: each arg must be a plain value: a number, text, true, false or null")
+    args = [_examine_value(arg, f"examine call {number}: arg {place}") for place, arg in enumerate(args, start=1)]
     board = call.get("board", 1)
     if not _positive(board):
         raise LevelError(f"examine call {number}: board must be a whole number of at least 1")
     if board > boards:
         raise LevelError(f"examine call {number} is on board {board}, but the level has only {count(boards, 'board')}")
-    if "returns" in call and not _plain(call["returns"]):
-        raise LevelError(f"examine call {number}: returns must be a plain value: a number, text, true, false or null")
-    return ExamineCall(list(args), board, call.get("returns", NOT_JUDGED))
+    returns = _examine_value(call["returns"], f"examine call {number}: returns") if "returns" in call else NOT_JUDGED
+    return ExamineCall(args, board, returns)
+
+
+_VALUES = "a plain value (a number, text, true, false or null), a list of plain values or of pairs, or a tuple written {tuple: [...]}"
+
+
+def _examine_value(value, where: str):
+    """A value of an examine call's `args` or `returns`, as Python holds it. The one place that knows the file's
+    convention, since YAML has no tuple: a plain value is itself; a list is a list; a list INSIDE a list is a pair (a
+    tuple of plain values); `{tuple: [...]}` is a tuple wherever one stands outside a list. Nothing goes deeper.
+    `where` ("examine call 2: arg 1") names the value in the refusals."""
+    if _plain(value):
+        return value
+    if isinstance(value, dict):
+        if set(value) != {"tuple"}:
+            raise LevelError(f"{where} is a mapping, and the only mapping allowed is {{tuple: [...]}}, which writes a tuple")
+        items = value["tuple"]
+        if not (isinstance(items, list) and items and all(_plain(item) for item in items)):
+            raise LevelError(f"{where}: {{tuple: ...}} must hold a list of at least one plain value, with no list or tuple inside it")
+        return tuple(items)
+    if isinstance(value, list):
+        return [_examine_item(item, where) for item in value]
+    raise LevelError(f"{where} must be {_VALUES}")
+
+
+def _examine_item(item, where: str):
+    """An item of a list in an examine call: a plain value, or a pair (a list inside the list, made of plain values)."""
+    if _plain(item):
+        return item
+    if isinstance(item, list):
+        if not (item and all(_plain(part) for part in item)):
+            raise LevelError(f"{where}: a pair (a list inside the list) must hold at least one plain value, with no list, pair or mapping inside it")
+        return tuple(item)
+    if isinstance(item, dict):
+        raise LevelError(f"{where}: inside a list a tuple is written as an inner list, never as {{tuple: [...]}}")
+    raise LevelError(f"{where} must be {_VALUES}")
 
 
 def _plain(value) -> bool:

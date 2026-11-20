@@ -69,11 +69,10 @@ def test_a_level_with_no_examiner_has_none():
         ({"function": "gallop", "calls": [{}, 3]}, "examine call 2 must be a mapping"),
         ({"function": "gallop", "calls": [{"arg": [1]}]}, "unknown key(s) in examine call 1: arg"),
         ({"function": "gallop", "calls": [{"args": 3}]}, "examine call 1: args must be a list"),
-        ({"function": "gallop", "calls": [{"args": [[1]]}]}, "each arg must be a plain value"),
-        ({"function": "gallop", "calls": [{"args": [{"a": 1}]}]}, "each arg must be a plain value"),
-        ({"function": "gallop", "calls": [{"args": [float("inf")]}]}, "each arg must be a plain value"),
-        ({"function": "gallop", "calls": [{"returns": [1, 2]}]}, "returns must be a plain value"),
-        ({"function": "gallop", "calls": [{"returns": {"a": 1}}]}, "returns must be a plain value"),
+        ({"function": "gallop", "calls": [{"args": [{"a": 1}]}]}, "examine call 1: arg 1 is a mapping, and the only mapping allowed is"),
+        ({"function": "gallop", "calls": [{"args": [1, float("inf")]}]}, "examine call 1: arg 2 must be a plain value"),
+        ({"function": "gallop", "calls": [{"returns": float("nan")}]}, "examine call 1: returns must be a plain value"),
+        ({"function": "gallop", "calls": [{"returns": {"a": 1}}]}, "examine call 1: returns is a mapping, and the only mapping allowed"),
         ({"function": "gallop", "calls": [{"board": 0}]}, "board must be a whole number of at least 1"),
         ({"function": "gallop", "calls": [{"board": "1"}]}, "board must be a whole number of at least 1"),
         ({"function": "gallop", "calls": [{"board": True}]}, "board must be a whole number of at least 1"),
@@ -85,6 +84,82 @@ def test_a_bad_examiner_is_refused_where_it_is_wrong(examine, message):
     with pytest.raises(LevelError, match=message.replace("(", r"\(").replace(")", r"\)")) as raised:
         make_level(ROW, api=API, examine=examine)
     assert raised.value.at == {"field": "examine"}
+
+
+# -- M5.3-4: lists and pairs, in the file and in what the examiner says ---------------------------------------------
+
+def test_a_list_a_list_of_pairs_and_a_tuple_are_read_as_python_holds_them():
+    level = examiner(
+        {"args": [[1, -1, 1]], "returns": [4, 9]},
+        {"args": [[[2, 1], [3, 3]], 5], "returns": [[0, 1], [2, 3]]},
+        {"args": [{"tuple": [1, "a"]}], "returns": {"tuple": [4, 9]}},
+        {"args": [[]], "returns": []},
+        {"args": [["a", True, None, 2.5]], "returns": [[1]]},
+    )
+    calls = level.examine.calls
+    assert [call.args for call in calls] == [[[1, -1, 1]], [[(2, 1), (3, 3)], 5], [(1, "a")], [[]], [["a", True, None, 2.5]]]
+    assert [call.returns for call in calls] == [[4, 9], [(0, 1), (2, 3)], (4, 9), [], [(1,)]]
+    assert [type(call.args[0]) for call in calls] == [list, list, tuple, list, list]
+    assert type(calls[0].returns) is list and type(calls[2].returns) is tuple
+    assert all(type(item) is tuple for item in calls[1].args[0] + calls[1].returns)
+
+
+def test_an_empty_list_is_allowed_and_a_pair_needs_a_value():
+    assert examiner({"args": [[], [[1, 2]]], "returns": []}).examine.calls[0].args == [[], [(1, 2)]]
+    with pytest.raises(LevelError, match="a pair"):
+        examiner({"args": [[[]]]})
+
+
+def test_a_call_reads_as_python_prints_it():
+    call = examiner({"args": [[1, -1], [[2, 1], [3, 3]], {"tuple": [4, 9]}, [], "up", None]}).examine.calls[0]
+    assert call.text("visit") == "visit([1, -1], [(2, 1), (3, 3)], (4, 9), [], 'up', None)"
+    assert examiner({"args": [{"tuple": [4]}]}).examine.calls[0].text("visit") == "visit((4,))"
+    assert examiner({"args": [[[7]]]}).examine.calls[0].text("visit") == "visit([(7,)])"
+
+
+def test_the_label_and_describe_carry_the_text_and_no_answer():
+    level = examiner({"args": [[[2, 1], [3, 3]]], "returns": [[777, 888]]}, {"args": [[5, 6]], "returns": {"tuple": [31337, 0]}})
+    assert [case.label for case in level.cases()] == ["gallop([(2, 1), (3, 3)])", "gallop([5, 6])"]
+    described = json.dumps(level.describe())
+    assert "gallop([(2, 1), (3, 3)])" in described and "gallop([5, 6])" in described
+    assert "777" not in described and "31337" not in described
+
+
+@pytest.mark.parametrize(
+    ("call", "message"),
+    [
+        ({"args": [[[1, [2]]]]}, "examine call 1: arg 1: a pair .a list inside the list. must hold at least one plain value, with no list, pair or mapping inside it"),
+        ({"args": [[[1, [2, 3]], [4, 5]]]}, "examine call 1: arg 1: a pair"),  # a pair inside a pair
+        ({"args": [[[[1]]]]}, "examine call 1: arg 1: a pair"),  # a list three deep
+        ({"args": [[[1, {"tuple": [2]}]]]}, "examine call 1: arg 1: a pair"),
+        ({"args": [1, [[]]]}, "examine call 1: arg 2: a pair"),  # an empty pair
+        ({"args": [[{"tuple": [1, 2]}]]}, "examine call 1: arg 1: inside a list a tuple is written as an inner list"),
+        ({"args": [[{"a": 1}]]}, "examine call 1: arg 1: inside a list a tuple is written as an inner list"),
+        ({"args": [{"tuple": [1], "x": 2}]}, "examine call 1: arg 1 is a mapping, and the only mapping allowed is"),
+        ({"args": [{"tuples": [1]}]}, "examine call 1: arg 1 is a mapping, and the only mapping allowed is"),
+        ({"args": [{}]}, "examine call 1: arg 1 is a mapping, and the only mapping allowed is"),
+        ({"args": [{"tuple": [[1, 2]]}]}, "examine call 1: arg 1: .tuple: .... must hold a list of at least one plain value"),  # a list inside a tuple
+        ({"args": [{"tuple": [{"tuple": [1]}]}]}, "examine call 1: arg 1: .tuple: .... must hold a list"),
+        ({"args": [{"tuple": []}]}, "examine call 1: arg 1: .tuple: .... must hold a list of at least one plain value"),
+        ({"args": [{"tuple": None}]}, "examine call 1: arg 1: .tuple: .... must hold a list of at least one plain value"),
+        ({"args": [{"tuple": 5}]}, "examine call 1: arg 1: .tuple: .... must hold a list of at least one plain value"),
+        ({"args": [[1, float("nan")]]}, "examine call 1: arg 1 must be a plain value"),
+        ({"returns": [[1, [2]]]}, "examine call 1: returns: a pair"),
+        ({"returns": [[[1]]]}, "examine call 1: returns: a pair"),
+        ({"returns": {"tuple": [[1]]}}, "examine call 1: returns: .tuple: ...."),
+        ({"returns": {"tuple": []}}, "examine call 1: returns: .tuple: ...."),
+        ({"returns": {"x": [1]}}, "examine call 1: returns is a mapping"),
+    ],
+)  # fmt: skip
+def test_what_the_examiner_cannot_hold_is_refused_in_a_sentence_naming_the_call(call, message):
+    with pytest.raises(LevelError, match=message) as raised:
+        examiner(call)
+    assert raised.value.at == {"field": "examine"}
+
+
+def test_a_call_that_is_refused_is_named_by_its_number():
+    with pytest.raises(LevelError, match="examine call 3: arg 2: a pair"):
+        examiner({}, {"args": [[[1]]]}, {"args": [0, [[1, [2]]]]})
 
 
 def test_a_call_to_a_board_that_is_not_there_names_the_boards_there_are():
