@@ -508,6 +508,92 @@ KEYWORDS: dict[str, tuple[list[str], str]] = {
 KEYWORD_NODES = {"for": "For", "if": "If", "while": "While", "break": "Break", "continue": "Continue", "def": "FunctionDef", "return": "Return"}
 KEYWORD_ALIASES = {"elif": "if", "else": "if"}  # help("elif") answers with the `if` entry
 
+# The kinds of value (M5.3, decision 9): "what is a list?" is neither an ability, a built-in nor a keyword. Each is brought
+# in by the first lesson whose snippets make such a value (`_kinds_made`). Named so that none is also a PYTHON name: the
+# whole numbers are `whole number` because `int` is the built-in's entry.
+VALUES: dict[str, tuple[list[str], str]] = {
+    "whole number": (
+        ["7"],
+        """A whole number, written with digits and no quotes. Python calls it an integer, `int` for short.
+
+        Numbers are for counting and arithmetic: `+`, `-` and `*` work on them, and `%` gives what is left over after dividing. `<`, `>` and `==` compare two of them. A number in quotes, `"7"`, is text: `int("7")` makes the number.
+
+        Example:
+            steps = 7
+            print(steps + 1)
+            print(steps % 2)
+        """,
+    ),
+    "text": (
+        ['"north"'],
+        """Text: letters, digits and signs between quotes. Python calls it a string, `str` for short.
+
+        `+` joins two texts and `len(text)` counts the characters. Each character has a place, counting from 0: `word[0]` is the first and `word[-1]` the last. `part in word` asks whether one text is inside another. Text never changes: a method such as `.upper()` hands back a new text and leaves the old one as it was.
+
+        Example:
+            word = "north"
+            print(word + "!")
+            print(len(word))
+            print(word[0])
+        """,
+    ),
+    "True and False": (
+        ["True", "False"],
+        """A yes or a no. There are only two, written with a capital and no quotes. Python calls them booleans, `bool` for short.
+
+        A comparison such as `steps > 3` makes one, and so does `in`. `if` and `while` read one to decide what runs. `and`, `or` and `not` combine them.
+
+        Example:
+            steps = 5
+            far = steps > 3
+            print(far)
+            if far and steps < 10:
+                print("in range")
+        """,
+    ),
+    "None": (
+        ["None"],
+        """Python's word for "nothing here". There is only one, written with a capital and no quotes.
+
+        A function that ends without a `return` hands back `None`, and so does a call that only does something, like `print()`. A name that holds `None` where you expected a value usually kept the answer of such a call.
+
+        Example:
+            def shout(word):
+                print(word + "!")
+            answer = shout("go")
+            print(answer)
+        """,
+    ),
+    "list": (
+        ["[1, 2, 3]"],
+        """Several values in a row under one name, written in square brackets with commas between them. `[]` is a list with nothing in it.
+
+        Each item has a place, counting from 0: `route[0]` is the first and `route[-1]` the last. `len(route)` counts the items, `value in route` asks whether one is there, and `for step in route:` visits each in turn. Unlike text, a list can change: `.append(value)` adds to its end.
+
+        Example:
+            route = [2, 5, 3]
+            print(route[0])
+            print(len(route))
+            for step in route:
+                print(step)
+        """,
+    ),
+    "tuple": (
+        ["(3, 2)"],
+        """Values that belong together, written in round brackets with a comma between them. A tuple of two is a pair, like the `(x, y)` of a square.
+
+        A tuple never changes once it is made. Take one value by its place, `place[0]`, or give each value a name of its own in one line: `x, y = place`. That is unpacking, and it needs exactly as many names as there are values. A function that returns two values with a comma between them hands back a tuple.
+
+        Example:
+            place = (3, 2)
+            x, y = place
+            print(x)
+            print(place[1])
+        """,
+    ),
+}
+VALUE_ALIASES = {"str": "text", "bool": "True and False"}  # help("str") answers with the `text` entry
+
 
 def parse_docstring(doc: str) -> dict:
     """Split a Google-style docstring into its paragraphs, args, returns and example."""
@@ -557,6 +643,12 @@ def keyword_entry(name: str) -> Entry:
     """The entry for a keyword of Python (`def`, `for`...)."""
     calls, doc = KEYWORDS[name]
     return Entry(name, "keyword", calls, **parse_docstring(doc))
+
+
+def value_entry(name: str) -> Entry:
+    """The entry for a kind of value (`list`, `text`...)."""
+    calls, doc = VALUES[name]
+    return Entry(name, "value", calls, **parse_docstring(doc))
 
 
 def python_entry(name: str) -> Entry:
@@ -691,6 +783,34 @@ def _nodes_used(lesson: str) -> frozenset[str]:
     return frozenset(used)
 
 
+def _kind_of(node: ast.AST) -> str | None:
+    """The kind of value a piece of syntax makes, if any: a constant, an f-string, or a list or tuple display that is
+    read. An unpacking target (`x, y = pair`) or an assigned-to list display is a Store, which makes nothing."""
+    if isinstance(node, ast.Constant):
+        value = node.value
+        if value is None:
+            return "None"
+        kinds = {bool: "True and False", int: "whole number", str: "text"}
+        return kinds.get(type(value))
+    if isinstance(node, ast.JoinedStr):
+        return "text"
+    if isinstance(node, (ast.List, ast.Tuple)) and isinstance(node.ctx, ast.Load):
+        return type(node).__name__.lower()
+    return None
+
+
+@functools.lru_cache(maxsize=256)
+def _kinds_made(lesson: str) -> frozenset[str]:
+    """The kinds of value a lesson's snippets make (VALUES' names). A snippet that isn't Python makes none."""
+    made: set[str] = set()
+    for code in lesson_snippets(lesson):
+        try:
+            made |= {kind for node in ast.walk(ast.parse(code)) if (kind := _kind_of(node))}
+        except SyntaxError:
+            continue
+    return frozenset(made)
+
+
 def entries(level_id: str, chapters: list[dict]) -> list[Entry]:
     """A level's Codex: its piece's abilities, then every built-in and text method taught so far.
 
@@ -710,11 +830,14 @@ def entries(level_id: str, chapters: list[dict]) -> list[Entry]:
         for name, node in KEYWORD_NODES.items():
             if node in used:
                 introduced.setdefault(name, item["id"])
-    here = parse_level(counted[-1]["data"])
+        for name in _kinds_made(item["lesson"]):
+            introduced.setdefault(name, item["id"])
+    here =parse_level(counted[-1]["data"])
     piece = PIECES[here.piece]
     found = [ability_entry(piece, name) for name in piece.ABILITIES if name in here.api]
     found += [python_entry(name) for name in PYTHON if name in introduced]
     found += [keyword_entry(name) for name in KEYWORDS if name in introduced]
+    found += [value_entry(name) for name in VALUES if name in introduced]
     for entry in found:
         entry.introduced = introduced[entry.name]
         entry.new = entry.introduced == level_id
@@ -737,8 +860,12 @@ def intro(piece: type[Piece] = Pawn) -> str:
 The Codex tab lists everything you've learned so far."""
 
 
-# Plain values: help(pawn.position) is help((2, 0)) by the time help sees it.
-_VALUES = (int, float, bool, tuple, list, dict, set, type(None))
+# Plain values: help(pawn.position) is help((2, 0)) by the time help sees it. The kinds with an entry (M5.3) ...
+_VALUE_KINDS = {int: "whole number", bool: "True and False", type(None): "None", list: "list", tuple: "tuple"}
+# ... and the rest, which keep the one-sentence answer.
+_VALUES = (float, dict, set)
+# The types themselves, for help(list): `int` is left out, since the built-in's entry answers for it.
+_VALUE_TYPES = {str: "text", bool: "True and False", list: "list", tuple: "tuple"}
 
 
 def player_namespace(**names) -> dict:
@@ -780,6 +907,11 @@ def describe(thing, piece: type[Piece] = Pawn) -> str:
     if isinstance(thing, Piece):
         return _overview(thing)
     name = piece.NAME
+    if (kind := _VALUE_KINDS.get(type(thing))) is not None:  # help([]) answers for the kind, and still points at the piece
+        return (
+            f"{format_entry(value_entry(kind))}\n\n"
+            f"help() explains what things do: try help(print), or help({name}) for what your {name} knows."
+        )
     if isinstance(thing, _VALUES):
         return (
             f"{thing!r} is a value (a {type(thing).__name__}), and help() explains what things do. "
@@ -808,6 +940,8 @@ def _entry_for(thing, piece: type[Piece] = Pawn) -> Entry | None:
             return python_entry(thing)
         if (keyword := KEYWORD_ALIASES.get(thing, thing)) in KEYWORDS:
             return keyword_entry(keyword)
+        if (kind := VALUE_ALIASES.get(thing, thing)) in VALUES:
+            return value_entry(kind)
         piece_name, _, ability = thing.partition(".")
         return ability_entry(piece, ability) if piece_name == piece.NAME and ability in piece.ABILITIES else None
     owner = getattr(thing, "__self__", None)
@@ -818,7 +952,10 @@ def _entry_for(thing, piece: type[Piece] = Pawn) -> Entry | None:
         if method in METHODS and (isinstance(owner, kind) or thing is getattr(kind, thing.__name__)):  # "x".upper, or str.upper
             return python_entry(method)
     # `help` is in `builtins` only once `site` has run; a missing one is None, which must not match help(None)
-    return next((python_entry(name) for name in BUILTINS if thing is not None and thing is getattr(builtins, name, None)), None)
+    built_in = next((python_entry(name) for name in BUILTINS if thing is not None and thing is getattr(builtins, name, None)), None)
+    if built_in is None and isinstance(thing, type) and thing in _VALUE_TYPES:
+        return value_entry(_VALUE_TYPES[thing])  # help(list)
+    return built_in
 
 
 def format_entry(entry: Entry) -> str:
