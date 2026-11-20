@@ -69,7 +69,7 @@ class Star:
 
 @dataclass
 class CallInfo:
-    """The examiner's call on one case of an examiner level (M5.2-4b fills it in): only the facts.
+    """The examiner's call on one case of an examiner level (M5.2): only the facts.
 
     The examiner's own words about the call (decision 5), passed or failed, are the case's `summary`, as any
     run's verdict is: a case is judged in order (an error, a lost run, a problem with the function itself, the
@@ -112,7 +112,7 @@ class LevelResult:
     case: int = 0
     case_note: str = ""  # the run: how many cases it worked for; a case: which one it is
     duration_ms: float = 0.0
-    call: CallInfo | None = None  # on an examiner level, the call this case made (M5.2-4b); None on any other
+    call: CallInfo | None = None  # on an examiner level, the call this case made (M5.2); None on any other
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -517,7 +517,7 @@ class Execution:
     error: BaseException | None  # None if the program ran to the end
     output: str
     tracer: Tracer
-    # The examiner's call (M5.2-4b), with a `call` only:
+    # The examiner's call (M5.2), with a `call` only:
     returned: object = None  # what the call handed back (None after exit()); only meaningful when `finished`
     finished: bool = False  # the call was made and ended without an error (it handed back, or ended by exit())
     problem: str | None = None  # why it wasn't made: "missing", "not_function" or "arguments"
@@ -538,7 +538,7 @@ def execute(
 ) -> Execution:
     """Run compiled player code under the tracer, capturing everything it prints.
     `call` is (a function's name, its arguments): once the program has ended without an error, the examiner checks
-    the function and calls it with a copy of the arguments, under the same tracer, budget and captured output (M5.2-4b)."""
+    the function and calls it with a copy of the arguments, under the same tracer, budget and captured output."""
     remember_source(source)
     # The code's own clocks only matter when something keeps time with them.
     keeps_time = world is not None and world.code_clocked

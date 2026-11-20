@@ -122,8 +122,8 @@ LIMITS = {"title": 60, "brief": 600, "trains": 200, "hint": 600, "hints": 5, "te
 
 @dataclass
 class FunctionRule:
-    """What a level asks of one function the player defines (M5.2; the file's `constraints.functions`, read by
-    M5.2-3). Every key is optional: None (or False) asks nothing."""
+    """What a level asks of one function the player defines (M5.2; the file's `constraints.functions`).
+    Every key is optional: None (or False) asks nothing."""
 
     params: int | None = None  # how many parameters it takes
     defaults: int | None = None  # how many of them have a default value
@@ -138,8 +138,8 @@ class Constraints:
     require_nodes: list[str] = field(default_factory=list)  # ast node names, e.g. "For"
     ban_nodes: list[str] = field(default_factory=list)
     max_numbers: int | None = None  # numbers written in the code, at most (M3.2, QA-029); 1 means one number, written once
-    functions: dict[str, FunctionRule] = field(default_factory=dict)  # by the function's name (M5.2-3 reads and checks it)
-    define: int = 0  # at least this many functions of the player's own naming, each called (M5.2-3)
+    functions: dict[str, FunctionRule] = field(default_factory=dict)  # by the function's name (M5.2)
+    define: int = 0  # at least this many functions of the player's own naming, each called (M5.2)
 
 
 class _Unset(Enum):
@@ -153,7 +153,7 @@ NOT_JUDGED = _Unset.NOT_JUDGED
 
 @dataclass
 class ExamineCall:
-    """One call the examiner makes (M5.2; the file's `examine.calls`, read by M5.2-4a, made by M5.2-4b).
+    """One call the examiner makes (M5.2; the file's `examine.calls`).
     `args` are plain values, given in order: fewer than the function's parameters is how a default is exercised."""
 
     args: list = field(default_factory=list)
@@ -168,7 +168,7 @@ class ExamineCall:
 @dataclass
 class Examine:
     """A level's examiner (M5.2, the file's `examine`): the program only defines, and the examiner calls
-    `function` once per call, each on a fresh board (M5.2-4a reads it, M5.2-4b runs it)."""
+    `function` once per call, each on a fresh board."""
 
     function: str
     calls: list[ExamineCall] = field(default_factory=list)
@@ -658,7 +658,7 @@ class Case:
     label: str  # "b3" (where a hidden goal is), or "board 1", "board 2", ...
     where: str  # for sentences: "with the goal on b3", "on board 2"
     level: Level  # the level as it is in this case
-    call: ExamineCall | None = None  # on an examiner level, the call this case makes (M5.2-4a sets it; label: its text)
+    call: ExamineCall | None = None  # on an examiner level, the call this case makes (its text is the label)
 
 
 def sandbox_level(api: list[str], piece: str = "pawn", lesson_board: dict | None = None) -> Level:

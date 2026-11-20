@@ -1,5 +1,5 @@
 """M5.2's examiner, as a level file gives it (M5.2-4a): reading and checking `examine`, one case per call, what the
-player is told about it. (Making the calls is M5.2-4b.)"""
+player is told about it, and the examiner's calls and words."""
 
 import json
 import sys
