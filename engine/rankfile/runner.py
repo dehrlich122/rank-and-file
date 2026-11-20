@@ -248,7 +248,7 @@ def _call_facts(level: Level, text: str, namespace: dict, run: Execution, unmet:
 def _examiner_summary(info: CallInfo, kind: str, facts: CallFacts) -> str:
     """The case's summary in the examiner's words, keeping its two parts apart on `info` for the UI."""
     info.happened, info.said = what_happened(kind, facts), examiner_line(kind)
-    return examiner_words(kind, facts)
+    return f"{info.happened} “{info.said}”"
 
 
 def _called_words(facts: CallFacts) -> str:
@@ -339,16 +339,11 @@ def examiner_line(kind: str) -> str:
     return _LINES[kind]
 
 
-def examiner_words(kind: str, facts: CallFacts) -> str:
-    """A case's whole summary: what happened, then the examiner's line in curly quotes. `kind` is "passed",
-    "passed_answered", "missing", "not_function", "arguments", "printed", "nothing", "wrong_value", "wrong_kind",
-    "unexpected", "board" or "board_answered"."""
-    return f"{what_happened(kind, facts)} “{examiner_line(kind)}”"
-
-
 def what_happened(kind: str, facts: CallFacts) -> str:
     """The first part of the words: what the examiner did and found, in plain sentences. The answer wanted shows
-    only where the examiner has judged one and the function was called."""
+    only where the examiner has judged one and the function was called. `kind` is "passed", "passed_answered",
+    "missing", "not_function", "arguments", "printed", "nothing", "wrong_value", "wrong_kind", "unexpected", "board"
+    or "board_answered"."""
     called, name = f"The examiner called `{facts.text}`", facts.function
     if kind == "passed":
         return f"{called}, and the board is as it should be."
