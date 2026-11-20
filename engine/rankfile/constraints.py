@@ -16,7 +16,7 @@ import tokenize
 from collections import Counter
 from dataclasses import dataclass
 
-from .errors import closest
+from .errors import _DEFS, _own_nodes, _returns_value, closest
 from .pieces import Piece
 from .words import and_list, count
 
@@ -106,7 +106,7 @@ def _is_docstring(node: ast.stmt) -> bool:
 
 def _docstrings(tree: ast.Module) -> list[ast.Expr]:
     """The docstrings: the bare text a module, function or class starts with."""
-    scopes = (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+    scopes = (ast.Module, *_DEFS, ast.ClassDef)
     return [scope.body[0] for scope in ast.walk(tree) if isinstance(scope, scopes) and scope.body and _is_docstring(scope.body[0])]
 
 
@@ -173,7 +173,7 @@ def _function_problems(tree: ast.Module, constraints, examine) -> list[str]:
 
 def _top_functions(tree: ast.Module) -> dict[str, ast.FunctionDef | ast.AsyncFunctionDef]:
     """The functions defined at the left edge of the program, by name (a later `def` of a name wins)."""
-    return {node.name: node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    return {node.name: node for node in tree.body if isinstance(node, _DEFS)}
 
 
 def _missing_function(name: str, params: int | None, defs: dict) -> str:
@@ -209,26 +209,12 @@ def _rule_problems(tree: ast.Module, fn: ast.FunctionDef | ast.AsyncFunctionDef,
     if rule.calls is not None and called < rule.calls:
         tail = "never calls it" if called == 0 else f"calls it in {count(called, 'place')}"  # places in the code, not calls made
         problems.append(f"This level wants your program to call `{name}` in at least {count(rule.calls, 'place')}, and it {tail}.")
-    if rule.returns and not any(isinstance(n, ast.Return) and not _is_none(n.value) for n in _own_nodes(fn)):
+    if rule.returns and not _returns_value(_own_nodes(fn.body)):
         problems.append(
             f"This level wants `{name}` to hand back a value: put `return` and the value inside it. "
             "A `return` on its own hands back nothing."
         )
     return problems
-
-
-def _is_none(node: ast.expr | None) -> bool:
-    return node is None or (isinstance(node, ast.Constant) and node.value is None)
-
-
-def _own_nodes(fn: ast.FunctionDef | ast.AsyncFunctionDef):
-    """Every node in `fn`'s own lines: not those of a function or lambda nested in it, which are theirs."""
-    pending = list(fn.body)
-    while pending:
-        node = pending.pop()
-        yield node
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
-            pending.extend(ast.iter_child_nodes(node))
 
 
 def _outside(tree: ast.Module, fn: ast.FunctionDef | ast.AsyncFunctionDef):
@@ -273,7 +259,7 @@ def _only_defines_problems(tree: ast.Module) -> list[str]:
     either (a nested `def` runs only when called, and isn't judged)."""
     problems, spans = [], []
     for i, stmt in enumerate(tree.body):
-        if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(stmt, _DEFS):
             problems += _def_runs_nothing(stmt)
         elif not _only_defines(stmt, i == 0):
             spans.append((stmt.lineno, stmt.end_lineno))
@@ -302,7 +288,7 @@ def _def_runs_nothing(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
 
 
 def _only_defines(stmt: ast.stmt, first: bool) -> bool:
-    if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Pass)):
+    if isinstance(stmt, (*_DEFS, ast.Pass)):
         return True
     if first and _is_docstring(stmt):
         return True
@@ -380,7 +366,7 @@ def _own_functions(tree: ast.Module) -> dict[str, ast.FunctionDef | ast.AsyncFun
     return {
         node.name: node
         for node in ast.walk(tree)
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and id(node) not in methods
+        if isinstance(node, _DEFS) and id(node) not in methods
     }
 
 

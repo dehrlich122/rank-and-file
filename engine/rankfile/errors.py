@@ -174,6 +174,15 @@ def _own_nodes(body: list[ast.stmt]):
             stack.extend(ast.iter_child_nodes(node))
 
 
+def _is_none(node: ast.expr | None) -> bool:
+    return node is None or (isinstance(node, ast.Constant) and node.value is None)
+
+
+def _returns_value(nodes) -> bool:
+    """Whether any of these nodes (a function's own, from `_own_nodes`) is a `return` that hands back a value."""
+    return any(isinstance(n, ast.Return) and not _is_none(n.value) for n in nodes)
+
+
 def _param_names(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
     args = fn.args
     named = [arg.arg for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs)]
@@ -301,7 +310,7 @@ def _none_from_own_function(line: int | None) -> str:
         if fn is None or id(node) in unused:
             continue
         inside = list(_own_nodes(fn.body))
-        if any(isinstance(n, ast.Return) and not _is_none(n.value) for n in inside):
+        if _returns_value(inside):
             continue
         has_bare = any(isinstance(n, ast.Return) for n in inside)
         reason = "no `return` with a value" if has_bare else "no `return`"
@@ -310,10 +319,6 @@ def _none_from_own_function(line: int | None) -> str:
             note += " `print` shows a value on the screen, but only `return` hands it back."
         return note
     return ""
-
-
-def _is_none(node: ast.expr | None) -> bool:
-    return node is None or (isinstance(node, ast.Constant) and node.value is None)
 
 
 def _explain_keyword(qualified: str, keyword: str, did_you_mean: str, namespace: dict, line: int | None) -> str:
