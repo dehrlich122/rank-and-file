@@ -2,17 +2,15 @@
 // Solutions are read from solutions/ and typed into the editor; this file never
 // contains solution code, and nothing here prints it.
 import { sleep } from "./cdp.mjs";
-import { BUTTONS, hoverHelpers, levelHelpers, settingsHelpers } from "./helpers.mjs";
+import { hoverHelpers, levelHelpers, settingsHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const LEVELS = ["ch01-l01", "ch01-l02", "ch01-l03", "ch01-l04", "ch01-l05"];
 
 export default async function appChecks({ browser: b, base, root, check }) {
-  const { solution, withoutExpectLine, openLevel, setCode, editorText, clickButton, hasButton, challengeTab, run, outcome, brief } = levelHelpers(b, base, root);
+  const { solution, withoutExpectLine, openLevel, setCode, editorText, clickButton, hasButton, challengeTab, codexTab, press, run, outcome, brief } = levelHelpers(b, base, root);
   const { wordAt, hover, hoverAway } = hoverHelpers(b);
   const { keepingSettings } = settingsHelpers(b);
-
-  const button = (index) => `document.querySelectorAll('${BUTTONS}')[${index}]`;
 
   /** What the game said in the console (guards, pick-ups, falls). Check it in Node; never report it: it can give a solution away. */
   const gameMessages = () => b.evaluate(`[...document.querySelectorAll('.console .game-message')].map((e) => e.textContent)`);
@@ -194,8 +192,8 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await setCode("pawn.fly()\n");
     await run();
     for (let i = 0; i < 3; i++) {
-      await b.evaluate(`${button(0)}.click()`); // back to the start
-      await b.evaluate(`${button(4)}.click()`); // and to the outcome again
+      await press(0); // back to the start
+      await press(4); // and to the outcome again
     }
     const note = await b.evaluate(`document.querySelector('.solution-section .give-up-note')?.textContent ?? ''`);
     expect(note.includes("after 2 more runs"), `after one failed run, replayed 3 times: "${note}"`);
@@ -632,10 +630,10 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await openLevel("ch01-l05");
     await setCode(solution("ch01-l05"));
     await run();
-    await b.evaluate(`${button(0)}.click()`);
+    await press(0);
     const start = await b.evaluate(`document.querySelector('.step-label').textContent`);
-    await b.evaluate(`${button(3)}.click()`);
-    await b.evaluate(`${button(3)}.click()`);
+    await press(3);
+    await press(3);
     const after = await b.evaluate(`({
       label: document.querySelector('.step-label').textContent,
       highlighted: !!document.querySelector('.level-right .cm-step-line'),
@@ -714,8 +712,8 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await setCode("gold = 3\npawn.jump()");
     await run(); // ends on the error at line 2
     const errorBg = await b.evaluate(`getComputedStyle(document.querySelector('.level-right .cm-error-line')).backgroundColor`);
-    await b.evaluate(`${button(0)}.click()`);
-    await b.evaluate(`${button(3)}.click()`); // step 1: line 1 is the step line
+    await press(0);
+    await press(3); // step 1: line 1 is the step line
     const stepBg = await b.evaluate(`getComputedStyle(document.querySelector('.level-right .cm-step-line')).backgroundColor`);
     await b.evaluate(`document.querySelector('.level-right .cm-content').focus()`);
     await b.key("Home", { keyCode: 36, modifiers: 2 }); // Ctrl+Home
@@ -772,7 +770,6 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   // -- The Codex (docs/Codex.md) ---------------------------------------------------------------
   // Entries are documentation, not spoilers; the code typed here is test code, never a solution.
-  const codexTab = () => b.evaluate(`[...document.querySelectorAll('.tab')].find((t) => t.textContent === 'Codex').click()`);
   const codexEntries = async () => {
     await codexTab();
     await b.waitFor(`document.querySelector('.codex')`, 20_000, "the Codex");
@@ -1288,7 +1285,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     expect(after.at === before.rings[0], `the label says ${after.at}, not ${before.rings[0]}`);
     expect(after.rings.join() !== before.rings.join(), `the rings did not change from ${before.rings.join()}`);
     expectRingsAgree(after, "after the jump");
-    await b.evaluate(`${button(0)}.click()`);
+    await press(0);
     expect(await ringsBecome(before.rings), `back at the start the rings are [${(await knightView()).rings.join()}], not [${before.rings.join()}]`);
     const back = await knightView();
     expect(back.at === before.at, `back at the start the label says ${back.at}, not ${before.at}`);

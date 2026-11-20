@@ -5,17 +5,15 @@
 // or the examiner levels (a do-nothing function); none is a level's solution. Checks report facts (lines, counts,
 // squares), never the editor's contents.
 import { sleep } from "./cdp.mjs";
-import { BUTTONS, levelHelpers } from "./helpers.mjs";
+import { levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const LEVEL = "practice-11";
 const ARROW = "↩";
 
 export default async function functionsChecks({ browser: b, base, root, check }) {
-  const { openLevel, setCode, run, brief, solution, challengeTab } = levelHelpers(b, base, root);
+  const { openLevel, setCode, run, brief, solution, challengeTab, codexTab, button, press } = levelHelpers(b, base, root);
 
-  const button = (index) => `document.querySelectorAll('${BUTTONS}')[${index}]`;
-  const press = (index) => b.evaluate(`${button(index)}.click()`);
   const boardLabel = `document.querySelector('.board-host .board').getAttribute('aria-label')`;
 
   /** Everything a step shows, read from the page. Lines are 1-based; `active` is the highlighted line (or null). */
@@ -58,14 +56,25 @@ export default async function functionsChecks({ browser: b, base, root, check })
     }
   }
 
-  /** Run `code` and rewind to before its first step, ready to step forward by hand. Returns the run's outcome card. */
-  async function startAtZero(code) {
-    await openLevel(LEVEL, { fresh: true });
-    await setCode(code);
-    const outcome = await run({ jump: false });
+  /** Rewind to before the first step and wait for the board to settle there. */
+  async function rewind() {
     await press(0);
     await b.waitFor(`/Step 0 /.test(document.querySelector('.step-label').textContent)`, 5000, "back at step 0");
     await settle();
+  }
+  /**
+   * Open level `id` on a fresh page, type `code` and run it (jumping to the last frame unless `jump` is false). Returns the
+   * outcome card. `code` may be a function that gives the program once the level is open (it reads the page).
+   */
+  async function runOn(id, code, { jump = true } = {}) {
+    await openLevel(id, { fresh: true });
+    await setCode(typeof code === "function" ? await code() : code);
+    return run({ jump });
+  }
+  /** Run `code` and rewind to before its first step, ready to step forward by hand. Returns the run's outcome card. */
+  async function startAtZero(code) {
+    const outcome = await runOn(LEVEL, code, { jump: false });
+    await rewind();
     return outcome;
   }
   /** One step forward, waiting for the step to change and the board to settle; false when there is no next step. */
@@ -173,7 +182,7 @@ export default async function functionsChecks({ browser: b, base, root, check })
     expect(inside.fold.summary === `your program's names (${count})` && count >= 2, `the fold reads "${inside.fold.summary}" with ${count} rows`);
     expect(inside.fold.rows[0] === "knight", `the fold's first row is ${inside.fold.rows[0]}`);
     // Open it with a real click, at the function's first line (a body of two lines, so one more step stays inside).
-    await press(0);
+    await rewind();
     await stepUntil((s) => s.active === 2 && s.scope, "the function's first line");
     const point = await b.evaluate(`(() => { const r = document.querySelector('.inspector details.fold summary').getBoundingClientRect(); return { x: r.x + 20, y: r.y + r.height / 2 }; })()`);
     for (const type of ["mousePressed", "mouseReleased"]) await b.send("Input.dispatchMouseEvent", { type, ...point, button: "left", clickCount: 1 });
@@ -189,7 +198,7 @@ export default async function functionsChecks({ browser: b, base, root, check })
     expect(end.fold === null && end.plain[0] === "knight", `module level: rows [${end.plain}]`);
     // Run again: the fold is closed once more.
     await run({ jump: false });
-    await press(0);
+    await rewind();
     await stepUntil((s) => s.scope, "a step inside the function on the second run");
     const again = await snap();
     expect(again.fold && again.fold.open === false, "after Run again the fold is still open");
@@ -197,9 +206,7 @@ export default async function functionsChecks({ browser: b, base, root, check })
   });
 
   await check("M5.2: a function that sets a name the program also has is stopped with its friendly words, on its line, traceback folded", async () => {
-    await openLevel(LEVEL, { fresh: true });
-    await setCode(`total = 0\n\ndef bump():\n    total += 1\n\nbump()`);
-    const r = await run();
+    const r = await runOn(LEVEL, `total = 0\n\ndef bump():\n    total += 1\n\nbump()`);
     expect(r.head === "Python stopped", brief(r));
     expect(/makes a new total of the function's own, which has no value yet on this line/.test(r.text.replace(/`/g, "")), `the friendly words are missing: ${brief(r)}`);
     const where = await b.evaluate(`(() => {
@@ -229,10 +236,8 @@ export default async function functionsChecks({ browser: b, base, root, check })
   }
 
   await check("M5.2: a function that calls itself forever ends with Python's own recursion limit, and Python is still alive", async () => {
-    await openLevel(LEVEL, { fresh: true });
-    await setCode(`def again():\n    again()\n\nagain()`);
     const started = Date.now();
-    const r = await run();
+    const r = await runOn(LEVEL, `def again():\n    again()\n\nagain()`);
     const took = Date.now() - started;
     expect(r.head === "Python stopped", `the run ended with: ${brief(r)}`);
     expect(r.text.includes("A function kept calling itself and never stopped, so Python gave up."), `the recursion sentence is missing: ${brief(r)}`);
@@ -241,10 +246,8 @@ export default async function functionsChecks({ browser: b, base, root, check })
   });
 
   await check("M5.2: a function that loops forever ends as an endless loop, and the next run works", async () => {
-    await openLevel(LEVEL, { fresh: true });
-    await setCode(`def spin():\n    while True:\n        pass\n\nspin()`);
     const started = Date.now();
-    const r = await run();
+    const r = await runOn(LEVEL, `def spin():\n    while True:\n        pass\n\nspin()`);
     const took = Date.now() - started;
     expect(r.head === "Endless loop", `the run ended with: ${brief(r)}`);
     const next = await nextRunWorks();
@@ -252,9 +255,7 @@ export default async function functionsChecks({ browser: b, base, root, check })
   });
 
   await check("M5.2: a function that calls itself until Python stops it, caught and carried on from, ends with the game's lost-track sentence, and the next run works", async () => {
-    await openLevel(LEVEL, { fresh: true });
-    await setCode(`def again():\n    again()\n\ntry:\n    again()\nexcept RecursionError:\n    pass\nprint("carried on")`);
-    const r = await run();
+    const r = await runOn(LEVEL, `def again():\n    again()\n\ntry:\n    again()\nexcept RecursionError:\n    pass\nprint("carried on")`);
     const text = r.text.replace(/`/g, "");
     expect(r.head === "Python stopped", `the run ended with: ${brief(r)}`);
     expect(text.includes("The game lost track of this program partway through"), `the lost-track sentence is missing: ${brief(r)}`);
@@ -328,11 +329,7 @@ export default async function functionsChecks({ browser: b, base, root, check })
     return `def ${call.split("(")[0].trim()}(*args, **kwargs):\n    pass`;
   }
   /** Open the level, type the made-up function and run it (jumping to the last frame unless `jump` is false). */
-  async function stubRun(id, { jump = true } = {}) {
-    await openLevel(id, { fresh: true });
-    await setCode(await stub());
-    return run({ jump });
-  }
+  const stubRun = (id, opts) => runOn(id, stub, opts);
   const clickCase = (index) => b.evaluate(`${caseButtons}[${index}].click()`);
   const pressedIs = (index) => `${caseButtons}[${index}]?.getAttribute('aria-pressed') === 'true'`;
   const rowPicked = (index) => `document.querySelectorAll('.outcome-host table.calls tr')[${index + 1}]?.classList.contains('picked')`;
@@ -399,25 +396,20 @@ export default async function functionsChecks({ browser: b, base, root, check })
 
   await check('M5.2: the caption is empty at the start, reads "The examiner calls" and the call at the end, and the board does not move', async () => {
     await stubRun(BOARD_ONLY, { jump: false });
-    const atStart = async () => {
-      await press(0);
-      await b.waitFor(`/Step 0 /.test(document.querySelector('.step-label').textContent)`, 5000, "back at step 0");
-      await sleep(300);
-    };
     /** Whether the caption is there and holds nothing but non-breaking spaces. */
     const empty = () =>
       b.evaluate(`(() => { const t = document.querySelector('.board-host p.boards-caption')?.textContent ?? ''; return t.length > 0 && [...t].every((c) => c === '\\u00a0'); })()`);
-    await atStart();
+    await rewind();
     const start = await examinerView();
     expect(await empty(), `at the first frame the caption holds ${JSON.stringify(start.caption)}`);
     await press(4);
     await b.waitFor(`document.querySelector('.board-host p.boards-caption')?.textContent.startsWith('The examiner calls ')`, 8000, "the caption filled at the last frame");
-    await sleep(300);
+    await settle();
     const end = await examinerView();
     const said = end.caption.slice("The examiner calls ".length).replace(/\.$/, "");
     expect(said === end.calls[end.pressed[0]], `the caption names ${said}, the pressed button is ${end.calls[end.pressed[0]]}`);
     expect(Math.abs(end.top - start.top) < 1, `the board's top is ${start.top}px with the caption empty and ${end.top}px filled`);
-    await atStart();
+    await rewind();
     const back = await examinerView();
     expect((await empty()) && Math.abs(back.top - start.top) < 1, "back at the start the caption is not empty, or the board moved");
     return `caption empty, filled, empty; the board's top moves ${Math.abs(end.top - start.top)}px (from ${start.top}px)`;
@@ -485,9 +477,7 @@ export default async function functionsChecks({ browser: b, base, root, check })
 
   // ---- Code spans in the cards ----
   await check("M5.2: a misspelt ability's error card has its sentence with the line tag first, code spans and no backtick", async () => {
-    await openLevel(LEVEL, { fresh: true });
-    await setCode("knight.jum(1, 2)");
-    const r = await run();
+    const r = await runOn(LEVEL, "knight.jum(1, 2)");
     expect(r.head === "Python stopped", brief(r));
     const detail = await b.evaluate(`(() => {
       const p = document.querySelector('.outcome-host .error-detail p');
@@ -561,7 +551,6 @@ export default async function functionsChecks({ browser: b, base, root, check })
   });
 
   // ---- The Codex's keywords, and help() ----
-  const codexTab = () => b.evaluate(`[...document.querySelectorAll('.tab')].find((t) => t.textContent === 'Codex').click()`);
   /** The Codex tab's "Keywords" group on a level: whether it is there, and its entries' names. */
   async function keywords(id) {
     await openLevel(id, { fresh: true });
@@ -613,9 +602,7 @@ export default async function functionsChecks({ browser: b, base, root, check })
   });
 
   await check("M5.2: help() on the player's own functions prints the signature and the docstring, or says it has no description yet", async () => {
-    await openLevel(LEVEL, { fresh: true });
-    await setCode(`def stride(squares, times=2):\n    "Takes some squares, some times."\n    return squares * times\n\ndef plain(a):\n    return a\n\nhelp(stride)\nhelp(plain)`);
-    const r = await run();
+    const r = await runOn(LEVEL, `def stride(squares, times=2):\n    "Takes some squares, some times."\n    return squares * times\n\ndef plain(a):\n    return a\n\nhelp(stride)\nhelp(plain)`);
     const lines = r.console.split("\n").map((l) => l.trim());
     const at = (start) => lines.findIndex((l) => l.startsWith(start));
     const [sig, doc, sig2, none] = [at("stride(squares, times=2)"), at("Takes some squares, some times."), at("plain(a)"), at("It has no description yet")];
