@@ -31,7 +31,16 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from .board import Direction, Pos, Tile, sign, square_name, step
-from .exceptions import BlockedError, BridgeError, CaptureError, GameError, GateLockedError, Lost
+from .exceptions import (
+    BlockedError,
+    BridgeError,
+    CaptureError,
+    DoorLockedError,
+    GameError,
+    GateLockedError,
+    Lost,
+    PickUpError,
+)
 from .words import count
 
 if TYPE_CHECKING:
@@ -75,6 +84,11 @@ class Foe:
     captured: bool = False
     gone: bool = False  # off the board: captured, or fallen into a pit (QA-017)
 
+
+
+def key_words(name: str | int) -> str:
+    """A key's name in words (M5.3): "the brass key", or "key 12" for a numbered one."""
+    return f"key {name}" if isinstance(name, int) else f"the {name} key"
 
 
 def _without_numbers(text: str) -> str:
@@ -133,6 +147,8 @@ class World:
 
     def state(self) -> dict:
         opened = self.opened | self._open_timed_gates() if self.board.timers else self.opened
+        if self.board.doors:  # a door is open from the pick-up of its key on (M5.3)
+            opened = opened | self._open_doors()
         state = {
             "pos": list(self.pos),
             "facing": self.facing.value,
@@ -155,9 +171,17 @@ class World:
             state["inventory"] = list(self.inventory)
         return state
 
+    @_acts
     def pick_up(self) -> None:
-        """Pick up the key on the square the piece stands on (M5.3): the name goes into `inventory`."""
-        raise NotImplementedError("M5.3-2")
+        """Pick up the key on the square the piece stands on (M5.3): its name goes into `inventory`, its stone
+        into `collected`. Nowhere else, or twice on one stone, is a PickUpError (no tick, nothing changes)."""
+        name = self.board.keys.get(self.pos)
+        if name is None or self.pos in self.collected:
+            raise PickUpError(f"There is nothing to pick up on {square_name(self.pos)}.")
+        self.inventory.append(name)
+        self.collected.add(self.pos)
+        message = f"Your {self.level.piece} picked up {key_words(name)}. Its satchel holds {self.inventory!r}."
+        self._emit("pick_up", at=list(self.pos), message=message)
 
     @_acts
     def move_forward(self) -> None:
@@ -168,6 +192,9 @@ class World:
         if self._locked_gate(target):
             self._emit("bump", at=list(target))
             raise GateLockedError(self._gate_locked_message(target), at=target)
+        if self._locked_door(target):
+            self._emit("bump", at=list(target))
+            raise DoorLockedError(self._door_locked_message(target), at=target)
         self._arrive(target, "move")
 
     @_acts
@@ -177,7 +204,7 @@ class World:
         It flies over anything: only the landing square matters, so a waypoint,
         gem or plank counts only where it lands. Landing off the board, on a
         wall, a signpost or a shut gate is a "bump" and a BlockedError; on a
-        guard's locked gate a GateLockedError; on an armoured enemy the
+        guard's locked gate a GateLockedError, on a door whose key it isn't carrying a DoorLockedError; on an armoured enemy the
         capture's own CaptureError. Any other enemy there is taken. A pit or an
         attacked square loses the run, as for a step (`_arrive`). One jump is
         one action, so one tick of the `action` clock.
@@ -207,7 +234,7 @@ class World:
     def landings(self) -> list[Pos]:
         """The squares a jump from here could land on without an error (M5.1), in order.
 
-        Not off the board, a wall, a signpost, a shut gate, a locked gate or an
+        Not off the board, a wall, a signpost, a shut gate, a locked gate or door, or an
         armoured enemy. A pit, an attacked square and an enemy that can be
         taken are landings: allowed, and the board's own marks say what
         happens there. The state carries them as "landings" on knight levels
@@ -248,7 +275,9 @@ class World:
             return None if target in self.bridged else "pit"
         if tile is Tile.GATE:
             return None if target in self.opened else "gate"
-        if tile in (Tile.GEM, Tile.PLANK):
+        if tile is Tile.DOOR:
+            return "door" if self._locked_door(target) else None
+        if tile in (Tile.GEM, Tile.PLANK, Tile.KEY):
             return None if target in self.collected else tile.value
         return LOOK_WORDS.get(tile)
 
@@ -273,11 +302,11 @@ class World:
         could stop it (M3.2): a wall, the board's edge, a signpost, or a gate
         that isn't open for good. That's every timed gate, even while it's
         open, so the count doesn't depend on when you ask, and a guard's gate
-        until it's opened. Pits and enemies don't stop the count."""
+        or a door until it's opened. Pits and enemies don't stop the count."""
         ahead, pos = 0, self.pos
         while True:
             target = step(pos, self.facing)
-            if self.board.blocked(target) or target in self.board.timers or self._locked_gate(target):
+            if self.board.blocked(target) or target in self.board.timers or self._locked_gate(target) or self._locked_door(target):
                 return ahead
             ahead, pos = ahead + 1, target
 
@@ -463,8 +492,8 @@ class World:
         return not self._stops_line(pos) and self._foe_at(pos) is None
 
     def _stops_line(self, pos: Pos) -> bool:
-        """A wall, a locked gate or a shut gate: it ends a chess piece's line and holds an enemy back."""
-        return self.board.blocked(pos) or self._locked_gate(pos) or self._shut(pos)
+        """A wall, a locked gate or door, or a shut gate: it ends a chess piece's line and holds an enemy back."""
+        return self.board.blocked(pos) or self._locked_gate(pos) or self._locked_door(pos) or self._shut(pos)
 
     def _across(self, side: str) -> Direction:
         """The direction to the piece's `side` ("left" or "right")."""
@@ -537,6 +566,18 @@ class World:
     def _locked_gate(self, pos: Pos) -> bool:
         return self.board.tile(pos) is Tile.GATE and pos not in self.opened
 
+    def _locked_door(self, pos: Pos) -> bool:
+        """A door whose key the piece isn't carrying (M5.3). The satchel only grows, so an open door stays open."""
+        return pos in self.board.doors and self.board.doors[pos] not in self.inventory
+
+    def _open_doors(self) -> set[Pos]:
+        return {pos for pos in self.board.doors if not self._locked_door(pos)}
+
+    def _door_locked_message(self, door: Pos) -> str:
+        wants = key_words(self.board.doors[door])
+        carrying = f"your satchel holds {self.inventory!r}" if self.inventory else "your satchel is empty"
+        return f"The door on {square_name(door)} is locked: it wants {wants}, and {carrying}."
+
     def _emit(self, kind: str, **details) -> None:
         if not self.listeners:
             return  # nobody is recording (e.g. scripts/solve.py's search)
@@ -550,6 +591,8 @@ class World:
             return BlockedError(self._bump_message(target, jumped=True), at=target)
         if self._locked_gate(target):
             return GateLockedError(self._gate_locked_message(target), at=target)
+        if self._locked_door(target):
+            return DoorLockedError(self._door_locked_message(target), at=target)
         foe = self._foe_at(target)
         if foe is not None and foe.enemy.armoured:
             return CaptureError(self._capture_message(target, foe))
