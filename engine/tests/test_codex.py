@@ -262,7 +262,7 @@ def test_help_on_a_knight_level_introduces_the_knight():
 def test_help_on_the_knight_lists_its_abilities_and_never_says_pawn():
     output = knight_says("help(knight)")
     listed = [line.strip() for line in output.splitlines() if line.startswith("    knight.")]
-    assert listed == ["knight.jump(dx, dy)", "knight.look(dx, dy)", "knight.at_goal()", "knight.position", "knight.wait(ticks=1)", "knight.read()"]
+    assert listed == ["knight.jump(dx, dy)", "knight.look(dx, dy)", "knight.at_goal()", "knight.position", "knight.wait(ticks=1)", "knight.read()", "knight.pick_up()", "knight.inventory"]
     assert "Help on knight: your piece. In this level it knows:" in output
     assert "pawn" not in output.lower()
 
