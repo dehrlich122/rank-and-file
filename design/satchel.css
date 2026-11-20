@@ -261,6 +261,108 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* pane 4: the level screen at a 1440 by 900 window (the columns as src/styles.css gives them) */
+.level-frame {
+  display: grid;
+  grid-template-columns: 418px 452px 522px;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.level-frame .stub {
+  min-height: 0;
+}
+
+.frame-mid {
+  padding: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.frame-mid .board {
+  flex: none;
+}
+
+/* pane 5: the examiner (the game's own classes draw the panel's list, the buttons and the card; these size the columns) */
+.mock-ex {
+  display: grid;
+  grid-template-columns: 418px 428px;
+  gap: 24px;
+  align-items: start;
+}
+
+.ex-panel {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.box-head {
+  margin: 0 0 6px;
+  font: 700 12px var(--font-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.card-col {
+  width: 428px;
+  box-sizing: border-box;
+}
+
+.btn-clip {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+.clip {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outcome .calls-clip {
+  table-layout: fixed;
+}
+
+.calls-clip th:nth-child(1) {
+  width: 38%;
+}
+
+.calls-clip th:nth-child(4) {
+  width: 28px;
+}
+
+.outcome .calls-clip td {
+  overflow-wrap: normal;
+}
+
+.calls-clip td:not(.more-cell) .btn {
+  max-width: 100%;
+}
+
+.calls tr.more td {
+  padding: 0 8px 4px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.more-key {
+  margin-right: 4px;
+  color: var(--muted);
+}
+
+.more-val {
+  margin-right: 12px;
+  color: var(--text);
+}
+
 .stage {
   display: grid;
   gap: 8px;
