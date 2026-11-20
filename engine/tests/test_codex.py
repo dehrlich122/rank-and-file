@@ -76,7 +76,8 @@ def test_every_documented_builtin_and_method_is_real_and_has_a_full_entry(name):
     if name in codex.BUILTINS:
         assert hasattr(builtins, name) and entry.kind == "builtin"
     else:
-        assert hasattr(str, name.removeprefix("str.")) and entry.kind == "method"
+        kind, _, method = name.partition(".")
+        assert hasattr({"str": str, "list": list}[kind], method) and entry.kind == "method"
     assert entry.calls and entry.paragraphs and entry.returns and entry.example
     assert bool(entry.args) == ("()" not in entry.calls[0]), f"{name}: its entry lists arguments exactly when it takes some"
 
@@ -224,10 +225,27 @@ def test_help_on_help_shows_its_own_entry_however_it_is_asked_for():
     assert expected.startswith("Help on help:") and "help(thing) or help()" in expected
 
 
-def test_help_is_the_last_builtin_taught_and_a_full_builtin_entry():
+def test_help_is_the_last_of_the_first_builtins_taught_and_a_full_builtin_entry():
     entry = codex.python_entry("help")
-    assert list(codex.BUILTINS)[-1] == "help"
+    assert list(codex.BUILTINS)[-5] == "help"  # chapter 8's four (M5.3) come after it
     assert entry.kind == "builtin" and entry.calls[0] == "help(thing)"
+
+
+def test_chapter_eights_five_entries_are_the_last_of_their_kind_in_order():
+    assert list(codex.BUILTINS)[-4:] == ["sorted", "min", "max", "sum"]
+    assert list(codex.METHODS)[-1] == "list.append"
+    kinds = {name: codex.python_entry(name).kind for name in ("sorted", "min", "max", "sum", "list.append")}
+    assert kinds == {"sorted": "builtin", "min": "builtin", "max": "builtin", "sum": "builtin", "list.append": "method"}
+
+
+def test_the_new_builtins_and_list_append_are_found_with_ast():
+    code = "keys = []\nkeys.append(1)\nprint(sorted(keys), min(keys), max(keys), sum(keys), 'x'.upper())"
+    assert codex.python_called(code) == {"print", "sorted", "min", "max", "sum", "list.append", "str.upper"}
+
+
+def test_help_shows_the_new_entries_however_they_are_asked_for():
+    for code, name in (("help(sorted)", "sorted"), ("help(min)", "min"), ("help(max)", "max"), ("help(sum)", "sum"), ("help([].append)", "list.append")):
+        assert run_sandbox(code, ["move"]).output == codex.format_entry(codex.python_entry(name)) + "\n\n"
 
 
 def test_a_lesson_that_calls_help_brings_its_entry_in_on_its_level_and_not_before():
