@@ -173,6 +173,11 @@ class Examine:
     function: str
     calls: list[ExamineCall] = field(default_factory=list)
 
+    @property
+    def judges_answer(self) -> bool:
+        """Whether any of its calls has an answer wanted (else only the board is judged)."""
+        return any(call.returns is not NOT_JUDGED for call in self.calls)
+
 
 @dataclass
 class Par:
@@ -361,7 +366,7 @@ class Level:
         if self.examine:
             function, calls = self.examine.function, self.examine.calls
             goals.append(f"The examiner calls {function} {count(len(calls), 'time')}, each call on a fresh board, and every call has to meet the goals above.")
-            if any(call.returns is not NOT_JUDGED for call in calls):
+            if self.examine.judges_answer:
                 goals.append(f"{function} also has to hand back the answer the examiner wants.")
         elif self.variants:
             goals.append(f"Your code has to work on all {len(self.variants) + 1} boards.")
