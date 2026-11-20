@@ -68,6 +68,17 @@ describe("renderCodex: the groups", () => {
     expect(titles(all)).toEqual(["Your pawn", "Python", "Text", "Keywords"]);
   });
 
+  it("splits the methods by owner, and puts the kinds of value last", () => {
+    const all = [entry("tuple", "value"), entry("for", "keyword"), entry("list.append", "method"), entry("str.upper", "method"), entry("print", "builtin")];
+    expect(titles(all)).toEqual(["Python", "Text", "Lists", "Keywords", "Kinds of value"]);
+  });
+
+  it("keeps the kinds of value out of the hover lookup but lists them in the tab", () => {
+    const view = renderCodex([entry("list", "value"), entry("print", "builtin")], "pawn");
+    expect([...view.entries.keys()]).toEqual(["print"]);
+    expect(asFake(view.element).find("codex-entry")).toHaveLength(2); // both are in the tab, so `show("list")` has an entry to open
+  });
+
   it("shows no Keywords group when no keyword is unlocked", () => {
     expect(titles([entry("print", "builtin")])).toEqual(["Python"]);
   });

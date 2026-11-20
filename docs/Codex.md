@@ -76,6 +76,14 @@ Example:
   shows a short example that is never on a board, so it is no hint for a level. The words are in
   `docs/M5/M5.2.md`, "The Codex's keywords". The Codex tab lists them under "Keywords", after "Text", and
   hovering one in code shows its entry (`elif` and `else` answer as `if`).
+- **Kinds of value** *(M5.3)* (`whole number`, `text`, `True and False`, `None`, `list`, `tuple`) are entries of the
+  kind `value`, written in `codex.VALUES`. They answer "what is a list?", which is neither an ability, a built-in
+  nor a keyword. No name clashes with a built-in's or keyword's (so the whole numbers are `whole number`; `int`
+  stays the built-in's entry). The Codex tab lists them under "Kinds of value", after "Keywords". They have no
+  hover: a variable called `text` or `list` must not show a card. A lesson brings one in when its snippets make
+  such a value, read with `ast` (`codex._kinds_made`): a constant, an f-string, or a list or tuple display that is
+  read, not assigned to (`x, y = pair` makes no tuple). The methods are split by owner: "Text" (`str.…`) and
+  "Lists" (`list.…`).
 - The level checker fails if an unlocked ability, a built-in or a text method
   called in a lesson has no entry. It also fails if a reference solution
   calls a built-in or method that hasn't been taught by its level.
@@ -117,7 +125,8 @@ internals (`rankfile.pieces`), and its interactive mode can't run here.
 | `help(pawn.move)`, `help(print)`, `help("pawn.move")` | That entry, laid out like Python's `help()` |
 | `help(help)`, `help("help")` | The entry for `help` itself; `help()` with nothing is the how-to-use text |
 | `help(pawn)` | What the pawn knows in this level, one line each |
-| `help(pawn.position)`, or any other plain value | A line saying it's a value, and what to try instead |
+| `help("list")`, `help(list)`, `help([])`, `help(pawn.position)` and the other kinds of value *(M5.3)*: `help("str")`, `help("bool")`, `help(7)`, `help(True)`, `help(None)` | The kind's entry (a bool is `True and False`), then, for a value, a line pointing at `help(print)` and `help(pawn)`. `help(int)` and `help("int")` stay the built-in's |
+| `help(2.5)`, a dict or a set | A line saying it's a value, and what to try instead |
 | `help("def")`, `help("for")` and the other keywords *(M5.2)* | That keyword's entry, on any level |
 | `help(my_function)`, a function of your own *(M5.2)* | How to call it (`stride(squares, times=2)`), then its docstring, or a line saying it has no description yet and where one goes |
 | `help(anything else)` | Python's own help text (`pydoc`) |
