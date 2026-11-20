@@ -220,7 +220,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
         status = "timeout" if isinstance(run.error, StepBudgetExceeded) else "error"
         return outcome(status, info.friendly, error=info, **recording)
     if call is not None and not judge:  # a lesson's snippet: only the call itself is looked at (M5.2-5a)
-        facts = _call_facts(level, recording["call"].text, namespace, run, [])
+        facts = _call_facts(level, namespace, run, [])
         if run.problem is not None:
             return outcome("incomplete", _examiner_summary(recording["call"], run.problem, facts), **recording)
         return outcome("finished", _called_words(facts), **recording)
@@ -228,7 +228,7 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
         return outcome("finished", "Finished.", **recording)
     unmet = unmet_objectives(level, world, run.output)
     if call is not None:  # the function, then the answer, then the board
-        facts = _call_facts(level, recording["call"].text, namespace, run, unmet)
+        facts = _call_facts(level, namespace, run, unmet)
         kind = _call_failure(run, facts) or _call_ending(facts)
         return outcome("solved" if kind in PASSED else "incomplete", _examiner_summary(recording["call"], kind, facts), **recording)
     if unmet:
@@ -236,11 +236,11 @@ def _run_board(level: Level, code: str, *, line_budget: int, enforce_constraints
     return outcome("solved", _solved_summary(level), **recording)
 
 
-def _call_facts(level: Level, text: str, namespace: dict, run: Execution, unmet: list[str]) -> CallFacts:
+def _call_facts(level: Level, namespace: dict, run: Execution, unmet: list[str]) -> CallFacts:
     """What the examiner's words may need about the call this run made."""
     function, args = level.examine.function, level.call.args
     return CallFacts(
-        function, text, namespace.get(function), _own_functions(namespace), args, run.returned,
+        function, level.call.text(function), namespace.get(function), _own_functions(namespace), args, run.returned,
         level.call.returns, run.call_output, unmet, run.signature,
     )  # fmt: skip
 
@@ -423,7 +423,8 @@ def run_sandbox(
     level = sandbox_level(api, piece, lesson_board)
     if call:
         name, args = parse_snippet_call(call)
-        level = replace(level, examine=Examine(name, [ExamineCall(args)]), call=ExamineCall(args))
+        examiner_call = ExamineCall(args)
+        level = replace(level, examine=Examine(name, [examiner_call]), call=examiner_call)
     return run_level(level, code, enforce_constraints=False, judge=False)
 
 
