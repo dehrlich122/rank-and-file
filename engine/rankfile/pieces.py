@@ -32,6 +32,9 @@ class Piece:
     # Whether this piece lands on squares rather than steps or walks over them (M5.1): the words of its
     # levels, and the landings its world's state carries, follow it.
     LANDS: ClassVar[bool] = False
+    # Abilities that exist in the code but are not built yet (M5.3): as far as the player can tell the piece doesn't
+    # have them, so typing one reads what it read before the contract. M5.3-3 empties it.
+    UNBUILT: ClassVar[tuple[str, ...]] = ()
 
     def __init__(self, world: World, unlocked: list[str]):
         # Pieces refuse normal attribute assignment (see __setattr__), so the
@@ -42,6 +45,8 @@ class Piece:
     def __getattribute__(self, name: str):
         # Called for every `piece.something` lookup, before the normal rules.
         cls = type(self)
+        if name in cls.UNBUILT:
+            raise AttributeError(f"{cls.NAME!r} object has no attribute {name!r}", name=name, obj=self)
         if name in cls.ABILITIES and name not in object.__getattribute__(self, "_unlocked"):
             raise LockedAbilityError(cls.NAME, name, list(object.__getattribute__(self, "_unlocked")))
         if name in cls.CANT:
@@ -299,6 +304,7 @@ class Knight(Piece):
         "capture_right": f"{_WALK} A knight takes an enemy by landing on it: jump onto the enemy's square.",
         "bridge": f"{_WALK} A jump flies over a pit, so a knight never needs a bridge.",
     }
+    UNBUILT = ("pick_up", "inventory")  # M5.3-3 moves both into ABILITIES
 
     # These docstrings are the Codex's entries for the knight (codex.py), as the pawn's are for the pawn.
 
@@ -409,6 +415,29 @@ class Knight(Piece):
             print(knight.read())
         """
         return self._world.read()
+
+    def pick_up(self):
+        """Pick up the key on the square your knight stands on.
+
+        Returns:
+            Nothing.
+
+        Example:
+            knight.pick_up()
+        """
+        self._world.pick_up()
+
+    @property
+    def inventory(self) -> list:
+        """The names of the keys your knight carries, in the order it picked them up.
+
+        Returns:
+            A list (a copy: changing it changes nothing).
+
+        Example:
+            print(knight.inventory)
+        """
+        return list(self._world.inventory)
 
 
 PIECES: dict[str, type[Piece]] = {"pawn": Pawn, "knight": Knight}

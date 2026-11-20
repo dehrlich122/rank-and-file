@@ -59,3 +59,7 @@ codex.Snippet.meant
 # M5.2-6a0: the examiner's two parts of a case's summary, read only through the result's JSON.
 runner.CallInfo.happened
 runner.CallInfo.said
+
+# M5.3 (keys, doors and the satchel): the errors package M5.3-2 raises.
+exceptions.PickUpError
+exceptions.DoorLockedError

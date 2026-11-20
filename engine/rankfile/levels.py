@@ -60,6 +60,8 @@ TILE_DETAILS: dict[Tile, tuple[set[str], set[str]]] = {
     Tile.GATE: ({"passphrase"}, {"question"}),
     Tile.TIMED_GATE: ({"every"}, {"clock", "open"}),
     Tile.RUNE: ({"text"}, set()),
+    Tile.KEY: ({"name"}, set()),  # M5.3: a name is text or a whole number
+    Tile.DOOR: ({"key"}, set()),  # the name of the key it wants
 }
 
 # Enemies (M3.1): the keys each kind takes, and the ground they can walk on.
@@ -483,7 +485,17 @@ class Level:
                 "function": self.examine.function,
                 "calls": [{"text": call.text(self.examine.function), "board": call.board} for call in self.examine.calls],
             },
+            **self._satchel(),
         }
+
+    def _satchel(self) -> dict:
+        """The keys and doors (M5.3), only when the board has any, so every other level describes itself as it always did."""
+        satchel = {}
+        if self.board.keys:
+            satchel["keys"] = [{"pos": list(pos), "name": name} for pos, name in self.board.keys.items()]
+        if self.board.doors:
+            satchel["doors"] = [{"pos": list(pos), "key": key} for pos, key in self.board.doors.items()]
+        return satchel
 
 
 def parse_level(data: dict) -> Level:
@@ -552,6 +564,7 @@ def parse_level(data: dict) -> Level:
         level.variants = _parse_variants(data.get("variants") or [], legend, level)
         if level.variants and level.goal_spots:
             raise LevelError("a level has ? squares for a hidden goal or other maps (variants), not both")
+    _check_keys_and_doors(level._boards())
     if "examine" in data:  # after the other maps: they are copies of the level, and don't carry the examiner
         level.examine = _parse_examine(data["examine"], len(level.variants) + 1, bool(level.goal_spots), level.constraints.functions)
     return level
@@ -606,6 +619,10 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
                     board.questions[(x, y)] = details[symbol]["question"]
             if tile is Tile.TIMED_GATE:
                 board.timers[(x, y)] = Timer(**details[symbol])
+            if tile is Tile.KEY:
+                board.keys[(x, y)] = details[symbol]["name"]
+            if tile is Tile.DOOR:
+                board.doors[(x, y)] = details[symbol]["key"]
             if symbol == START:
                 if start is not None:
                     raise LevelError("the map has more than one start square (P)")
@@ -637,6 +654,11 @@ def _parse_details(symbol: str, tile: Tile, meaning: dict) -> dict:
                 raise LevelError(f"legend {symbol!r}: a timed gate needs {key}: a whole number of ticks")
         elif key == "clock":
             _check_clock(f"legend {symbol!r}", value)
+        elif key in ("name", "key"):  # a key's name, and the name its door wants: text or a whole number (M5.3)
+            if isinstance(value, bool) or not (isinstance(value, int) or (isinstance(value, str) and value)):
+                raise LevelError(f"legend {symbol!r}: a {tile.value} needs {key}: text or a whole number")
+            if isinstance(value, str) and len(value) > LIMITS["text"]:
+                raise LevelError(f"legend {symbol!r}: the {key} may be at most {LIMITS['text']} characters")
         elif not isinstance(value, str) or not value:
             raise LevelError(f"legend {symbol!r}: a {tile.value} needs {key}")
         elif len(value) > LIMITS["text"]:
@@ -645,6 +667,21 @@ def _parse_details(symbol: str, tile: Tile, meaning: dict) -> dict:
     if tile is Tile.TIMED_GATE and details["every"] <= open_for:
         raise LevelError(f"legend {symbol!r}: a timed gate's every must be more than its open ({open_for}), or it would never shut")
     return details
+
+
+def _check_keys_and_doors(boards: list[Level]) -> None:
+    """Every door wants a key some board of the level has, and the names are all text or all whole numbers (M5.3)."""
+    keys = [name for level in boards for name in level.board.keys.values()]
+    wanted = [key for level in boards for key in level.board.doors.values()]
+    if len({isinstance(name, str) for name in [*keys, *wanted]}) > 1:
+        raise LevelError("keys are named with text or with whole numbers, not both in one level", at={"field": "legend"})
+    for number, level in enumerate(boards, start=1):
+        for pos, key in level.board.doors.items():
+            if key not in keys:
+                raise LevelError(
+                    f"the door on {square_name(pos)} wants the key {key!r}, and no board of the level has a key with that name",
+                    at={"square": square_name(pos), **({"board": number} if len(boards) > 1 else {})},
+                )
 
 
 @dataclass

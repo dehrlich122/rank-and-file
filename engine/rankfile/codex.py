@@ -58,8 +58,8 @@ SNIPPET = re.compile(
 @dataclass
 class Entry:
     name: str  # as code writes it: "pawn.move", "print"
-    # "ability", "property" (used without parentheses), "builtin", "method" (of text, M3.6), or "keyword" (`def`,
-    # `return`, `for`...: a word of the language itself, M5.2)
+    # "ability", "property" (used without parentheses), "builtin", "method" (of text, M3.6), "keyword" (`def`,
+    # `return`, `for`...: a word of the language itself, M5.2) or "value" (a kind of value, M5.3)
     kind: str
     calls: list[str]  # how to use it: ["pawn.move(squares=1)"]; some built-ins have more than one form
     paragraphs: list[str]  # what it does
