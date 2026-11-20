@@ -285,7 +285,7 @@ def _def_runs_nothing(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
 
 
 def _only_defines(stmt: ast.stmt, first: bool) -> bool:
-    if isinstance(stmt, (*_DEFS, ast.Pass)):
+    if isinstance(stmt, ast.Pass):
         return True
     if first and _is_docstring(stmt):
         return True
