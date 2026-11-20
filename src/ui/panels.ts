@@ -1,7 +1,7 @@
 // The small read-only panels around the board: variables, console output,
 // and the outcome of a run.
 import { VOICE } from "./voice";
-import type { ErrorInfo, LevelInfo, LevelResult, Star, Var } from "../py/protocol";
+import type { ErrorInfo, LevelInfo, LevelResult, Star, Step, Var } from "../py/protocol";
 import { h, withCode } from "./dom";
 import { icon } from "./icons";
 import type { LogEntry } from "./playback";
@@ -13,11 +13,7 @@ export function piecesFirst(vars: Var[], piece: string): Var[] {
 }
 
 /** What `Inspector.show` is told when playback is inside a function: which one, how deep, and the program's names. */
-interface FunctionScope {
-  scope: string;
-  depth: number;
-  globals: Var[];
-}
+type FunctionScope = Pick<Step, "scope" | "depth" | "globals">;
 
 type Snapshot = Map<string, string>;
 const snapshot = (vars: Var[]): Snapshot => new Map(vars.map((v) => [v.name, v.value]));

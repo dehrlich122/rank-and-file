@@ -402,7 +402,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
           callCaption.replaceChildren(...(call && index - 1 >= call.first_step ? ["The examiner calls ", h("code", {}, call.text)] : [" "]));
         }
         const { step } = frame;
-        inspector.show(step?.vars ?? null, step && step.depth > 0 ? { scope: step.scope, depth: step.depth, globals: step.globals } : undefined);
+        inspector.show(step?.vars ?? null, step ?? undefined);
         consoleView.show(consoleAt(frame));
         if (index === last) finish(result, animate ? durationMs : 0);
         else outcomeHost.replaceChildren();
