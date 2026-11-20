@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from .exceptions import IT_KNOWS, GameArgumentError, GameError, Lost
 from .pieces import Pawn, Piece
 from .tracer import PLAYER_FILENAME, StepBudgetExceeded
-from .words import count
+from .words import and_list, count
 
 
 @dataclass
@@ -69,9 +69,9 @@ def friendly_message(exc: BaseException, namespace: dict, line: int | None = Non
     if isinstance(exc, TypeError):
         return _explain_type(exc, namespace, line)
     if isinstance(exc, IndexError):
-        return _explain_index(exc)
+        return _explain_index(exc, line)
     if isinstance(exc, ValueError):
-        return _explain_value(exc)
+        return _explain_value(exc, line)
     if isinstance(exc, ZeroDivisionError):
         return "You divided by zero. That has no answer, in maths or in Python."
     if isinstance(exc, RecursionError):
@@ -464,22 +464,213 @@ def _none_hint(namespace: dict, line: int | None) -> str:
 # -- text: positions and numbers read from it (M3.6) ----------------------------
 
 
-def _explain_index(exc: IndexError) -> str:
-    if "string index out of range" in str(exc):
+def _explain_index(exc: IndexError, line: int | None) -> str:
+    msg = str(exc)
+    if "string index out of range" in msg:
         return (
             "That position is past the end of the text. Positions start at 0, so text with 4 characters "
             "ends at position 3. A negative position counts back from the end: -1 is the last character."
         )
-    return f"Python stopped with an IndexError: {exc}"
+    if match := re.fullmatch(r"(list|tuple)(?: assignment)? index out of range", msg):
+        return _explain_past_the_end(match.group(1), _player_scope(exc), line)
+    return f"Python stopped with an IndexError: {msg}"
 
 
-def _explain_value(exc: ValueError) -> str:
-    if match := re.match(r"invalid literal for int\(\) with base 10: (.+)", str(exc)):
+def _explain_value(exc: ValueError, line: int | None) -> str:
+    msg = str(exc)
+    if match := re.match(r"invalid literal for int\(\) with base 10: (.+)", msg):
         return (
             f"`int()` can only read text made of digits, like \"42\", and it was given {match.group(1)}. "
             "Spaces, letters and anything else in the text have to be taken out first."
         )
-    return f"Python stopped with a ValueError: {exc}"
+    if match := re.fullmatch(r"(too many|not enough) values to unpack \(expected (\d+)(?:, got (\d+))?\)", msg):
+        return _explain_unpack_count(match.group(1) == "too many", int(match.group(2)), match.group(3), line)
+    if match := re.fullmatch(r"(list|tuple)\.(?:remove|index)\(x\): x not in \1", msg):
+        return f"That value isn't in the {match.group(1)}. Ask first with `in`."
+    if match := re.fullmatch(r"(max|min)\(\) iterable argument is empty", msg):
+        return _explain_empty_pick(match.group(1), _player_scope(exc), line)
+    return f"Python stopped with a ValueError: {msg}"
+
+
+# -- lists and tuples (M5.3): the numbers and names are read from the error's line with `ast` ------
+
+_MISSING = object()  # a value the line's code can't be read for
+
+
+def _player_scope(exc: BaseException) -> dict:
+    """The names the innermost player frame can see (its locals over the program's own names), as they stood at the error."""
+    scope, tb = {}, exc.__traceback__
+    while tb is not None:
+        if tb.tb_frame.f_code.co_filename == PLAYER_FILENAME:
+            scope = {**tb.tb_frame.f_globals, **tb.tb_frame.f_locals}
+        tb = tb.tb_next
+    return scope
+
+
+def _nodes_on(line: int | None, *types: type[ast.AST]) -> list:
+    """Every node of these types that starts on the error's line."""
+    tree = _player_tree()
+    if tree is None or line is None:
+        return []
+    return [node for node in ast.walk(tree) if isinstance(node, types) and node.lineno == line]
+
+
+def _value_of(node: ast.AST, scope: dict):
+    """What a small expression is worth (a literal, a name, `a[i]`, a sum of those), or _MISSING. Calls are never run."""
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.Name):
+        return scope.get(node.id, _MISSING)
+    if isinstance(node, (ast.List, ast.Tuple)):
+        parts = [_value_of(part, scope) for part in node.elts]
+        if any(part is _MISSING for part in parts):
+            return _MISSING
+        return parts if isinstance(node, ast.List) else tuple(parts)
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        inner = _value_of(node.operand, scope)
+        return -inner if type(inner) in (int, float) else _MISSING
+    if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub, ast.Mult)):
+        left, right = _value_of(node.left, scope), _value_of(node.right, scope)
+        if type(left) is int and type(right) is int:
+            return {ast.Add: left + right, ast.Sub: left - right, ast.Mult: left * right}[type(node.op)]
+    if isinstance(node, ast.Subscript):
+        seq, place = _value_of(node.value, scope), _value_of(node.slice, scope)
+        if isinstance(seq, (list, tuple)) and type(place) is int and -len(seq) <= place < len(seq):
+            return seq[place]
+    return _MISSING
+
+
+def _shown(value) -> str | None:
+    """A value as the player wrote it, or None where it is unknown, None itself, or too long for a sentence."""
+    if value is _MISSING or value is None:
+        return None
+    text = repr(value)
+    return text if len(text) <= 20 else None
+
+
+def _explain_past_the_end(kind: str, scope: dict, line: int | None) -> str:
+    """A place past either end of a list or tuple. The length and the place come from the line's `a[i]`, when exactly one fits."""
+    hits = [
+        (len(seq), place)
+        for node in _nodes_on(line, ast.Subscript)
+        if type(seq := _value_of(node.value, scope)).__name__ == kind
+        and type(place := _value_of(node.slice, scope)) is int
+        and not -len(seq) <= place < len(seq)
+    ]
+    if len(hits) != 1:
+        return (
+            f"That place is past the end of the {kind}. Places count from 0, so a {kind} with 4 items ends at `[3]`; "
+            "a negative place counts back from the end, and -1 is the last one."
+        )
+    size, place = hits[0]
+    if size == 0:
+        return f"That {kind} is empty, so there is nothing at `[{place}]`."
+    if place >= 0:
+        return f"That {kind} has {count(size, 'item')}, so the last one is at `[{size - 1}]`: places count from 0. There is nothing at `[{place}]`."
+    if size == 1:
+        return f"That {kind} has 1 item, so its only place is `[0]` (or `[-1]`, counting back from the end). There is nothing at `[{place}]`."
+    return (
+        f"That {kind} has {count(size, 'item')}, so its places run from `[0]` to `[{size - 1}]`, "
+        f"and back from the end from `[-1]` to `[-{size}]`. There is nothing at `[{place}]`."
+    )
+
+
+def _unpacking_on(line: int | None) -> tuple[ast.stmt, ast.expr | None] | None:
+    """The one unpacking on the line, as (the statement, its value): `x, y = ...` or `for x, y in ...`; None if none or several."""
+    found = [
+        (node, node.value)
+        for node in _nodes_on(line, ast.Assign)
+        if isinstance(node.targets[0], (ast.Tuple, ast.List))
+    ] + [(node, None) for node in _nodes_on(line, ast.For) if isinstance(node.target, (ast.Tuple, ast.List))]
+    return found[0] if len(found) == 1 else None
+
+
+def _explain_unpack_count(too_many: bool, names: int, values: str | None, line: int | None) -> str:
+    have = count(int(values), "value") if values else ("more values than that" if too_many else "fewer values than that")
+    found = _unpacking_on(line)
+    if found and isinstance(found[0], ast.For):
+        where = f"There are {count(names, 'name')} after the `for` and {have} in the item it was given."
+    elif found:
+        where = f"There are {count(names, 'name')} on the left of the `=` and {have} on the right."
+    else:
+        where = f"There are {count(names, 'name')} on the left and {have} on the right."
+    return f"{where} Unpacking needs exactly one name for each value."
+
+
+def _explain_unpack_non_row(type_name: str, scope: dict, line: int | None) -> str:
+    """`x, y = 5`: the value and the names are read from the line's one unpacking, where there is one."""
+    found = _unpacking_on(line)
+    names = shown = None
+    subject = "The value on the right"
+    if found:
+        statement, value = found
+        target = statement.target if isinstance(statement, ast.For) else statement.targets[0]
+        if all(isinstance(part, ast.Name) for part in target.elts):
+            names = and_list([f"`{part.id}`" for part in target.elts])
+        if value is not None:
+            shown = _shown(_value_of(value, scope))
+        else:
+            subject = "Each item it goes through"
+    kind = _kind(type_name)
+    if shown and shown != kind:
+        subject = shown
+    return (
+        f"{subject} is {kind}: there is nothing inside it to hand out to {names or 'the names on the left'}. "
+        "Unpacking needs a tuple or a list."
+    )
+
+
+def _explain_empty_pick(fn: str, scope: dict, line: int | None) -> str:
+    """`max()` or `min()` of nothing. The empty thing is named where the line's call hands it a name or a literal we can read."""
+    kinds = {
+        type(value).__name__
+        for call in _nodes_on(line, ast.Call)
+        if isinstance(call.func, ast.Name)
+        and call.func.id == fn
+        and len(call.args) == 1
+        and not call.keywords
+        and isinstance(value := _value_of(call.args[0], scope), (list, tuple, str))
+        and len(value) == 0
+    }
+    what = {"list": "an empty list", "tuple": "an empty tuple", "str": "empty text"}[kinds.pop()] if len(kinds) == 1 else "something with no items in it"
+    return f"`{fn}()` was handed {what}, so there is no {'largest' if fn == 'max' else 'smallest'} item to hand back."
+
+
+def _sequences_ordered_on(line: int | None, scope: dict) -> list:
+    """What the line's `sorted(...)`, `min(...)`, `max(...)` and `.sort()` are asked to put in order: lists and tuples we can read."""
+    found = []
+    for call in _nodes_on(line, ast.Call):
+        func = call.func
+        if isinstance(func, ast.Name) and func.id in ("sorted", "min", "max") and call.args:
+            found.append(_value_of(call.args[0], scope) if len(call.args) == 1 else [_value_of(arg, scope) for arg in call.args])
+        elif isinstance(func, ast.Attribute) and func.attr == "sort":
+            found.append(_value_of(func.value, scope))
+    return [seq for seq in found if isinstance(seq, (list, tuple))]
+
+
+def _explain_unordered(left: str, right: str, scope: dict, line: int | None) -> str:
+    """Text against a number. The pair shown is read from the one sequence the line puts in order."""
+    head = "Python can't put text and numbers in one order"
+    pairs = set()
+    for seq in _sequences_ordered_on(line, scope):
+        first = {type(item).__name__: item for item in reversed(seq)}  # the first of each kind wins
+        if left != right and left in first and right in first and (a := _shown(first[left])) and (b := _shown(first[right])):
+            pairs.add((a, b))
+    if len(pairs) == 1:
+        a, b = pairs.pop()
+        return f"{head}: it has no rule for whether {a} comes before {b}."
+    return f"{head}: it has no rule for which of them comes first."
+
+
+def _explain_place_kind(kind: str, type_name: str, scope: dict, line: int | None) -> str:
+    """A place in a list that isn't a whole number. The value is named where the line has one `a[...]` it can read."""
+    shown = {
+        _shown(place)
+        for node in _nodes_on(line, ast.Subscript)
+        if type(_value_of(node.value, scope)).__name__ == kind and type(place := _value_of(node.slice, scope)).__name__ == type_name
+    }
+    value = shown.pop() if len(shown) == 1 else None
+    return f"A place in a {kind} is a whole number, like `[0]`. {value or 'That place'} is {_kind(type_name)}."
 
 
 # -- type errors: the right thing used the wrong way -----------------------------
@@ -573,6 +764,18 @@ def _explain_type_message(exc: TypeError, namespace: dict, line: int | None) -> 
             "Text can't be changed once it's made: you can't put a new character into a position. "
             "Make a new text instead, with a method like replace() or by joining pieces together."
         )
+    if msg == "'tuple' object does not support item assignment":
+        return "A tuple can't be changed once it is made. Build a new one, or use a list if the values have to change."
+    if (
+        (match := re.fullmatch(r"'[<>]=?' not supported between instances of '(\w+)' and '(\w+)'", msg))
+        and "str" in match.groups()
+        and {*match.groups()} & {"int", "float"}
+    ):  # text against a number only: other mixes keep Python's words
+        return _explain_unordered(match.group(1), match.group(2), _player_scope(exc), line)
+    if match := re.fullmatch(r"cannot unpack non-iterable (\w+) object", msg):
+        return _explain_unpack_non_row(match.group(1), _player_scope(exc), line)
+    if match := re.fullmatch(r"(list|tuple) indices must be integers or slices, not (\w+)", msg):
+        return _explain_place_kind(match.group(1), match.group(2), _player_scope(exc), line)
     if msg in ("'NoneType' object is not subscriptable", "object of type 'NoneType' has no len()"):
         if listed := _none_from_list_method(line):
             return f"There's nothing to use here: the value is None. {listed}"

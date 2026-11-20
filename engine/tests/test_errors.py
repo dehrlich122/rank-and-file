@@ -442,3 +442,149 @@ def test_a_none_from_read_keeps_the_rune_words_next_to_a_list_method(rune_corrid
     friendly = run_level(rune_corridor, "a = [1]\na.append(2)\ntext = pawn.read()\nprint(text[0])").error.friendly
     assert "If it came from `read()`, your pawn isn't standing on a rune" in friendly
     assert "hands back nothing" not in friendly
+
+
+# -- the mistakes lists and tuples bring (M5.3-E2) --------------------------------------------
+
+_PAST_END = "That {} has 3 items, so the last one is at `[2]`: places count from 0. There is nothing at `[{}]`."
+_PAST_END_ANY = "That place is past the end of the {}. Places count from 0, so a {} with 4 items ends at `[3]`; a negative place counts back from the end, and -1 is the last one."
+
+
+@pytest.mark.parametrize(
+    "code, friendly",
+    [
+        ("a = [5, 6, 7]\nprint(a[3])", _PAST_END.format("list", 3)),
+        ("a = (5, 6, 7)\nprint(a[3])", _PAST_END.format("tuple", 3)),
+        ("a = [5, 6, 7]\ni = 2\nprint(a[i + 3])", _PAST_END.format("list", 5)),
+        ("a = [5, 6, 7]\na[3] = 1", _PAST_END.format("list", 3)),
+        ("grid = [[1, 2, 3], [4]]\nprint(grid[0][3])", _PAST_END.format("list", 3)),
+        ("a = [5, 6, 7]\nprint(a[-4])", "That list has 3 items, so its places run from `[0]` to `[2]`, and back from the end from `[-1]` to `[-3]`. There is nothing at `[-4]`."),
+        ("a = [5]\nprint(a[-2])", "That list has 1 item, so its only place is `[0]` (or `[-1]`, counting back from the end). There is nothing at `[-2]`."),
+        ("a = []\nprint(a[0])", "That list is empty, so there is nothing at `[0]`."),
+        ("def f(items):\n    return items[3]\nf([5, 6, 7])", _PAST_END.format("list", 3)),
+        # not readable from the line: the sentence stands without the numbers
+        ("def f():\n    return [1, 2]\nprint(f()[5])", _PAST_END_ANY.format("list", "list")),
+        ("a = (5, 6)\nb = (1,)\nprint(a[7], b[7])", _PAST_END_ANY.format("tuple", "tuple")),
+    ],
+)
+def test_a_place_past_the_end_of_a_list_or_tuple(corridor, code, friendly):
+    assert run_level(corridor, code).error.friendly == friendly
+
+
+def test_text_keeps_its_words_for_a_place_past_the_end(corridor):
+    friendly = run_level(corridor, "t = 'abc'\nprint(t[5])").error.friendly
+    assert friendly.startswith("That position is past the end of the text.")
+    assert run_level(corridor, "'abc'.index('z')").error.friendly == "Python stopped with a ValueError: substring not found"
+
+
+_UNPACK = "Unpacking needs exactly one name for each value."
+
+
+@pytest.mark.parametrize(
+    "code, friendly",
+    [
+        ("x, y = [1, 2, 3]", f"There are 2 names on the left of the `=` and 3 values on the right. {_UNPACK}"),
+        ("x, y, z = (1, 2)", f"There are 3 names on the left of the `=` and 2 values on the right. {_UNPACK}"),
+        ("x, = [1, 2]", f"There are 1 name on the left of the `=` and 2 values on the right. {_UNPACK}"),
+        ("for x, y in [(1, 2, 3)]:\n    pass", f"There are 2 names after the `for` and 3 values in the item it was given. {_UNPACK}"),
+        ("x, y = iter([1, 2, 3])", f"There are 2 names on the left of the `=` and more values than that on the right. {_UNPACK}"),
+        ("x, y = 1, 2; a, b = [1]", f"There are 2 names on the left and 1 value on the right. {_UNPACK}"),
+    ],
+)
+def test_unpacking_the_wrong_number_of_values(corridor, code, friendly):
+    assert run_level(corridor, code).error.friendly == friendly
+
+
+@pytest.mark.parametrize(
+    "code, friendly",
+    [
+        ("x, y = 5", "5 is a whole number (an int): there is nothing inside it to hand out to `x` and `y`. Unpacking needs a tuple or a list."),
+        ("n = 2.5\nx, y, z = n", "2.5 is a number with a decimal point (a float): there is nothing inside it to hand out to `x`, `y` and `z`. Unpacking needs a tuple or a list."),
+        ("def f():\n    return 5\nx, y = f()", "The value on the right is a whole number (an int): there is nothing inside it to hand out to `x` and `y`. Unpacking needs a tuple or a list."),
+        ("a = [0, 0]\na[0], y = 5", "5 is a whole number (an int): there is nothing inside it to hand out to the names on the left. Unpacking needs a tuple or a list."),
+        ("x, y = None", "The value on the right is None: there is nothing inside it to hand out to `x` and `y`. Unpacking needs a tuple or a list."),
+        ("for x, y in [1, 2]:\n    pass", "Each item it goes through is a whole number (an int): there is nothing inside it to hand out to `x` and `y`. Unpacking needs a tuple or a list."),
+    ],
+)
+def test_unpacking_something_that_is_not_a_row_of_values(corridor, code, friendly):
+    assert run_level(corridor, code).error.friendly == friendly
+
+
+def test_changing_a_tuples_item(corridor):
+    friendly = run_level(corridor, "t = (1, 2)\nt[0] = 5").error.friendly
+    assert friendly == "A tuple can't be changed once it is made. Build a new one, or use a list if the values have to change."
+    assert run_level(corridor, "t = 'ab'\nt[0] = 'c'").error.friendly.startswith("Text can't be changed once it's made")
+
+
+_NO_ORDER = "Python can't put text and numbers in one order: it has no rule for {}."
+
+
+@pytest.mark.parametrize(
+    "code, rule",
+    [
+        ("a = [3, 'a', 1]\nprint(sorted(a))", "whether 'a' comes before 3"),
+        ("a = [3, 'a', 1]\na.sort()", "whether 'a' comes before 3"),
+        ("a = (2.5, 'b')\nprint(max(a))", "whether 'b' comes before 2.5"),
+        ("a = ['b', 7]\nprint(min(a))", "whether 7 comes before 'b'"),
+        ("print(max(3, 'a'))", "whether 'a' comes before 3"),
+        ("print(sorted(2 * [1] + ['x']))", "which of them comes first"),
+        ("a = [1, 'a']\nb = [2, 'b']\nprint(sorted(a), sorted(b))", "which of them comes first"),
+        ("print(sorted([4, 'z']))", "whether 'z' comes before 4"),
+        ("def f():\n    return [1, 'a']\nprint(sorted(f()))", "which of them comes first"),
+        ("a = [1, 'a']\nb = [2, 'b']\nprint(sorted(a) + sorted(b))", "which of them comes first"),
+    ],
+)
+def test_putting_text_and_numbers_in_order(corridor, code, rule):
+    assert run_level(corridor, code).error.friendly == _NO_ORDER.format(rule)
+
+
+def test_other_kinds_with_no_order_between_them(corridor):
+    friendly = run_level(corridor, "print([1] < 3)").error.friendly
+    assert friendly == "Python stopped with a TypeError: '<' not supported between instances of 'list' and 'int'"
+
+
+@pytest.mark.parametrize(
+    "code, kind",
+    [
+        ("a = [1]\na.remove(2)", "list"),
+        ("a = [1]\nprint(a.index(2))", "list"),
+        ("a = (1,)\nprint(a.index(2))", "tuple"),
+    ],
+)
+def test_remove_or_index_of_something_that_is_not_there(corridor, code, kind):
+    assert run_level(corridor, code).error.friendly == f"That value isn't in the {kind}. Ask first with `in`."
+
+
+@pytest.mark.parametrize(
+    "code, friendly",
+    [
+        ("a = []\nprint(max(a))", "`max()` was handed an empty list, so there is no largest item to hand back."),
+        ("a = []\nprint(min(a))", "`min()` was handed an empty list, so there is no smallest item to hand back."),
+        ("print(min(()))", "`min()` was handed an empty tuple, so there is no smallest item to hand back."),
+        ("print(max(''))", "`max()` was handed empty text, so there is no largest item to hand back."),
+        ("print(max([]), max([]))", "`max()` was handed an empty list, so there is no largest item to hand back."),
+        ("print(max(x for x in []))", "`max()` was handed something with no items in it, so there is no largest item to hand back."),
+        ("def f():\n    return []\nprint(max(f()))", "`max()` was handed something with no items in it, so there is no largest item to hand back."),
+    ],
+)
+def test_the_largest_or_smallest_of_nothing(corridor, code, friendly):
+    assert run_level(corridor, code).error.friendly == friendly
+
+
+@pytest.mark.parametrize(
+    "code, friendly",
+    [
+        ("a = [1, 2]\nprint(a[1.0])", "A place in a list is a whole number, like `[0]`. 1.0 is a number with a decimal point (a float)."),
+        ("a = (1, 2)\nprint(a['1'])", "A place in a tuple is a whole number, like `[0]`. '1' is text (a str)."),
+        ("a = [1, 2]\nplace = 3 / 2\nprint(a[place])", "A place in a list is a whole number, like `[0]`. 1.5 is a number with a decimal point (a float)."),
+        ("def f():\n    return [1, 2]\nprint(f()[1.0])", "A place in a list is a whole number, like `[0]`. That place is a number with a decimal point (a float)."),
+        ("a = [1, 2]\nprint(a[0.5], a[1.5])", "A place in a list is a whole number, like `[0]`. That place is a number with a decimal point (a float)."),
+    ],
+)
+def test_a_place_that_is_not_a_whole_number(corridor, code, friendly):
+    assert run_level(corridor, code).error.friendly == friendly
+
+
+def test_text_keeps_its_words_for_a_place_that_is_not_a_whole_number(corridor):
+    friendly = run_level(corridor, "t = 'abc'\nprint(t[1.0])").error.friendly
+    assert friendly == "Python stopped with a TypeError: string indices must be integers, not 'float'"
