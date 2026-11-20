@@ -178,9 +178,85 @@ BUILTINS: dict[str, tuple[list[str], str]] = {
             help(print)
         """,
     ),
+    "sorted": (
+        ["sorted(values)"],
+        """Make a new list with the same items in order, smallest first.
+
+        The list you give it doesn't change: `sorted()` hands back a new one.
+        Numbers go from the smallest up, and text goes in alphabetical order,
+        capital letters first. Pairs go by their first value, then by their
+        second.
+
+        Args:
+            values: the items to put in order: a list or a tuple. They must
+                all be the same kind: Python can't put text and numbers in
+                one order.
+
+        Returns:
+            A new list, in order.
+
+        Example:
+            keys = [12, 3, 7]
+            print(sorted(keys))
+        """,
+    ),
+    "min": (
+        ["min(values)"],
+        """Find the smallest item.
+
+        `min([12, 3, 7])` is 3. With text, it's the first in alphabetical
+        order. Several values separated by commas work too: `min(3, 7)`.
+
+        Args:
+            values: the items to look through: a list or a tuple with at
+                least one item. An empty one stops your program with an
+                error.
+
+        Returns:
+            The smallest item. The list doesn't change.
+
+        Example:
+            print(min([12, 3, 7]))
+        """,
+    ),
+    "max": (
+        ["max(values)"],
+        """Find the largest item.
+
+        `max([12, 3, 7])` is 12. With text, it's the last in alphabetical
+        order. Several values separated by commas work too: `max(3, 7)`.
+
+        Args:
+            values: the items to look through: a list or a tuple with at
+                least one item. An empty one stops your program with an
+                error.
+
+        Returns:
+            The largest item. The list doesn't change.
+
+        Example:
+            print(max([12, 3, 7]))
+        """,
+    ),
+    "sum": (
+        ["sum(values)"],
+        """Add up all the numbers in a list.
+
+        `sum([1, 2, 3])` is 6. An empty list adds up to 0.
+
+        Args:
+            values: the numbers to add: a list or a tuple of numbers.
+
+        Returns:
+            The total, a number.
+
+        Example:
+            print(sum([4, 9, 2]))
+        """,
+    ),
 }
 
-# Methods of text (M3.6): called on a piece of text, `text.upper()`. Named
+# Methods of text (M3.6), and of lists (M5.3: only `append` is taught): called on a piece of text, `text.upper()`. Named
 # "str.upper" in the Codex, since a str is Python's name for text. The order is
 # the order the lessons teach them.
 METHODS: dict[str, tuple[list[str], str]] = {
@@ -317,6 +393,30 @@ METHODS: dict[str, tuple[list[str], str]] = {
         Example:
             pieces = "north,3".split(",")
             print(pieces[0])
+        """,
+    ),
+    "list.append": (
+        ["items.append(value)"],
+        """Add one item to the end of a list.
+
+        It changes the list itself: afterwards the list is one longer. Start
+        with an empty list, `[]`, and append to it to build a list one item
+        at a time.
+
+        It hands back nothing (None), so call it on a line of its own.
+        `items = items.append(3)` would lose the list.
+
+        Args:
+            value: the item to add: a number, text, a pair, anything.
+
+        Returns:
+            Nothing.
+
+        Example:
+            seen = []
+            seen.append("brass")
+            seen.append("iron")
+            print(seen)
         """,
     ),
 }
@@ -482,8 +582,9 @@ def _builtins_in(callees: list[ast.expr]) -> set[str]:
 
 
 def _methods_in(callees: list[ast.expr]) -> set[str]:
-    """The methods of text among them, named as the Codex does ("str.upper")."""
-    return {f"str.{callee.attr}" for callee in callees if isinstance(callee, ast.Attribute) and f"str.{callee.attr}" in METHODS}
+    """The methods among them, named as the Codex does ("str.upper", "list.append"). The code doesn't say what kind of value a
+    method is called on, so an attribute matches every METHODS name that ends in it."""
+    return {name for name in METHODS for callee in callees if isinstance(callee, ast.Attribute) and name.partition(".")[2] == callee.attr}
 
 
 def python_called(code: str) -> set[str]:
@@ -712,9 +813,10 @@ def _entry_for(thing, piece: type[Piece] = Pawn) -> Entry | None:
     owner = getattr(thing, "__self__", None)
     if isinstance(owner, Piece) and getattr(thing, "__name__", "") in type(owner).ABILITIES:
         return ability_entry(type(owner), thing.__name__)
-    method = f"str.{getattr(thing, '__name__', '')}"
-    if method in METHODS and (isinstance(owner, str) or thing is getattr(str, thing.__name__)):  # "x".upper, or str.upper
-        return python_entry(method)
+    for kind in (str, list):
+        method = f"{kind.__name__}.{getattr(thing, '__name__', '')}"
+        if method in METHODS and (isinstance(owner, kind) or thing is getattr(kind, thing.__name__)):  # "x".upper, or str.upper
+            return python_entry(method)
     # `help` is in `builtins` only once `site` has run; a missing one is None, which must not match help(None)
     return next((python_entry(name) for name in BUILTINS if thing is not None and thing is getattr(builtins, name, None)), None)
 
