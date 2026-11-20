@@ -4,7 +4,7 @@ import time
 
 from conftest import basics, make_level
 from rankfile import bridge
-from rankfile.runner import CALL_DEPTH, run_level, run_sandbox, run_snippet
+from rankfile.runner import CALL_DEPTH, _stack_depth, run_level, run_sandbox, run_snippet
 from rankfile.tracer import PLAYER_FILENAME, Tracer
 
 # -- plain snippets ---------------------------------------------------------------
@@ -188,6 +188,12 @@ def test_what_a_line_does_with_a_functions_answer_records_on_a_continuing_step(c
     calling, inside, rest = result.steps[1:]
     assert calling["events"] == inside["events"] == []
     assert [event["kind"] for event in rest["events"]] == ["move", "move"]
+
+
+def test_a_plain_run_continues_nothing(corridor):
+    result = run_level(corridor, "pawn.move(1)\n")
+    assert result.steps
+    assert all(step["continues"] is False for step in result.steps)
 
 
 def test_a_printed_answer_is_on_the_continuing_step(corridor):
@@ -546,17 +552,10 @@ def test_the_limit_is_put_back_however_the_run_ends(corridor):
     assert sys.getrecursionlimit() == before
 
 
-def _depth_here() -> int:
-    depth, frame = 0, sys._getframe(1)
-    while frame is not None:
-        depth, frame = depth + 1, frame.f_back
-    return depth
-
-
 def test_a_limit_that_is_already_lower_is_never_raised():
     namespace = {"__name__": "__main__", "limit": sys.getrecursionlimit}
     before = sys.getrecursionlimit()
-    sys.setrecursionlimit(_depth_here() + 80)  # room for the engine's own few frames, but less than the player is given
+    sys.setrecursionlimit(_stack_depth() + 80)  # room for the engine's own few frames, but less than the player is given
     tight = sys.getrecursionlimit()
     try:
         result = run_snippet("print(limit())", namespace=namespace)

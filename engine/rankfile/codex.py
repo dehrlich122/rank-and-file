@@ -42,7 +42,7 @@ from typing import NamedTuple
 
 from .errors import LEVEL_PIECE, piece_class
 from .exceptions import IT_KNOWS
-from .levels import NOT_JUDGED, Level, parse_level
+from .levels import Level, parse_level
 from .pieces import PIECES, Pawn, Piece
 
 SECTIONS = ("Args", "Returns", "Example")
@@ -573,7 +573,7 @@ def _rule_nodes(level: Level) -> set[str]:
     or an examiner call that judges an answer, needs `return`."""
     rules, examine = level.constraints, level.examine
     nodes = {"FunctionDef"} if rules.functions or rules.define or examine is not None else set()
-    if any(rule.returns for rule in rules.functions.values()) or (examine is not None and any(call.returns is not NOT_JUDGED for call in examine.calls)):
+    if any(rule.returns for rule in rules.functions.values()) or (examine is not None and examine.judges_answer):
         nodes.add("Return")
     return nodes
 
