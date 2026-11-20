@@ -251,6 +251,20 @@ export default async function functionsChecks({ browser: b, base, root, check })
     return `${took} ms to the card; next run: ${next}`;
   });
 
+  await check("M5.2: a function that calls itself until Python stops it, caught and carried on from, ends with the game's lost-track sentence, and the next run works", async () => {
+    await openLevel(LEVEL, { fresh: true });
+    await setCode(`def again():\n    again()\n\ntry:\n    again()\nexcept RecursionError:\n    pass\nprint("carried on")`);
+    const r = await run();
+    const text = r.text.replace(/`/g, "");
+    expect(r.head === "Python stopped", `the run ended with: ${brief(r)}`);
+    expect(text.includes("The game lost track of this program partway through"), `the lost-track sentence is missing: ${brief(r)}`);
+    expect(text.includes("Give the function a way to stop calling itself"), `the advice is missing: ${brief(r)}`);
+    expect(r.stars === 0 && r.next === null, `the run was judged: ${r.stars} stars, next ${r.next}`); // an error is neither solved nor lost on the board
+    expect(!(await b.evaluate(`!!document.querySelector('.outcome-host .line-tag')`)), "the card carries a line tag");
+    const next = await nextRunWorks();
+    return `the lost-track sentence on the card; next run: ${next}`;
+  });
+
   // ---- The examiner on the level screen (ch07-l03 judges the board only; ch07-l04 also wants an answer handed back) ----
   // A failing run types a made-up function named as the page's call list names it, taking any call and doing nothing.
   // The answers the examiner wants are spoilers: these checks read them in the page and report counts and booleans only,
