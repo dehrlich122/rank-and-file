@@ -287,8 +287,7 @@ class Level:
             return self._calls()
         if self.goal_spots:
             return [Case(square_name(spot), f"with the goal on {square_name(spot)}", replace(self, goal=spot)) for spot in self.goal_spots]
-        boards = [Case(f"board {number}", f"on board {number}", variant) for number, variant in enumerate(self.variants, start=2)]
-        return [Case("board 1", "on board 1", replace(self, variants=[])), *boards]
+        return [Case(f"board {number}", f"on board {number}", board) for number, board in enumerate(self._boards(), start=1)]
 
     def _boards(self) -> list[Level]:
         """This board, then each other map, as levels of their own (the examiner belongs to the whole level, not to them)."""
