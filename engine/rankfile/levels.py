@@ -20,7 +20,7 @@ from .board import Board, Direction, Pos, Tile, Timer, sign, square_name
 from .constraints import NODE_NAMES, describe_rules
 from .pieces import PIECES
 from .words import and_list, count
-from .world import CHASERS, CHESS_LINES, CLOCKS, World
+from .world import CHASERS, CHESS_LINES, CLOCKS, World, key_words
 
 
 class LevelError(ValueError):
@@ -411,6 +411,15 @@ class Level:
             if any(enemy.kind == "chaser" for enemy in self.enemies):
                 obstacles.append("A chaser doesn't see pits: if its step lands on one, it falls in and is gone.")
         obstacles.extend(gate_rule(pos, timer) for pos, timer in sorted(self.board.timers.items()))
+        if keys := names(self.board.squares(Tile.KEY)):
+            where, stone = (f"A key on {keys[0]}", "its stone") if len(keys) == 1 else (f"Keys on {and_list(keys)}", "a key's stone")
+            obstacles.append(f"{where}: land on {stone} and `pick_up()` puts it in your satchel.")
+        if doors := self.board.squares(Tile.DOOR):
+            if len(doors) == 1:
+                rule = f"A door on {square_name(doors[0])}: you can land on it only while you carry {key_words(self.board.doors[doors[0]])}."
+            else:
+                rule = f"Doors on {and_list(names(doors))}: you can land on one only while you carry the key it names."
+            obstacles.append(rule)
         obstacles.extend(enemy.describe(self.piece) for enemy in self.enemies)
         if jumps:  # landing on an enemy takes it (or is an error, if it's armoured): only its own move or attack catches a knight
             if any(enemy.kind not in CHESS_LINES for enemy in self.enemies):
@@ -670,7 +679,10 @@ def _parse_details(symbol: str, tile: Tile, meaning: dict) -> dict:
 
 
 def _check_keys_and_doors(boards: list[Level]) -> None:
-    """Every door wants a key some board of the level has, and the names are all text or all whole numbers (M5.3)."""
+    """Keys and doors are the knight's, every door wants a key some board of the level has, and the names are all
+    text or all whole numbers (M5.3)."""
+    if any(level.piece != "knight" and (level.board.keys or level.board.doors) for level in boards):
+        raise LevelError("keys and doors are for the knight: the pawn learns them in M5.5", at={"field": "piece"})
     keys = [name for level in boards for name in level.board.keys.values()]
     wanted = [key for level in boards for key in level.board.doors.values()]
     if len({isinstance(name, str) for name in [*keys, *wanted]}) > 1:
