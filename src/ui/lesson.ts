@@ -13,7 +13,7 @@ import { BoardView } from "./board";
 import { codexHover, type CodexLookup } from "./codex";
 import { h, withCode } from "./dom";
 import { createEditor, getCode, setActiveLine, setErrorLine } from "./editor";
-import { errorCard, logNodes } from "./panels";
+import { errorCard, examinerCalls, logNodes } from "./panels";
 import { Player, buildFrames, consoleAt } from "./playback";
 import { settings } from "../settings";
 
@@ -150,7 +150,7 @@ class Snippet {
       "div",
       { class: "snippet" },
       editorHost,
-      call ? h("div", { class: "snippet-call muted small" }, "The examiner calls ", h("code", {}, call)) : null,
+      call ? h("div", { class: "snippet-call muted small" }, ...examinerCalls(call)) : null,
       h(
         "div",
         { class: "snippet-row" },
