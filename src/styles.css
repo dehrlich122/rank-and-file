@@ -1328,7 +1328,7 @@ pre {
 .inspector .group-head {
   margin: 0;
   padding: 2px 8px;
-  font: 600 13px var(--font-code);
+  font: 600 calc(var(--code-size) - 2px) var(--font-code);
   color: var(--text);
 }
 
@@ -1340,7 +1340,7 @@ pre {
 .inspector .fold summary {
   cursor: pointer;
   padding: 3px 8px;
-  font: 12px var(--font-code);
+  font: calc(var(--code-size) - 3px) var(--font-code);
   color: var(--muted);
 }
 
