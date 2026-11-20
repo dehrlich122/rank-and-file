@@ -26,7 +26,7 @@ from dataclasses import asdict, dataclass, field, replace
 
 from . import codex
 from .board import Tile, square_name
-from .constraints import check_constraints, code_lines, lint
+from .constraints import _values, check_constraints, code_lines, lint
 from .errors import ErrorInfo, _kind, closest, explain
 from .exceptions import LostTrackError
 from .levels import NOT_JUDGED, Case, Examine, ExamineCall, Level, names, sandbox_level
@@ -356,7 +356,7 @@ def what_happened(kind: str, facts: CallFacts) -> str:
     if kind == "not_function":
         return f"{called}, but `{name}` in your program is {_what_it_is(facts.found)}, not a function. Keep that name for the `def`."
     if kind == "arguments":
-        return f"{called}{_with_values(len(facts.args))}, and {_what_it_takes(facts.found, facts.signature, len(facts.args))}"
+        return f"{called} with {_values(len(facts.args))}, and {_what_it_takes(facts.found, facts.signature, len(facts.args))}"
     if kind == "board":
         return f"{called}, and when the call ended " + " Also, ".join(facts.unmet)
     if kind == "board_answered":
@@ -379,10 +379,6 @@ def _what_it_is(value: object) -> str:
         return "a class"
     shown, kind = safe_repr(value), _kind(type(value).__name__)
     return shown if shown == kind else f"{shown}, {kind}"
-
-
-def _with_values(n: int) -> str:
-    return " with no values" if n == 0 else f" with {count(n, 'value')}"
 
 
 def _what_it_takes(function: object, signature: inspect.Signature | None, given: int) -> str:
