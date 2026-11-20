@@ -27,12 +27,20 @@ class GateLockedError(BlockedError):
     """The piece tried to walk through a gate that hasn't been opened yet."""
 
 
+class DoorLockedError(BlockedError):
+    """The piece tried to land on a door whose key it isn't carrying (M5.3)."""
+
+
 class CaptureError(GameError):
     """The piece tried to capture where there's nothing it can take (M3.1)."""
 
 
 class BridgeError(GameError):
     """The piece tried to lay a plank with none to lay, or where there's no pit (QA-017)."""
+
+
+class PickUpError(GameError):
+    """The piece tried to pick something up where there's nothing to take (M5.3)."""
 
 
 class LostTrackError(GameError):

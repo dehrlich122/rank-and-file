@@ -106,6 +106,7 @@ class World:
         self.crossed: set[Pos] = set()  # waypoints the piece has passed over
         self.collected: set[Pos] = set()  # gems and planks the piece has picked up
         self.planks = level.planks  # planks it's carrying (QA-017)
+        self.inventory: list[str | int] = []  # the names of the keys it's carrying, in the order picked up (M5.3)
         self.bridged: set[Pos] = set()  # pits with a plank over them
         self.ticks = dict.fromkeys(CLOCKS, 0)
         self.lines_seen: set[int] = set()  # for the new_line clock
@@ -115,6 +116,7 @@ class World:
         self.code_clocked = sorted(self.clocked & CODE_CLOCKS)  # clocks the code winds, whose counts the board shows (QA-021)
         self.chess = any(enemy.kind in CHESS_LINES for enemy in level.enemies)  # M3.4
         self.jumps = level.lands  # the piece jumps, so the state carries its landing squares (M5.1)
+        self.satchel = bool(self.board.keys or self.board.doors)  # the state carries what it's carrying (M5.3)
         self.lost: Lost | None = None
         self.listeners: list[Callable[[Event], None]] = []
 
@@ -124,6 +126,7 @@ class World:
         twin.opened, twin.refused = set(self.opened), dict(self.refused)
         twin.crossed, twin.collected, twin.bridged = set(self.crossed), set(self.collected), set(self.bridged)
         twin.ticks, twin.lines_seen = dict(self.ticks), set(self.lines_seen)
+        twin.inventory = list(self.inventory)
         twin.foes = [copy.copy(foe) for foe in self.foes]
         twin.listeners = []
         return twin
@@ -148,7 +151,13 @@ class World:
             state["attacked"] = [list(pos) for pos in sorted(self.attacked())]
         if self.jumps:  # only on knight levels, so pawn recordings don't grow (M5.1)
             state["landings"] = [] if self.lost else [list(pos) for pos in self.landings()]
+        if self.satchel:  # only on levels with keys or doors, so other recordings stay lean (M5.3)
+            state["inventory"] = list(self.inventory)
         return state
+
+    def pick_up(self) -> None:
+        """Pick up the key on the square the piece stands on (M5.3): the name goes into `inventory`."""
+        raise NotImplementedError("M5.3-2")
 
     @_acts
     def move_forward(self) -> None:

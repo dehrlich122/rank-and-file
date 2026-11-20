@@ -451,6 +451,8 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
   waypoint: (left, top) => waypoint(left, top),
   gem: (left, top) => gem(left, top),
   rune: (left, top, level, pos) => rune(left, top, find(level.runes, pos)?.text ?? ""),
+  key: null, // drawn as floor until M5.3-6
+  door: null,
 };
 
 /** A tile's sprite, centred on its square. */
