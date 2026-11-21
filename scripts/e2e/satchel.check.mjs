@@ -97,4 +97,55 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
     expect(ran.summary.includes("cross([1, -1])") && !ran.summary.includes("`"), `the summary reads "${ran.summary}"`);
     return ran.summary;
   });
+
+  // ---- The Codex ----
+  /** Open level `id` and read its Codex tab: the group headings in order, and each entry's name, group and whether it is marked New. */
+  async function codexOf(id) {
+    await openLevel(id, { fresh: true });
+    await codexTab();
+    await b.waitFor(`document.querySelector('.codex .codex-entry')`, 20_000, "the Codex's entries");
+    return b.evaluate(`(() => {
+      const entries = [];
+      const headings = [];
+      for (const el of document.querySelector('.codex').children) {
+        if (el.tagName === 'H3') headings.push(el.textContent);
+        else if (el.classList.contains('codex-entry')) entries.push({ name: el.dataset.codex, group: headings.at(-1) ?? '', isNew: !!el.querySelector('.codex-new') });
+      }
+      return { headings, entries };
+    })()`);
+  }
+  const newOnes = (codex, names) => names.filter((name) => codex.entries.some((e) => e.name === name && e.isNew));
+  const allNew = (codex) => codex.entries.filter((e) => e.isNew).map((e) => e.name);
+
+  await check("M5.3: ch08-l04's Codex has a Lists group straight after Text, holding list.append, new; every str. method is under Text", async () => {
+    const { headings, entries } = await codexOf("ch08-l04");
+    expect(headings.includes("Text") && headings.indexOf("Lists") === headings.indexOf("Text") + 1, headings.join("|"));
+    const append = entries.find((e) => e.name === "list.append");
+    expect(append && append.group === "Lists" && append.isNew, JSON.stringify(append));
+    expect(entries.every((e) => (e.group === "Text") === e.name.startsWith("str.") && (e.group === "Lists") === e.name.startsWith("list.")), JSON.stringify(entries.map((e) => [e.name, e.group])));
+    return headings.join("|");
+  });
+
+  await check("M5.3: ch08-l05's Codex lists sorted, min, max and sum, all new", async () => {
+    const codex = await codexOf(HELP);
+    const names = ["sorted", "min", "max", "sum"];
+    expect(newOnes(codex, names).length === names.length, `new here: [${allNew(codex)}]`);
+    return names.join();
+  });
+
+  await check("M5.3: ch08-l01's Codex lists the kind list, new, under Kinds of value", async () => {
+    const codex = await codexOf("ch08-l01");
+    const kind = codex.entries.find((e) => e.name === "list");
+    expect(kind && kind.group === "Kinds of value" && kind.isNew, JSON.stringify(kind));
+    return `kinds: ${codex.entries.filter((e) => e.group === "Kinds of value").map((e) => e.name)}`;
+  });
+
+  await check("M5.3: ch08-l02 brings in the kind tuple and knight.position; ch08-l03 the knight's pick_up and inventory", async () => {
+    const two = await codexOf("ch08-l02");
+    expect(newOnes(two, ["tuple", "knight.position"]).length === 2, `new on 8.2: [${allNew(two)}]`);
+    expect(two.entries.find((e) => e.name === "tuple")?.group === "Kinds of value", "tuple is not under Kinds of value");
+    const three = await codexOf("ch08-l03");
+    expect(newOnes(three, ["knight.pick_up", "knight.inventory"]).length === 2, `new on 8.3: [${allNew(three)}]`);
+    return `8.3 lists ${three.entries.filter((e) => e.name.startsWith("knight.")).map((e) => e.name)}`;
+  });
 }
