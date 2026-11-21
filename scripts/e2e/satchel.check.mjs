@@ -98,6 +98,53 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
     return ran.summary;
   });
 
+  // ---- A list in the variables panel, and in an error ----
+  /** Open level `id` fresh, type the made-up `code` and run it (to the last frame); returns the outcome card. */
+  async function runMadeUp(id, code) {
+    await openLevel(id, { fresh: true });
+    await setCode(code);
+    return run();
+  }
+  /** Go back to step 0, then step forward to the end: for each step, the variables panel as {name: value}. */
+  async function stepThrough() {
+    await press(0);
+    await b.waitFor(`/Step 0 /.test(document.querySelector('.step-label').textContent)`, 5000, "back at step 0");
+    const panel = () => b.evaluate(`({
+      label: document.querySelector('.step-label').textContent,
+      vars: Object.fromEntries([...document.querySelectorAll('.inspector tr')].map((r) => [r.querySelector('.var-name').textContent, r.querySelector('.var-value').textContent])),
+    })`);
+    const steps = [await panel()];
+    const total = Number(/of (\d+)/.exec(steps[0].label)?.[1]);
+    for (let i = 0; i < total; i++) {
+      await press(3);
+      await b.waitFor(`document.querySelector('.step-label').textContent !== ${JSON.stringify(steps.at(-1).label)}`, 5000, "the next step");
+      steps.push(await panel());
+    }
+    return steps;
+  }
+
+  await check("M5.3: stepping shows a list growing in the variables panel, and both names of a for over pairs with their values", async () => {
+    // moves nothing, and is no route: an empty list, three appends of numbers, then a loop over two pairs
+    const r = await runMadeUp(SCRATCH, "found = []\nfound.append(5)\nfound.append(6)\nfound.append(7)\nfor first, second in [(1, 2), (3, 4)]:\n    print(first, second)\n");
+    expect(r.head !== "Python stopped", brief(r));
+    const steps = await stepThrough();
+    const seen = (name) => [...new Set(steps.map((s) => s.vars[name]).filter((v) => v !== undefined))];
+    const found = seen("found");
+    // the list's value grows: each value after the first holds the one before it, minus its closing bracket
+    expect(found.length >= 4 && found[0].replace(/\s/g, "") === "[]" && found.every((v, i) => i === 0 || v.startsWith(found[i - 1].replace(/\]$/, ""))), `found takes the values [${found}]`);
+    expect(found.at(-1).replace(/\s/g, "") === "[5,6,7]", `found ends as ${found.at(-1)}`);
+    const [first, second] = [seen("first"), seen("second")];
+    expect(first.join() === "1,3" && second.join() === "2,4", `first takes [${first}], second [${second}]`);
+    return `${steps.length} steps; found: ${found.join(" -> ")}; first: ${first}; second: ${second}`;
+  });
+
+  await check("M5.3: asking a list for a place past its end stops with the friendly card, naming the list's length and the place", async () => {
+    const r = await runMadeUp(SCRATCH, "items = [4, 9]\nprint(items[5])\n");
+    const words = "That list has 2 items, so the last one is at [1]: places count from 0. There is nothing at [5].";
+    expect(r.head === "Python stopped" && r.text.replace(/`/g, "").includes(words) && r.errorLine, brief(r));
+    return "friendly card with the list's length, the last place and the place asked for";
+  });
+
   // ---- The Codex ----
   /** Open level `id` and read its Codex tab: the group headings in order, and each entry's name, group and whether it is marked New. */
   async function codexOf(id) {
