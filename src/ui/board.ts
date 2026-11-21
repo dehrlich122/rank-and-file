@@ -17,6 +17,7 @@ import { motionReduced, settings } from "../settings";
 import { sound } from "../sound";
 import { landingSounds, soundsForStep } from "../sound/events";
 import { describeBoard } from "./boardText";
+import { doorTile, keyTile, openDoors } from "./keyDoor";
 import { jumpPlan, type JumpPlan, playableEvents } from "./motion";
 import { halftone, litGrid, M, S } from "./sprites/floor";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite, type Skin, type TileName } from "./sprites";
@@ -279,6 +280,9 @@ export class BoardView {
     this.mark("gem", "collected", state.collected);
     this.mark("plank", "collected", state.collected);
     this.mark("pit", "bridged", state.bridged);
+    this.mark("key", "collected", state.collected);
+    // A door stands open while its key is carried: the engine lists the names carried, so the board reads the doors off that.
+    this.mark("door", "open", openDoors(this.level.doors, state.inventory));
     // The shaded squares only change when a piece is taken, so skip the rebuild otherwise.
     const attackedKey = state.attacked?.join(";");
     if (state.attacked && attackedKey !== this.attackedKey) {
@@ -451,8 +455,8 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
   waypoint: (left, top) => waypoint(left, top),
   gem: (left, top) => gem(left, top),
   rune: (left, top, level, pos) => rune(left, top, find(level.runes, pos)?.text ?? ""),
-  key: null, // drawn as floor until M5.3-6
-  door: null,
+  key: (left, top, level, pos) => keyTile(left, top, find(level.keys ?? [], pos)?.name ?? ""),
+  door: (left, top, level, pos) => doorTile(left, top, find(level.doors ?? [], pos)?.key ?? ""),
 };
 
 /** A tile's sprite, centred on its square. */

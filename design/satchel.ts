@@ -3,7 +3,7 @@
 // Pane 1 the key (K1 to K3), pane 2 the door (D1, D2), pane 3 the satchel (S1 to S3), pane 4 the two board shapes (L1,
 // L2, H1), pane 5 the examiner with a list (X1 to X3, T1, T2), each in both themes. Every board is
 // drawn with the game's real sprites and classes on a made-up 6 by 5 board; the key, the door and the satchel are drawn
-// here, in this file, because the real sprites come after the designer picks. Dev-only; nothing here is in the game.
+// here, in this file, because the real sprites come after the designer picks (K3 and D2 are the picked takes, and now come from src/ui/keyDoor.ts). Dev-only; nothing here is in the game.
 // The only new colours are tokens in satchel.css.
 import "@fontsource/orbitron/500.css";
 import "@fontsource/orbitron/700.css";
@@ -15,6 +15,7 @@ import type { Pos } from "../src/py/protocol";
 import { h } from "../src/ui/dom";
 import { callList } from "../src/ui/panels";
 import { goal, hero, tile } from "../src/ui/sprites";
+import { doorArt as doorD2, keyArt as keyK3, line, nameText, rect, shaftAcross, shaftDown } from "../src/ui/keyDoor";
 import { litGrid, M, S } from "../src/ui/sprites/floor";
 import { svg } from "../src/ui/svg";
 
@@ -87,24 +88,12 @@ function drawBoard({ things, label, geo = SHEET }: Spec): SVGSVGElement {
   return board;
 }
 
-// -- the new art, in a 64-unit square centred on (0, 0) -----------------------------------------------------------------
-
-/** A name written to fit a width: one or two digits get bigger letters than five. */
-function nameText(text: Name, x: number, y: number, width: number, extra = "", anchor = "middle", cap = 19): SVGElement {
-  const size = Math.min(cap, Math.floor(width / (text.length * 0.62)));
-  return svg("text", { class: `name ${extra}`, x, y, "text-anchor": anchor, "dominant-baseline": "central", style: `font-size:${size}px` }, text);
-}
-
-const line = (cls: string, d: string) => svg("path", { class: cls, d });
-const rect = (cls: string, x: number, y: number, w: number, hh: number, r = 0) => svg("rect", { class: cls, x, y, width: w, height: hh, rx: r });
-
-/** A key's shaft and teeth, hanging from (x, top) down to (x, bottom) or running right along y. */
-const shaftDown = (x: number, top: number, bottom: number) => `M ${x} ${top} V ${bottom} M ${x} ${bottom - 11} H ${x + 9} M ${x} ${bottom - 3} H ${x + 6}`;
-const shaftAcross = (left: number, y: number, right: number) => `M ${left} ${y} H ${right} M ${right - 11} ${y} V ${y + 8} M ${right - 3} ${y} V ${y + 6}`;
+// -- the art, in a 64-unit square centred on (0, 0): K3 and D2 are the game's own (src/ui/keyDoor.ts) -----------------------------------------------------------------
 
 type KeyLook = "K1" | "K2" | "K3";
 
 function keyArt(look: KeyLook, name: Name): SVGElement {
+  if (look === "K3") return keyK3(name); // the name on the stone's edge, set like the board's own coordinates
   const art = svg("g", { class: "key-art" });
   if (look === "K1") {
     // a tag on a string under the key
@@ -116,12 +105,9 @@ function keyArt(look: KeyLook, name: Name): SVGElement {
       svg("circle", { class: "k-line", cx: -21, cy: 11, r: 1.6 }),
       nameText(name, 2, 15.5, 40),
     );
-  } else if (look === "K2") {
-    // the name inside the key's bow
-    art.append(rect("k-line bow", -26, -28, 52, 22, 11), line("k-line", shaftDown(0, -6, 25)), nameText(name, 0, -17, 40));
   } else {
-    // the name on the stone's edge, set like the board's own coordinates
-    art.append(svg("circle", { class: "k-line", cx: -14, cy: -8, r: 9 }), line("k-line", shaftAcross(-5, -8, 24)), line("edge-rule", "M -29 14 H 29"), nameText(name, -27, 23, 46, "edge-name", "start", 15));
+    // K2: the name inside the key's bow
+    art.append(rect("k-line bow", -26, -28, 52, 22, 11), line("k-line", shaftDown(0, -6, 25)), nameText(name, 0, -17, 40));
   }
   return art;
 }
@@ -129,21 +115,14 @@ function keyArt(look: KeyLook, name: Name): SVGElement {
 type DoorLook = "D1" | "D2";
 
 function doorArt(look: DoorLook, name: Name, open: boolean): SVGElement {
+  if (look === "D2") return doorD2(name, open); // a square slab, a key slot in it, the name in a capsule on the lintel
+  // D1: an arched slab, a keyhole in it, the name on a plate set across its foot
   const art = svg("g", { class: open ? "door-art door-open" : "door-art door-locked" });
-  if (look === "D1") {
-    // an arched slab, a keyhole in it, the name on a plate set across its foot
-    const arch = "M -17 8 V -10 A 17 17 0 0 1 17 -10 V 8 Z";
-    art.append(line(open ? "d-line d-void" : "d-line d-slab", arch));
-    if (open) art.append(line("d-line d-slab", "M -17 -10 V 8 L -8 5 V -7 Z"));
-    else art.append(svg("circle", { class: "k-line", cx: 0, cy: -9, r: 3.4 }), line("k-line", "M 0 -6 V 1"), line("d-grain", "M -9 -22 V 3 M 9 -22 V 3"));
-    art.append(rect("tag", -27, 11, 54, 16, 3), nameText(name, 0, 19.5, 46));
-  } else {
-    // a square slab, a key slot in it, the name in a capsule on the lintel (the shape of a key's bow)
-    art.append(rect(open ? "d-line d-void" : "d-line d-slab", -17, -8, 34, 34));
-    if (open) art.append(line("d-line d-slab", "M -17 -8 V 26 L -7 22 V -4 Z"));
-    else art.append(rect("k-line", -2.5, -1, 5, 17), line("k-line", "M 2.5 11 H 7"));
-    art.append(rect("k-line bow", -26, -29, 52, 19, 9.5), nameText(name, 0, -19.5, 44));
-  }
+  const arch = "M -17 8 V -10 A 17 17 0 0 1 17 -10 V 8 Z";
+  art.append(line(open ? "d-line d-void" : "d-line d-slab", arch));
+  if (open) art.append(line("d-line d-slab", "M -17 -10 V 8 L -8 5 V -7 Z"));
+  else art.append(svg("circle", { class: "k-line", cx: 0, cy: -9, r: 3.4 }), line("k-line", "M 0 -6 V 1"), line("d-grain", "M -9 -22 V 3 M 9 -22 V 3"));
+  art.append(rect("tag", -27, 11, 54, 16, 3), nameText(name, 0, 19.5, 46));
   return art;
 }
 
