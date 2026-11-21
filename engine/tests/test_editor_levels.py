@@ -188,10 +188,19 @@ def test_every_level_in_the_repo_fits_the_limit():
 # -- the editor's options ----------------------------------------------------------------------------
 
 
+def test_the_editor_offers_neither_pick_up_nor_inventory_until_m5_5():
+    knight = PIECES["knight"].ABILITIES
+    assert "pick_up" in knight and "inventory" in knight  # the pieces keep them: levels, the Codex and the checker read them
+    offered = editor_options()["pieces"]["knight"]
+    assert offered == [a for a in knight if a not in ("pick_up", "inventory")]
+    assert offered and "pick_up" not in offered and "inventory" not in offered
+    assert editor_options()["pieces"]["pawn"] == list(PIECES["pawn"].ABILITIES)
+
+
 def test_the_options_come_from_the_checkers_own_tables():
     options = editor_options()
     assert options["max_side"] == MAX_SIDE
-    assert options["pieces"] == {name: list(piece.ABILITIES) for name, piece in PIECES.items()}
+    assert options["pieces"] == {name: [a for a in piece.ABILITIES if a not in ("pick_up", "inventory")] for name, piece in PIECES.items()}
     assert set(options["tiles"]) == {tile.value for tile in Tile}
     assert set(options["enemies"]) == set(ENEMY_KEYS)
     assert options["clocks"] == list(CLOCKS)

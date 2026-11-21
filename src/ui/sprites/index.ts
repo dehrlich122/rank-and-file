@@ -205,7 +205,7 @@ export function crown(mastered: boolean): SVGElement {
 // -- the registry -------------------------------------------------------------------------------------
 
 /** The sprite each kind of tile is drawn with (a floor has none). The board adds a gate's open state, a waypoint's crossed one. */
-export const TILE_SPRITE: Record<Exclude<TileKind, "floor">, TileName> = {
+export const TILE_SPRITE: Record<Exclude<TileKind, "floor" | "key" | "door">, TileName> = {
   wall: "wall",
   sign: "sign",
   rune: "rune",

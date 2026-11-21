@@ -1,0 +1,15 @@
+# expect: error GateLockedError
+for i in range(4):
+    knight.jump(1, -2)
+    knight.jump(-1, -2)
+    knight.pick_up()
+    knight.jump(1, 2)
+print(4)
+knight.jump(2, 1)
+knight.jump(1, -2)
+knight.jump(-2, 1)
+print([4, 12, 26, 32])
+knight.jump(2, 1)
+knight.jump(1, -2)
+knight.jump(-2, 1)
+knight.jump(1, 2)

@@ -1,0 +1,50 @@
+id: ch08-l02
+chapter: 8
+title: "Pairs"
+trains: "Tuples: two values that travel together, unpacked into two names, and knight.position as one"
+brief: "This time the examiner names the stones, not the jumps: a list of places, each an (x, y) pair. Your knight knows where it stands. Work out each jump."
+piece: knight
+map: |
+  O O P O
+  O . O O
+  O O O .
+  O O . O
+  G O O O
+legend: {"O": "pit"}
+start: {"facing": "north"}
+api: ["jump", "position"]
+examine: {"function": "visit", "calls": [{"args": [[[3, 2], [1, 3], [2, 1], [0, 0]]], "board": 1}, {"args": [[[2, 4], [3, 2], [2, 0]]], "board": 2}, {"args": [[[4, 2], [3, 4], [1, 5], [3, 6], [1, 7], [0, 5]]], "board": 3}, {"args": [[[0, 2], [1, 4], [3, 3], [5, 2], [6, 4]]], "board": 4}]}
+par: {"lines": 4}
+hints:
+- "The examiner hands over places, and jump() wants a jump. Where is your knight standing when it needs the next one?"
+- "A for loop can unpack each pair into two names. knight.position is a pair too: where the knight stands now. A jump is the difference between two places: how far right from here to there, and how far up."
+- "Two names for each pair, and two more for where the knight stands:\nfor x, y in stops:\n    here_x, here_y = knight.position\n    knight.jump(x - ..., y - ...)"
+lesson: ch08/ch08-l02.md
+lesson_board:
+  map: |
+    . . . . .
+    . . . . .
+    P . . . .
+  start: {"facing": "north"}
+variants:
+- map: |
+    O O . O
+    P O O O
+    O O O .
+    O O O O
+    O O G O
+- map: |
+    O . O O O
+    O O O . O
+    G . O O O
+    O O O . O
+    O O O O O
+    O O O O .
+    O O O O O
+    O O O P O
+- map: |
+    O . O O O O G
+    O O O . O O O
+    . O O O O . O
+    O O O O O O O
+    O P O O O O O

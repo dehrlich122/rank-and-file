@@ -1,0 +1,65 @@
+id: ch08-l01
+chapter: 8
+title: "A List of Jumps"
+trains: "A list: several values in a row under one name, and a for loop over them"
+brief: "The examiner has written each climb down as a list: one number for every jump, 1 for a step to the right, -1 for a step to the left. It will call your spell climb with the list. Ride it."
+piece: knight
+map: |
+  G O O
+  O O O
+  O . O
+  O O O
+  . O O
+  O O O
+  O . O
+  O O O
+  O O P
+legend: {"O": "pit"}
+start: {"facing": "north"}
+api: ["jump"]
+examine: {"function": "climb", "calls": [{"args": [[-1, -1, 1, -1]], "board": 1}, {"args": [[-1, 1, 1, -1, 1]], "board": 2}, {"args": [[1, -1, 1]], "board": 3}, {"args": [[1, 1, -1, 1]], "board": 4}]}
+par: {"lines": 3}
+hints:
+- "The examiner's calls are listed before the run. Read each list against its board: what does a 1 do, and a -1?"
+- "A for loop over a list runs its lines once for each item, and its variable is the item itself, not a count. So the loop never needs to know how long the list is. Each item is the first number of a jump; the second is always the same."
+- "A loop over a list, one item for each lap:\nfor item in items:\n    knight.jump(item, ...)"
+lesson: ch08/ch08-l01.md
+lesson_board:
+  map: |
+    . . . . .
+    . . . . .
+    P . . . .
+    . . . . .
+    . . . . .
+  start: {"facing": "north"}
+variants:
+- map: |
+    O O G
+    O O O
+    O . O
+    O O O
+    O O .
+    O O O
+    O . O
+    O O O
+    . O O
+    O O O
+    O P O
+- map: |
+    O G
+    O O
+    . O
+    O O
+    O .
+    O O
+    P O
+- map: |
+    O O G
+    O O O
+    O . O
+    O O O
+    O O .
+    O O O
+    O . O
+    O O O
+    P O O

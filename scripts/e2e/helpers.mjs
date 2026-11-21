@@ -84,6 +84,72 @@ export function hoverHelpers(browser) {
   };
 }
 
+/**
+ * The examiner's calls on the level screen and the result card, for the suites that run an examiner level. A button says
+ * "call N" (with its mark above the board); the call itself is the button's tooltip, minus "Replay " in the table.
+ * Both readers hand back the calls' own text, counts, booleans and measures only: never an answer (a wanted or got
+ * value, which is a spoiler on a real level).
+ */
+export function examinerHelpers(browser) {
+  return {
+    /** What the board host shows of the calls: the buttons' text, tooltips and tops, the pressed one, the caption, the board's shape. */
+    examinerView: () =>
+      browser.evaluate(`(() => {
+        const row = document.querySelector('.board-host .case-row');
+        const buttons = row ? [...row.querySelectorAll('button')] : [];
+        const caption = document.querySelector('.board-host p.boards-caption');
+        const board = document.querySelector('.board-host .board');
+        const box = board.getBoundingClientRect();
+        return {
+          row: row?.getAttribute('aria-label') ?? null,
+          calls: buttons.map((e) => e.title),
+          texts: buttons.map((e) => e.textContent),
+          marks: buttons.map((e) => e.textContent.slice(-1)),
+          tops: buttons.map((e) => e.getBoundingClientRect().top),
+          pressed: buttons.flatMap((e, i) => (e.getAttribute('aria-pressed') === 'true' ? [i] : [])),
+          thumbs: document.querySelectorAll('.board-host button.board-thumb').length,
+          caption: caption?.textContent ?? null,
+          top: box.top,
+          shape: box.width + 'x' + box.height + '/' + board.querySelectorAll('*').length,
+          cases: document.querySelectorAll('.board-host .case-row').length,
+        };
+      })()`),
+
+    /** The Challenge panel's call list, in order: each call's text (in the DOM whether or not the tab is on show). */
+    challengeCalls: () => browser.evaluate(`[...document.querySelectorAll('ol.call-list li code.call-code')].map((e) => e.textContent)`),
+
+    /** The outcome card's examiner parts and its table of calls (null when there is none): booleans, the calls' text and the buttons' words. */
+    examinerCard: () =>
+      browser.evaluate(`(() => {
+        const table = document.querySelector('.outcome-host table.calls');
+        const rows = table ? [...table.querySelectorAll('tr')] : [];
+        return {
+          line: !!document.querySelector('.outcome-host p.examiner-line'),
+          mark: document.querySelector('.outcome-host p.examiner-line .examiner-mark')?.textContent ?? null,
+          text: document.querySelector('.outcome-host .outcome').innerText.replace(/\\s+/g, ' '),
+          table: table && {
+            head: rows[0].children.length,
+            rows: rows.slice(1).map((tr) => {
+              const [call, wanted, got, mark] = [...tr.children];
+              const replay = call.querySelector('button');
+              return {
+                call: replay.title.replace(/^Replay /, ''),
+                words: replay.textContent,
+                replays: replay.title.startsWith('Replay '),
+                wanted: wanted.textContent.trim() !== '',
+                none: got.textContent.trim() === 'None',
+                same: got.textContent.trim() === wanted.textContent.trim(),
+                mark: mark.textContent.trim(),
+                markClass: mark.classList.contains('ok') ? 'ok' : mark.classList.contains('no') || mark.querySelector('.no') ? 'no' : '',
+                picked: tr.classList.contains('picked'),
+              };
+            }),
+          },
+        };
+      })()`),
+  };
+}
+
 /** The settings key, for checks that change a setting and must put it back. */
 export function settingsHelpers(browser) {
   const key = JSON.stringify("rank-and-file:settings");

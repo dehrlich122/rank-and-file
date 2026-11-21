@@ -217,7 +217,7 @@ function callsTable(run: LevelResult, shown: LevelResult, replay?: (index: numbe
     return h(
       "tr",
       { class: i === picked ? "picked" : undefined },
-      h("td", {}, h("button", { class: "btn btn-small", title: `Replay ${c.label}`, onClick: () => replay?.(i) }, c.label)),
+      h("td", {}, h("button", { class: "btn btn-small", title: `Replay ${c.label}`, onClick: () => replay?.(i) }, `call ${i + 1}`)), // the full call is in the tooltip, the Challenge list and the card's sentence
       h("td", {}, wanted),
       h("td", {}, got),
       h("td", { class: mark === "✓" ? "ok" : "no" }, mark),

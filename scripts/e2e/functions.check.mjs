@@ -5,7 +5,7 @@
 // or the examiner levels (a do-nothing function); none is a level's solution. Checks report facts (lines, counts,
 // squares), never the editor's contents.
 import { sleep } from "./cdp.mjs";
-import { levelHelpers } from "./helpers.mjs";
+import { examinerHelpers, levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const LEVEL = "practice-11";
@@ -13,6 +13,8 @@ const ARROW = "↩";
 
 export default async function functionsChecks({ browser: b, base, root, check }) {
   const { openLevel, setCode, run, brief, solution, challengeTab, codexTab, button, press } = levelHelpers(b, base, root);
+
+  const { examinerView, examinerCard, challengeCalls } = examinerHelpers(b);
 
   const boardLabel = `document.querySelector('.board-host .board').getAttribute('aria-label')`;
 
@@ -275,54 +277,6 @@ export default async function functionsChecks({ browser: b, base, root, check })
   const MARK = { ok: "✓", no: "✗" };
   const caseButtons = `[...document.querySelectorAll('.board-host .case-row button')]`;
 
-  /** What the board host shows of the examiner's calls (the calls' own text, counts, booleans, the board's shape). */
-  const examinerView = () =>
-    b.evaluate(`(() => {
-      const row = document.querySelector('.board-host .case-row');
-      const buttons = row ? [...row.querySelectorAll('button')] : [];
-      const caption = document.querySelector('.board-host p.boards-caption');
-      const board = document.querySelector('.board-host .board');
-      const box = board.getBoundingClientRect();
-      return {
-        row: row?.getAttribute('aria-label') ?? null,
-        calls: buttons.map((e) => e.textContent.replace(/ [${MARK.ok}${MARK.no}]$/, '')),
-        marks: buttons.map((e) => e.textContent.slice(-1)),
-        pressed: buttons.flatMap((e, i) => (e.getAttribute('aria-pressed') === 'true' ? [i] : [])),
-        thumbs: document.querySelectorAll('.board-host button.board-thumb').length,
-        caption: caption?.textContent ?? null,
-        top: box.top,
-        shape: box.width + 'x' + box.height + '/' + board.querySelectorAll('*').length,
-        cases: document.querySelectorAll('.board-host .case-row').length,
-      };
-    })()`);
-
-  /** The outcome card's examiner parts and its table of calls (null when there is none): booleans and the calls' text only. */
-  const examinerCard = () =>
-    b.evaluate(`(() => {
-      const table = document.querySelector('.outcome-host table.calls');
-      const rows = table ? [...table.querySelectorAll('tr')] : [];
-      return {
-        line: !!document.querySelector('.outcome-host p.examiner-line'),
-        mark: document.querySelector('.outcome-host p.examiner-line .examiner-mark')?.textContent ?? null,
-        text: document.querySelector('.outcome-host .outcome').innerText.replace(/\\s+/g, ' '),
-        table: table && {
-          head: rows[0].children.length,
-          rows: rows.slice(1).map((tr) => {
-            const [call, wanted, got, mark] = [...tr.children];
-            return {
-              call: call.textContent.trim(),
-              wanted: wanted.textContent.trim() !== '',
-              none: got.textContent.trim() === 'None',
-              same: got.textContent.trim() === wanted.textContent.trim(),
-              mark: mark.textContent.trim(),
-              markClass: mark.classList.contains('ok') ? 'ok' : mark.classList.contains('no') || mark.querySelector('.no') ? 'no' : '',
-              picked: tr.classList.contains('picked'),
-            };
-          }),
-        },
-      };
-    })()`);
-
   /** The made-up function: the call list's function name, a catch-all signature, a body that does nothing. */
   async function stub() {
     const call = await b.evaluate(`document.querySelector('ol.call-list code.call-code').textContent`);
@@ -439,6 +393,35 @@ export default async function functionsChecks({ browser: b, base, root, check })
     card = await examinerCard();
     expect(pickedIndex(card) === 1, "the row's button did not move the picked row");
     return `${n} rows, none returned, the picked row follows the pressed call both ways`;
+  });
+
+  await check("M5.3: after a run the buttons say call 1, call 2 … each with its mark, the table's first column says call N, and the full call is each button's tooltip (the table's after Replay)", async () => {
+    const r = await stubRun(ANSWER);
+    expect(r.head !== "Solved!", `the made-up function solved the level: ${r.head}`);
+    const listed = await challengeCalls(); // the Challenge panel's numbered list: "call N" is its Nth item
+    const view = await examinerView();
+    const card = await examinerCard();
+    const n = listed.length;
+    expect(n >= 2 && view.texts.length === n, `${n} calls listed, ${view.texts.length} buttons`);
+    const numbered = listed.map((_, i) => `call ${i + 1}`);
+    expect(JSON.stringify(view.texts) === JSON.stringify(numbered.map((words) => `${words} ${MARK.no}`)), `the buttons read ${JSON.stringify(view.texts)}`);
+    expect(JSON.stringify(view.calls) === JSON.stringify(listed), "a button's tooltip is not the Challenge panel's item of the same number");
+    expect(card.table && card.table.rows.length === n, `the table has ${card.table?.rows.length} rows for ${n} calls`);
+    const rows = card.table.rows;
+    expect(JSON.stringify(rows.map((row) => row.words)) === JSON.stringify(numbered), `the table's first column reads ${JSON.stringify(rows.map((row) => row.words))}`);
+    expect(rows.every((row, i) => row.replays && row.call === listed[i]), "a table button's tooltip is not Replay and the Challenge panel's item of the same number");
+    return `${n} buttons and rows: ${numbered.join(", ")}; tooltips match the Challenge list`;
+  });
+
+  await check("M5.3: a hidden-goal level's case buttons keep their square labels and carry no tooltip and no call number", async () => {
+    const r = await runOn("practice-01", "pass"); // a made-up program that moves nothing: every case fails
+    expect(r.head !== "Solved!", `the made-up program solved the level: ${r.head}`);
+    const row = await b.evaluate(`[...document.querySelectorAll('.board-host .case-row button')].map((e) => ({ text: e.textContent, titled: e.hasAttribute('title') }))`);
+    expect(row.length === 4, `${row.length} buttons in the case row`);
+    expect(row.every((e) => new RegExp("^[a-h][1-8] [" + MARK.ok + MARK.no + "]$").test(e.text)), `the buttons read ${JSON.stringify(row.map((e) => e.text))}`);
+    expect(row.every((e) => !e.titled), `${row.filter((e) => e.titled).length} buttons carry a title`);
+    expect((await examinerCard()).table === null, "a table of calls on a hidden-goal level");
+    return `${row.length} buttons read ${row.map((e) => e.text).join(", ")}, none with a tooltip`;
   });
 
   await check("M5.2: a program that makes the examiner's call itself is refused before the run, naming the line", async () => {

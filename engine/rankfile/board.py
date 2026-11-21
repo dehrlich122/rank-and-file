@@ -65,6 +65,8 @@ class Tile(Enum):
     PLANK = "plank"  # picked up by walking over it; pawn.bridge() lays it over a pit (QA-017)
     TIMED_GATE = "timed_gate"  # open only on every Nth tick of its clock (M3.1)
     RUNE = "rune"  # floor with text on it, which the piece reads by standing on it (M3.6)
+    KEY = "key"  # picked up by landing on it and calling pick_up(); each has a name (M5.3)
+    DOOR = "door"  # a gate a carried key opens; each wants a key by name (M5.3)
 
     @property
     def blocks(self) -> bool:
@@ -95,6 +97,8 @@ class Board:
     questions: dict[Pos, str] = field(default_factory=dict)  # what the guard asks, at gates that ask (M3.1)
     timers: dict[Pos, Timer] = field(default_factory=dict)  # when each timed gate is open (M3.1)
     runes: dict[Pos, str] = field(default_factory=dict)  # text written on rune tiles (M3.6)
+    keys: dict[Pos, str | int] = field(default_factory=dict)  # each key's name (M5.3)
+    doors: dict[Pos, str | int] = field(default_factory=dict)  # the key each door wants (M5.3)
 
     def contains(self, pos: Pos) -> bool:
         x, y = pos

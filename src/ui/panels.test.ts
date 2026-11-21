@@ -218,7 +218,7 @@ describe("outcomeCard: the examiner's table of calls", () => {
     expect(table.tag).toBe("table");
     expect(table.all("th").map((th) => th.text)).toEqual(["call", "wanted", "got", ""]);
     expect(rows(c).length).toBe(3);
-    expect(rows(c).map((r) => r.all("button")[0]!.text)).toEqual(["f(1)", "f(2)", "f(3)"]);
+    expect(rows(c).map((r) => r.all("button")[0]!.text)).toEqual(["call 1", "call 2", "call 3"]);
     expect(cells(rows(c)[0]!).slice(1)).toEqual(["2", "2", "✓"]);
     expect(cells(rows(c)[1]!).slice(1)).toEqual(["4", "'4'", "✗"]);
     const order = c.children.map((child) => (typeof child === "string" ? "" : (child.attributes.get("class") ?? "")));
@@ -244,8 +244,8 @@ describe("outcomeCard: the examiner's table of calls", () => {
   it("leaves wanted and got empty where nothing is wanted or the case never ran", () => {
     const run = result({ cases: [three[0]!, aCase("f(2)", "lost", { wanted: null, returned: "3" }), aCase("f(3)", "lost", null)] });
     const c = card(run);
-    expect(cells(rows(c)[1]!)).toEqual(["f(2)", "", "", "✗"]);
-    expect(cells(rows(c)[2]!)).toEqual(["f(3)", "", "", "✗"]);
+    expect(cells(rows(c)[1]!)).toEqual(["call 2", "", "", "✗"]);
+    expect(cells(rows(c)[2]!)).toEqual(["call 3", "", "", "✗"]);
   });
 
   it("is not there with no cases, or when no case has an answer wanted", () => {
@@ -271,6 +271,12 @@ describe("outcomeCard: the examiner's table of calls", () => {
     expect(seen).toEqual([2, 0]);
     expect(rows(c)[1]!.all("button")[0]!.attributes.get("title")).toBe("Replay f(2)");
     expect(() => rows(card(result({ cases: three })))[1]!.all("button")[0]!.fire("click")).not.toThrow();
+  });
+
+  it("numbers the buttons, and keeps each full call in the tooltip", () => {
+    const buttons = rows(card(result({ cases: three }))).map((r) => r.all("button")[0]!);
+    expect(buttons.map((b) => b.text)).toEqual(["call 1", "call 2", "call 3"]);
+    expect(buttons.map((b) => b.attributes.get("title"))).toEqual(["Replay f(1)", "Replay f(2)", "Replay f(3)"]);
   });
 
   it("still takes the two arguments alone", () => {
