@@ -4,15 +4,18 @@
 // satchel is drawn (the designer's picks are still open). Every program typed here is made up: plain Python over
 // lists of numbers, never a route for a level, never a solution. Checks report facts (labels, counts, class names, the
 // words of a card), never the editor's contents.
-import { levelHelpers } from "./helpers.mjs";
+import { examinerHelpers, levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const CHAPTER = ["ch08-l01", "ch08-l02", "ch08-l03", "ch08-l04", "ch08-l05", "ch08-l06"];
 const SCRATCH = "ch08-l04"; // an ordinary run-your-program knight level: a made-up program that moves nothing runs on it
 const HELP = "ch08-l05";
+const EXAMINER = "ch08-l06"; // an examiner level whose calls carry lists and which wants an answer handed back
+const MARK = { no: "✗" };
 
 export default async function satchelChecks({ browser: b, base, root, check }) {
   const { openLevel, setCode, run, brief, codexTab, press } = levelHelpers(b, base, root);
+  const { examinerView, examinerCard, challengeCalls } = examinerHelpers(b);
 
   // ---- The level list ----
   await check("M5.3: Chapter 8 is listed after Chapter 7 as The Satchel, in the Knight tier, with six levels and a last one that is the mastery", async () => {
@@ -203,5 +206,75 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
     const three = await codexOf("ch08-l03");
     expect(newOnes(three, ["knight.pick_up", "knight.inventory"]).length === 2, `new on 8.3: [${allNew(three)}]`);
     return `8.3 lists ${three.entries.filter((e) => e.name.startsWith("knight.")).map((e) => e.name)}`;
+  });
+
+  // ---- The examiner's buttons and table on a level whose calls carry lists ----
+  // The made-up function: the call list's function name, a catch-all signature, a body that does nothing. It fails every
+  // call and solves nothing. What the examiner wants is a spoiler: these checks measure the table's cells (widths, counts,
+  // booleans) and never read their text out.
+  async function stubRun() {
+    await openLevel(EXAMINER, { fresh: true });
+    const name = (await challengeCalls())[0].split("(")[0].trim();
+    await setCode(`def ${name}(*args, **kwargs):
+    pass`);
+    return run();
+  }
+
+  await check("M5.3: before a run the Challenge panel lists every call in code, with lists in them; after a failed run the buttons read call N ✗ on one line, and the caption names the pressed call", async () => {
+    await openLevel(EXAMINER, { fresh: true });
+    const listed = await challengeCalls();
+    const items = await b.evaluate(`document.querySelectorAll('ol.call-list li').length`);
+    expect(listed.length >= 2 && items === listed.length, `${listed.length} calls in code of ${items} items`);
+    expect(listed.some((call) => call.includes("[")) && listed.every((call) => call.endsWith(")")), "the calls do not carry lists");
+    const r = await stubRun();
+    expect(r.head !== "Solved!", `the made-up function solved the level: ${r.head}`);
+    await b.waitFor(`document.querySelector('.board-host p.boards-caption')?.textContent.startsWith('The examiner calls ')`, 8000, "the caption filled at the last frame");
+    const view = await examinerView();
+    const n = listed.length;
+    expect(JSON.stringify(view.texts) === JSON.stringify(listed.map((_, i) => `call ${i + 1} ${MARK.no}`)), `the buttons read ${JSON.stringify(view.texts)}`);
+    expect(view.tops.every((top) => Math.abs(top - view.tops[0]) < 1), `the buttons' tops are ${view.tops.join()}: they do not stand on one line`);
+    expect(view.pressed.join() === "0", `pressed buttons: [${view.pressed}]`);
+    expect(JSON.stringify(view.calls) === JSON.stringify(listed), "a tooltip is not the Challenge panel's item of the same number");
+    const said = view.caption.slice("The examiner calls ".length).replace(/[.]$/, "");
+    expect(said === view.calls[view.pressed[0]], "the caption does not name the pressed button's tooltip");
+    return `${n} calls, the buttons on one line at ${view.tops[0]}px; the caption names the pressed one`;
+  });
+
+  await check("M5.3: the result card's table holds its lists whole: no sideways scroll, a one-line first column, a wanted column wider than a character and clipped nowhere; its buttons replay", async () => {
+    const r = await stubRun();
+    expect(r.head !== "Solved!", `the made-up function solved the level: ${r.head}`);
+    const m = await b.evaluate(`(() => {
+      const card = document.querySelector('.outcome-host .outcome');
+      const rows = [...card.querySelectorAll('table.calls tbody tr')];
+      const width = (e) => e.getBoundingClientRect().width;
+      const sideways = (e) => e.scrollWidth > e.clientWidth;
+      return {
+        rows: rows.length,
+        cardSideways: sideways(card),
+        hostSideways: sideways(document.querySelector('.outcome-host')),
+        middleSideways: sideways(document.querySelector('.level-middle')),
+        firstOneLine: rows.map((tr) => { const range = document.createRange(); range.selectNodeContents(tr.children[0].querySelector('button')); return range.getClientRects().length; }),
+        firstWidths: rows.map((tr) => width(tr.children[0])),
+        wantedFilled: rows.map((tr) => tr.children[1].textContent.trim() !== ''),
+        wantedClipped: rows.map((tr) => sideways(tr.children[1])),
+        wantedWidths: rows.map((tr) => width(tr.children[1])),
+        listsInWanted: rows.filter((tr) => tr.children[1].textContent.includes('[')).length,
+      };
+    })()`);
+    expect(m.rows >= 2, `${m.rows} rows`);
+    expect(!m.cardSideways && !m.hostSideways && !m.middleSideways, `scrolls sideways: card ${m.cardSideways}, card's host ${m.hostSideways}, middle panel ${m.middleSideways}`);
+    expect(m.firstOneLine.every((lines) => lines === 1), `first-column buttons take ${m.firstOneLine} lines`);
+    expect(m.firstWidths.every((w) => Math.abs(w - m.firstWidths[0]) < 1), `first-column widths ${m.firstWidths.map(Math.round)}`);
+    expect(m.wantedFilled.every(Boolean), "a wanted cell is empty");
+    expect(m.wantedClipped.every((clipped) => !clipped), "a wanted cell is clipped");
+    expect(m.wantedWidths.every((w) => w >= 80), `wanted widths ${m.wantedWidths.map(Math.round)}: one is under 80 px`);
+    expect(m.listsInWanted >= 1, "no wanted cell holds a list");
+    // A table button replays its call: that row is picked, and the button above the board with the same number is pressed.
+    const last = m.rows - 1;
+    await b.evaluate(`document.querySelectorAll('.outcome-host table.calls tbody tr')[${last}].children[0].querySelector('button').click()`);
+    await b.waitFor(`document.querySelectorAll('.board-host .case-row button')[${last}]?.getAttribute('aria-pressed') === 'true' && document.querySelectorAll('.outcome-host table.calls tr')[${last + 1}]?.classList.contains('picked')`, 5000, "the last call's button pressed and its row picked");
+    const [view, card] = [await examinerView(), await examinerCard()];
+    expect(view.pressed.join() === String(last) && card.table.rows.findIndex((row) => row.picked) === last, `after the click: pressed [${view.pressed}]`);
+    return `${m.rows} rows, widest first column ${Math.round(Math.max(...m.firstWidths))}px, narrowest wanted cell ${Math.round(Math.min(...m.wantedWidths))}px; the last row's button replays call ${m.rows}`;
   });
 }
