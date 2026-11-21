@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { chapters } from "./content";
 import { ProgressStore } from "./progress";
-import { tierCleared, unlockedPieces, wornPiece } from "./promotion";
+import { PROMOTIONS, tierCleared, unlockedPieces, wornPiece } from "./promotion";
 import { sanitize, settings } from "./settings";
 import { memoryStorage } from "./storage.fake";
 
@@ -32,6 +32,10 @@ describe("promotion", () => {
     expect(unlockedPieces(store)).toEqual(["pawn", "knight"]);
     store.reset();
     expect(unlockedPieces(store)).toEqual(["pawn"]);
+  });
+
+  it("teases the knight's chapter, no longer saying its levels aren't built", () => {
+    expect(PROMOTIONS[0]!.teaser).toBe("The knight moves in an L, over anything in its way. Chapter 7 is waiting.");
   });
 
   it("is never earned for a tier with no chapters, or outside the curriculum", () => {

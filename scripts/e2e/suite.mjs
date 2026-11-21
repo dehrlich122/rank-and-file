@@ -16,7 +16,7 @@ export class ChromeDied extends Error {
   }
 }
 
-const SPOILERS = ".cm-content, .hint-list, .compare-note";
+const SPOILERS = ".cm-content, .hint-list, .compare-note, .outcome .calls";
 
 export function expect(condition, message) {
   if (!condition) throw new CheckFailed(message);

@@ -10,7 +10,7 @@ import yaml
 from rankfile import bridge
 from rankfile.constraints import code_lines
 from rankfile.levels import parse_level
-from rankfile.search import CLOCKS, GAVE_UP, NO_ROUTE, ROUTE, RouteSearch, Search
+from rankfile.search import CLOCKS, EXAMINER, GAVE_UP, NO_ROUTE, ROUTE, RouteSearch, Search
 
 ROOT = Path(__file__).resolve().parents[2]
 LEVEL_FILES = sorted(path for path in (ROOT / "levels").glob("*/*.yaml") if path.name != "chapters.yaml")
@@ -55,6 +55,22 @@ def test_obstacles_that_tick_with_the_code_cannot_be_judged():
     assert search.run() and search.status == CLOCKS and search.positions == 0
 
 
+def test_an_examiner_level_is_declined_at_once_before_any_board_is_searched():
+    level = made(examine={"function": "gallop", "calls": [{"args": [1], "board": 1}, {"args": [2], "board": 2}]}, variants=[{"map": "G .\nP .\n"}])
+    search = RouteSearch(level)
+    assert search.run() and search.status == EXAMINER and search.positions == 0 and search.actions == []
+    clocked = made(examine={"function": "gallop", "calls": [{}]}, enemies=[{"kind": "patrol", "route": ["b2", "b3"], "clock": "line"}])
+    assert RouteSearch(clocked).status == EXAMINER  # not "clocks"
+
+
+def test_the_search_reports_an_examiner_level_as_one_result_not_one_per_call():
+    level = made(examine={"function": "gallop", "calls": [{"args": [1], "board": 1}, {"args": [2], "board": 2}]}, variants=[{"map": "G .\nP .\n"}])
+    search = Search(level)
+    result = search.step(0.05)
+    assert result["done"] and search.done and result["cases"] == 1
+    assert [r["status"] for r in result["results"]] == [EXAMINER]
+
+
 def test_a_slice_stops_after_its_time_and_carries_on_where_it_was():
     search = RouteSearch(made(map="G . . . . . . .\n. . . . . . . .\n. . . . . . . .\nP . . . . . . .\n"))
     assert search.run(0.0) is False and search.status is None
@@ -85,6 +101,47 @@ def test_a_knight_level_is_beyond_the_walking_search_until_m5_5():
     assert [r["status"] for r in finish(Search(level))["results"]] == [NO_ROUTE]
 
 
+GATE = {"D": {"tile": "gate", "passphrase": "open"}}
+WALLED_GATE = "G # . .\n# . . .\n. . D .\nP . . .\n"  # the goal is walled in, and a gate stands where it doesn't help
+KNIGHT_GATE = "G . . .\n. . . .\n. . D .\nP . . .\n"
+
+
+def searched(level, cap=400_000) -> RouteSearch:
+    search = RouteSearch(level, cap)
+    search.run()
+    return search
+
+
+def test_a_phrase_that_opens_nothing_does_not_keep_a_walled_in_pawn_board_searching():
+    plain = searched(made(map="G # . .\n# . . .\n. . . .\nP . . .\n"))
+    gated = searched(made(map=WALLED_GATE, legend=GATE), cap=2000)
+    assert plain.status == gated.status == NO_ROUTE
+    assert gated.positions < 4 * plain.positions  # not near the cap
+
+
+@pytest.mark.parametrize("legend, say", [(GATE, ""), ({"D": {"tile": "gate", "passphrase": "open", "question": "What opens a door?"}}, ""), ({}, "open")], ids=["a gate", "a gate that asks", "an objective phrase"])
+def test_a_knight_board_with_a_phrase_to_say_ends_at_once_with_no_route(legend, say):
+    level = made(piece="knight", api=["jump"], map=KNIGHT_GATE if legend else OPEN, legend=legend, objectives=["reach_goal", {"say": say}] if say else ["reach_goal"])
+    search = searched(level)
+    assert search.status == NO_ROUTE and search.positions < 10
+
+
+def test_a_phrase_that_opens_the_only_way_to_the_goal_is_still_a_route_with_the_say_counted():
+    walled = "G . . .\n# # D #\n. . . .\nP . . .\n"
+    shut = searched(made(map=walled.replace("D", "#")))
+    through = searched(made(map=walled, legend=GATE))
+    assert shut.status == NO_ROUTE
+    assert through.status == ROUTE and ("say", "open") in through.actions
+    assert through.lines > 1  # the walk, the say and the walk on are separate lines
+
+
+def test_a_phrase_an_objective_asks_for_is_said_on_the_route_and_counted():
+    without = searched(made())
+    asked = searched(made(objectives=["reach_goal", {"say": "hello"}]))
+    assert asked.status == ROUTE and ("say", "hello") in asked.actions
+    assert asked.lines == without.lines + 1
+
+
 def test_the_check_goes_through_the_bridge_in_slices():
     started = json.loads(bridge.solve_start(json.dumps({"id": "x", "title": "x", "map": OPEN, "api": ["move"]})))
     assert started == {"ok": True, "cases": 1}
@@ -99,6 +156,12 @@ def test_the_check_goes_through_the_bridge_in_slices():
 def test_every_repo_board_gets_the_same_answer_sliced_or_whole(path):
     level = parse_level(yaml.safe_load(path.read_text(encoding="utf-8")))
     sliced = finish(Search(level, max_states=400_000))["results"]
+    if level.examine:  # an examiner level is one case, the whole level (M5.2-4b-3): the search doesn't call the function
+        assert [(r["status"], r["lines"]) for r in sliced] == [(EXAMINER, None)]
+        one = RouteSearch(level, 400_000)
+        one.run()
+        assert one.status == EXAMINER
+        return
     whole = []
     for case in level.cases():
         one = RouteSearch(case.level, 400_000)

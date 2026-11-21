@@ -46,3 +46,16 @@ tracer.StepBudgetExceeded.__module__
 
 # Read by Python's error messages when they name the player's help().
 codex.player_namespace.help.__qualname__
+
+# M5.2 (functions and the examiner): fields only the UI reads, through JSON.
+runner.LevelResult.call
+tracer.Step.globals  # M5.2-1
+tracer.Step.depth
+tracer.Step.continues
+
+# M5.2-5a: a lesson snippet's fence, read by name; only the level checker unpacks it.
+codex.Snippet.meant
+
+# M5.2-6a0: the examiner's two parts of a case's summary, read only through the result's JSON.
+runner.CallInfo.happened
+runner.CallInfo.said

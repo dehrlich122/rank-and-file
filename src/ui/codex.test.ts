@@ -1,9 +1,11 @@
 import { python } from "@codemirror/lang-python";
 import { EditorState } from "@codemirror/state";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chapters, codexChapters, levelLabel } from "../content";
 import type { CodexChapter } from "../py/protocol";
-import { codexNameAt } from "./codex";
+import type { CodexEntry } from "../py/protocol";
+import { codexNameAt, renderCodex } from "./codex";
+import { asFake, fakeDocument } from "./dom.fake";
 
 describe("codexNameAt: what a hover over code looks up", () => {
   const doc = "pawn.move(2)\nprint(pawn.position)\nother.move()\n# pawn.wait()";
@@ -37,6 +39,42 @@ describe("codexNameAt: what a hover over code looks up", () => {
     const names = EditorState.create({ doc: text, extensions: [python()] });
     expect(codexNameAt(names, text.indexOf("upper") + 1, 1, "pawn")?.name).toBe("str.upper");
     expect(codexNameAt(names, text.indexOf("strip") + 1, 1, "pawn")?.name).toBe("str.strip");
+  });
+
+  it("finds a keyword by its own name, and `elif` and `else` as `if`", () => {
+    const lines = ["for i in range(2):", "    if i:", "        continue", "    elif i > 5:", "        break", "    else:", "        pass", "while x:", "    pass", "def f():", "    return 1"];
+    const text = lines.join("\n");
+    const code = EditorState.create({ doc: text, extensions: [python()] });
+    const name = (word: string) => codexNameAt(code, text.indexOf(word) + 1, 1, "pawn")?.name ?? null;
+    expect(["for", "if", "continue", "elif", "break", "else", "while", "def", "return"].map(name)).toEqual(
+      ["for", "if", "continue", "if", "break", "if", "while", "def", "return"],
+    );
+    expect(name("pass")).toBe("pass"); // a candidate like any keyword: the lookup finds no entry for it
+    expect(name("range")).toBe("range");
+  });
+});
+
+describe("renderCodex: the groups", () => {
+  beforeEach(() => vi.stubGlobal("document", fakeDocument));
+  afterEach(() => vi.unstubAllGlobals());
+
+  const entry = (name: string, kind: CodexEntry["kind"]): CodexEntry => ({
+    name, kind, calls: [name], paragraphs: ["Does something."], args: [], returns: "", example: "", introduced: chapters[0]!.levels[0]!.id, new: false,
+  });
+  const titles = (entries: CodexEntry[]) => asFake(renderCodex(entries, "pawn").element).all("h3").map((title) => title.text);
+
+  it("lists the keywords in a group of their own, after the others", () => {
+    const all = [entry("for", "keyword"), entry("str.upper", "method"), entry("print", "builtin"), entry("pawn.move", "ability")];
+    expect(titles(all)).toEqual(["Your pawn", "Python", "Text", "Keywords"]);
+  });
+
+  it("shows no Keywords group when no keyword is unlocked", () => {
+    expect(titles([entry("print", "builtin")])).toEqual(["Python"]);
+  });
+
+  it("writes a keyword's form where a call would be", () => {
+    const code = asFake(renderCodex([entry("while", "keyword")], "pawn").element).find("codex-call");
+    expect(code.map((call) => call.text)).toEqual(["while"]);
   });
 });
 

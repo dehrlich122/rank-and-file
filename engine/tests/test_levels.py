@@ -158,6 +158,23 @@ def test_idiomatic_note_exists(level_file):
     assert note.exists() and note.read_text(encoding="utf-8").strip()
 
 
+RUN_FENCE = re.compile(r"^```python run", re.MULTILINE)
+
+
+def run_fence_counts(text: str) -> tuple[int, int]:
+    """(the fence lines the page would run, the snippets the engine reads) in a lesson. The page (lesson.ts) runs any
+    fence line that starts with ```python run; the engine's `codex.SNIPPET` needs its exact grammar. A fence it doesn't
+    read would run on the page and never be checked. Counted on lines: a fence inside a fence isn't looked for."""
+    return len(RUN_FENCE.findall(text)), len(codex.snippets(text))
+
+
+def test_a_mis_spaced_run_fence_is_not_read_the_same_by_both():
+    good = "```python run\nx = 1\n```\n```python run error\nx\n```\n```python run lost calls f(1)\ndef f(n): pass\n```\n"
+    assert run_fence_counts(good) == (3, 3)
+    for fence in ("python run  calls f(1)", "python run\tcalls f(1)", "python run finished", "python run callsf(1)", "python run  error"):
+        assert run_fence_counts(f"```{fence}\nx = 1\n```\n") == (1, 0), fence
+
+
 def test_lesson_is_short_and_runnable(level_file):
     level = load(level_file)
     if level.challenge_set:
@@ -168,10 +185,12 @@ def test_lesson_is_short_and_runnable(level_file):
     words = re.findall(r"[A-Za-z0-9_']+", prose)
     assert len(words) <= MAX_LESSON_WORDS, f"{level.lesson} has {len(words)} words of prose"
 
-    snippets = codex.SNIPPET.findall(text)
+    fences, read = run_fence_counts(text)
+    assert fences == read, f"{level.lesson}: {fences} fence lines start with ```python run, but the engine reads {read} snippets"
+    snippets = codex.snippets(text)
     assert 1 <= len(snippets) <= 3, f"{level.lesson} needs 1-3 runnable snippets"
-    for meant, code in snippets:
-        result = run_sandbox(code, level.api, piece=level.piece, lesson_board=level.lesson_board)
+    for meant, call, code in snippets:
+        result = run_sandbox(code, level.api, piece=level.piece, lesson_board=level.lesson_board, call=call)
         if meant:
             assert result.status == meant, f"snippet should end in {meant} on purpose, not {result.status}:\n{code}"
         else:

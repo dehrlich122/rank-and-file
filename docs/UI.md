@@ -104,7 +104,28 @@ worker are in `docs/ARCHITECTURE.md`; the Codex's entries are in `docs/Codex.md`
   a solution to offer and stars to show, and where the solved card leads. **A new difference between kinds of
   level is a field on the host; the view never tests `host.kind`.**
 - The Learn panel pages one step per runnable snippet (`splitIntoSteps` in
-  `ui/lesson.ts`, QA-010).
+  `ui/lesson.ts`, QA-010). A fence `python run calls f(1, 2)` is a snippet the examiner calls: the call's text
+  (`snippetCall`) goes to `runSandbox` as `call`, a caption "The examiner calls `f(1, 2)`" sits under the
+  code, and the engine's `summary` shows in the bar after a "finished" or "incomplete" run (`.snippet-summary`).
+- The variables panel (`Inspector.show(vars, fn?)`) is one table at module level. Inside a function (`step.depth`
+  above 0, `fn` passed) it shows the function's own names under its heading (`double()`) with a bar beside them,
+  then a closed fold "your program's names (N)" (`step.globals`; the fold stays as the player left it, `reset()`
+  closes it). "Changed" marks are kept per list: the program's names against the program's as last shown, the
+  function's against the previous step only when it was the same scope at the same depth.
+- On an examiner level the outcome card shows `call.happened` as its paragraph and the examiner's line apart
+  under it (`.examiner-line`, with an `E` mark), instead of the one `summary` paragraph.
+- An examiner level's calls (M5.2-6b): before a run the Challenge panel lists them under the Goal
+  (`callList` in `ui/panels.ts`: `ol.call-list`, each call a `code.call-code`), and the boards are as on any level
+  with other maps. After a run with cases the board host holds a `div.case-row` ("The examiner's calls"), one
+  toggle button per call with ✓ or ✗, and the board of the call on show: no small boards, because calls and
+  boards needn't match. The outcome card adds `table.calls` (call, wanted, got, mark; the row on show is
+  `picked`; each call a button that replays it) when at least one call wants an answer.
+  While a call's recording plays, a `p.boards-caption` between the buttons and the board reads "The examiner
+  calls `f(1)`" from the call's first step on (a non-breaking space before it, so the board doesn't jump).
+- Inside a function, playback marks the line that made the call: `setCallLine` (`ui/editor.ts`) gives that
+  line's gutter the class `cm-call-line`, and the editor's theme draws a return arrow in the line number's left
+  padding. The line comes from `callingLine` (`ui/playback.ts`), read from the steps' depths; the examiner's own
+  call has none.
 - Playback buttons follow `controlStates()` in `ui/playback.ts`. Editing code
   drops the current recording, and Play or the right arrows then run the new
   code. How a recording is replayed is in `docs/ARCHITECTURE.md` ("Playback").

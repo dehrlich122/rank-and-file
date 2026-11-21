@@ -25,6 +25,9 @@
   --step-line: light-dark(rgb(10 127 156 / 0.18), rgb(59 224 255 / 0.17));
   --selection: light-dark(rgb(10 127 156 / 0.25), rgb(59 224 255 / 0.3));
   --active-line: light-dark(rgb(10 127 156 / 0.05), rgb(255 255 255 / 0.04));
+  /* the function's names (the bar beside them) and the examiner's mark and line */
+  --scope-bar: var(--accent);
+  --examiner: light-dark(#a8610a, #ffb454);
 
   /* hostile: magenta / red, and only that */
   --bad: light-dark(#c4144f, #ff5c86);
@@ -740,6 +743,21 @@ pre {
   padding-left: 20px;
 }
 
+/* the examiner's calls, numbered (M5.2-6b) */
+.tab-panel .call-intro {
+  margin-bottom: 0;
+}
+
+.tab-panel .call-list {
+  margin: 6px 0 0;
+  padding-left: 22px;
+}
+
+.call-code {
+  font: 13px var(--font-code);
+  color: var(--accent);
+}
+
 .abilities {
   display: flex;
   flex-wrap: wrap;
@@ -1133,6 +1151,52 @@ pre {
   margin: 6px 0 0;
 }
 
+/* the examiner's line, apart from what happened */
+.outcome .examiner-line {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-style: italic;
+}
+
+.outcome .examiner-mark {
+  flex: none;
+  padding: 0 6px;
+  font: 700 11px var(--font-code);
+  font-style: normal;
+  background: var(--examiner);
+  color: var(--accent-text);
+}
+
+/* the examiner's calls, answer wanted against answer got, one row a call (M5.2-6b) */
+.outcome .calls {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font: 13px var(--font-code);
+}
+
+.outcome .calls th,
+.outcome .calls td {
+  padding: 2px 8px;
+  text-align: left;
+  overflow-wrap: anywhere; /* a long value wraps in its cell: the card never scrolls sideways */
+}
+
+.outcome .calls tr.picked {
+  background: var(--panel);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.outcome .calls .ok {
+  color: var(--accent);
+}
+
+.outcome .calls .no {
+  color: var(--examiner);
+}
+
 /* The code changed after this run, so the card describes an older version. */
 .outcome.stale > :not(.stale-note) {
   opacity: 0.55;
@@ -1254,6 +1318,30 @@ pre {
 
 .inspector tr.changed td {
   animation: changed 1s ease-out;
+}
+
+/* inside a function: its own names with a bar down their left, the program's names folded underneath */
+.inspector .scope {
+  border-left: 3px solid var(--scope-bar);
+}
+
+.inspector .group-head {
+  margin: 0;
+  padding: 2px 8px;
+  font: 600 calc(var(--code-size) - 2px) var(--font-code);
+  color: var(--text);
+}
+
+.inspector .scope > .muted {
+  margin: 0;
+  padding: 3px 8px;
+}
+
+.inspector .fold summary {
+  cursor: pointer;
+  padding: 3px 8px;
+  font: calc(var(--code-size) - 3px) var(--font-code);
+  color: var(--muted);
 }
 
 @keyframes changed {

@@ -1,0 +1,36 @@
+id: ch07-l06
+chapter: 7
+title: "Spells That Cast Spells"
+trains: "Functions that call functions: a long job taken apart into small named pieces"
+brief: "The longest road yet, and the shortest spellbook you can write for it. Small spells, and bigger spells made of them."
+piece: knight
+map: |
+  O O O O O O O O O O . O
+  O O O O O O O O O . G O
+  O O O O O O O O O . O .
+  O O O O O O O O . O O .
+  O O O O O O O . O O O O
+  O O O O O O . O O . O O
+  O O O O O . . O O O O O
+  O O O O O . O . O O O O
+  O . O O . O O . O O O O
+  P O O . O O O O O O O O
+  O O . O O . O O O O O O
+  O O O O O O O O O O O O
+legend: {"O": "pit"}
+start: {"facing": "north"}
+api: ["jump"]
+constraints: {"max_lines": 14}
+par: {"lines": 14}
+hints:
+- "Look for the smallest figure that repeats, then for the bigger figure that is made of it."
+- "A function can call another function. Name the small figure first. Then name the bigger figure, and in its body call the small one instead of writing its jumps again. The program itself is then a few calls and the jumps in between."
+- "A function that calls another:\ndef pair():\n    knight.jump(...)\n    knight.jump(...)\n\ndef long():\n    pair()\n    knight.jump(...)\n    pair()"
+lesson: ch07/ch07-l06.md
+lesson_board:
+  map: |
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    P . . . . . .
+  start: {"facing": "north"}

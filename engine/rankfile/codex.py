@@ -36,23 +36,31 @@ import inspect
 import io
 import re
 import textwrap
+import types
 from dataclasses import asdict, dataclass, field
+from typing import NamedTuple
 
 from .errors import LEVEL_PIECE, piece_class
 from .exceptions import IT_KNOWS
-from .levels import parse_level
+from .levels import Level, parse_level
 from .pieces import PIECES, Pawn, Piece
 
 SECTIONS = ("Args", "Returns", "Example")
 
-# A lesson's runnable snippets: ```python run``` blocks, optionally `run error`, `run lost` or `run timeout`.
-SNIPPET = re.compile(r"^```python run(?: (error|lost|timeout))?\n(.*?)^```", re.MULTILINE | re.DOTALL)
+# A lesson's runnable snippets: ```python run``` blocks, optionally `run error`, `run lost` or `run timeout`, and
+# optionally `calls gallop(1, 2)` after that (M5.2-5a): the call the examiner makes once the snippet has run, the
+# rest of the fence line.
+SNIPPET = re.compile(
+    r"^```python run(?: (?P<meant>error|lost|timeout))?(?: calls +(?P<call>\S[^\n]*))?\n(?P<code>.*?)^```", re.MULTILINE | re.DOTALL
+)
 
 
 @dataclass
 class Entry:
     name: str  # as code writes it: "pawn.move", "print"
-    kind: str  # "ability", "property" (used without parentheses), "builtin" or "method" (of text, M3.6)
+    # "ability", "property" (used without parentheses), "builtin", "method" (of text, M3.6), or "keyword" (`def`,
+    # `return`, `for`...: a word of the language itself, M5.2)
+    kind: str
     calls: list[str]  # how to use it: ["pawn.move(squares=1)"]; some built-ins have more than one form
     paragraphs: list[str]  # what it does
     args: list[dict] = field(default_factory=list)  # {"name", "about"} for each argument
@@ -147,6 +155,27 @@ BUILTINS: dict[str, tuple[list[str], str]] = {
 
         Example:
             print(int("7") + 1)
+        """,
+    ),
+    "help": (
+        ["help(thing)", "help()"],
+        """Show what something does: its entry in the Codex.
+
+        `help(print)` shows the entry for `print` in the console, and it works
+        the same way on an ability of your piece. Put a word of the language
+        in quotes: `help("def")`. On a function of your own it shows how to
+        call it, and the docstring you wrote under its `def` line.
+
+        Args:
+            thing: what to ask about: an ability, a built-in, a function of
+                your own, or a keyword in quotes. Leave it out to see how
+                `help()` works.
+
+        Returns:
+            Nothing.
+
+        Example:
+            help(print)
         """,
     ),
 }
@@ -295,6 +324,90 @@ METHODS: dict[str, tuple[list[str], str]] = {
 # Everything the lessons can teach about Python itself, built-ins first.
 PYTHON = {**BUILTINS, **METHODS}
 
+# The words of the language itself (M5.2), in the order the curriculum brings them in. Each is brought in by the
+# first lesson whose snippets use the syntax named in KEYWORD_NODES. `elif` and `else` are part of `if`'s entry.
+KEYWORDS: dict[str, tuple[list[str], str]] = {
+    "for": (
+        ["for name in things:"],
+        """Run the indented lines once for each item, with `name` holding that item. `range(3)` hands out 0, 1 and 2.
+
+        Example:
+            for i in range(3):
+                print(i)
+        """,
+    ),
+    "if": (
+        ["if condition: … elif other: … else:"],
+        """Run the indented lines only if the condition is true. `elif` tries another condition when the ones above it were false; `else` runs when none were true. Both are optional.
+
+        Example:
+            if steps > 3:
+                print("far")
+            elif steps == 3:
+                print("just right")
+            else:
+                print("near")
+        """,
+    ),
+    "while": (
+        ["while condition:"],
+        """Run the indented lines again and again, for as long as the condition is true. It is checked before every lap, so something inside has to change it.
+
+        Example:
+            left = 3
+            while left > 0:
+                left = left - 1
+        """,
+    ),
+    "break": (
+        ["break"],
+        """Leave the loop you are in at once. The laps that were left don't happen.
+
+        Example:
+            while True:
+                if done:
+                    break
+        """,
+    ),
+    "continue": (
+        ["continue"],
+        """Skip the rest of this lap and go straight on to the next one.
+
+        Example:
+            for i in range(5):
+                if i == 2:
+                    continue
+                print(i)
+        """,
+    ),
+    "def": (
+        ["def name(parameter, other=default):"],
+        """Make a function of your own: a name for some lines of code. Nothing runs when Python reads the `def`; the lines run each time the name is called. The names in the parentheses are parameters: blanks that each call fills in, in order. A parameter written with `= value` has a default: leave it out of a call and it holds that value. Parameters with defaults come last. A sentence in quotes as the first line of the body (a docstring) says what the function does, and `help(name)` shows it.
+
+        Example:
+            def cheer(name, times=1):
+                for i in range(times):
+                    print(f"Go, {name}!")
+            cheer("Ada")
+            cheer("Bo", 3)
+        """,
+    ),
+    "return": (
+        ["return value"],
+        """Hand a value back to the line that called the function, and leave the function right there. A function that ends without a `return` hands back `None`. `print` shows a value on the screen; `return` gives it to the caller.
+
+        Example:
+            def double(n):
+                return n * 2
+            print(double(4) + 1)
+        """,
+    ),
+}
+
+# The syntax (`ast` node names) whose first use in a lesson's snippets brings each keyword into the Codex.
+KEYWORD_NODES = {"for": "For", "if": "If", "while": "While", "break": "Break", "continue": "Continue", "def": "FunctionDef", "return": "Return"}
+KEYWORD_ALIASES = {"elif": "if", "else": "if"}  # help("elif") answers with the `if` entry
+
 
 def parse_docstring(doc: str) -> dict:
     """Split a Google-style docstring into its paragraphs, args, returns and example."""
@@ -340,6 +453,12 @@ def ability_entry(piece: type[Piece], name: str) -> Entry:
     return Entry(f"{piece.NAME}.{name}", kind, [call], **parse_docstring(doc or ""))
 
 
+def keyword_entry(name: str) -> Entry:
+    """The entry for a keyword of Python (`def`, `for`...)."""
+    calls, doc = KEYWORDS[name]
+    return Entry(name, "keyword", calls, **parse_docstring(doc))
+
+
 def python_entry(name: str) -> Entry:
     """The entry for one of Python's own tools: a built-in (`print`) or a method of text (`str.upper`)."""
     calls, doc = PYTHON[name]
@@ -373,9 +492,22 @@ def python_called(code: str) -> set[str]:
     return _builtins_in(callees) | _methods_in(callees)
 
 
+class Snippet(NamedTuple):
+    """One runnable snippet of a lesson, as its fence gives it."""
+
+    meant: str  # how it ends on purpose: "error", "lost", "timeout", or "" (it finishes)
+    call: str  # the call the examiner makes after it ("gallop(1, 2)"), or "" (none)
+    code: str
+
+
+def snippets(markdown: str) -> list[Snippet]:
+    """A lesson's runnable snippets, in order, read by name from the pattern."""
+    return [Snippet(found["meant"] or "", (found["call"] or "").strip(), found["code"]) for found in SNIPPET.finditer(markdown)]
+
+
 def lesson_snippets(markdown: str) -> list[str]:
     """The code of a lesson's runnable snippets, in order."""
-    return [code for _, code in SNIPPET.findall(markdown)]
+    return [snippet.code for snippet in snippets(markdown)]
 
 
 def taught(markdown: str) -> set[str]:
@@ -414,7 +546,7 @@ def level_tags(data: dict, chapters: list[dict]) -> dict:
     Returns {"tier": str | None, "chapter": int | None}.
     """
     level = parse_level(data)
-    abilities, nodes, pieces = set(level.api), set(level.constraints.require_nodes), {level.piece}
+    abilities, nodes, pieces = set(level.api), set(level.constraints.require_nodes) | _rule_nodes(level), {level.piece}
     latest: dict | None = None
     for chapter in chapters:
         if not chapter["curriculum"] or not (abilities or nodes or pieces):
@@ -433,6 +565,17 @@ def level_tags(data: dict, chapters: list[dict]) -> dict:
         if found:
             latest = chapter  # later chapters come later in play order, so the last one found is the latest
     return {"tier": latest["tier"], "chapter": latest["chapter"]} if latest else {"tier": None, "chapter": None}
+
+
+def _rule_nodes(level: Level) -> set[str]:
+    """The syntax a level's function rules and examiner need (M5.2), so the level file needn't repeat them in
+    `require_nodes`: a function rule, `define` or an examiner needs `def`; a rule that a function hands back a value,
+    or an examiner call that judges an answer, needs `return`."""
+    rules, examine = level.constraints, level.examine
+    nodes = {"FunctionDef"} if rules.functions or rules.define or examine is not None else set()
+    if any(rule.returns for rule in rules.functions.values()) or (examine is not None and examine.judges_answer):
+        nodes.add("Return")
+    return nodes
 
 
 @functools.lru_cache(maxsize=256)  # a list asks about every level in it, and the lessons are the same each time
@@ -462,10 +605,15 @@ def entries(level_id: str, chapters: list[dict]) -> list[Entry]:
         level = parse_level(item["data"])
         for name in [f"{level.piece}.{ability}" for ability in level.api] + sorted(taught(item["lesson"])):
             introduced.setdefault(name, item["id"])
+        used = _nodes_used(item["lesson"])
+        for name, node in KEYWORD_NODES.items():
+            if node in used:
+                introduced.setdefault(name, item["id"])
     here = parse_level(counted[-1]["data"])
     piece = PIECES[here.piece]
     found = [ability_entry(piece, name) for name in piece.ABILITIES if name in here.api]
     found += [python_entry(name) for name in PYTHON if name in introduced]
+    found += [keyword_entry(name) for name in KEYWORDS if name in introduced]
     for entry in found:
         entry.introduced = introduced[entry.name]
         entry.new = entry.introduced == level_id
@@ -523,7 +671,7 @@ def player_namespace(**names) -> dict:
 
 def describe(thing, piece: type[Piece] = Pawn) -> str:
     """What help(thing) shows, on a level whose piece is `piece`."""
-    if thing is _NOTHING or _is_help(thing) or (isinstance(thing, str) and thing in ("help", "modules")):
+    if thing is _NOTHING or thing == "modules":
         return intro(piece)
     entry = _entry_for(thing, piece)
     if entry is not None:
@@ -536,6 +684,8 @@ def describe(thing, piece: type[Piece] = Pawn) -> str:
             f"{thing!r} is a value (a {type(thing).__name__}), and help() explains what things do. "
             f'Try help(print), help({name}) for what your {name} knows, or help("{name}.position") for one of them.'
         )
+    if isinstance(thing, types.FunctionType):
+        return _function_help(thing)
     text = _python_help(thing)
     if isinstance(thing, str) and text.startswith("No Python documentation found"):
         return f"There's no help on {thing!r}. Try help(print), or help({name}) for what your {name} knows."
@@ -550,9 +700,13 @@ def _is_help(thing) -> bool:
 def _entry_for(thing, piece: type[Piece] = Pawn) -> Entry | None:
     """The Codex entry for an ability (`pawn.move`), a built-in (`print`), a method of text (`"x".upper`), or any of their names as text.
     A name as text answers for the level's own piece only: help("knight.jump") on a pawn level knows nothing."""
+    if _is_help(thing):
+        return python_entry("help")
     if isinstance(thing, str):
         if thing in PYTHON:
             return python_entry(thing)
+        if (keyword := KEYWORD_ALIASES.get(thing, thing)) in KEYWORDS:
+            return keyword_entry(keyword)
         piece_name, _, ability = thing.partition(".")
         return ability_entry(piece, ability) if piece_name == piece.NAME and ability in piece.ABILITIES else None
     owner = getattr(thing, "__self__", None)
@@ -561,7 +715,8 @@ def _entry_for(thing, piece: type[Piece] = Pawn) -> Entry | None:
     method = f"str.{getattr(thing, '__name__', '')}"
     if method in METHODS and (isinstance(owner, str) or thing is getattr(str, thing.__name__)):  # "x".upper, or str.upper
         return python_entry(method)
-    return next((python_entry(name) for name in BUILTINS if thing is getattr(builtins, name)), None)
+    # `help` is in `builtins` only once `site` has run; a missing one is None, which must not match help(None)
+    return next((python_entry(name) for name in BUILTINS if thing is not None and thing is getattr(builtins, name, None)), None)
 
 
 def format_entry(entry: Entry) -> str:
@@ -578,6 +733,17 @@ def format_entry(entry: Entry) -> str:
         lines += ["    Returns:", *_fill(entry.returns, 8), ""]
     if entry.example:
         lines += ["    Example:", *textwrap.indent(entry.example, " " * 8).splitlines()]
+    return "\n".join(lines).rstrip()
+
+
+def _function_help(function: types.FunctionType) -> str:
+    """help(f) for a function the player wrote, in the Codex's plain style: how to call it, then its docstring."""
+    lines = [f"{function.__name__}{inspect.signature(function)}", ""]
+    doc = inspect.getdoc(function)
+    if not doc:
+        return "\n".join(lines + _fill("It has no description yet: a sentence in quotes as the first line of its body would show here.", 4))
+    for paragraph in doc.split("\n\n"):
+        lines += [*_fill(" ".join(paragraph.split()), 4), ""]
     return "\n".join(lines).rstrip()
 
 

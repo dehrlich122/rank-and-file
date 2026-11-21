@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Step, WorldState } from "../py/protocol";
-import { BASE_STEP_MS, buildFrames, consoleAt, controlStates, frameDuration, Player, type Frame } from "./playback";
+import { BASE_STEP_MS, buildFrames, callingLine, consoleAt, controlStates, frameDuration, Player, type Frame } from "./playback";
 
 const start: WorldState = { pos: [0, 0], facing: "north", opened: [], crossed: [], collected: [], planks: 0, bridged: [], enemies: [], tick: 0, lost: null };
 const at = (pos: [number, number], facing: WorldState["facing"] = "north"): WorldState => ({ ...start, pos, facing });
@@ -12,6 +12,9 @@ function step(line: number, pos: [number, number] | null, output = ""): Step {
     events: pos ? [{ kind: "move", state: at(pos) }] : [],
     output,
     vars: [],
+    globals: [],
+    depth: 0,
+    continues: false,
   };
 }
 
@@ -168,4 +171,82 @@ describe("Player", () => {
     expect(player.index).toBe(0);
   });
 
+});
+
+describe("callingLine", () => {
+  /** made-up steps: [line, depth] pairs, with `continues` for the rest of a calling line after a return */
+  const trace = (...rows: Array<[number, number, boolean?]>): Step[] => rows.map(([line, depth, continues]) => ({ ...step(line, null), depth, continues: continues ?? false }));
+
+  it("is null at module level, and for a step that isn't there", () => {
+    const steps = trace([1, 0], [2, 0]);
+    expect(callingLine(steps, 0)).toBeNull();
+    expect(callingLine(steps, 1)).toBeNull();
+    expect(callingLine(steps, -1)).toBeNull();
+    expect(callingLine(steps, 2)).toBeNull();
+    expect(callingLine([], 0)).toBeNull();
+  });
+
+  it("is the line that called the function, for every step inside it", () => {
+    const steps = trace([1, 0], [5, 0], [2, 1], [3, 1], [6, 0]); // def at 1; a call on line 5 runs lines 2 and 3
+    expect(callingLine(steps, 1)).toBeNull();
+    expect(callingLine(steps, 2)).toBe(5);
+    expect(callingLine(steps, 3)).toBe(5);
+    expect(callingLine(steps, 4)).toBeNull();
+  });
+
+  it("is the immediate caller two calls deep, not the top line", () => {
+    const steps = trace([1, 0], [2, 0], [8, 0], [3, 1], [4, 2], [5, 2]); // line 8 calls the function at 3, which calls the helper at line 4
+    expect(callingLine(steps, 3)).toBe(8);
+    expect(callingLine(steps, 4)).toBe(3);
+    expect(callingLine(steps, 5)).toBe(3);
+  });
+
+  it("is the outer call again once the helper has returned (a continues step in between)", () => {
+    const steps = trace([9, 0], [3, 1], [4, 2], [3, 1, true], [5, 1]);
+    expect(callingLine(steps, 2)).toBe(3);
+    expect(callingLine(steps, 3)).toBe(9); // the rest of line 3, back in the caller
+    expect(callingLine(steps, 4)).toBe(9);
+  });
+
+  it("follows each call to its own line, when two calls are on different lines", () => {
+    const steps = trace([5, 0], [2, 1], [6, 0], [2, 1]);
+    expect(callingLine(steps, 1)).toBe(5);
+    expect(callingLine(steps, 3)).toBe(6);
+  });
+
+  it("gives a call made from a loop the loop line it is on", () => {
+    const steps = trace([4, 0], [5, 0], [2, 1], [5, 0], [2, 1], [5, 0], [2, 1]); // line 4 is a for, line 5 the call in its body
+    expect(callingLine(steps, 2)).toBe(5);
+    expect(callingLine(steps, 4)).toBe(5);
+    expect(callingLine(steps, 6)).toBe(5);
+  });
+
+  describe("on an examiner level", () => {
+    // the program's two defs (steps 0 and 1); the examiner's call starts at step 2, inside the function at depth 1
+    const steps = trace([1, 0], [6, 0], [2, 1], [3, 2], [4, 2], [2, 1, true], [5, 1]);
+
+    it("has no calling line inside the function the examiner called", () => {
+      expect(callingLine(steps, 2, 2)).toBeNull();
+      expect(callingLine(steps, 5, 2)).toBeNull();
+      expect(callingLine(steps, 6, 2)).toBeNull();
+    });
+
+    it("has the helper's calling line inside a helper that function called", () => {
+      expect(callingLine(steps, 3, 2)).toBe(2);
+      expect(callingLine(steps, 4, 2)).toBe(2);
+    });
+
+    it("looks back as usual before the call's first step, and at module level", () => {
+      expect(callingLine(steps, 1, 2)).toBeNull();
+      const own = trace([1, 0], [5, 0], [2, 1], [3, 1]); // a program that calls its own function (line 5) before the examiner's call, which starts at step 3
+      expect(callingLine(own, 2, 3)).toBe(5);
+      expect(callingLine(own, 3, 3)).toBeNull();
+    });
+
+    it("never looks before the first step, where the same steps with no examiner would find a caller", () => {
+      const only = trace([1, 0], [2, 1]);
+      expect(callingLine(only, 1, 1)).toBeNull();
+      expect(callingLine(only, 1)).toBe(1);
+    });
+  });
 });

@@ -76,8 +76,10 @@ def load_sandbox(api_json: str, board_json: str = "null", piece: str = "pawn") -
     return json.dumps(sandbox_level(json.loads(api_json), piece, lesson_board=json.loads(board_json)).describe())
 
 
-def run_sandbox(code: str, api_json: str, board_json: str = "null", piece: str = "pawn") -> str:
-    return json.dumps(runner.run_sandbox(code, json.loads(api_json), piece, lesson_board=json.loads(board_json)).to_dict())
+def run_sandbox(code: str, api_json: str, board_json: str = "null", piece: str = "pawn", call: str = "") -> str:
+    """A lesson snippet's run. `call`: the call the examiner makes after it ("gallop(1, 2)"); "" means none (M5.2-5a)."""
+    result = runner.run_sandbox(code, json.loads(api_json), piece, lesson_board=json.loads(board_json), call=call)
+    return json.dumps(result.to_dict())
 
 
 def codex(level_id: str, chapters_json: str) -> str:

@@ -11,9 +11,9 @@ import { PythonHungError, type PyClient } from "../py/client";
 import type { LevelInfo, LevelResult } from "../py/protocol";
 import { BoardView } from "./board";
 import { codexHover, type CodexLookup } from "./codex";
-import { h } from "./dom";
+import { h, withCode } from "./dom";
 import { createEditor, getCode, setActiveLine, setErrorLine } from "./editor";
-import { errorCard, logNodes } from "./panels";
+import { errorCard, examinerCalls, logNodes } from "./panels";
 import { Player, buildFrames, consoleAt } from "./playback";
 import { settings } from "../settings";
 
@@ -21,7 +21,7 @@ import { settings } from "../settings";
 const SNIPPET_STATUS: Record<LevelResult["status"], string> = {
   finished: "✓ Finished",
   solved: "✓ Finished",
-  incomplete: "✓ Finished",
+  incomplete: "✗ Not called", // only a snippet with an examiner's call can end this way
   lost: "✗ Lost",
   error: "✗ Python stopped",
   timeout: "⏱ Stopped",
@@ -46,6 +46,11 @@ export interface Lesson {
 }
 
 const isSnippet = (token: Token): boolean => token.type === "code" && /^python run\b/.test(token.lang ?? "");
+
+/** The call the examiner makes after a snippet's code runs: the text after `calls ` on its fence's info line, or "". */
+export function snippetCall(lang: string | undefined): string {
+  return /^python run\b.*?\bcalls\s+(.*)$/.exec(lang ?? "")?.[1]?.trim() ?? "";
+}
 
 /** Split a lesson's Markdown tokens into steps: each step ends with a runnable snippet. */
 export function splitIntoSteps(tokens: Token[]): Token[][] {
@@ -91,7 +96,7 @@ export function renderLesson(markdown: string, context: LessonContext): Lesson {
     for (const token of stepTokens) {
       if (isSnippet(token)) {
         flush();
-        const snippet = new Snippet((token as { text: string }).text, context, loadSandbox);
+        const snippet = new Snippet((token as { text: string }).text, snippetCall((token as { lang?: string }).lang), context, loadSandbox);
         snippets.push(snippet);
         step.append(snippet.element);
       } else {
@@ -127,6 +132,7 @@ class Snippet {
   private readonly boardHost = h("div", { class: "snippet-board" });
   private readonly status = h("span", { class: "snippet-status muted small" });
   private readonly output = h("pre", { class: "snippet-output", hidden: true });
+  private readonly summary = h("div", { class: "snippet-summary muted small" });
   private readonly errorHost = h("div", {});
   private readonly runButton: HTMLButtonElement;
   private board: BoardView | null = null;
@@ -134,6 +140,7 @@ class Snippet {
 
   constructor(
     code: string,
+    private readonly call: string,
     private readonly context: LessonContext,
     private readonly loadSandbox: () => Promise<LevelInfo>,
   ) {
@@ -143,10 +150,11 @@ class Snippet {
       "div",
       { class: "snippet" },
       editorHost,
+      call ? h("div", { class: "snippet-call muted small" }, ...examinerCalls(call)) : null,
       h(
         "div",
         { class: "snippet-row" },
-        h("div", { class: "snippet-bar" }, this.runButton, this.status, this.output, this.errorHost),
+        h("div", { class: "snippet-bar" }, this.runButton, this.status, this.output, this.summary, this.errorHost),
         this.boardHost,
       ),
     );
@@ -175,12 +183,13 @@ class Snippet {
     this.player?.dispose();
     this.runButton.disabled = true;
     this.status.textContent = "Running…";
+    this.summary.replaceChildren();
     this.errorHost.replaceChildren();
     setErrorLine(this.editor, null);
     try {
       const level = await this.loadSandbox();
       const board = this.showBoard(level);
-      const result = await this.context.client.call("runSandbox", { code: getCode(this.editor), api: this.context.api, board: this.context.board, piece: this.context.piece });
+      const result = await this.context.client.call("runSandbox", { code: getCode(this.editor), api: this.context.api, board: this.context.board, piece: this.context.piece, call: this.call || undefined });
       this.play(result, board);
     } catch (error) {
       this.status.textContent =
@@ -213,6 +222,8 @@ class Snippet {
   private finish(result: LevelResult): void {
     setActiveLine(this.editor, null);
     this.status.textContent = SNIPPET_STATUS[result.status];
+    // The examiner's words about the call; a snippet without a call has none to show.
+    if (this.call && (result.status === "finished" || result.status === "incomplete")) this.summary.replaceChildren(...withCode(result.summary));
     if (result.error) {
       setErrorLine(this.editor, result.error.line);
       this.errorHost.replaceChildren(errorCard(result.error));

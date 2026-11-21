@@ -19,10 +19,19 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def redact(node):
     if isinstance(node, dict):
-        return {key: hidden(key, value) if key in HIDDEN else redact(value) for key, value in node.items()}
+        return {key: hidden(key, value) if key in HIDDEN else redact_calls(value) if key == "examine" else redact(value) for key, value in node.items()}
     if isinstance(node, list):
         return [redact(item) for item in node]
     return node
+
+
+def redact_calls(examine):
+    """The answer an examiner wants (a call's `returns`) is a spoiler like a passphrase; the key stays, so a reader knows the call is judged.
+    (A rule's `constraints.functions.<name>.returns` is true or false, and stays visible: it is not under `examine`.)"""
+    if not isinstance(examine, dict) or not isinstance(examine.get("calls"), list):
+        return redact(examine)
+    calls = [{**redact(call), "returns": "<answer hidden>"} if isinstance(call, dict) and "returns" in call else redact(call) for call in examine["calls"]]
+    return {**redact(examine), "calls": calls}
 
 
 def hidden(key, value):

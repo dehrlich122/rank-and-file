@@ -24,6 +24,10 @@
   title: Runes
   tier: pawn
   summary: Reading runes, text as characters, slices and methods, asking text questions with in, and turning text into numbers and routes.
+- chapter: 7
+  title: Spellbook
+  tier: knight
+  summary: "Functions: spells of your own that take orders, hand back answers and cast each other, and a knight to cast them."
 - chapter: 0
   title: Testing ground
   tier: practice

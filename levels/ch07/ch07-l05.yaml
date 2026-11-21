@@ -1,0 +1,65 @@
+id: ch07-l05
+chapter: 7
+title: "What Happens in the Spell"
+trains: "Scope: a function's own names, and why values go in through parameters and come out through return"
+brief: "Three toll bridges. Every stone on a bridge names its toll. At the gate the guard asks what the three crossings cost you in all."
+piece: knight
+map: |
+  O O O O O O O X O O O O
+  O O O O O O O . O O O O
+  O O O O O f . O G O O O
+  O O O O O O O O . O O O
+  O O O O e O O O O O O O
+  O O O O O O O O O O O O
+  O O O d O O O O O O O O
+  O O O O c O O O O O O O
+  O O . O O O O O O O O O
+  O a O b O O O O O O O O
+  O O O O O O O O O O O O
+  P O . O O O O O O O O O
+legend: {"O": "pit", "a": {"tile": "rune", "text": "5"}, "b": {"tile": "rune", "text": "8"}, "c": {"tile": "rune", "text": "6"}, "d": {"tile": "rune", "text": "3"}, "e": {"tile": "rune", "text": "2"}, "f": {"tile": "rune", "text": "3"}, "X": {"tile": "gate", "question": "Halt! What did the three crossings cost you in all? Answer with the number.", "passphrase": "27"}}
+start: {"facing": "north"}
+api: ["jump", "read"]
+constraints: {"max_lines": 17, "define": 1}
+par: {"lines": 17}
+hints:
+- "One function can cross any of the three bridges, if it is told how many stones the bridge has. What should it hand back?"
+- "A name made inside a function lives only there, and starts fresh on every call. A function can read a name from outside, but it cannot change one: adding to an outside total from inside is an error. So add each toll to a name of the function's own, return it, and keep the total outside. Print the total on the stone beside the gate."
+- "The function returns its own sum, and the program adds it to the total:\ntotal = cross(...)\ntotal += cross(...)"
+lesson: ch07/ch07-l05.md
+lesson_board:
+  map: |
+    . R . . .
+    . . . . X
+    P . . . .
+  legend: {"R": {"tile": "rune", "text": "4"}, "X": {"tile": "gate", "question": "What did the crossing cost you?", "passphrase": "4"}}
+  start: {"facing": "north"}
+variants:
+- map: |
+    O O O O O O O X O O O O
+    O O O O O O O . O O O O
+    O O O O O f . O G O O O
+    O O O O O O O O . O O O
+    O O O O e O O O O O O O
+    O O O O O O O O O O O O
+    O O O d O O O O O O O O
+    O O O O c O O O O O O O
+    O O . O O O O O O O O O
+    O a O b O O O O O O O O
+    O O O O O O O O O O O O
+    P O . O O O O O O O O O
+  legend: {"a": {"tile": "rune", "text": "1"}, "b": {"tile": "rune", "text": "9"}, "c": {"tile": "rune", "text": "5"}, "d": {"tile": "rune", "text": "9"}, "e": {"tile": "rune", "text": "4"}, "f": {"tile": "rune", "text": "5"}, "X": {"tile": "gate", "question": "Halt! What did the three crossings cost you in all? Answer with the number.", "passphrase": "33"}}
+- map: |
+    O O O O O O O X O O O O
+    O O O O O O O . O O O O
+    O O O O O f . O G O O O
+    O O O O O O O O . O O O
+    O O O O e O O O O O O O
+    O O O O O O O O O O O O
+    O O O d O O O O O O O O
+    O O O O c O O O O O O O
+    O O . O O O O O O O O O
+    O a O b O O O O O O O O
+    O O O O O O O O O O O O
+    P O . O O O O O O O O O
+  legend: {"a": {"tile": "rune", "text": "9"}, "b": {"tile": "rune", "text": "5"}, "c": {"tile": "rune", "text": "8"}, "d": {"tile": "rune", "text": "6"}, "e": {"tile": "rune", "text": "7"}, "f": {"tile": "rune", "text": "5"}, "X": {"tile": "gate", "question": "Halt! What did the three crossings cost you in all? Answer with the number.", "passphrase": "40"}}

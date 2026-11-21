@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { sleep } from "./cdp.mjs";
 
 export const BUTTONS = ".playback-buttons button"; // back to start, step back, play, step forward, jump to end
+const playbackButton = (index) => `document.querySelectorAll('${BUTTONS}')[${index}]`;
 
 export function levelHelpers(browser, base, root) {
   return {
@@ -46,9 +47,12 @@ export function levelHelpers(browser, base, root) {
       browser.evaluate(`[...document.querySelectorAll(${JSON.stringify(`${scope} .cm-line`)})].map((line) => line.textContent).join('\\n')`),
 
     ...buttonHelpers(browser),
+    ...runHelpers(browser),
 
     /** Show the level's Challenge tab. */
     challengeTab: () => buttonHelpers(browser).clickButton("Challenge", ".tabs"),
+    /** Show the level's Codex tab. */
+    codexTab: () => buttonHelpers(browser).clickButton("Codex", ".tabs"),
   };
 }
 
@@ -115,5 +119,43 @@ export function buttonHelpers(browser) {
       })()`),
     /** Whether there's a button labelled `label`. */
     hasButton: (label, scope = "body") => browser.evaluate(`!!${find(label, scope)}`),
+  };
+}
+
+/** Pressing Run and reading the outcome card. */
+function runHelpers(browser) {
+  /** Once a recording is playing: optionally jump to its end, then describe the outcome card. */
+  async function outcome({ jump = true } = {}) {
+    if (jump) await browser.evaluate(`(() => { const e = ${playbackButton(4)}; if (!e.disabled) e.click(); })()`);
+    await browser.waitFor(`document.querySelector('.outcome-host .outcome')`, 30_000, "outcome card");
+    return browser.evaluate(`({
+      head: document.querySelector('.outcome-head strong').textContent,
+      tone: document.querySelector('.outcome-host .outcome').className,
+      buttons: [...document.querySelectorAll('.outcome-host .outcome-head a, .outcome-host .outcome-head button')].map((e) => e.textContent),
+      note: document.querySelector('.outcome-host .case-note')?.textContent ?? null,
+      text: document.querySelector('.outcome-host .outcome').innerText.replace(/\\s+/g, ' '),
+      errorLine: !!document.querySelector('.level-right .cm-error-line'),
+      warnMarks: document.querySelectorAll('.level-right .cm-lint-marker-warning').length,
+      step: document.querySelector('.step-label').textContent,
+      vars: [...document.querySelectorAll('.inspector tr')].map((r) => r.innerText.replace(/\\s+/g, ' ')),
+      console: document.querySelector('.console').innerText,
+      next: document.querySelector('.outcome-host a')?.textContent ?? null,
+      stars: document.querySelectorAll('.outcome-host .stars li.earned').length,
+    })`);
+  }
+  return {
+    outcome,
+    /** The playback button `index` (see BUTTONS), as a JS expression for `evaluate`. */
+    button: playbackButton,
+    /** Click the playback button `index`. */
+    press: (index) => browser.evaluate(`${playbackButton(index)}.click()`),
+    /** Press Run, optionally jump to the end, and describe the outcome. */
+    async run({ jump = true } = {}) {
+      await browser.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
+      await browser.waitFor(`!document.querySelector('.outcome-host').textContent.includes('Running')`, 20_000, "run finished");
+      return outcome({ jump });
+    },
+    /** A one-line description of an outcome, for a check's message. */
+    brief: (r) => `${r.head}: ${r.text.slice(0, 110)}`,
   };
 }

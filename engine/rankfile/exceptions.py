@@ -35,6 +35,17 @@ class BridgeError(GameError):
     """The piece tried to lay a plank with none to lay, or where there's no pit (QA-017)."""
 
 
+class LostTrackError(GameError):
+    """A run came out of its recursion limit without the tracer: nothing it did afterwards was counted or recorded."""
+
+    def __init__(self):
+        super().__init__(
+            "The game lost track of this program partway through, so the run ends here. "
+            "That happens when a function calls itself until Python stops it and the program carries on anyway. "
+            "Give the function a way to stop calling itself."
+        )
+
+
 IT_KNOWS = "In this level it knows"  # how every message that lists what the piece can do starts
 
 

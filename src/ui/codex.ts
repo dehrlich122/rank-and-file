@@ -25,7 +25,7 @@ export interface CodexView extends CodexLookup {
   show(name: string): void;
 }
 
-/** The Codex tab: the piece's abilities, then Python's built-ins. Entries new in this level start open. */
+/** The Codex tab: the piece's abilities, then Python's built-ins, text methods and keywords. Entries new in this level start open. */
 export function renderCodex(entries: CodexEntry[], piece: string): CodexView {
   const items = new Map(entries.map((entry) => [entry.name, codexEntry(entry)]));
   const group = (title: string, kind: (entry: CodexEntry) => boolean) => {
@@ -42,6 +42,7 @@ export function renderCodex(entries: CodexEntry[], piece: string): CodexView {
       ...group(`Your ${piece}`, (entry) => entry.kind === "ability" || entry.kind === "property"),
       ...group("Python", (entry) => entry.kind === "builtin"),
       ...group("Text", (entry) => entry.kind === "method"),
+      ...group("Keywords", (entry) => entry.kind === "keyword"),
     ),
     show(name) {
       const item = items.get(name);
@@ -119,7 +120,11 @@ export function codexNameAt(state: EditorState, pos: number, side: -1 | 1, piece
     const found = name?.startsWith(`${piece}.`) ? name : `str.${state.sliceDoc(node.from, node.to)}`;
     return { name: found, from: node.from, to: node.to };
   }
-  return node.name === "VariableName" ? { name: state.sliceDoc(node.from, node.to), from: node.from, to: node.to } : null;
+  if (node.name === "VariableName") return { name: state.sliceDoc(node.from, node.to), from: node.from, to: node.to };
+  // A keyword's node is named by its own text ("for", "def"); `elif` and `else` share the entry of `if`.
+  // The grammar names its keyword nodes in lower case ("pass" too); the lookup finds nothing for one with no entry.
+  if (!/^[a-z]+$/.test(node.name)) return null;
+  return { name: node.name === "elif" || node.name === "else" ? "if" : node.name, from: node.from, to: node.to };
 }
 
 /** Hovering a function in code shows its Codex entry. `current` is null until the level's Codex has loaded. */

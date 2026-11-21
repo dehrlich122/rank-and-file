@@ -40,7 +40,10 @@ export class Fake {
   }
 }
 
-export const fakeDocument = { createElement: (tag: string) => new Fake(tag) };
+export const fakeDocument = {
+  createElement: (tag: string) => new Fake(tag),
+  createElementNS: (_ns: string, tag: string) => new Fake(tag), // svg icons
+};
 
 /** An element h() built on the fake document, as the Fake it is. */
 export const asFake = (element: HTMLElement): Fake => element as unknown as Fake;

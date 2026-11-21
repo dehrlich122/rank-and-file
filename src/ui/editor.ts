@@ -16,13 +16,15 @@ import {
 } from "@codemirror/language";
 import { lintGutter, lintKeymap, setDiagnostics, type Diagnostic } from "@codemirror/lint";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
-import { Compartment, EditorState, Prec, RangeSetBuilder, StateEffect, StateField, type Extension } from "@codemirror/state";
+import { Compartment, EditorState, Prec, RangeSet, RangeSetBuilder, StateEffect, StateField, type Extension } from "@codemirror/state";
 import {
   crosshairCursor,
   Decoration,
   drawSelection,
   dropCursor,
   EditorView,
+  GutterMarker,
+  gutterLineClass,
   highlightActiveLine,
   highlightActiveLineGutter,
   highlightSpecialChars,
@@ -105,7 +107,11 @@ export function createEditor(options: EditorOptions): EditorView {
     syntaxHighlighting(pythonColors),
   ];
   if (options.readOnly) extensions.push(EditorState.readOnly.of(true), EditorView.editable.of(false));
-  else if (!options.compact) extensions.push(lintGutter()); // warnings only appear on code being written
+  else if (!options.compact) {
+    extensions.push(lintGutter()); // warnings only appear on code being written
+    // room for the return arrow (`cm-call-line`) left of the line number, always, so nothing shifts when it comes and goes
+    extensions.push(EditorView.theme({ ".cm-lineNumbers .cm-gutterElement": { paddingLeft: "22px" } }));
+  }
   if (options.placeholder) extensions.push(placeholder(options.placeholder));
   if (options.extensions) extensions.push(...options.extensions);
   return new EditorView({ parent: options.parent, doc: options.code, extensions });
@@ -190,6 +196,14 @@ export function setActiveLine(view: EditorView, line: number | null): void {
   }
 }
 
+/**
+ * Mark the line that made the call being played back (null to clear): a return arrow in the gutter,
+ * left of the line's number. The theme below draws it, so it takes no room of its own.
+ */
+export function setCallLine(view: EditorView, line: number | null): void {
+  view.dispatch({ effects: setCall.of(line) });
+}
+
 /** Mark the line an error came from (null to clear). */
 export function setErrorLine(view: EditorView, line: number | null): void {
   view.dispatch({ effects: setError.of(line) });
@@ -215,6 +229,7 @@ export function setMarks(view: EditorView, marks: Mark[]): void {
 
 export function clearMarks(view: EditorView): void {
   setActiveLine(view, null);
+  setCallLine(view, null);
   setErrorLine(view, null);
   setMarks(view, []);
 }
@@ -279,38 +294,50 @@ function followWrapSetting(): Extension {
 
 const setActive = StateEffect.define<number | null>();
 const setError = StateEffect.define<number | null>();
+const setCall = StateEffect.define<number | null>();
 
 interface Marked {
   active: number | null;
   error: number | null;
+  call: number | null; // the line that made the call being played back: a gutter mark, not a line decoration
   decorations: DecorationSet;
+  gutter: RangeSet<GutterMarker>;
 }
 
 const activeLine = Decoration.line({ class: "cm-step-line" });
 const errorLine = Decoration.line({ class: "cm-error-line" });
 
-const lineMarks = StateField.define<Marked>({
-  create: () => ({ active: null, error: null, decorations: Decoration.none }),
+/** Puts `cm-call-line` on the line's gutter elements; the theme draws the arrow on the line number's. */
+class CallLineMarker extends GutterMarker {
+  override elementClass = "cm-call-line";
+}
+const callLine = new CallLineMarker();
+
+export const lineMarks = StateField.define<Marked>({
+  create: () => ({ active: null, error: null, call: null, decorations: Decoration.none, gutter: RangeSet.empty }),
   update(value, transaction) {
-    let { active, error } = value;
+    let { active, error, call } = value;
     if (transaction.docChanged) {
       active = null; // the code changed, so old highlights no longer apply
       error = null;
+      call = null;
     }
     for (const effect of transaction.effects) {
       if (effect.is(setActive)) active = effect.value;
       if (effect.is(setError)) error = effect.value;
+      if (effect.is(setCall)) call = effect.value;
     }
-    if (active === value.active && error === value.error && !transaction.docChanged) return value;
+    if (active === value.active && error === value.error && call === value.call && !transaction.docChanged) return value;
     const doc = transaction.state.doc;
     const ranges = [];
     const valid = (line: number | null): line is number => line !== null && line >= 1 && line <= doc.lines;
     if (valid(active) && active !== error) ranges.push(activeLine.range(doc.line(active).from));
     if (valid(error)) ranges.push(errorLine.range(doc.line(error).from));
     ranges.sort((a, b) => a.from - b.from);
-    return { active, error, decorations: Decoration.set(ranges) };
+    const gutter = valid(call) ? RangeSet.of([callLine.range(doc.line(call).from)]) : RangeSet.empty;
+    return { active, error, call, decorations: Decoration.set(ranges), gutter };
   },
-  provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
+  provide: (field) => [EditorView.decorations.from(field, (value) => value.decorations), gutterLineClass.from(field, (value) => value.gutter)],
 });
 
 // -- colours ---------------------------------------------------------------------
@@ -324,6 +351,9 @@ const themeFromPage = EditorView.theme({
   ".cm-gutters": { backgroundColor: "var(--code-bg)", color: "var(--muted)", borderRight: "1px solid var(--border)" },
   ".cm-activeLine": { backgroundColor: "var(--active-line)" },
   ".cm-activeLineGutter": { backgroundColor: "var(--active-line)" },
+  // the return arrow of the line that made the call: drawn in the line number's own left padding, so no width changes
+  ".cm-lineNumbers .cm-gutterElement.cm-call-line": { position: "relative" },
+  ".cm-lineNumbers .cm-gutterElement.cm-call-line::before": { content: '"↩"', position: "absolute", left: "5px", fontSize: "0.9em", color: "var(--accent)", pointerEvents: "none" },
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": { backgroundColor: "var(--selection)" },
   ".cm-matchingBracket": { backgroundColor: "var(--selection)", outline: "none" },
   ".cm-tooltip": { backgroundColor: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)" },

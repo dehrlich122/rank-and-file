@@ -7,9 +7,9 @@ How the browser checks work, how to write one, and what bites. Read this before 
 
 - `npm run e2e` (`scripts/e2e/`) drives the real app over the Chrome DevTools
   protocol. It needs `npm run dev` running.
-- The suites are `harness.check.mjs`, `app.check.mjs` and
-  `ui.check.mjs`, with shared helpers (`openLevel`, `setCode`, `solution`) in
-  `helpers.mjs`.
+- The suites are `harness`, `app`, `ui`, `editor`, `share`, `free` and `functions` (Chapter 7: the player's
+  own functions and the examiner; about 100 s), one `<name>.check.mjs` each; `--only=<name>` runs one. The shared
+  helpers (`openLevel`, `setCode`, `solution`, `run`, `outcome`) are in `helpers.mjs`.
 - Each check is `check(label, fn)`, where `fn` throws via
   `expect`.
 - It writes
@@ -19,9 +19,14 @@ How the browser checks work, how to write one, and what bites. Read this before 
 
 ## Judging a run
 
-- Headless Chrome's renderer sometimes dies on this machine (a crash inside Chrome, not the game: `docs/M4/M4.4.md`
-  "The e2e crash"). The runner starts a new Chrome and reruns that suite, at most three attempts, and names the
-  restarts in its last line: judge a run by that line and the exit code. `CHROME_PATH` picks another browser (Edge).
+- Headless Chrome's renderer sometimes died on this machine (a crash inside Chrome, not the game: `docs/M4/M4.4.md`
+  "The e2e crash"). One cause is known and switched off (`docs/M5/M5.2.md`, "As built", M5.2-X): every check
+  loads a new URL, Chrome's back-forward cache kept the last six pages alive with two Python workers each, and the
+  renderer died as the first was dropped, at a Chrome's eighth page load. The harness launches Chrome with that
+  cache off. Whether the older deaths had the same cause is not proven, so the safety net stays: the runner starts
+  a new Chrome and reruns that suite, at most three attempts, names the restarts in its last line, and each
+  `RESTART` line gives Chrome's exit status. Judge a run by the last line and the exit code. `CHROME_PATH` picks
+  another browser (Edge).
 - The full run takes 10 to 14 minutes. Never merge, and never edit files the dev server serves, while it is going:
   Vite reloads and checks fail.
 

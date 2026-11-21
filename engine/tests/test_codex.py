@@ -2,10 +2,12 @@
 
 import builtins
 import types
+from dataclasses import replace
 
 import pytest
 
 from rankfile import codex
+from rankfile.levels import Examine, ExamineCall, parse_level
 from rankfile.pieces import PIECES, Knight, Pawn
 from rankfile.repl import Repl
 from rankfile.runner import run_level, run_sandbox, run_snippet
@@ -91,7 +93,7 @@ def test_taught_so_far_is_the_curriculum_before_a_level_then_its_own_chapter_up_
 
 def test_a_levels_codex_is_its_abilities_then_the_builtins_taught_so_far():
     entries = codex.entries("t1", CHAPTERS)
-    assert [entry.name for entry in entries] == ["pawn.move", "pawn.wait", "print", "range"]
+    assert [entry.name for entry in entries] == ["pawn.move", "pawn.wait", "print", "range", "for"]  # a keyword the lesson uses comes last (M5.2-7)
     introduced = {entry.name: (entry.introduced, entry.new) for entry in entries}
     assert introduced["pawn.move"] == ("c1", False)
     assert introduced["print"] == ("c2", False)  # the snippet that isn't Python is skipped
@@ -101,7 +103,7 @@ def test_a_levels_codex_is_its_abilities_then_the_builtins_taught_so_far():
 
 def test_only_this_levels_abilities_are_listed():
     # An ability unlocked earlier but locked here can't be used, so it isn't listed.
-    assert [entry.name for entry in codex.entries("t2", CHAPTERS)] == ["pawn.move", "print", "range"]  # the built-ins still work
+    assert [entry.name for entry in codex.entries("t2", CHAPTERS)] == ["pawn.move", "print", "range", "for"]  # the built-ins and keywords still work
 
 
 def test_a_lessons_built_ins_are_found_with_ast():
@@ -213,16 +215,39 @@ def knight_says(code: str) -> str:
     return result.output
 
 
+def test_help_on_help_shows_its_own_entry_however_it_is_asked_for():
+    expected = codex.format_entry(codex.python_entry("help")) + "\n\n"
+    for code in ("help(help)", 'help("help")'):
+        assert run_sandbox(code, ["move"]).output == expected
+        assert knight_says(code) == expected
+    assert run_snippet("help(help)").output == expected
+    assert expected.startswith("Help on help:") and "help(thing) or help()" in expected
+
+
+def test_help_is_the_last_builtin_taught_and_a_full_builtin_entry():
+    entry = codex.python_entry("help")
+    assert list(codex.BUILTINS)[-1] == "help"
+    assert entry.kind == "builtin" and entry.calls[0] == "help(thing)"
+
+
+def test_a_lesson_that_calls_help_brings_its_entry_in_on_its_level_and_not_before():
+    chapters = [{"curriculum": True, "levels": [level("h1", ["move"], "print(1)"), level("h2", ["move"], "help(print)"), level("h3", ["move"])]}]
+    assert "help" not in [entry.name for entry in codex.entries("h1", chapters)]
+    here = {entry.name: entry for entry in codex.entries("h2", chapters)}
+    assert here["help"].new and here["help"].introduced == "h2"
+    later = {entry.name: entry for entry in codex.entries("h3", chapters)}
+    assert later["help"].introduced == "h2" and not later["help"].new
+
+
 def test_help_on_a_pawn_level_with_nothing_is_the_pawns_intro_as_before():
     assert run_sandbox("help()", ["move"]).output == PAWN_INTRO + "\n\n"
-    assert run_sandbox("help(help)", ["move"]).output == PAWN_INTRO + "\n\n"
     assert run_sandbox('help("modules")', ["move"]).output == PAWN_INTRO + "\n\n"
     assert codex.describe(codex._NOTHING) == PAWN_INTRO  # no piece known (a plain snippet): the pawn's words
     assert run_snippet("help()").output == PAWN_INTRO + "\n\n"
 
 
 def test_help_on_a_knight_level_introduces_the_knight():
-    for code in ("help()", "help(help)", 'help("help")'):
+    for code in ("help()", 'help("modules")'):
         output = knight_says(code)
         assert output == (
             "help(something) shows what it does and how to use it. For example:\n\n"
@@ -378,6 +403,38 @@ def test_a_required_construct_is_found_through_a_lessons_snippets():
     assert tags([tier_chapter(1, "pawn", prose), *TIERED[2:]], ["move"], ["While"]) == ("bishop", 3)
 
 
+FUNCTIONAL = [
+    tier_chapter(1, "pawn", taught_level(["move"], "pawn.move()")),
+    tier_chapter(2, "knight", taught_level(["move"], "def hop():\n    pass")),
+    tier_chapter(3, "bishop", taught_level(["move"], "def hop():\n    return 1")),
+]
+
+
+def rules_tags(constraints: dict) -> tuple:
+    data = {**needs(["move"]), "constraints": constraints}
+    answer = codex.level_tags(data, FUNCTIONAL)
+    return answer["tier"], answer["chapter"]
+
+
+def test_function_rules_need_def_and_a_returning_rule_needs_return():
+    assert rules_tags({"max_lines": 3}) == ("pawn", 1)
+    assert rules_tags({"functions": {"hop": {}}}) == ("knight", 2)
+    assert rules_tags({"define": 1}) == ("knight", 2)
+    assert rules_tags({"functions": {"hop": {"returns": False}}}) == ("knight", 2)
+    assert rules_tags({"functions": {"hop": {"returns": True}}}) == ("bishop", 3)
+    assert rules_tags({"functions": {"hop": {}, "skip": {"returns": True}}}) == ("bishop", 3)
+
+
+def test_an_examiner_needs_def_and_a_judged_answer_needs_return():
+    level = parse_level(needs(["move"]))
+    assert codex._rule_nodes(level) == set()
+    assert codex._rule_nodes(replace(level, examine=Examine(function="hop"))) == {"FunctionDef"}
+    only_board = Examine(function="hop", calls=[ExamineCall(args=[1])])
+    assert codex._rule_nodes(replace(level, examine=only_board)) == {"FunctionDef"}
+    judged = Examine(function="hop", calls=[ExamineCall(returns=None), ExamineCall(returns=3)])
+    assert codex._rule_nodes(replace(level, examine=judged)) == {"FunctionDef", "Return"}
+
+
 def test_a_snippet_that_is_not_python_teaches_nothing_and_does_not_stop_the_search():
     chapters = [
         tier_chapter(1, "pawn", taught_level(["move"], "this is not Python", "pawn.move()")),
@@ -418,3 +475,154 @@ def test_something_taught_by_nobody_is_ignored_and_the_rest_decides():
 def test_the_latest_of_several_needs_wins():
     assert tags(TIERED, ["turn_left"], ["While"]) == ("bishop", 3)
     assert tags(TIERED, ["wait"], ["For"]) == ("bishop", 3)  # nobody teaches For: only the ability counts
+
+
+# -- keywords (M5.2-7) -------------------------------------------------------------
+
+KEYWORD_NAMES = ["for", "if", "while", "break", "continue", "def", "return"]
+
+
+def test_the_seven_keyword_entries_have_the_approved_words():
+    assert list(codex.KEYWORDS) == KEYWORD_NAMES
+    entries = {name: codex.keyword_entry(name) for name in KEYWORD_NAMES}
+    assert all(entry.kind == "keyword" and entry.name == name and len(entry.calls) == 1 for name, entry in entries.items())
+    assert entries["for"].to_dict() == {
+        "name": "for", "kind": "keyword", "calls": ["for name in things:"],
+        "paragraphs": ["Run the indented lines once for each item, with `name` holding that item. `range(3)` hands out 0, 1 and 2."],
+        "args": [], "returns": "", "example": "for i in range(3):\n    print(i)", "introduced": "", "new": False,
+    }
+    assert entries["if"].calls == ["if condition: … elif other: … else:"]
+    assert "`elif` tries another condition" in entries["if"].paragraphs[0]
+    assert entries["if"].example == 'if steps > 3:\n    print("far")\nelif steps == 3:\n    print("just right")\nelse:\n    print("near")'
+    assert entries["while"].example == "left = 3\nwhile left > 0:\n    left = left - 1"
+    assert entries["break"].calls == ["break"] and entries["break"].example == "while True:\n    if done:\n        break"
+    assert entries["continue"].paragraphs == ["Skip the rest of this lap and go straight on to the next one."]
+    assert entries["def"].calls == ["def name(parameter, other=default):"]
+    assert entries["def"].paragraphs[0].endswith("a docstring) says what the function does, and `help(name)` shows it.")
+    assert entries["def"].example.splitlines()[2] == '        print(f"Go, {name}!")'
+    assert entries["return"].calls == ["return value"] and "`return` gives it to the caller." in entries["return"].paragraphs[0]
+    assert entries["return"].example == "def double(n):\n    return n * 2\nprint(double(4) + 1)"
+
+
+def keyword_chapters() -> list[dict]:
+    return [
+        {"curriculum": True, "levels": [level("k1", ["move"], "pawn.move()"), level("k2", ["move"], "for i in range(2):\n    pass", "this is not Python")]},
+        {"curriculum": True, "levels": [level("k3", ["move"], "def f():\n    return 1\nwhile x:\n    break"), level("k4", ["move"], "if a:\n    pass\nelif b:\n    pass")]},
+    ]
+
+
+def keywords_at(level_id: str) -> list[tuple[str, str, bool]]:
+    return [(entry.name, entry.introduced, entry.new) for entry in codex.entries(level_id, keyword_chapters()) if entry.kind == "keyword"]
+
+
+def test_a_keyword_is_listed_from_the_first_lesson_that_uses_it_and_not_before():
+    assert keywords_at("k1") == []
+    assert keywords_at("k2") == [("for", "k2", True)]
+    assert keywords_at("k3") == [("for", "k2", False), ("while", "k3", True), ("break", "k3", True), ("def", "k3", True), ("return", "k3", True)]
+    assert keywords_at("k4")[1] == ("if", "k4", True)
+    assert [name for name, _, _ in keywords_at("k4")] == ["for", "if", "while", "break", "def", "return"]  # `continue` is taught by nobody here
+
+
+def test_keywords_come_after_the_text_methods():
+    chapters = [{"curriculum": True, "levels": [level("r1", ["move"], "for c in 'a'.upper():\n    print(c)")]}]
+    assert [entry.kind for entry in codex.entries("r1", chapters)] == ["ability", "builtin", "method", "keyword"]
+
+
+def test_help_on_a_keyword_shows_its_entry_on_any_level():
+    output = run_sandbox('help("def")\nhelp("else")\nhelp("elif")\nhelp("continue")', ["move"]).output
+    assert output.count("Help on if:") == 2 and "Help on def:" in output and "Help on continue:" in output
+    assert "def name(parameter, other=default):" in output and "Example:\n        def cheer(name, times=1):" in output
+    assert len(output) < 3000  # not Python's reference manual
+
+
+def test_help_on_other_text_keeps_its_behaviour():
+    assert "There's no help on 'zzz'" in run_sandbox('help("zzz")', ["move"]).output
+
+
+def function_help(code: str) -> str:
+    result = run_sandbox(code, ["move"])
+    assert result.status == "finished"
+    return result.output
+
+
+def test_help_on_the_players_function_with_a_docstring_is_in_the_codex_style():
+    output = function_help('def stride(squares, times=2, *rest):\n    """Walk a few squares.\n\n    Then rest."""\n\nhelp(stride)')
+    assert output.splitlines()[0] == "stride(squares, times=2, *rest)"
+    assert "    Walk a few squares." in output and "    Then rest." in output
+    assert "Help on function" not in output and "__main__" not in output
+
+
+def test_help_on_the_players_function_without_a_docstring_says_how_to_add_one():
+    output = function_help("def stride(squares, times=2):\n    pass\n\nhelp(stride)")
+    assert output.splitlines()[0] == "stride(squares, times=2)"
+    assert "a sentence in quotes as the first line of its" in output and "body would show here" in output
+    assert "Help on function" not in output and "__main__" not in output
+
+
+def test_help_on_a_lambda_does_not_crash():
+    output = function_help("double = lambda n: n * 2\nhelp(double)")
+    assert output.splitlines()[0] == "<lambda>(n)"
+
+
+# -- the fence of a lesson's runnable snippet (M5.2-5a) --------------------------------------------------------
+
+
+def fenced(info, code="pawn.move(1)\n"):
+    return f"{FENCE}python {info}\n{code}{FENCE}\n"
+
+
+@pytest.mark.parametrize(
+    ("info", "meant", "call"),
+    [
+        ("run", "", ""),
+        ("run error", "error", ""),
+        ("run lost", "lost", ""),
+        ("run timeout", "timeout", ""),
+        ("run calls gallop(1, 2)", "", "gallop(1, 2)"),
+        ("run error calls gallop(1)", "error", "gallop(1)"),
+        ("run lost calls gallop(1)", "lost", "gallop(1)"),
+        ("run timeout calls gallop(1)", "timeout", "gallop(1)"),
+        ("run calls  gallop('a b', -1)  ", "", "gallop('a b', -1)"),
+    ],
+)
+def test_a_snippets_fence_gives_its_meaning_call_and_code_by_name(info, meant, call):
+    [snippet] = codex.snippets("Words.\n\n" + fenced(info, "a = 1\nb = 2\n") + "\nMore words.\n")
+    assert (snippet.meant, snippet.call, snippet.code) == (meant, call, "a = 1\nb = 2\n")
+
+
+@pytest.mark.parametrize("info", ["run calls", "run calls ", "runner", "run erro", "run error calls", "py run calls f()", "calls f()"])
+def test_a_fence_that_is_not_a_runnable_snippet_is_not_found(info):
+    assert codex.snippets(fenced(info)) == []
+
+
+def test_lesson_snippets_are_still_just_the_codes_in_order():
+    text = fenced("run", "one()\n") + "\n" + fenced("run calls hop(1)", "def hop(n):\n    pass\n") + fenced("run error", "two(\n")
+    assert codex.lesson_snippets(text) == ["one()\n", "def hop(n):\n    pass\n", "two(\n"]
+    assert [snippet.meant for snippet in codex.snippets(text)] == ["", "", "error"]
+
+
+def test_what_a_marked_snippet_calls_is_still_taught():
+    text = fenced("run calls shout('hi')", "def shout(word):\n    print(word.upper())\n")
+    assert codex.taught(text) == {"print", "str.upper"}
+
+
+def test_help_is_brought_in_by_the_lesson_that_calls_it_in_the_real_curriculum():
+    from test_levels import chapters_in_play_order
+
+    chapters = chapters_in_play_order()
+    assert "help" not in [entry.name for entry in codex.entries("ch07-l05", chapters)]
+    here = {entry.name: entry for entry in codex.entries("ch07-l06", chapters)}
+    assert here["help"].new and here["help"].introduced == "ch07-l06"
+
+
+def test_help_without_a_builtins_help_still_looks_things_up(monkeypatch):
+    # `builtins.help` exists only once `site` has run (M5.2-V); help(None) must not match the builtin that is missing.
+    monkeypatch.delattr(builtins, "help")
+    assert not hasattr(builtins, "help")
+    assert codex._entry_for(print).name == "print"
+    assert [codex._entry_for(thing) for thing in (None, 42, lambda: 0)] == [None, None, None]
+    for code in ("help(None)", "help(42)", "def f():\n    pass\nhelp(f)"):
+        result = run_snippet(code)
+        assert result.status == "ok", code
+        assert "Help on" not in result.output, code
+    assert "Help on print:" in run_snippet("help(print)").output

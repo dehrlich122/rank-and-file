@@ -80,6 +80,12 @@ describe("the answers in words", () => {
     expect(lines[3]!.text).toMatch(/^On board 4: can't judge/);
   });
 
+  it("decline an examiner level in one sentence, with no board name and no footnote", () => {
+    const one = progress({ done: true, results: [result("examiner", { label: "level", where: "on this level", positions: 0 })] });
+    expect(solveLines(one)).toEqual([{ mark: "skip", text: "Can't judge: on this level the examiner calls your function, and the check only tries plain calls. Your own solution, from test-play, shows it can be solved." }]);
+    expect(solveFootnote(one)).toBeNull();
+  });
+
   it("name each place a hidden goal could be", () => {
     const [line] = solveLines(progress({ cases: 2, unit: "place", results: [result("route", { lines: 4, label: "b3", where: "with the goal on b3" })] }));
     expect(line!.text).toBe("With the goal on b3: a route exists, 4 lines of plain calls.");
