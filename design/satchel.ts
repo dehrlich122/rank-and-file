@@ -16,6 +16,7 @@ import { h } from "../src/ui/dom";
 import { callList } from "../src/ui/panels";
 import { goal, hero, tile } from "../src/ui/sprites";
 import { doorArt as doorD2, keyArt as keyK3, line, nameText, rect, shaftAcross, shaftDown } from "../src/ui/keyDoor";
+import { satchelContents } from "../src/ui/satchel";
 import { litGrid, M, S } from "../src/ui/sprites/floor";
 import { svg } from "../src/ui/svg";
 
@@ -126,9 +127,6 @@ function doorArt(look: DoorLook, name: Name, open: boolean): SVGElement {
   return art;
 }
 
-/** A small key for the satchel: the same bow and shaft in every take, since the name is written beside it. */
-const keyGlyph = () => svg("svg", { class: "glyph", viewBox: "0 0 34 20", "aria-hidden": "true" }, svg("circle", { class: "k-line", cx: 8, cy: 10, r: 6 }), line("k-line", "M 14 10 H 31 M 25 10 V 16 M 30 10 V 14"));
-
 // -- the sheet's helpers -------------------------------------------------------------------------------------------------
 
 const keyThing = (look: KeyLook, name: Name, at: Pos = THING): Thing => ({ at, art: keyArt(look, name) });
@@ -180,7 +178,6 @@ function doorPane(): HTMLElement {
 // -- pane 3: the satchel -------------------------------------------------------------------------------------------------
 
 type Where = "S1" | "S2" | "S3";
-const CAPACITY = 8;
 const TWO: Name[] = ["brass", "iron"];
 const EIGHT: Name[] = ["7", "12", "3", "41", "9", "25", "16", "8"];
 
@@ -197,19 +194,10 @@ const STATES: Contents[] = [
 /** How Python prints the list: names in quotes, numbers without. */
 const printed = (keys: Name[]) => `[${keys.map((k) => (/^\d+$/.test(k) ? k : `'${k}'`)).join(", ")}]`;
 
-function chip(name: Name, index?: number): HTMLElement {
-  return h("li", { class: "chip" }, node(keyGlyph()), h("span", { class: "chip-name" }, name), ...(index === undefined ? [] : [h("span", { class: "chip-index" }, `[${index}]`)]));
-}
-
 function satchel(where: Where, keys: Name[]): HTMLElement {
-  const slots = where === "S3" ? [] : Array.from({ length: CAPACITY - keys.length }, () => h("li", { class: "slot", "aria-hidden": "true" }));
-  const list = h("ul", { class: `satchel satchel-${where}`, "aria-label": "The satchel" }, ...keys.map((k, i) => chip(k, where === "S3" ? i : undefined)), ...slots);
-  const head = h("p", { class: "satchel-head" }, "Satchel", h("span", {}, `${keys.length} of ${CAPACITY}`));
-  const parts: HTMLElement[] = [head, list];
-  if (where === "S3") {
-    parts.push(h("p", { class: "python" }, h("span", { class: "py-say" }, "print(knight.inventory)"), h("span", { class: "py-out" }, `${printed(keys)}`)));
-  }
-  return h("div", { class: `satchel-box satchel-box-${where}` }, ...parts);
+  const contents = satchelContents(keys, { slots: where !== "S3", cls: `satchel-${where}`, extra: where === "S3" ? (i) => [h("span", { class: "chip-index" }, `[${i}]`)] : undefined });
+  if (where === "S3") contents.push(h("p", { class: "python" }, h("span", { class: "py-say" }, "print(knight.inventory)"), h("span", { class: "py-out" }, printed(keys))));
+  return h("div", { class: "satchel-box" }, ...contents);
 }
 
 const stub = (cls: string, title: string, ...lines: HTMLElement[]) => h("aside", { class: `stub ${cls}` }, h("p", { class: "stub-head" }, title), ...lines);

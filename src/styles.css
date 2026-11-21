@@ -585,7 +585,11 @@ pre {
     height: 100%;
   }
 
-  :root[data-code-panel="bottom"] .boards-main .board {
+  :root[data-code-panel="bottom"] .satchel-stage {
+    height: 100%;
+  }
+
+  :root[data-code-panel="bottom"] .boards-main :is(.board, .satchel-stage) {
     flex: 1 1 0;
     min-height: 0;
   }
@@ -1392,6 +1396,87 @@ pre {
   height: auto;
   max-height: var(--board-max-height, 60vh);
   user-select: none;
+}
+
+/* The satchel (M5.3): on a level whose state carries an inventory, the board and a column of eight slots stand side by side.
+   A level without one has no .satchel-stage: its board is where it always was. */
+.satchel-stage {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.satchel-stage .board {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.satchel-box {
+  display: grid;
+  flex: none;
+  gap: 4px;
+  justify-items: start;
+  min-width: 0;
+}
+
+.satchel-head {
+  margin: 0;
+  display: flex;
+  gap: 8px;
+  font: 700 11px var(--font-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.satchel-head span {
+  font: 11px var(--font-code);
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+.satchel {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.satchel-chip,
+.satchel-slot {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 96px;
+  height: 26px;
+  padding: 0 4px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.satchel-slot {
+  border-style: dashed;
+}
+
+.satchel-glyph {
+  flex: none;
+  width: 24px;
+  height: 15px;
+}
+
+.satchel-glyph .k-line {
+  stroke-width: 2.6;
+}
+
+.satchel-chip-name {
+  font: 700 13px var(--font-code);
+  color: var(--text);
+  white-space: nowrap;
 }
 
 .board-mini {
