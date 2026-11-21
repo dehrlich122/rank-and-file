@@ -484,7 +484,12 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     caseBoard = new BoardView(run.cases[index]!.level, { spots });
     const title = examiner ? "The examiner's calls" : (level?.case_title ?? "");
     const buttons = run.cases.map((c, i) =>
-      h("button", { class: "btn btn-small btn-toggle", "aria-pressed": String(i === index), onClick: () => showCase(i, "play") }, `${c.label} ${verdict(c)}`),
+      h(
+        "button",
+        // an examiner's call is long (it carries lists): the button says "call 1", the tooltip has the call in full
+        { class: "btn btn-small btn-toggle", "aria-pressed": String(i === index), title: examiner ? c.label : undefined, onClick: () => showCase(i, "play") },
+        `${examiner ? `call ${i + 1}` : c.label} ${verdict(c)}`,
+      ),
     );
     callCaption = examiner ? h("p", { class: "boards-caption" }, " ") : null; // the words come with the playback: they start at the call's first step
     boardHost.replaceChildren(h("div", { class: "case-row", role: "group", "aria-label": title }, examiner ? null : h("span", { class: "muted small" }, `${title}:`), ...buttons), ...(callCaption ? [callCaption] : []), onStage(caseBoard, run.cases[index]!.level.start));
@@ -500,7 +505,9 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     caseBoard?.dispose();
     for (const thumb of thumbs) thumb.dispose();
     const boards = level.boards; // the same boards a run's cases come back with
-    const wide = boards.some((info) => info.width > 8); // a board wider than a chessboard would be drawn too small beside the others: the small boards go under it (QA-064)
+    // a board wider than a chessboard would be drawn too small beside the others: the small boards go under it (QA-064);
+    // so do they on a level with a satchel, whose column beside the board would leave the large board hardly bigger than the small ones
+    const wide = boards.some((info) => info.width > 8) || satchel !== null;
     caseBoard = shown > 0 ? new BoardView(boards[shown]!) : null; // board 1 is the level's own
     const mark = (i: number) => (run ? ` ${verdict(run.cases[i]!)}` : "");
     thumbs = [];

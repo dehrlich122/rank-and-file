@@ -1200,6 +1200,13 @@ pre {
   outline-offset: -2px;
 }
 
+/* the first column says "call 1": one line, no wider than its words, so wanted and got get the room */
+.outcome .calls th:first-child,
+.outcome .calls td:first-child {
+  white-space: nowrap;
+  width: 1%;
+}
+
 .outcome .calls .ok {
   color: var(--accent);
 }
