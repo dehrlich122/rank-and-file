@@ -73,11 +73,16 @@ ENEMY_KEYS = {
 }
 OPEN_GROUND = (Tile.FLOOR, Tile.WAYPOINT, Tile.GEM, Tile.PLANK, Tile.RUNE)
 
+# Abilities the editor does not offer yet: keys and doors reach it in M5.5, so until then they could do nothing
+# on its boards. Take the names out of this set in M5.5. Levels, the Codex and the checker still read piece.ABILITIES.
+EDITOR_HIDDEN_ABILITIES = {"pick_up", "inventory"}
+
+
 def editor_options() -> dict:
     """What the level editor (M4.2) offers, read from the checker's own tables, so the editor keeps no rules of its own."""
     return {
         "max_side": MAX_SIDE,
-        "pieces": {name: list(piece.ABILITIES) for name, piece in PIECES.items()},
+        "pieces": {name: [a for a in piece.ABILITIES if a not in EDITOR_HIDDEN_ABILITIES] for name, piece in PIECES.items()},
         "tiles": {tile.value: {"needs": sorted(TILE_DETAILS.get(tile, (set(), set()))[0]), "may": sorted(TILE_DETAILS.get(tile, (set(), set()))[1])} for tile in Tile},
         "enemies": {kind: sorted(keys - {"kind"}) for kind, keys in ENEMY_KEYS.items()},
         "clocks": list(CLOCKS),
