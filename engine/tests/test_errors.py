@@ -3,8 +3,10 @@
 import pytest
 
 from conftest import make_level
+from rankfile import codex, errors
 from rankfile.pieces import Knight
-from rankfile.runner import run_level, run_sandbox
+from rankfile.runner import run_level, run_sandbox, run_snippet
+from rankfile.tracer import StepBudgetExceeded
 
 
 @pytest.mark.parametrize(
@@ -613,3 +615,126 @@ def test_a_place_that_is_not_a_whole_number(corridor, code, friendly):
 def test_text_keeps_its_words_for_a_place_that_is_not_a_whole_number(corridor):
     friendly = run_level(corridor, "t = 'abc'\nprint(t[1.0])").error.friendly
     assert friendly == "Python stopped with a TypeError: string indices must be integers, not 'float'"
+
+
+# -- translating an error never raises, and never names the wrong place (M5.3-R1) ---------------
+
+_PAST_END_8 = "That list has 8 items, so the last one is at `[7]`: places count from 0. There is nothing at `[8]`."
+_UNPACK_ANY = "The value on the right is {}: there is nothing inside it to hand out to `x` and `y`. Unpacking needs a tuple or a list."
+_ORDER_ANY = "Python can't put text and numbers in one order: it has no rule for which of them comes first."
+_BIG = "n = 10 ** 5000\n"  # past the 4300 digits Python will turn into text
+
+
+@pytest.mark.parametrize(
+    "code, friendly",
+    [
+        (_BIG + "x, y = n", _UNPACK_ANY.format("a whole number (an int)")),
+        (_BIG + "print(sorted([n, 'a']))", _ORDER_ANY),
+        (
+            "class Thing:\n    def __repr__(self):\n        raise KeyError('no')\nthing = Thing()\nx, y = thing",
+            _UNPACK_ANY.format("a Thing"),
+        ),
+        # a huge place that only the line's other subscript can name: no numbers, no raise
+        (
+            _BIG + "def f():\n    return []\na = [1]\nprint(f()[0], a[n])",
+            _PAST_END_ANY.format("list", "list"),
+        ),
+    ],
+)
+def test_a_translation_with_a_value_that_cannot_be_shown_still_gives_its_sentence(code, friendly):
+    result = run_snippet(code)
+    assert result.status == "error"
+    assert result.error.friendly == friendly
+
+
+def test_showing_a_value_never_runs_the_players_code():
+    calls = []
+    code = (
+        "class Thing:\n"
+        "    def __repr__(self):\n        calls.append('repr')\n        return 'T'\n"
+        "    def __str__(self):\n        calls.append('str')\n        return 'T'\n"
+        "    def __format__(self, spec):\n        calls.append('format')\n        return 'T'\n"
+        "class Count(int):\n"
+        "    def __repr__(self):\n        calls.append('int repr')\n        return '5'\n"
+        "class Row(list):\n"
+        "    def __getitem__(self, place):\n        calls.append('getitem')\n        return 0\n"
+        "    def __repr__(self):\n        calls.append('list repr')\n        return '[]'\n"
+    )
+    for failing in (
+        "x, y = Thing()",
+        "x, y = Count(5)",
+        "a = [1, 2]\nprint(a[Thing()])",
+        "a = [1, 2]\nprint(a[Count(5)])",
+        "row = Row([1, 'a'])\nrow.sort()",
+        "print(sorted([Count(5), 'a']))",
+        "print(sorted(Row([1, 'a'])))",
+        "print(max(Row()))",
+    ):
+        run = run_snippet(code + failing, namespace=codex.player_namespace(calls=calls))
+        assert run.status == "error"
+        assert calls == [], failing
+
+
+def test_a_short_list_of_plain_values_is_shown():
+    friendly = run_snippet("a = [1, 2]\nprint(a[[1, 'x']])").error.friendly
+    assert friendly == "A place in a list is a whole number, like `[0]`. [1, 'x'] is a list."
+
+
+def test_a_translation_that_raises_falls_back_to_the_untranslated_sentence(monkeypatch):
+    def broken(*_):
+        raise ValueError("a bug in a translation")
+
+    monkeypatch.setattr(errors, "_explain_name", broken)
+    result = run_snippet("print(pwan)")
+    assert result.status == "error"
+    assert result.error.friendly == "Python stopped with a NameError: name 'pwan' is not defined"
+    # and when the error's own text can't be made either
+    class Silent(Exception):
+        def __str__(self):
+            raise RuntimeError("no text")
+
+    assert errors.friendly_message(Silent(), {}) == "Python stopped with a Silent."
+
+
+def test_what_stops_a_run_or_the_program_is_not_swallowed_by_a_translation(monkeypatch):
+    assert not issubclass(StepBudgetExceeded, Exception)  # so `except Exception` lets the tracer's stop through
+
+    def stop(*_):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(errors, "_explain_name", stop)
+    with pytest.raises(KeyboardInterrupt):
+        run_snippet("print(pwan)")
+
+
+@pytest.mark.parametrize(
+    "loop",
+    [
+        "b = [a[i] for i in range(10)]",
+        "b = {a[i] for i in range(10)}",
+        "b = {i: a[i] for i in range(10)}",
+        "b = [a[j] for i in range(10) for j in [i]]",
+        "b = [0 for i in range(10) if a[i] == 0]",
+    ],
+)
+def test_a_comprehension_does_not_name_the_place_of_another_variable_of_its_name(loop):
+    # `i` and `j` are 9 outside the comprehension; inside, the place that failed is 8
+    result = run_snippet("i = 9\nj = 9\na = [0] * 8\n" + loop)
+    assert result.error.friendly == _PAST_END_ANY.format("list", "list")
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "i = 9\na = [0] * 8\nfor i in range(10):\n    b = a[i]",
+        "i = 9\na = [0] * 8\nb = list(a[i] for i in range(10))",
+        "a = [0] * 8\nb = [a[8] for i in range(10)]",
+    ],
+)
+def test_a_loop_or_a_generator_still_names_the_real_place(code):
+    assert run_snippet(code).error.friendly == _PAST_END_8
+
+
+def test_a_line_that_reads_and_writes_the_same_place_names_it():
+    friendly = run_snippet("a = [0] * 8\nfor i in range(10): a[i] = a[i]").error.friendly
+    assert friendly == _PAST_END_8

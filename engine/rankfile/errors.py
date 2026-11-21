@@ -49,6 +49,19 @@ def explain(exc: BaseException, namespace: dict | None = None) -> ErrorInfo:
 
 
 def friendly_message(exc: BaseException, namespace: dict, line: int | None = None) -> str:
+    """The plain-language sentence for `exc`. A translation is a helper, and a helper must never take the player's
+    error down with it: if one raises, the error gets the sentence an untranslated error gets. Only `Exception` is
+    caught, so `KeyboardInterrupt`, `SystemExit` and the tracer's `StepBudgetExceeded` (a `BaseException`) pass."""
+    try:
+        return _translate(exc, namespace, line)
+    except Exception:
+        try:
+            return f"Python stopped with a {type(exc).__name__}: {exc}"
+        except Exception:  # an error whose own text can't be made
+            return f"Python stopped with a {type(exc).__name__}."
+
+
+def _translate(exc: BaseException, namespace: dict, line: int | None) -> str:
     if isinstance(exc, (GameError, Lost)):
         text = str(exc)  # the game's own messages are written for the player already
         if isinstance(exc, GameArgumentError) and text.endswith(", not None.") and (note := _none_from_own_function(line)):
@@ -160,9 +173,27 @@ _DEFS = (ast.FunctionDef, ast.AsyncFunctionDef)
 def _player_tree() -> ast.Module | None:
     """The player's program as a syntax tree, from linecache; None where it can't be parsed."""
     try:
-        return ast.parse("".join(linecache.getlines(PLAYER_FILENAME)))
+        tree = ast.parse("".join(linecache.getlines(PLAYER_FILENAME)))
     except SyntaxError:
         return None
+    _mark_comprehension_names(tree)
+    return tree
+
+
+def _mark_comprehension_names(tree: ast.Module) -> None:
+    """Flag the names a list, set or dict comprehension makes for itself (`i` in `[a[i] for i in ...]`). Python 3.14 runs
+    these inside the enclosing frame and takes the name out again, so a lookup after the error would find another `i`."""
+    for comp in ast.walk(tree):
+        if not isinstance(comp, (ast.ListComp, ast.SetComp, ast.DictComp)):
+            continue
+        made = {name.id for gen in comp.generators for name in ast.walk(gen.target) if isinstance(name, ast.Name)}
+        parts = [comp.key, comp.value] if isinstance(comp, ast.DictComp) else [comp.elt]
+        parts += [gen.iter for gen in comp.generators[1:]]  # the first `iter` is read before the names are made
+        parts += [test for gen in comp.generators for test in gen.ifs]
+        for part in parts:
+            for name in ast.walk(part):
+                if isinstance(name, ast.Name) and name.id in made:
+                    name.made_by_comprehension = True  # ast nodes take any attribute
 
 
 def _own_nodes(body: list[ast.stmt]):
@@ -528,6 +559,8 @@ def _value_of(node: ast.AST, scope: dict):
     if isinstance(node, ast.Constant):
         return node.value
     if isinstance(node, ast.Name):
+        if getattr(node, "made_by_comprehension", False):
+            return _MISSING  # the comprehension's own name is gone from the frame; whatever `scope` has under it is another
         return scope.get(node.id, _MISSING)
     if isinstance(node, (ast.List, ast.Tuple)):
         parts = [_value_of(part, scope) for part in node.elts]
@@ -539,18 +572,35 @@ def _value_of(node: ast.AST, scope: dict):
         return -inner if type(inner) in (int, float) else _MISSING
     if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub, ast.Mult)):
         left, right = _value_of(node.left, scope), _value_of(node.right, scope)
-        if type(left) is int and type(right) is int:
+        if type(left) is int and type(right) is int and left.bit_length() + right.bit_length() <= _MAX_BITS:
             return {ast.Add: left + right, ast.Sub: left - right, ast.Mult: left * right}[type(node.op)]
     if isinstance(node, ast.Subscript):
         seq, place = _value_of(node.value, scope), _value_of(node.slice, scope)
-        if isinstance(seq, (list, tuple)) and type(place) is int and -len(seq) <= place < len(seq):
-            return seq[place]
+        if type(seq) in (list, tuple) and type(place) is int and -len(seq) <= place < len(seq):
+            return seq[place]  # exact kinds only: a subclass's own `__len__` or `__getitem__` is the player's code
     return _MISSING
 
 
+_MAX_BITS = 64  # the biggest whole number these sentences will write out or do sums with: it keeps `str()` and `*` cheap and safe
+
+
+def _plain(value, depth: int = 0) -> bool:
+    """Whether `value` is of a built-in kind that can be written out with no player code and no surprises: a small
+    number, short text, a bool, None, or a short list or tuple of those. Exact kinds: a subclass can bring its own `__repr__`."""
+    kind = type(value)
+    if kind is int:
+        return value.bit_length() <= _MAX_BITS
+    if kind is str:
+        return len(value) <= 20
+    if kind in (float, bool, type(None)):
+        return True
+    return kind in (list, tuple) and depth < 3 and len(value) <= 6 and all(_plain(item, depth + 1) for item in value)
+
+
 def _shown(value) -> str | None:
-    """A value as the player wrote it, or None where it is unknown, None itself, or too long for a sentence."""
-    if value is _MISSING or value is None:
+    """A value as the player wrote it, or None where it is unknown, None itself, not plain (see `_plain`), or too long
+    for a sentence. It never calls the player's code (`safe_repr` would call a class's own `__repr__`)."""
+    if value is _MISSING or value is None or not _plain(value):
         return None
     text = repr(value)
     return text if len(text) <= 20 else None
@@ -558,19 +608,20 @@ def _shown(value) -> str | None:
 
 def _explain_past_the_end(kind: str, scope: dict, line: int | None) -> str:
     """A place past either end of a list or tuple. The length and the place come from the line's `a[i]`, when exactly one fits."""
-    hits = [
+    hits = {  # a set: a line that reads and writes the same place (`a[i] = a[i]`) names it once
         (len(seq), place)
         for node in _nodes_on(line, ast.Subscript)
-        if type(seq := _value_of(node.value, scope)).__name__ == kind
+        if type(seq := _value_of(node.value, scope)) in (list, tuple)
+        and type(seq).__name__ == kind
         and type(place := _value_of(node.slice, scope)) is int
         and not -len(seq) <= place < len(seq)
-    ]
-    if len(hits) != 1:
+    }
+    if len(hits) != 1 or next(iter(hits))[1].bit_length() > _MAX_BITS:  # too big a number to write into a sentence
         return (
             f"That place is past the end of the {kind}. Places count from 0, so a {kind} with 4 items ends at `[3]`; "
             "a negative place counts back from the end, and -1 is the last one."
         )
-    size, place = hits[0]
+    size, place = hits.pop()
     if size == 0:
         return f"That {kind} is empty, so there is nothing at `[{place}]`."
     if place >= 0:
@@ -637,7 +688,7 @@ def _explain_empty_pick(fn: str, scope: dict, line: int | None) -> str:
         and call.func.id == fn
         and len(call.args) == 1
         and not call.keywords
-        and isinstance(value := _value_of(call.args[0], scope), (list, tuple, str))
+        and type(value := _value_of(call.args[0], scope)) in (list, tuple, str)
         and len(value) == 0
     }
     what = {"list": "an empty list", "tuple": "an empty tuple", "str": "empty text"}[kinds.pop()] if len(kinds) == 1 else "something with no items in it"
@@ -653,7 +704,7 @@ def _sequences_ordered_on(line: int | None, scope: dict) -> list:
             found.append(_value_of(call.args[0], scope) if len(call.args) == 1 else [_value_of(arg, scope) for arg in call.args])
         elif isinstance(func, ast.Attribute) and func.attr == "sort":
             found.append(_value_of(func.value, scope))
-    return [seq for seq in found if isinstance(seq, (list, tuple))]
+    return [seq for seq in found if type(seq) in (list, tuple)]
 
 
 def _explain_unordered(left: str, right: str, scope: dict, line: int | None) -> str:
