@@ -1,10 +1,6 @@
 /* M5.3 (design sheet, dev-only): Chapter 8. Pane framing, the key, the door and the satchel. The game's own classes
    (src/styles.css) draw the board; the new art is drawn here, with the game's wire colours. */
 
-:root {
-  --slot-line: var(--border);
-}
-
 body {
   margin: 0;
   background: #070414;
@@ -306,96 +302,22 @@ body {
   align-items: start;
 }
 
-.satchel-box {
-  display: grid;
-  gap: 4px;
-  justify-items: start;
-  min-width: 0;
-}
-
-.satchel-head {
-  margin: 0;
-  display: flex;
-  gap: 8px;
-  font: 700 11px var(--font-display);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.satchel-head span {
-  font: 11px var(--font-code);
-  letter-spacing: 0;
-  color: var(--muted);
-}
-
-.satchel {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  gap: 4px;
-}
-
 .satchel-S1,
 .satchel-S3 {
+  flex-direction: row;
   flex-wrap: wrap;
   max-width: 280px;
 }
 
-.satchel-S2 {
-  flex-direction: column;
-}
-
-.chip,
-.slot {
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  border: 1px solid var(--slot-line);
-  background: var(--panel);
-}
-
-.slot {
-  border-style: dashed;
-}
-
-.satchel-S1 .chip,
-.satchel-S1 .slot {
+.satchel-S1 .satchel-chip,
+.satchel-S1 .satchel-slot {
   width: 72px;
-  height: 26px;
-  padding: 0 4px;
 }
 
-.satchel-S2 .chip,
-.satchel-S2 .slot {
-  width: 96px;
-  height: 26px;
-  padding: 0 4px;
-}
-
-.satchel-S3 .chip {
-  height: 26px;
+.satchel-S3 .satchel-chip {
+  width: auto;
   padding: 0 6px 0 4px;
   border-color: var(--wire-amber);
-}
-
-.glyph {
-  flex: none;
-  width: 24px;
-  height: 15px;
-}
-
-.glyph .k-line {
-  stroke-width: 2.6;
-}
-
-.chip-name {
-  font: 700 13px var(--font-code);
-  color: var(--text);
-  white-space: nowrap;
 }
 
 .chip-index {
