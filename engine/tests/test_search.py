@@ -197,13 +197,17 @@ def test_the_check_goes_through_the_bridge_in_slices():
 
 @pytest.mark.parametrize("path", LEVEL_FILES, ids=lambda path: path.stem)
 def test_every_repo_board_gets_the_same_answer_sliced_or_whole(path):
-    level = parse_level(yaml.safe_load(path.read_text(encoding="utf-8")))
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    level = parse_level(data)
     sliced = finish(Search(level, max_states=400_000))["results"]
-    if level.examine:  # an examiner level is one case, the whole level (M5.2-4b-3): the search doesn't call the function
-        assert [(r["status"], r["lines"]) for r in sliced] == [(EXAMINER, None)]
+    legends = [data.get("legend") or {}] + [(variant.get("legend") or {}) for variant in data.get("variants") or []]
+    has_keys = any(isinstance(entry, dict) and entry.get("tile") in ("key", "door") for legend in legends for entry in legend.values())
+    if level.examine or has_keys:  # declined whole, one case for the level: an examiner level (M5.2-4b-3), or keys and doors (until M5.5)
+        expected = EXAMINER if level.examine else KEYS
+        assert [(r["status"], r["lines"]) for r in sliced] == [(expected, None)]
         one = RouteSearch(level, 400_000)
         one.run()
-        assert one.status == EXAMINER
+        assert one.status == expected
         return
     whole = []
     for case in level.cases():
