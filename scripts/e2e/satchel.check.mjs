@@ -431,4 +431,114 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
     expect(wanting.every((sq) => end.label.includes(`The door on ${sq} is open`)) && end.doors.every((d) => d.open || end.label.includes(`The door on ${d.sq} is locked`)), `the label: ${end.label}`);
     return `a key picked up in ${plan.jumps.length} jumps; ${wanting.length} of ${end.doors.length} doors open`;
   });
+
+  /** Back to the first frame, then forward one step at a time to the last: the settled look at each frame. */
+  async function framesOf() {
+    const label = () => b.evaluate(`document.querySelector('.step-label').textContent`);
+    await press(0);
+    await b.waitFor(`/Step 0 /.test(document.querySelector('.step-label').textContent)`, 5000, "back at step 0");
+    const frames = [await settledLook()];
+    const total = Number(/of (\d+)/.exec(await label())?.[1]);
+    for (let i = 0; i < total; i++) {
+      const before = await label();
+      await press(3);
+      await b.waitFor(`document.querySelector('.step-label').textContent !== ${JSON.stringify(before)}`, 5000, "the next step");
+      frames.push(await settledLook());
+    }
+    return frames;
+  }
+
+  await check("M5.3: at every frame of the run, the keys the label still lists plus the keys in the satchel make the board's number of keys, and the tiles marked collected are the satchel's", async () => {
+    const { start } = await pickedUp();
+    const frames = await framesOf();
+    const total = start.keys.length;
+    expect(frames.length >= 3, `${frames.length} frames`);
+    const sums = frames.map((f) => f.left.length + f.chips.length);
+    expect(sums.every((n) => n === total), `at the frames, listed + carried is [${sums}] of ${total}`);
+    const tiles = frames.map((f) => f.keys.filter((k) => k.collected).length);
+    expect(same(tiles, frames.map((f) => f.chips.length)), `collected tiles [${tiles}], carried [${frames.map((f) => f.chips.length)}]`);
+    expect(frames[0].chips.length === 0 && frames.at(-1).chips.length === 1, `carried [${frames.map((f) => f.chips.length)}]`);
+    return `${frames.length} frames, listed + carried is ${total} at each; carried [${frames.map((f) => f.chips.length)}]`;
+  });
+
+  await check("M5.3: a rewind undoes it all (the satchel empty, the key on the board and in the label, the door locked) and the end, by Jump to end and by playing through, is as the run left it", async () => {
+    const { start, end } = await pickedUp();
+    await press(0);
+    await b.waitFor(`/Step 0 /.test(document.querySelector('.step-label').textContent)`, 5000, "back at step 0");
+    const back = await settledLook();
+    expect(back.chips.length === 0 && back.count === "0 of 8" && back.slots === 8 && same(facts(back), facts(start)), `at the start: ${JSON.stringify(facts(back))}`);
+    expect(end.chips.length === 1 && !same(facts(back), facts(end)), "the start and the end are not told apart");
+    await press(4);
+    await b.waitFor(`document.querySelector('.outcome-host .outcome')`, 10_000, "the outcome card at the end");
+    expect(same(facts(await settledLook()), facts(end)), "Jump to end does not show what the run ended with");
+    await press(0);
+    await press(2);
+    await b.waitFor(`document.querySelector('.outcome-host .outcome')`, 30_000, "the outcome card after playing through");
+    expect(same(facts(await settledLook()), facts(end)), "playing through does not show what the run ended with");
+    return "start, jump to end and play through each show the same satchel, label and tiles as before";
+  });
+
+  await check("M5.3: a new run starts empty: a program that does nothing ends with an empty satchel and every key on the board", async () => {
+    const { start, end } = await pickedUp();
+    expect(end.chips.length === 1, "the first run did not fill the satchel");
+    await setCode("pass\n");
+    const r = await run();
+    expect(r.head !== "Python stopped", brief(r));
+    const after = await settledLook();
+    expect(same(facts(after), facts(start)) && after.count === "0 of 8", `after: ${JSON.stringify(facts(after))}`);
+    return "the satchel is empty and every key is back on the board";
+  });
+
+  await check("M5.3: pick_up() where the knight starts stops with the friendly card naming that square, and the satchel stays empty", async () => {
+    const start = await openKeys();
+    await setCode(typed(["pick"]));
+    const r = await run();
+    const text = r.text.replace(/`/g, "");
+    expect(r.head === "Python stopped" && text.includes(`There is nothing to pick up on ${start.at}.`) && r.errorLine, brief(r));
+    const end = await settledLook();
+    expect(end.chips.length === 0 && end.count === "0 of 8" && same(facts(end), facts(start)), `the satchel: ${JSON.stringify(facts(end))}`);
+    return `the card names ${start.at}`;
+  });
+
+  /** The words of a carried list as Python writes them: ['bone'], [12]. */
+  const pyList = (names) => `[${names.map((n) => (/^\d+$/.test(n) ? n : `'${n}'`)).join(", ")}]`;
+
+  /** The shortest way over the stones to a door, from the start or from a key's stone after picking it up. Returns { parts, door, carried } or null. */
+  function doorPlan(view, carry) {
+    const starts = carry ? view.left.flatMap((key) => { const to = jumpsBetween(view, view.at, key.sq); return to ? [{ key, parts: [...to, "pick"], from: key.sq }] : []; }) : [{ key: null, parts: [], from: view.at }];
+    const plans = starts.flatMap(({ key, parts, from }) =>
+      view.doors.filter((d) => !key || d.wants !== key.name).flatMap((door) => {
+        const to = jumpsBetween(view, from, door.sq);
+        return to ? [{ parts: [...parts, ...to], jumps: parts.filter((p) => p !== "pick").length + to.length, door, carried: key ? [key.name] : [] }] : [];
+      }),
+    );
+    return plans.sort((p, q) => p.jumps - q.jumps)[0] ?? null;
+  }
+
+  async function stoppedAtDoor(carry) {
+    const start = await openKeys();
+    const plan = doorPlan(start, carry);
+    if (!plan || plan.jumps > 5) return { start, plan: null };
+    await setCode(typed(plan.parts));
+    const r = await run();
+    const text = r.text.replace(/`/g, "");
+    const words = `The door on ${plan.door.sq} is locked: it wants ${keyWords(plan.door.wants)}, and your satchel ${plan.carried.length ? `holds ${pyList(plan.carried)}` : "is empty"}.`;
+    return { start, plan, r, said: text.includes(words), end: await settledLook() };
+  }
+
+  await check("M5.3: landing on a locked door with an empty satchel stops with the friendly card naming the door's square and the key it wants, and saying the satchel is empty", async () => {
+    const { plan, r, said, end } = await stoppedAtDoor(false);
+    expect(plan, "no door can be reached over the stones the board shows within five jumps");
+    expect(r.head === "Python stopped" && said, brief(r));
+    expect(end.chips.length === 0, `the satchel holds ${end.chips.length} keys`);
+    return `the card names the door on ${plan.door.sq} and the key it wants, after ${plan.jumps} jumps`;
+  });
+
+  await check("M5.3: landing on a door that wants another key, with a key carried, says the satchel holds that key", async () => {
+    const { plan, r, said, end } = await stoppedAtDoor(true);
+    expect(plan, "no way picks up a key and lands on a door wanting another within five jumps");
+    expect(r.head === "Python stopped" && said, brief(r));
+    expect(end.chips.length === 1 && end.chips[0] === plan.carried[0], `the satchel holds [${end.chips}]`);
+    return `the card says the satchel holds the key carried, at the door on ${plan.door.sq} after ${plan.jumps} jumps`;
+  });
 }
