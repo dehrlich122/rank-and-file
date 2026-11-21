@@ -145,6 +145,15 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
     return "friendly card with the list's length, the last place and the place asked for";
   });
 
+  await check("M5.3: help([]) and help(sorted) in a run print the list entry and the sorted entry", async () => {
+    const r = await runMadeUp(HELP, "help([])\nhelp(sorted)\n");
+    expect(r.head !== "Python stopped", brief(r));
+    const at = (phrase) => r.console.indexOf(phrase);
+    const [list, listWords, sorted, sortedWords] = ["Help on list:", "Several values in a row under one name", "Help on sorted:", "Make a new list with the same items in order, smallest first."].map(at);
+    expect(list >= 0 && listWords > list && sorted > listWords && sortedWords > sorted, `phrases found at ${[list, listWords, sorted, sortedWords]} of ${r.console.length} characters`);
+    return "the list entry, then the sorted entry, in the console";
+  });
+
   // ---- The Codex ----
   /** Open level `id` and read its Codex tab: the group headings in order, and each entry's name, group and whether it is marked New. */
   async function codexOf(id) {
