@@ -1,0 +1,56 @@
+id: ch08-l04
+chapter: 8
+title: "Gathering"
+trains: "Building a list: an empty one, and append() adding to its end"
+brief: "The first stones each carry a number. The ladder beyond them has no signs at all: the numbers you passed are its route. Remember every one."
+piece: knight
+map: |
+  O O O O O O O O G O O
+  O O O O O O O O O O O
+  O O O O O O O . O O O
+  O O O O O O O O O O O
+  P O O O O O . O O O O
+  O O a O O O O O O O O
+  O O O O b O O . O O O
+  O O O O O O c O O O O
+  O O O O O O O O d O O
+legend: {"O": "pit", "a": {"tile": "rune", "text": "-1"}, "b": {"tile": "rune", "text": "-1"}, "c": {"tile": "rune", "text": "1"}, "d": {"tile": "rune", "text": "1"}}
+start: {"facing": "north"}
+api: ["jump", "read"]
+constraints: {"max_lines": 8}
+par: {"lines": 6}
+hints:
+- "The runes come first and the ladder after them, so the numbers have to be kept. How many names would that take, and how many lines?"
+- "Start with an empty list before the loop. On each rune stone, add its number to the end of the list with append: one line, however many runes there are. Turn the rune's text into a number first. After the last rune the list is the ladder's route: loop over it."
+- "Build the list, then use it:\nroute = []\nfor i in range(...):\n    ...\n    route.append(...)\nfor side in route:\n    ..."
+lesson: ch08/ch08-l04.md
+lesson_board:
+  map: |
+    . . . . . . .
+    . . . . . . .
+    . . . . . . .
+    P . . . . . .
+  start: {"facing": "north"}
+variants:
+- map: |
+    O O O O O O O O G O O
+    O O O O O O O O O O O
+    O O O O O O O O O . O
+    O O O O O O O O O O O
+    P O O O O O O O O O .
+    O O a O O O O O O O O
+    O O O O b O O O O . O
+    O O O O O O c O O O O
+    O O O O O O O O d O O
+  legend: {"a": {"tile": "rune", "text": "1"}, "b": {"tile": "rune", "text": "1"}, "c": {"tile": "rune", "text": "-1"}, "d": {"tile": "rune", "text": "-1"}}
+- map: |
+    O O O O O O O O G O O
+    O O O O O O O O O O O
+    O O O O O O O O O . O
+    O O O O O O O O O O O
+    P O O O O O O O . O O
+    O O a O O O O O O O O
+    O O O O b O O O O . O
+    O O O O O O c O O O O
+    O O O O O O O O d O O
+  legend: {"a": {"tile": "rune", "text": "1"}, "b": {"tile": "rune", "text": "-1"}, "c": {"tile": "rune", "text": "1"}, "d": {"tile": "rune", "text": "-1"}}

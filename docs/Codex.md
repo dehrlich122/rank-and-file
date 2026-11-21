@@ -151,3 +151,7 @@ when the player reuses the piece's name.
   Chapter 7 in play order, so its three knight levels (`practice-11` to `practice-13`, from
   `scripts/gen_knight.py`: the jump, jumping over and landing on, `knight.look(dx, dy)`) show `knight.jump` as
   brought in by 7.1; only `knight.look` is still brought in there, by `practice-13`.
+- Chapter 8 brings in *(M5.3)*: the kind `list` on 8.1 and `tuple` on 8.2, with `knight.position`;
+  `knight.pick_up` (an ability) and `knight.inventory` (a property: the satchel, a fresh list each time it is
+  asked for) on 8.3; `list.append`, the first entry under "Lists", on 8.4; and the built-ins `sorted`, `min`,
+  `max` and `sum` on 8.5, whose lesson calls all four. The mastery, 8.6, brings in nothing.

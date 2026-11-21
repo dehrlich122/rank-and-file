@@ -1,0 +1,61 @@
+id: ch08-l05
+chapter: 8
+title: "In Order"
+trains: "A whole list at once: sorted(), min() and max()"
+brief: "The keys of the vault are numbered. Two guards stand before it. The first asks for your smallest key. The second wants to hear all of them, smallest first."
+piece: knight
+map: |
+  P O O O O O O O O
+  O O O O O O O O O
+  O . O O O O O O O
+  O O O O O O O O O
+  a O . O O O O O O
+  O O O O O O O O O
+  O b O . O O O G O
+  O O O O O O . . O
+  O O c O . X Y O O
+  O O O O O O O . .
+  O O O d O O O O O
+legend: {"O": "pit", "a": {"tile": "key", "name": 32}, "b": {"tile": "key", "name": 12}, "c": {"tile": "key", "name": 4}, "d": {"tile": "key", "name": 26}, "X": {"tile": "gate", "question": "Halt! Which is the smallest key in your satchel? Answer with its number.", "passphrase": "4"}, "Y": {"tile": "gate", "question": "And now all of them, smallest first. Answer with the list, as print() shows a list.", "passphrase": "[4, 12, 26, 32]"}}
+start: {"facing": "north"}
+api: ["jump", "pick_up", "inventory"]
+par: {"lines": 14}
+hints:
+- "The keys' numbers differ on every board, so the answers can't be typed in. The satchel knows them."
+- "min gives the smallest item of a list. sorted gives a new list with the same items in order, smallest first, and leaves the first list as it was. The second guard wants the whole list, as print shows a list: square brackets and commas. Say each answer from the stone beside its gate."
+- "One line for each guard:\nprint(min(knight.inventory))\nprint(sorted(knight.inventory))"
+lesson: ch08/ch08-l05.md
+lesson_board:
+  map: |
+    . a . . .
+    . . . . .
+    P . b . .
+  legend: {"a": {"tile": "key", "name": 12}, "b": {"tile": "key", "name": 5}}
+  start: {"facing": "north"}
+variants:
+- map: |
+    P O O O O O O O O
+    O O O O O O O O O
+    O . O O O O O O O
+    O O O O O O O O O
+    a O . O O O O O O
+    O O O O O O O O O
+    O b O . O O O G O
+    O O O O O O . . O
+    O O c O . X Y O O
+    O O O O O O O . .
+    O O O d O O O O O
+  legend: {"a": {"tile": "key", "name": 39}, "b": {"tile": "key", "name": 16}, "c": {"tile": "key", "name": 3}, "d": {"tile": "key", "name": 7}, "X": {"tile": "gate", "question": "Halt! Which is the smallest key in your satchel? Answer with its number.", "passphrase": "3"}, "Y": {"tile": "gate", "question": "And now all of them, smallest first. Answer with the list, as print() shows a list.", "passphrase": "[3, 7, 16, 39]"}}
+- map: |
+    P O O O O O O O O
+    O O O O O O O O O
+    O . O O O O O O O
+    O O O O O O O O O
+    a O . O O O O O O
+    O O O O O O O O O
+    O b O . O O O G O
+    O O O O O O . . O
+    O O c O . X Y O O
+    O O O O O O O . .
+    O O O d O O O O O
+  legend: {"a": {"tile": "key", "name": 35}, "b": {"tile": "key", "name": 23}, "c": {"tile": "key", "name": 34}, "d": {"tile": "key", "name": 13}, "X": {"tile": "gate", "question": "Halt! Which is the smallest key in your satchel? Answer with its number.", "passphrase": "13"}, "Y": {"tile": "gate", "question": "And now all of them, smallest first. Answer with the list, as print() shows a list.", "passphrase": "[13, 23, 34, 35]"}}

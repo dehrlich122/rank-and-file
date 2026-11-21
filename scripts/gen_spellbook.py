@@ -711,36 +711,42 @@ def drawn(spec: dict, made: dict) -> dict:
     return {**spec, **made["level"], "piece": "knight", "facing": "north", "par": len(made["reference"]), "hints": [said(hint) for hint in spec["hints"]], "note": note}
 
 
-def confirmed(spec: dict, made: dict) -> list[str]:
+def confirmed(spec: dict, made: dict, chapter: int) -> list[str]:
     """The engine's own count of the fewest jumps on each board, against the stones'."""
     # a guard's gate can't be passed without the answer, so a board with one is counted with the gate left open
+    # (Chapter 8: its keys, doors and gates as plain stones)
     opened = {key: value for key, value in spec.items() if key != "rules"} if "open" in made else spec
-    level = parse_level(yaml.safe_load(yaml_text(drawn(opened, {**made, "level": made.get("open", made["level"])}), chapter=CHAPTER, api=spec["api"], par=99, hints=["", "", ""])))
+    level = parse_level(yaml.safe_load(yaml_text(drawn(opened, {**made, "level": made.get("open", made["level"])}), chapter=chapter, api=spec["api"], par=99, hints=["", "", ""])))
     fewest = [len(route) if (route := shortest(case.level, looks=False)) else None for case in level.cases()]
     print(f"  {made['shape']}; fewest jumps on each board, by the engine: {fewest}; along the stones: {made['lengths']}")
     return [] if fewest == made["lengths"] else [f"{spec['id']}: a board has another way than along its stones"]
 
 
-def made_of(spec: dict) -> dict | None:
-    return MAKERS[spec["kind"]](spec, random.Random(spec["seed"]))
+def writers(chapter: int, makers: dict):
+    """A chapter's `build_one` and `probe` (what `levelgen.main` takes): `makers` lays each kind of level and
+    builds its reference and wrong attempts; the files go to the chapter's folders. Chapter 8's generator
+    (gen_satchel.py) writes through this too."""
 
+    def made_of(spec: dict) -> dict | None:
+        return makers[spec["kind"]](spec, random.Random(spec["seed"]))
 
-def build_one(spec: dict) -> list[str]:
-    made = made_of(spec)
-    if made is None:
-        return [f"{spec['id']}: the search found no board for its plan"]
-    print(f"{spec['id']}:")
-    problems = odd(spec) + confirmed(spec, made)
-    return problems + build(drawn(spec, made), CHAPTER, spec["api"], lambda _draft: (text(made["reference"]), f"{code_lines(text(made['reference']))} lines", lambda kind, _level: text(made["wrong"][kind])))
+    def build_one(spec: dict) -> list[str]:
+        made = made_of(spec)
+        if made is None:
+            return [f"{spec['id']}: the search found no board for its plan"]
+        print(f"{spec['id']}:")
+        problems = odd(spec) + confirmed(spec, made, chapter)
+        return problems + build(drawn(spec, made), chapter, spec["api"], lambda _draft: (text(made["reference"]), f"{code_lines(text(made['reference']))} lines", lambda kind, _level: text(made["wrong"][kind])))
 
+    def probe(spec: dict) -> None:
+        made = made_of(spec)
+        print(f"{spec['id']} ({spec['title']}): " + ("no board for its plan" if made is None else f"a reference of {len(made['reference'])} lines"))
+        if made:
+            problems = odd(spec) + confirmed(spec, made, chapter)
+            print(f"  problems: {len(problems)}" + "".join(f"\n  {problem}" for problem in problems))
 
-def probe(spec: dict) -> None:
-    made = made_of(spec)
-    print(f"{spec['id']} ({spec['title']}): " + ("no board for its plan" if made is None else f"a reference of {len(made['reference'])} lines"))
-    if made:
-        problems = odd(spec) + confirmed(spec, made)
-        print(f"  problems: {len(problems)}" + "".join(f"\n  {problem}" for problem in problems))
+    return build_one, probe
 
 
 if __name__ == "__main__":
-    main(LEVELS, build_one, probe)
+    main(LEVELS, *writers(CHAPTER, MAKERS))

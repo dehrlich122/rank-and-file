@@ -1,0 +1,52 @@
+id: ch08-l03
+chapter: 8
+title: "The Satchel"
+trains: "The satchel: pick_up(), knight.inventory, and asking a list a question with in"
+brief: "Two keys lie by the road, and further on it forks: a brass door one way, an iron door the other. Your knight can't know which keys it will find. Its satchel can."
+piece: knight
+map: |
+  O O O O O G
+  O O O O O O
+  O O O O . O
+  O O O O O O
+  P O O D O E
+  O O . O O O
+  a O O O . O
+  O O b O O O
+legend: {"O": "pit", "a": {"tile": "key", "name": "iron"}, "b": {"tile": "key", "name": "bone"}, "D": {"tile": "door", "key": "brass"}, "E": {"tile": "door", "key": "iron"}}
+start: {"facing": "north"}
+api: ["jump", "pick_up", "inventory"]
+par: {"lines": 12}
+hints:
+- "Pick up both keys first. Which door to take is a question only the satchel can answer, and the answer differs from board to board."
+- "knight.inventory is a list of the keys picked up so far, by name. in asks whether a value is in a list, and gives True or False, so it can stand in an if. Ask about one door's key: take that door if it is there, the other door if it isn't."
+- "Ask the satchel, then choose:\nif \"brass\" in knight.inventory:\n    ...\nelse:\n    ..."
+lesson: ch08/ch08-l03.md
+lesson_board:
+  map: |
+    . a . . .
+    . . D . .
+    P . . . .
+  legend: {"a": {"tile": "key", "name": "brass"}, "D": {"tile": "door", "key": "brass"}}
+  start: {"facing": "north"}
+variants:
+- map: |
+    O O O O O G
+    O O O O O O
+    O O O O . O
+    O O O O O O
+    P O O D O E
+    O O . O O O
+    a O O O . O
+    O O b O O O
+  legend: {"a": {"tile": "key", "name": "iron"}, "b": {"tile": "key", "name": "brass"}}
+- map: |
+    O O O O O G
+    O O O O O O
+    O O O O . O
+    O O O O O O
+    P O O D O E
+    O O . O O O
+    a O O O . O
+    O O b O O O
+  legend: {"a": {"tile": "key", "name": "bone"}, "b": {"tile": "key", "name": "brass"}}
