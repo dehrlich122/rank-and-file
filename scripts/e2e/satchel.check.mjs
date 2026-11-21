@@ -1,10 +1,13 @@
 // End-to-end checks for Chapter 8, The Satchel (lists, tuples, a satchel of keys): that it is in the level list, that
 // every level opens, the lessons' error snippets and the called one, the Codex's new groups and entries, a list in the
-// variables panel and in an error, and help() on a list and on sorted. Nothing here pins how a key, a door or the
-// satchel is drawn (the designer's picks are still open). Every program typed here is made up: plain Python over
-// lists of numbers, never a route for a level, never a solution. Checks report facts (labels, counts, class names, the
-// words of a card), never the editor's contents.
-import { examinerHelpers, levelHelpers } from "./helpers.mjs";
+// variables panel and in an error, and help() on a list and on sorted; then keys, doors and the satchel played for real
+// on ch08-l03 (the page's own sentences and tiles, which follow the state the engine reports, through a run, a rewind and
+// the other boards). Every program typed in the first part is made up: plain Python over lists of numbers. The second part
+// types jumps it works out itself from what the board shows (a breadth-first search over a knight's jumps, never a stored
+// route): they are part of a way through a real level, so no check reports them, a program's text or an examiner's answer.
+// Checks report facts (labels, counts, class names, the words of a card), never the editor's contents.
+import { sleep } from "./cdp.mjs";
+import { examinerHelpers, levelHelpers, settingsHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const CHAPTER = ["ch08-l01", "ch08-l02", "ch08-l03", "ch08-l04", "ch08-l05", "ch08-l06"];
@@ -276,5 +279,156 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
     const [view, card] = [await examinerView(), await examinerCard()];
     expect(view.pressed.join() === String(last) && card.table.rows.findIndex((row) => row.picked) === last, `after the click: pressed [${view.pressed}]`);
     return `${m.rows} rows, widest first column ${Math.round(Math.max(...m.firstWidths))}px, narrowest wanted cell ${Math.round(Math.min(...m.wantedWidths))}px; the last row's button replays call ${m.rows}`;
+  });
+
+  // ---- Keys, doors and the satchel, played for real ----
+  const KEYS = "ch08-l03"; // three boards, text-named keys and doors, the first level with pick_up()
+  const NO_SATCHEL = "ch08-l01"; // no keys or doors on it: no satchel
+  const JUMPS = [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]];
+  const [file, rank] = [(sq) => sq.charCodeAt(0) - 97, (sq) => Number(sq.slice(1))];
+  const keyWords = (name) => (/^\d+$/.test(name) ? `key ${name}` : `the ${name} key`);
+
+  /** What the page shows of the board on show and its satchel, in one read: the board's label, its keys', doors' and pits' tiles by square (read off each tile's place in the drawing), and the satchel's rows. */
+  const READ = `(() => {
+    const stage = document.querySelector('.board-host .satchel-stage');
+    const board = stage?.querySelector('.board');
+    const box = stage?.querySelector('.satchel-box');
+    const label = board?.getAttribute('aria-label') ?? '';
+    const size = /(\\d+) by (\\d+) board/.exec(label);
+    const [width, height] = [Number(size?.[1]), Number(size?.[2])];
+    const at = (g) => {
+      const t = /translate\\(\\s*(-?[\\d.]+)[ ,]+(-?[\\d.]+)/.exec(g.querySelector('.spr')?.getAttribute('transform') ?? '');
+      return t ? String.fromCharCode(97 + Math.round((t[1] - 54) / 64)) + (height - Math.round((t[2] - 32) / 64)) : null;
+    };
+    const tiles = (selector) => [...(board?.querySelectorAll('.squares ' + selector) ?? [])];
+    return {
+      label, width, height,
+      keys: tiles('g.key').map((g) => ({ sq: at(g), collected: g.classList.contains('collected') })),
+      doorTiles: tiles('g.door').map((g) => ({ sq: at(g), open: g.classList.contains('open') })),
+      blocked: tiles('g.pit, g.wall, g.gate').map(at),
+      boxes: document.querySelectorAll('.satchel-box').length,
+      stages: document.querySelectorAll('.satchel-stage').length,
+      count: box?.querySelector('.satchel-head span')?.textContent ?? null,
+      chips: [...(box?.querySelectorAll('.satchel-chip-name') ?? [])].map((e) => e.textContent),
+      slots: box?.querySelectorAll('.satchel-slot').length ?? 0,
+    };
+  })()`;
+
+  /** READ, with the label's sentences read out: the knight's square, the keys still to pick up (name and square) and each door (square, open, the key it wants). */
+  async function look() {
+    const raw = await b.evaluate(READ);
+    const listed = /To pick up: ([^.]*)\./.exec(raw.label)?.[1];
+    const left = (listed ? listed.split(/, | and /) : []).map((item) => {
+      const m = /^(?:the (.+) key|key (.+)) on ([a-z]\d+)$/.exec(item);
+      expect(m, `a "To pick up" item the check cannot read: "${item}"`);
+      return { name: m[1] ?? m[2], sq: m[3] };
+    });
+    const doors = [...raw.label.matchAll(/The door on ([a-z]\d+) is (open|locked: it wants (?:the (.+?) key|key (\d+)))/g)].map((m) => ({ sq: m[1], open: m[2] === "open", wants: m[3] ?? m[4] ?? null }));
+    return { ...raw, at: /Your knight is on ([a-z]\d+)/.exec(raw.label)?.[1], left, doors };
+  }
+
+  /** The look at the moment the page has stopped changing: the label and the satchel unchanged for two reads, 150 ms apart. */
+  async function settledLook() {
+    let [view, last] = [await look(), null];
+    for (let i = 0; i < 25 && JSON.stringify([view.label, view.chips]) !== last; i++) {
+      last = JSON.stringify([view.label, view.chips]);
+      await sleep(150);
+      view = await look();
+    }
+    return view;
+  }
+
+  /** The jumps (as [dx, dy] pairs) from square `from` to square `to` over the stones the drawing shows: a breadth-first search; pits, walls, gates and every door but `to` are never landed on. null when there is no way. */
+  function jumpsBetween(view, from, to) {
+    const shut = new Set([...view.blocked, ...view.doors.map((d) => d.sq)].filter((sq) => sq !== to));
+    const came = new Map([[from, null]]);
+    const queue = [from];
+    for (let cur = queue.shift(); cur !== undefined; cur = queue.shift()) {
+      if (cur === to) {
+        const way = [];
+        for (let c = cur; came.get(c); c = came.get(c)[0]) way.unshift(came.get(c)[1]);
+        return way;
+      }
+      for (const [dx, dy] of JUMPS) {
+        const [x, y] = [file(cur) + dx, rank(cur) + dy];
+        const next = `${String.fromCharCode(97 + x)}${y}`;
+        if (x < 0 || x >= view.width || y < 1 || y > view.height || shut.has(next) || came.has(next)) continue;
+        came.set(next, [cur, [dx, dy]]);
+        queue.push(next);
+      }
+    }
+    return null;
+  }
+
+  /** The program for a list of parts: a [dx, dy] jump or "pick". */
+  const typed = (parts) => parts.map((p) => (p === "pick" ? "knight.pick_up()" : `knight.jump(${p[0]}, ${p[1]})`)).join("\n") + "\n";
+
+  /** The key to pick up first, with its way: one a door wants if there is one, then the shortest way. */
+  function keyPlan(view) {
+    const options = view.left.flatMap((key) => {
+      const jumps = jumpsBetween(view, view.at, key.sq);
+      return jumps ? [{ key, jumps, door: view.doors.find((d) => d.wants === key.name) ?? null }] : [];
+    });
+    return options.sort((p, q) => Number(!!q.door) - Number(!!p.door) || p.jumps.length - q.jumps.length)[0];
+  }
+
+  /** Everything the satchel and the board say, as plain facts to compare: the rows, the count, the keys still listed, each door's sentence and the tiles marked. */
+  const facts = (view) => ({
+    chips: view.chips, count: view.count, slots: view.slots, left: view.left.map((k) => `${k.name}@${k.sq}`),
+    doors: view.doors.map((d) => `${d.sq}:${d.open}`), collected: view.keys.filter((k) => k.collected).map((k) => k.sq), open: view.doorTiles.filter((d) => d.open).map((d) => d.sq),
+  });
+  const same = (p, q) => JSON.stringify(p) === JSON.stringify(q);
+
+  /** Open the keys level fresh and read it. */
+  async function openKeys() {
+    await openLevel(KEYS, { fresh: true });
+    return settledLook();
+  }
+
+  /** Open the keys level, work out a way to a key from what it shows, type it with a pick_up() and run it (to the last frame). */
+  async function pickedUp() {
+    const start = await openKeys();
+    const plan = keyPlan(start);
+    expect(plan, "no key can be reached by jumps over the stones the board shows");
+    await setCode(typed([...plan.jumps, "pick"]));
+    const r = await run();
+    return { start, plan, r, end: await settledLook() };
+  }
+
+  await check("M5.3: ch08-l03 opens with the satchel beside the large board, empty (0 of 8, eight slots, no key); the board's label lists the keys and a sentence per door; ch08-l01 has none", async () => {
+    const v = await openKeys();
+    expect(v.boxes === 1 && v.stages === 1, `${v.boxes} satchels, ${v.stages} stages`);
+    expect(v.count === "0 of 8" && v.slots === 8 && v.chips.length === 0, `count "${v.count}", ${v.slots} slots, ${v.chips.length} keys`);
+    const where = await b.evaluate(`({
+      wide: !!document.querySelector('.board-host .boards.boards-wide'),
+      inMain: !!document.querySelector('.boards-wide .boards-main .satchel-stage .satchel-box'),
+      inThumbs: document.querySelectorAll('.board-thumb .satchel-box, .boards-side .satchel-box').length,
+      thumbs: document.querySelectorAll('.board-host button.board-thumb').length,
+    })`);
+    expect(where.wide && where.inMain && where.inThumbs === 0 && where.thumbs >= 2, JSON.stringify(where));
+    expect(v.left.length >= 1 && v.left.length === v.keys.length, `${v.left.length} keys listed in the label, ${v.keys.length} drawn`);
+    expect(v.doors.length >= 1 && v.doors.length === (v.label.match(/ is locked/g) ?? []).length && v.doors.every((d) => !d.open && d.wants), `${v.doors.length} doors, ${(v.label.match(/ is locked/g) ?? []).length} "is locked" sentences`);
+    expect(v.keys.every((k) => !k.collected) && v.doorTiles.every((d) => !d.open) && v.doorTiles.length === v.doors.length, "a tile is marked before any run");
+    await openLevel(NO_SATCHEL, { fresh: true });
+    const none = await b.evaluate(`({ stage: document.querySelectorAll('.satchel-stage').length, box: document.querySelectorAll('.satchel-box').length })`);
+    expect(none.stage === 0 && none.box === 0, JSON.stringify(none));
+    return `${v.left.length} keys and ${v.doors.length} doors on the board; a satchel on ${KEYS}, none on ${NO_SATCHEL}`;
+  });
+
+  await check("M5.3: a key picked up for real: the satchel holds its name (1 of 8, seven slots), the label drops it, its tile is marked collected, the console says so, and the door that wants it reads open", async () => {
+    const { start, plan, r, end } = await pickedUp();
+    expect(r.head !== "Python stopped", brief(r));
+    const name = plan.key.name;
+    expect(end.chips.length === 1 && end.chips[0] === name && end.count === "1 of 8" && end.slots === 7, `chips [${end.chips}], count "${end.count}", ${end.slots} slots`);
+    expect(!end.left.some((k) => k.sq === plan.key.sq || k.name === name), `the label still lists the key: ${end.label}`);
+    expect(end.left.length === start.left.length - 1, `${end.left.length} keys left of ${start.left.length}`);
+    expect(end.keys.find((k) => k.sq === plan.key.sq)?.collected && end.keys.filter((k) => k.collected).length === 1, "its tile is not the one marked collected");
+    expect(new RegExp(`picked up[^.]*${name}`).test(r.console), "the console does not say the key was picked up");
+    // the doors that want it read open in the label and stand open in the drawing; the others stay locked
+    const wanting = start.doors.filter((d) => d.wants === name).map((d) => d.sq);
+    const [byLabel, byTile] = [end.doors.filter((d) => d.open).map((d) => d.sq), end.doorTiles.filter((d) => d.open).map((d) => d.sq)];
+    expect(same(byLabel, wanting) && same(byTile, wanting), `doors open by the label [${byLabel}], by the tiles [${byTile}]; wanting it [${wanting}]`);
+    expect(wanting.every((sq) => end.label.includes(`The door on ${sq} is open`)) && end.doors.every((d) => d.open || end.label.includes(`The door on ${d.sq} is locked`)), `the label: ${end.label}`);
+    return `a key picked up in ${plan.jumps.length} jumps; ${wanting.length} of ${end.doors.length} doors open`;
   });
 }
