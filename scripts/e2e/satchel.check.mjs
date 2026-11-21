@@ -50,4 +50,51 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
     expect(failed.length === 0, failed.join("; "));
     return `${CHAPTER.length} levels open without an exception`;
   });
+
+  // ---- The lessons' snippets (Learn panel) ----
+  /** Open lesson `id`, page to the step holding snippet `index`, run it and read what it shows: its ending status, the examiner's words, the error card. */
+  async function runLessonSnippet(id, index) {
+    await openLevel(id, { fresh: true });
+    for (let i = 0; i < index; i++) await b.evaluate(`document.querySelector('.lesson-pager .btn-primary').click()`);
+    const step = `document.querySelectorAll('.lesson .lesson-step')[${index}]`;
+    await b.waitFor(`${step}?.hidden === false`, 5000, `lesson step ${index} on show`);
+    await b.evaluate(`${step}.querySelector('.snippet .btn').click()`);
+    await b.waitFor(`/^[✓✗⏱]/.test(${step}.querySelector('.snippet-status').textContent)`, 30_000, "the snippet's ending status");
+    return b.evaluate(`(() => {
+      const s = ${step}.querySelector('.snippet');
+      const card = s.querySelector('.error-detail p');
+      return {
+        snippets: document.querySelectorAll('.lesson .snippet').length,
+        status: s.querySelector('.snippet-status').textContent,
+        caption: s.querySelector('.snippet-call code')?.textContent ?? null,
+        summary: s.querySelector('.snippet-summary').textContent,
+        card: card ? card.innerText.replace(/\\s+/g, ' ').trim() : null,
+        cardCodes: card ? card.querySelectorAll('code').length : 0,
+      };
+    })()`);
+  }
+
+  const ERROR_SNIPPETS = [
+    ["ch08-l01", "That list has 3 items, so the last one is at [2]: places count from 0. There is nothing at [3]."],
+    ["ch08-l02", "A tuple can't be changed once it is made. Build a new one, or use a list if the values have to change."],
+    ["ch08-l04", "The value here is None, which has no append. .append() changes the list itself and hands back nothing (None). Call it on a line of its own, and keep using the list's own name."],
+  ];
+  for (const [id, words] of ERROR_SNIPPETS) {
+    await check(`M5.3: ${id}'s lesson error snippet stops with the friendly card, in the lesson's words`, async () => {
+      const ran = await runLessonSnippet(id, 1);
+      expect(ran.snippets === 3, `${ran.snippets} snippets`);
+      expect(ran.status === "✗ Python stopped", `the status reads "${ran.status}"`);
+      expect(ran.card !== null && ran.card.includes(words), `the card reads "${ran.card}"`);
+      expect(!ran.card.includes("`"), "a backtick shows in the card");
+      return `card with ${ran.cardCodes} code spans`;
+    });
+  }
+
+  await check("M5.3: ch08-l01's third lesson snippet runs to its end, and its caption and summary name the examiner's call cross([1, -1])", async () => {
+    const ran = await runLessonSnippet("ch08-l01", 2);
+    expect(ran.snippets === 3 && ran.status === "✓ Finished", `${ran.snippets} snippets, status "${ran.status}"`);
+    expect(ran.caption === "cross([1, -1])", `the caption's call is "${ran.caption}"`);
+    expect(ran.summary.includes("cross([1, -1])") && !ran.summary.includes("`"), `the summary reads "${ran.summary}"`);
+    return ran.summary;
+  });
 }
