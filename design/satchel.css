@@ -2,13 +2,6 @@
    (src/styles.css) draw the board; the new art is drawn here, with the game's wire colours. */
 
 :root {
-  /* new tokens: the fill of a key and of a name plate (a floor square shows through nothing), the door's slab and the
-     dark doorway behind an open one */
-  --key-fill: light-dark(#fff3dc, #2b1d06);
-  --plate-fill: light-dark(#fff8e8, #1a1206);
-  --slab-fill: light-dark(#e4e0f8, #1a1240);
-  --doorway: var(--void);
-  --name-halo: light-dark(rgb(248 247 253 / 0.92), rgb(9 4 22 / 0.92));
   --slot-line: var(--border);
 }
 
@@ -154,67 +147,6 @@ body {
 .land .ink {
   stroke: var(--land);
   stroke-width: 3.4;
-}
-
-/* the new art: lit amber line work for the key (a thing to act on), violet for the door's structure; names are plain
-   text on a plate or a halo and carry no glow */
-.k-line,
-.d-line,
-.tag,
-.edge-rule {
-  stroke-width: 2.2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-
-.k-line {
-  fill: var(--key-fill);
-  stroke: var(--wire-amber);
-  filter: drop-shadow(0 0 1.8px var(--glow-amber));
-}
-
-.tag {
-  fill: var(--plate-fill);
-  stroke: var(--wire-amber);
-  filter: drop-shadow(0 0 1.8px var(--glow-amber));
-}
-
-.d-line {
-  stroke: var(--wire-wall);
-  filter: drop-shadow(0 0 1.8px var(--glow-wall, transparent));
-}
-
-.d-slab {
-  fill: var(--slab-fill);
-}
-
-.d-void {
-  fill: var(--doorway);
-}
-
-.d-grain {
-  fill: none;
-  stroke: var(--wire-wall);
-  stroke-width: 1.4;
-  opacity: 0.7;
-}
-
-.edge-rule {
-  fill: none;
-  stroke: var(--wire-amber);
-  opacity: 0.8;
-}
-
-.name {
-  fill: var(--text);
-  font-family: var(--font-code);
-  font-weight: 700;
-}
-
-.name.edge-name {
-  paint-order: stroke;
-  stroke: var(--name-halo);
-  stroke-width: 4px;
 }
 
 /* pane 3: the level screen's layout, the side panels as stand-ins */
