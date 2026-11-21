@@ -4,8 +4,8 @@
 //   npm run e2e                       all suites against http://localhost:5173/
 //   npm run e2e -- http://localhost:4173/ --only=app
 //
-// Suites: harness, app, ui, editor, share, free, functions. `functions` is the player's own functions (Chapter 7) and
-// runs alone in about a minute (--only=functions). `share` and `free` need the dev server (npm run dev): they make
+// Suites: harness, app, ui, editor, share, free, functions, satchel. `functions` is the player's own functions (Chapter 7) and
+// runs alone in about a minute (--only=functions); `satchel` is Chapter 8 (lists, tuples, the satchel). `share` and `free` need the dev server (npm run dev): they make
 // share codes in the page by importing src/share/codec.ts, and `free` also tries "Save to the repo", a dev-only
 // button (that check skips itself on a build).
 //
@@ -20,6 +20,7 @@ import editorChecks from "./editor.check.mjs";
 import freeChecks from "./free.check.mjs";
 import functionsChecks from "./functions.check.mjs";
 import harnessChecks from "./harness.check.mjs";
+import satchelChecks from "./satchel.check.mjs";
 import shareChecks from "./share.check.mjs";
 import uiChecks from "./ui.check.mjs";
 import { ChromeDied, createSuite } from "./suite.mjs";
@@ -30,7 +31,7 @@ const base = (args.find((arg) => /^https?:\/\//.test(arg)) ?? "http://localhost:
 const only = args.find((arg) => arg.startsWith("--only="))?.slice("--only=".length);
 const outDir = join(root, "e2e-results");
 
-const suites = { harness: harnessChecks, app: appChecks, ui: uiChecks, editor: editorChecks, share: shareChecks, free: freeChecks, functions: functionsChecks };
+const suites = { harness: harnessChecks, app: appChecks, ui: uiChecks, editor: editorChecks, share: shareChecks, free: freeChecks, functions: functionsChecks, satchel: satchelChecks };
 
 try {
   await fetch(base);
