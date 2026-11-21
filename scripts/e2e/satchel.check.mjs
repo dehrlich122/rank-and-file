@@ -541,4 +541,68 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
     expect(end.chips.length === 1 && end.chips[0] === plan.carried[0], `the satchel holds [${end.chips}]`);
     return `the card says the satchel holds the key carried, at the door on ${plan.door.sq} after ${plan.jumps} jumps`;
   });
+
+  await check("M5.3: code that changes knight.inventory in place gets the note, on its line, that the satchel fills only with pick_up()", async () => {
+    await openKeys();
+    await setCode('knight.inventory.append("brass")\n'); // made up: moves nothing, and is no route
+    const r = await run();
+    expect(r.warnMarks === 1, brief(r));
+    const spot = await b.evaluate(`(() => { const r = document.querySelector('.level-right .cm-lint-marker-warning').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    await b.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...spot });
+    try {
+      await b.waitFor(`document.querySelector('.cm-tooltip-lint .cm-diagnostic')`, 5000, "the warning's tooltip");
+      const note = (await b.evaluate(`document.querySelector('.cm-tooltip-lint .cm-diagnostic').textContent`)).replace(/`/g, "");
+      expect(note.includes("Your knight's satchel fills only with pick_up(). Changing knight.inventory changes a copy."), `the note reads "${note}"`);
+    } finally {
+      await b.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 });
+    }
+    expect((await settledLook()).chips.length === 0, "the satchel holds a key");
+    return "the warning on its line says the satchel fills only with pick_up(), and the satchel stayed empty";
+  });
+
+  await check("M5.3: the other boards: board 2 on show, at its end, adds up (listed + carried is its keys), board 1 put back shows its own satchel, and there is one satchel throughout", async () => {
+    const { end } = await pickedUp();
+    const oneSatchel = () => b.evaluate(`({ boxes: document.querySelectorAll('.satchel-box').length, wide: !!document.querySelector('.boards.boards-wide .boards-main .satchel-box'), thumbs: document.querySelectorAll('.board-thumb .satchel-box').length })`);
+    const replay = async (n) => {
+      await b.evaluate(`document.querySelector('button.board-thumb[title="Replay board ${n}"]').click()`);
+      await b.waitFor(`document.querySelector('.boards-caption')?.textContent.startsWith('Board ${n}')`, 10_000, `board ${n} on show`);
+      await press(4);
+      await b.waitFor(`document.querySelector('.outcome-host .outcome')`, 10_000, `board ${n}'s outcome card`);
+      return settledLook();
+    };
+    const two = await replay(2);
+    expect(two.left.length + two.chips.length === two.keys.length && two.keys.length >= 1, `board 2: ${two.left.length} listed + ${two.chips.length} carried of ${two.keys.length} keys`);
+    expect(two.keys.filter((k) => k.collected).length === two.chips.length && two.count === `${two.chips.length} of 8` && two.slots === 8 - two.chips.length, `board 2's satchel: count "${two.count}", ${two.slots} slots`);
+    const shape = await oneSatchel();
+    expect(shape.boxes === 1 && shape.wide && shape.thumbs === 0, JSON.stringify(shape));
+    const one = await replay(1);
+    expect(same(facts(one), facts(end)), `board 1 put back reads ${JSON.stringify(facts(one))}`);
+    expect(one.left.length + one.chips.length === one.keys.length, "board 1 does not add up");
+    return `board 2 ends carrying ${two.chips.length} of its ${two.keys.length} keys; board 1 is as its own run left it`;
+  });
+
+  // ---- Both themes ----
+  const { keepingSettings } = settingsHelpers(b);
+  const COLOURS = `(() => {
+    const css = (selector, property) => getComputedStyle(document.querySelector(selector))[property];
+    return { slot: css('.satchel-slot', 'borderTopColor'), key: css('.satchel-stage .board .key .k-line', 'stroke'), door: css('.satchel-stage .board .door .d-line', 'stroke'), page: css('body', 'backgroundColor') };
+  })()`;
+  const visible = (colour) => !!colour && colour !== "none" && colour !== "transparent" && !/^rgba\(.*,\s*0\)$/.test(colour) && !/\/\s*0\)$/.test(colour);
+
+  await check("M5.3: in the dark and the light theme the satchel's slot border, a key's line and a door's line are all coloured (not transparent), and the page's background differs between the themes", async () => {
+    await openLevel(KEYS, { fresh: true });
+    const seen = {};
+    await keepingSettings(async () => {
+      for (const theme of ["dark", "light"]) {
+        await b.evaluate(`localStorage.setItem('rank-and-file:settings', JSON.stringify({ ...JSON.parse(localStorage.getItem('rank-and-file:settings') ?? '{}'), theme: ${JSON.stringify(theme)} }))`);
+        await openLevel(KEYS, { fresh: true });
+        seen[theme] = await b.evaluate(COLOURS);
+        const unseen = Object.entries(seen[theme]).filter(([, colour]) => !visible(colour)).map(([what]) => what);
+        expect(unseen.length === 0, `in the ${theme} theme these have no colour: ${unseen.map((what) => `${what} "${seen[theme][what]}"`)}`);
+      }
+    });
+    expect(seen.dark.page !== seen.light.page, `the page's background is ${seen.dark.page} in both themes`);
+    expect(seen.dark.slot !== seen.light.slot || seen.dark.key !== seen.light.key, "no colour changed with the theme");
+    return `dark and light: slot border, key line, door line coloured; the page ${seen.dark.page} then ${seen.light.page}`;
+  });
 }
