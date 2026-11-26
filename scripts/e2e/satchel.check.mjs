@@ -282,7 +282,7 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
   });
 
   // ---- Keys, doors and the satchel, played for real ----
-  const KEYS = "ch08-l03"; // three boards, text-named keys and doors, the first level with pick_up()
+  const KEYS = "ch08-l03"; // two boards, text-named keys and doors, the first level with pick_up()
   const NO_SATCHEL = "ch08-l01"; // no keys or doors on it: no satchel
   const JUMPS = [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]];
   const [file, rank] = [(sq) => sq.charCodeAt(0) - 97, (sq) => Number(sq.slice(1))];
@@ -405,7 +405,7 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
       inThumbs: document.querySelectorAll('.board-thumb .satchel-box, .boards-side .satchel-box').length,
       thumbs: document.querySelectorAll('.board-host button.board-thumb').length,
     })`);
-    expect(where.wide && where.inMain && where.inThumbs === 0 && where.thumbs >= 2, JSON.stringify(where));
+    expect(where.wide && where.inMain && where.inThumbs === 0 && where.thumbs >= 1, JSON.stringify(where));
     expect(v.left.length >= 1 && v.left.length === v.keys.length, `${v.left.length} keys listed in the label, ${v.keys.length} drawn`);
     expect(v.doors.length >= 1 && v.doors.length === (v.label.match(/ is locked/g) ?? []).length && v.doors.every((d) => !d.open && d.wants), `${v.doors.length} doors, ${(v.label.match(/ is locked/g) ?? []).length} "is locked" sentences`);
     expect(v.keys.every((k) => !k.collected) && v.doorTiles.every((d) => !d.open) && v.doorTiles.length === v.doors.length, "a tile is marked before any run");
