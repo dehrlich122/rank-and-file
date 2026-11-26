@@ -218,6 +218,18 @@ describe("YAML", () => {
     expect(parseYaml("a: yes\nb: 'yes'")).toEqual({ a: true, b: "yes" }); // why it matters
   });
 
+  it("round-trips a gate's label, and writes no label key for a gate without one", () => {
+    const d = blankDraft(3, 1);
+    d.goal = null;
+    d.cells[0]![1] = { tile: "gate", passphrase: "a", question: "Well?", label: "WELL" };
+    d.cells[0]![2] = { tile: "gate", passphrase: "b", question: "Or?" };
+    const back = yamlToDraft(draftToYaml(d));
+    expect(back.cells[0]![1]!.label).toBe("WELL");
+    expect("label" in back.cells[0]![2]!).toBe(false);
+    const legend = Object.values(draftToLevelData(d).legend as Record<string, Record<string, unknown>>);
+    expect(legend.map((entry) => "label" in entry)).toEqual([true, false]);
+  });
+
   it("round-trips text with colons, quotes and leading symbols", () => {
     const d: Draft = blankDraft(3, 1);
     d.goal = null;
@@ -243,6 +255,14 @@ describe("what the board draws", () => {
     expect(info.enemies[1]).toEqual({ kind: "rook", route: [[3, 2]], loop: false, clock: "action", armoured: false });
     expect(info.start).toMatchObject({ pos: [0, 0], facing: "east", planks: 1, enemies: [[1, 0], [3, 2]] });
     expect(info.goal).toEqual([3, 3]);
+  });
+
+  it("carries a gate's label into its question's entry, and none where there is no label", () => {
+    const labelled = FILE.replace('X: {tile: gate, question: "How many?", passphrase: "yes"}', 'X: {tile: gate, question: "How many?", label: "COUNT", passphrase: "yes"}');
+    const d = draft(labelled);
+    expect(d.cells[2]![1]!.label).toBe("COUNT");
+    expect(draftToLevelInfo(d).questions).toEqual([{ pos: [1, 2], text: "How many?", label: "COUNT" }]);
+    expect("label" in draftToLevelInfo(draft()).questions[0]!).toBe(false);
   });
 
   it("sorts hidden-goal squares by file, then rank, as the engine does", () => {
