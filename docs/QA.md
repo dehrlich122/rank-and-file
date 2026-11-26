@@ -2033,6 +2033,26 @@ The designer's play-test of Chapter 8, in progress. Findings as they come.
 - **Its e2e check** (M5.3-Q67, `d40278e`): one `satchel` check expected at least two small boards beside the
   large one on 8.3, and there is one now; an `implementer` changed the number and a comment. `satchel` 26 of 26.
 
+### QA-068 · 8.5 In Order: two gates side by side, both marked "?" · Open, being built; the words wait for the designer
+
+- **Observed** *(Designer, 2026-11-26)*: "8.5 the gates with two question marks don't scan easily better to
+  replace the '?' with a real piece of information, like 'max' and 'list'".
+- **Why it happens:** every guard's gate that asks a question carries the same badge, "?" (`board.ts`, the
+  gate's art); what it asks is in its tooltip and in the Challenge panel only. 8.5 is the first level with two
+  such gates on neighbouring squares, so the board itself does not say which guard asks what.
+- **The fix, as a rule for every level:** a gate in a level file may carry a short `label` (1 to 8 characters,
+  only on a gate that asks a question), and the board shows it in the badge where "?" is; a gate without one
+  keeps "?". The engine checks it and reports it with the gate's question; the editor's gate gets the field
+  too (it builds its fields from what the engine offers). No older level changes.
+  - Eight characters is what the badge holds inside one square (its pill is 6.5 units a character plus 8, in
+    a square of 64).
+  - On 8.5 a square is about 31 px at 1400 by 860 (the hand-test list's item 11), so the badge's text is under
+    5 px high there, whatever it says. The words help most once that board is larger.
+- **Packages:** Q68-1 the engine and the protocol; Q68-2 the board and the editor; then 8.5's two labels
+  (level content, Fable's, by the generator); Q68-3 the e2e check.
+- **The words, for the designer:** "min" would name the built-in the level asks the player to find. See the
+  options put to him (2026-11-26).
+
 ---
 
 ## Queued work
