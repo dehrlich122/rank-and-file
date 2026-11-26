@@ -58,7 +58,7 @@ export interface LevelInfo {
   runes: Array<{ pos: Pos; text: string }>; // the text on each rune tile, which `pawn.read()` gives back (M3.6)
   keys?: Array<{ pos: Pos; name: string | number }>; // each key's name, only on a board with keys (M5.3)
   doors?: Array<{ pos: Pos; key: string | number }>; // the key each door wants, only on a board with doors (M5.3)
-  questions: Array<{ pos: Pos; text: string }>; // what the guard asks, at gates that ask (never the answer)
+  questions: Array<{ pos: Pos; text: string; label?: string }>; // what the guard asks, at gates that ask (never the answer); label: a short word for the badge, where the level gives one (QA-068)
   timed_gates: Array<{ pos: Pos; every: number; open: number; clock: Clock; text: string }>; // open for the first `open` ticks of every `every` (QA-024); text: its rule in words
   enemies: Enemy[]; // patrols and chasers; where they are is in each WorldState
   goal: Pos | null;
