@@ -12,6 +12,7 @@ export interface Cell {
   text?: string; // a sign's words, or a rune's
   passphrase?: string; // a gate's answer
   question?: string; // what a gate asks
+  label?: string; // a short word for the gate's badge, instead of "?"
   every?: number; // a timed gate: opens and shuts every this many ticks...
   open?: number; // ...and is open for this many of them
   clock?: Clock; // a timed gate's clock
@@ -59,7 +60,7 @@ export interface Draft {
   extra: Record<string, unknown>; // the level file's other keys, kept as they were
 }
 
-export const DETAIL_KEYS = ["text", "passphrase", "question", "every", "open", "clock"] as const;
+export const DETAIL_KEYS = ["text", "passphrase", "question", "label", "every", "open", "clock"] as const;
 export const FACINGS: Facing[] = ["north", "east", "south", "west"];
 export const ENEMY_KINDS: Array<Enemy["kind"]> = ["patrol", "chaser", "rook", "bishop"];
 /** The enemy keys that are copied as they are (a route is squares, so it has its own handling). */
@@ -166,7 +167,7 @@ export function draftToLevelInfo(draft: Draft): LevelInfo {
     tiles: cells.map((row) => row.map((cell) => cell.tile)),
     signs: squares.filter(({ cell }) => cell.tile === "sign").map(({ cell, pos }) => ({ pos, text: cell.text ?? "" })),
     runes: squares.filter(({ cell }) => cell.tile === "rune").map(({ cell, pos }) => ({ pos, text: cell.text ?? "" })),
-    questions: squares.filter(({ cell }) => cell.tile === "gate" && cell.question !== undefined).map(({ cell, pos }) => ({ pos, text: cell.question! })),
+    questions: squares.filter(({ cell }) => cell.tile === "gate" && cell.question !== undefined).map(({ cell, pos }) => ({ pos, text: cell.question!, ...(cell.label !== undefined && { label: cell.label }) })),
     timed_gates: timedGates,
     enemies: draft.enemies.map((enemy) => ({
       kind: enemy.kind,

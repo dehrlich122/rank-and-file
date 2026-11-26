@@ -439,8 +439,8 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
   wall: (left, top) => wall(left, top),
   sign: (left, top, level, pos) => signpost(left, top, find(level.signs, pos)?.text ?? ""),
   gate: (left, top, level, pos) => {
-    const question = find(level.questions, pos)?.text;
-    return question ? gate(left, top, `The guard asks: "${question}"`, "?") : gate(left, top, "A locked gate. A guard keeps it shut.");
+    const asked = find(level.questions, pos);
+    return asked?.text ? gate(left, top, `The guard asks: "${asked.text}"`, asked.label ?? "?") : gate(left, top, "A locked gate. A guard keeps it shut.");
   },
   timed_gate: (left, top, level, pos) => {
     const timer = find(level.timed_gates, pos);
