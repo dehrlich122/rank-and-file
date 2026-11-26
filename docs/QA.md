@@ -2033,7 +2033,7 @@ The designer's play-test of Chapter 8, in progress. Findings as they come.
 - **Its e2e check** (M5.3-Q67, `d40278e`): one `satchel` check expected at least two small boards beside the
   large one on 8.3, and there is one now; an `implementer` changed the number and a comment. `satchel` 26 of 26.
 
-### QA-068 · 8.5 In Order: two gates side by side, both marked "?" · Open, being built; the words wait for the designer
+### QA-068 · 8.5 In Order: two gates side by side, both marked "?" · Fixed: a gate may carry a word; 8.5's say "smallest" and "in order"
 
 - **Observed** *(Designer, 2026-11-26)*: "8.5 the gates with two question marks don't scan easily better to
   replace the '?' with a real piece of information, like 'max' and 'list'".
@@ -2050,8 +2050,22 @@ The designer's play-test of Chapter 8, in progress. Findings as they come.
     5 px high there, whatever it says. The words help most once that board is larger.
 - **Packages:** Q68-1 the engine and the protocol; Q68-2 the board and the editor; then 8.5's two labels
   (level content, Fable's, by the generator); Q68-3 the e2e check.
-- **The words, for the designer:** "min" would name the built-in the level asks the player to find. See the
-  options put to him (2026-11-26).
+- **The words, for the designer:** "min" would name the built-in the level asks the player to find. Three
+  pairs were put to him: "smallest" / "in order" (what each guard asks, in the brief's words; recommended),
+  "number" / "list" (the kind of answer), "min" / "list" (nearest his example).
+- **Decided** *(Designer, 2026-11-26)*: "smallest" / "in order".
+- **Done:** Q68-1 `54a16ec` (the rule in the engine, the protocol), Q68-2 `0216adf` (the badge, the editor's
+  field "A word on the gate (optional)"), 8.5's labels `458e319` (level content), Q68-3 `795a59d` (e2e). The
+  details are in `docs/M5/M5.3.md`, "As built", QA1. After the last merge, from the main checkout: `npm run
+  check` exit 0, `satchel` 28 of 28, `editor` 50 of 50; `app` 161 of 161 after Q68-2.
+- **Pinned in e2e:** on 8.5 the left gate says "smallest" and the right one "in order", neither says "?", each
+  tooltip still gives the whole question, each pill sits inside its own square and they do not touch; an
+  older gate (The Toll, `practice-08`) still says "?"; in the editor the word's field follows the question's,
+  the badge follows the field, and the engine's two sentences answer a word with no question and a word of 9
+  characters.
+- **Measured, and left with item 11 of the hand-test list:** at 1400 by 860 each pill on 8.5 is 28.9 px wide
+  with 1.9 px between them, so eight characters are about 3 px each. The words are there and they fit; they
+  are small because that board is (about 31 px a square beside the satchel).
 
 ---
 
