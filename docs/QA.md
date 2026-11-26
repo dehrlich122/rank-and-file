@@ -2001,7 +2001,7 @@ by one)*. The pass started the `/simplify` pass on the M5.2 diff.
 
 The designer's play-test of Chapter 8, in progress. Findings as they come.
 
-### QA-067 · 8.3 The Satchel: boards 1 and 2 ask the same thing of the program · Open, waits for the designer's pick
+### QA-067 · 8.3 The Satchel: boards 1 and 2 ask the same thing of the program · Fixed: two boards
 
 - **Observed** *(Designer, 2026-11-26)*: "8.3 how are boards 1 and 2 different? they accept the exact same
   solution..."
@@ -2023,6 +2023,15 @@ The designer's play-test of Chapter 8, in progress. Findings as they come.
      first item, as 8.1 taught) then fails, and `in` is what the level needs. Boards 1 and 2 still both pass
      a program that always takes the iron door.
   3. Leave it: the board where either door opens stays as a board with nothing to decide.
+- **Decided** *(Designer, 2026-11-26)*: option 1. "yeah drop it to 2 boards, it's enough to get the point across
+  and the third board was a red herring."
+- **Done** (`4996341`): `scripts/gen_satchel.py` draws as before and drops the pair that opens both doors, so
+  the map and the other two boards are as they were: board 1 holds iron and bone, board 2 bone and brass. Only
+  the level file changed (ten lines out). The reference, its note, the hints, par (12 lines) and the lesson are
+  unchanged; the reference solves both boards with three stars and the three wrong attempts end as before. No
+  hint and no note speaks of a number of boards (counted by a script, not read). `npm run check` exit 0.
+- **Its e2e check** (M5.3-Q67, `d40278e`): one `satchel` check expected at least two small boards beside the
+  large one on 8.3, and there is one now; an `implementer` changed the number and a comment. `satchel` 26 of 26.
 
 ---
 
