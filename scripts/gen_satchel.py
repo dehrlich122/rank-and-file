@@ -291,7 +291,8 @@ KEYS = 4  # 8.5's keys
 
 def answers_of(numbers: list[int]) -> dict:
     """The two guards of a board whose keys carry `numbers`."""
-    return {"X": {"tile": "gate", "question": SMALLEST, "passphrase": str(min(numbers))}, "Y": {"tile": "gate", "question": ALL, "passphrase": str(sorted(numbers))}}
+    asked = {"X": (SMALLEST, "smallest", str(min(numbers))), "Y": (ALL, "in order", str(sorted(numbers)))}  # the labels: QA-068, the designer's pick
+    return {symbol: {"tile": "gate", "question": question, "label": label, "passphrase": answer} for symbol, (question, label, answer) in asked.items()}
 
 
 def guarded(spec: dict, rng: random.Random) -> dict | None:
