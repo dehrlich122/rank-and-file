@@ -1997,6 +1997,33 @@ No finding, so no QA item. He overruled none of the choices the build made (`doc
 "for QA1"): they stand *(the orchestrator's reading: he raised no objection; the wordings were not answered one
 by one)*. The pass started the `/simplify` pass on the M5.2 diff.
 
+## Session 21 — 2026-11-26 · M5.3 QA1, Chapter 8, The Satchel (`m5-3-chapter-8`, PR #29)
+
+The designer's play-test of Chapter 8, in progress. Findings as they come.
+
+### QA-067 · 8.3 The Satchel: boards 1 and 2 ask the same thing of the program · Open, waits for the designer's pick
+
+- **Observed** *(Designer, 2026-11-26)*: "8.3 how are boards 1 and 2 different? they accept the exact same
+  solution..."
+- **Why it happens:** the three boards share one map and differ only in which two of the three keys lie on the
+  two key stones. Board 1 holds iron and bone (only the iron door opens), board 2 iron and brass (**both** doors
+  open), board 3 bone and brass (only the brass door opens). Board 2 refuses nothing: whichever door a program
+  takes, it passes. So a program that never asks the satchel anything and always takes the iron door passes
+  boards 1 and 2 and stops at the locked door on board 3. The level as a whole still needs the question (boards
+  1 and 3 between them), but board 2 adds nothing to it.
+- **Where it came from:** the spec's "two of three kinds, a different two on every board". Three kinds have
+  exactly three pairs, and one of them is the pair that opens both doors.
+- **A limit worth knowing:** with two doors, any three boards include two that want the same door. Only two
+  boards, or a third door, give boards that each refuse what another accepts.
+- **Options, for the designer:**
+  1. *Two boards (recommended):* drop board 2. One board opens only the iron door, the other only the brass
+     door; nothing is there twice. Par and the lesson stay; the hints and the note are checked for "three boards".
+  2. *Three boards, board 2 given a job:* board 2 holds the same two keys as board 1 with the stones swapped,
+     so the key that matters is picked up at the other stone. A program that asks the satchel by place (the
+     first item, as 8.1 taught) then fails, and `in` is what the level needs. Boards 1 and 2 still both pass
+     a program that always takes the iron door.
+  3. Leave it: the board where either door opens stays as a board with nothing to decide.
+
 ---
 
 ## Queued work
