@@ -95,6 +95,7 @@ class Board:
     signs: dict[Pos, str] = field(default_factory=dict)  # text written on sign tiles
     gates: dict[Pos, str] = field(default_factory=dict)  # the passphrase for each gate
     questions: dict[Pos, str] = field(default_factory=dict)  # what the guard asks, at gates that ask (M3.1)
+    labels: dict[Pos, str] = field(default_factory=dict)  # a short word for the badge at gates that ask, where the level gives one (QA-068)
     timers: dict[Pos, Timer] = field(default_factory=dict)  # when each timed gate is open (M3.1)
     runes: dict[Pos, str] = field(default_factory=dict)  # text written on rune tiles (M3.6)
     keys: dict[Pos, str | int] = field(default_factory=dict)  # each key's name (M5.3)

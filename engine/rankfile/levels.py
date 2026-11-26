@@ -57,7 +57,7 @@ BUILTIN_SYMBOLS = {".": Tile.FLOOR, "#": Tile.WALL, START: Tile.FLOOR, GOAL: Til
 # details each one needs, then the ones it may add.
 TILE_DETAILS: dict[Tile, tuple[set[str], set[str]]] = {
     Tile.SIGN: ({"text"}, set()),
-    Tile.GATE: ({"passphrase"}, {"question"}),
+    Tile.GATE: ({"passphrase"}, {"label", "question"}),
     Tile.TIMED_GATE: ({"every"}, {"clock", "open"}),
     Tile.RUNE: ({"text"}, set()),
     Tile.KEY: ({"name"}, set()),  # M5.3: a name is text or a whole number
@@ -124,7 +124,8 @@ MAX_SIDE = 12  # squares along a board's edge (M4.2): the editor's limit, and a 
 MAX_BOARDS = 6  # a level and its other maps (M4.3); the repo's most is 4
 # How long each free-text field may be, and how many hints and enemies a level may have (M4.3). They guard what
 # arrives in a shared level; every level in the repo fits (engine/tests/test_editor_levels.py), well within them.
-LIMITS = {"title": 60, "brief": 600, "trains": 200, "hint": 600, "hints": 5, "text": 300, "enemies": 12, "solution": 2000, "starter": 2000}
+# "label" is how long a gate's label may be: the short word on the board where the guard's "?" would be (QA-068).
+LIMITS = {"title": 60, "brief": 600, "trains": 200, "hint": 600, "hints": 5, "text": 300, "label": 8, "enemies": 12, "solution": 2000, "starter": 2000}
 
 
 @dataclass
@@ -467,7 +468,10 @@ class Level:
             ],
             "signs": [{"pos": list(pos), "text": text} for pos, text in self.board.signs.items()],
             "runes": [{"pos": list(pos), "text": text} for pos, text in self.board.runes.items()],
-            "questions": [{"pos": list(pos), "text": text} for pos, text in self.board.questions.items()],
+            "questions": [
+                {"pos": list(pos), "text": text, **({"label": self.board.labels[pos]} if pos in self.board.labels else {})}
+                for pos, text in self.board.questions.items()
+            ],  # a label only where the level gives one (QA-068)
             "timed_gates": [{"pos": list(pos), **asdict(timer), "text": gate_rule(pos, timer)} for pos, timer in self.board.timers.items()],
             "enemies": [
                 {"kind": enemy.kind, "route": [list(pos) for pos in enemy.route], "loop": enemy.loop, "clock": enemy.clock, "armoured": enemy.armoured}
@@ -637,6 +641,8 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
                 board.gates[(x, y)] = details[symbol]["passphrase"]
                 if "question" in details[symbol]:
                     board.questions[(x, y)] = details[symbol]["question"]
+                if "label" in details[symbol]:
+                    board.labels[(x, y)] = details[symbol]["label"]
             if tile is Tile.TIMED_GATE:
                 board.timers[(x, y)] = Timer(**details[symbol])
             if tile is Tile.KEY:
@@ -679,10 +685,19 @@ def _parse_details(symbol: str, tile: Tile, meaning: dict) -> dict:
                 raise LevelError(f"legend {symbol!r}: a {tile.value} needs {key}: text or a whole number")
             if isinstance(value, str) and len(value) > LIMITS["text"]:
                 raise LevelError(f"legend {symbol!r}: the {key} may be at most {LIMITS['text']} characters")
+        elif key == "label":  # a gate's label: a short word for the board's badge (QA-068)
+            if not isinstance(value, str):
+                raise LevelError(f"legend {symbol!r}: a gate's label must be text")
+            if not value.strip():
+                raise LevelError(f"legend {symbol!r}: a gate's label can't be empty")
+            if len(value) > LIMITS["label"]:
+                raise LevelError(f"legend {symbol!r}: a gate's label may be at most {LIMITS['label']} characters")
         elif not isinstance(value, str) or not value:
             raise LevelError(f"legend {symbol!r}: a {tile.value} needs {key}")
         elif len(value) > LIMITS["text"]:
             raise LevelError(f"legend {symbol!r}: the {key} may be at most {LIMITS['text']} characters")
+    if "label" in details and "question" not in details:
+        raise LevelError(f"legend {symbol!r}: a gate's label needs a question, because the label is the question in a word")
     open_for = details.get("open", Timer.open)
     if tile is Tile.TIMED_GATE and details["every"] <= open_for:
         raise LevelError(f"legend {symbol!r}: a timed gate's every must be more than its open ({open_for}), or it would never shut")
