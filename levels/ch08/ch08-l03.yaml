@@ -39,14 +39,4 @@ variants:
     O O . O O O
     a O O O . O
     O O b O O O
-  legend: {"a": {"tile": "key", "name": "iron"}, "b": {"tile": "key", "name": "brass"}}
-- map: |
-    O O O O O G
-    O O O O O O
-    O O O O . O
-    O O O O O O
-    P O O D O E
-    O O . O O O
-    a O O O . O
-    O O b O O O
   legend: {"a": {"tile": "key", "name": "bone"}, "b": {"tile": "key", "name": "brass"}}

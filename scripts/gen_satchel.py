@@ -180,7 +180,8 @@ SATCHEL = {  # 8.3's fixed lines
 def forked(spec: dict, rng: random.Random) -> dict | None:
     """Two road stones with a key one jump off each (the same jumps both times), then a fork: two doors a jump
     from the second road stone, two squares apart, which join again one jump on; the goal is a jump beyond.
-    Three boards on one map: each holds a different two of the three kinds of key."""
+    Two boards on one map: each holds one door's key and the kind no door wants, so each board opens one door
+    and neither door opens on both. (QA-067: a third board, holding both doors' keys, refused nothing.)"""
     for _ in range(TRIES):
         road, spur, last, a = (rng.choice(KNIGHT_JUMPS) for _ in range(4))
         b = (-a[0], a[1]) if abs(a[0]) == 1 else (a[0], -a[1])  # the other door: the first one's mirror
@@ -199,6 +200,7 @@ def forked(spec: dict, rng: random.Random) -> dict | None:
     marks = {stones[3]: RUNES[0], stones[4]: RUNES[1], stones[5]: "D", stones[6]: "E"}
     drawn = board(stones, size, marks)
     held = [rng.sample(pair, 2) for pair in rng.sample(list(combinations(KINDS, 2)), 3)]
+    held = [pair for pair in held if set(pair) != set(KINDS[:2])]  # drawn as before, so the other two boards stay
     doors = {"D": {"tile": "door", "key": KINDS[0]}, "E": {"tile": "door", "key": KINDS[1]}}
     line = {key: said(value) for key, value in SATCHEL.items()}
     fetch = [FOR.format("i", 2), *indented([JUMP(*road), JUMP(*spur), PICK, JUMP(*back(spur))])]
@@ -212,7 +214,7 @@ def forked(spec: dict, rng: random.Random) -> dict | None:
             "nokey": [PICK, *fetch, *by_first, end],
             "byhand": [line["byhand"].format(KINDS[0]), *fetch, *by_first, end],
         },
-        "shape": f"{len(stones)} stones, 3 boards, both doors open on {sum(set(pair) == set(KINDS[:2]) for pair in held)} of them",
+        "shape": f"{len(stones)} stones, {len(held)} boards, both doors open on {sum(set(pair) == set(KINDS[:2]) for pair in held)} of them",
         "fills": {},
         "lengths": [5],
     }
