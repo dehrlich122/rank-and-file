@@ -1124,4 +1124,41 @@ export default async function editorChecks({ browser: b, base, root, check }) {
     expect((await hashNow()) === "#/free/sandbox", "the level screen did not open for a goal put back");
     return "refused: editor with Problems, Write code disabled; accepted again: level screen";
   });
+
+  // -- QA-068: a gate's word ---------------------------------------------------------------------------------------
+  const gateBadges = () => b.evaluate(`[...document.querySelectorAll('.ed-board .board .squares g.gate:not(.timed-gate) .badge-text')].map((e) => e.textContent)`);
+  const waitBadges = (wanted, what) => b.waitFor(`JSON.stringify([...document.querySelectorAll('.ed-board .board .squares g.gate:not(.timed-gate) .badge-text')].map((e) => e.textContent)) === ${JSON.stringify(JSON.stringify(wanted))}`, 30_000, what);
+
+  await check("QA-068: a gate's word: its field follows the question's, the board's badge says the word (and ? again when it is emptied), the engine's sentences answer a word with no question and one that is too long", async () => {
+    await newLevel();
+    await tool("Gate");
+    await click(3, 3);
+    await setValue("The answer that opens it", "alpha");
+    const captions = await b.evaluate(`[...document.querySelectorAll('.props .field > .field-label')].map((e) => e.textContent)`);
+    const [asks, word] = [captions.indexOf("What the guard asks (optional)"), captions.indexOf("A word on the gate (optional)")];
+    expect(asks >= 0 && word === asks + 1, `captions: ${captions.join(" | ")}`);
+    await setValue("What the guard asks (optional)", "Who goes?");
+    await waitBadges(["?"], "the gate's ? badge");
+    await setValue("A word on the gate (optional)", "smallest");
+    await waitBadges(["smallest"], "the gate's word on the board");
+    await settled();
+    expect((await problemsText()).includes("None"), `problems: ${await problemsText()}`);
+    await setValue("A word on the gate (optional)", "");
+    await waitBadges(["?"], "? back on the gate once the word is emptied");
+    // a word with no question: the engine's sentence
+    await setValue("A word on the gate (optional)", "abc");
+    await setValue("What the guard asks (optional)", "");
+    await waitText(".ed-problems", `t.includes('needs a question')`, "the engine's sentence about a word needing a question");
+    expect(await b.evaluate(`document.querySelector('.ed-toolbar .btn-primary').disabled`),"Test-play should wait while the draft has this problem");
+    // a word of 9 characters with a question: the engine's other sentence
+    await setValue("What the guard asks (optional)", "Who goes?");
+    await setValue("A word on the gate (optional)", "abcdefghi");
+    await waitText(".ed-problems", `t.includes('at most 8 characters')`, "the engine's sentence about a word too long");
+    // 8 characters is the longest the engine takes
+    await setValue("A word on the gate (optional)", "abcdefgh");
+    await waitBadges(["abcdefgh"], "an 8-character word on the board");
+    await settled();
+    expect((await problemsText()).includes("None") && !(await b.evaluate(`document.querySelector('.ed-toolbar .btn-primary').disabled`)), `problems: ${await problemsText()}`);
+    return `captions in order (question ${asks + 1}, word ${word + 1}); badge "?" -> word -> "?"; both of the engine's sentences shown; ${(await gateBadges()).length} gate on the board`;
+  });
 }
