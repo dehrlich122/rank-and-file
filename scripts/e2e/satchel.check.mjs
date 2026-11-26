@@ -605,4 +605,31 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
     expect(seen.dark.slot !== seen.light.slot || seen.dark.key !== seen.light.key, "no colour changed with the theme");
     return `dark and light: slot border, key line, door line coloured; the page ${seen.dark.page} then ${seen.light.page}`;
   });
+
+  // ---- A guard's gate says a word (QA-068) ----
+  /** Every guard's gate with a badge on the board on show (not the other boards' small pictures): its badge's words, its tooltip, and (from the page's own geometry) the left and right edges of its square and of its pill. */
+  const GATE_BADGES = `[...document.querySelectorAll('.board-host .board .squares g.gate:not(.timed-gate)')].filter((g) => g.querySelector('.badge-group') && !g.closest('.board-thumb')).map((g) => {
+    const [square, pill] = [g.previousElementSibling.getBoundingClientRect(), g.querySelector('.badge-group rect.badge').getBoundingClientRect()];
+    return { badge: g.querySelector('.badge-text').textContent, tip: g.querySelector(':scope > title')?.textContent ?? '', square: [square.left, square.right], pill: [pill.left, pill.right] };
+  })`;
+
+  await check("QA-068: 8.5's two guards' gates say a word each (smallest, then in order), each tooltip still gives the guard's whole question, and the pills sit inside their own squares without touching", async () => {
+    await openLevel(HELP, { fresh: true });
+    const gates = (await b.evaluate(GATE_BADGES)).sort((p, q) => p.square[0] - q.square[0]);
+    expect(gates.length === 2, `${gates.length} guard's gates with a badge`);
+    expect(gates[0].badge === "smallest" && gates[1].badge === "in order", `badges "${gates.map((g) => g.badge)}"`);
+    expect(gates.every((g) => g.badge !== "?"), "a gate still says ?");
+    expect(gates.every((g) => g.tip.startsWith('The guard asks: "') && g.tip.length - 'The guard asks: ""'.length > g.badge.length), `tooltips ${gates.map((g) => g.tip.length)} characters long`);
+    expect(gates.every((g) => g.pill[0] >= g.square[0] - 0.5 && g.pill[1] <= g.square[1] + 0.5), `pill [${gates.map((g) => `${g.pill[0].toFixed(1)}..${g.pill[1].toFixed(1)}`)}] in squares [${gates.map((g) => `${g.square[0].toFixed(1)}..${g.square[1].toFixed(1)}`)}]`);
+    const gap = gates[1].pill[0] - gates[0].pill[1];
+    expect(gap >= 0, `the pills overlap by ${(-gap).toFixed(1)}px`);
+    return `pill widths ${gates.map((g) => (g.pill[1] - g.pill[0]).toFixed(1)).join(" and ")}px, ${gap.toFixed(1)}px between them`;
+  });
+
+  await check("QA-068: an older guard's gate with no label still says ? (The Toll, practice-08)", async () => {
+    await openLevel("practice-08", { fresh: true });
+    const gates = await b.evaluate(GATE_BADGES);
+    expect(gates.length >= 1 && gates.every((g) => g.badge === "?" && g.tip.startsWith('The guard asks: "')), `badges "${gates.map((g) => g.badge)}"`);
+    return `${gates.length} guard's gate says ?`;
+  });
 }
