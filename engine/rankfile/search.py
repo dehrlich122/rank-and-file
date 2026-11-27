@@ -13,8 +13,9 @@ watchdog, and a big board (many gems, an enemy) can be cancelled by not asking a
 
 Code clocks (`line`, `new_line`) depend on how the code is written, not just on the route, so levels with
 clockwork obstacles are beyond it. So are examiner levels (M5.2): there the player's program only defines a function
-and the examiner calls it, so a route of plain calls says nothing; the whole level is declined, once. So are levels with keys or doors (M5.3): the search doesn't pick up keys or
-open doors yet, and declines them whole until M5.5 teaches it.
+and the examiner calls it, so a route of plain calls says nothing; the whole level is declined, once. So are levels
+with keys or doors (M5.3): the search doesn't pick up keys or open doors yet, and declines them whole until M5.5
+teaches it.
 """
 
 import time
@@ -58,11 +59,8 @@ class RouteSearch:
         self._queue: list[tuple] = []
         self._best: dict[tuple, tuple[int, int]] = {}  # the cheapest (lines, turns) that reach each state
         self._reached = 0  # positions reached, kept once the frontier is dropped
-        if level.examine:
-            self._finish(EXAMINER)
-            return
-        if _has_keys(level):
-            self._finish(KEYS)
+        if reason := _declined(level):
+            self._finish(reason)
             return
         start = World(level)
         if start.code_clocked:
@@ -138,7 +136,7 @@ class Search:
 
     def __init__(self, level: Level, max_states: int = MAX_STATES):
         # An examiner level, or one with keys or doors, is declined whole: one case, not one per call or board.
-        declined = level.examine or _has_keys(level)
+        declined = _declined(level)
         self.cases: list[Case] = [Case("level", "on this level", level)] if declined else level.cases()
         self._unit = "place" if level.goal_spots else "board"  # what a case is, for the words around the answer
         self._searches = [RouteSearch(case.level, max_states) for case in self.cases]
@@ -170,9 +168,12 @@ class Search:
         return {"label": case.label, "where": case.where, "status": search.status, "lines": search.lines if search.status == ROUTE else None, "positions": search.positions}
 
 
-def _has_keys(level: Level) -> bool:
-    """Whether any board of the level has a key or a door (the search doesn't follow them yet, M5.5)."""
-    return any(board.board.keys or board.board.doors for board in (level, *level.variants))
+def _declined(level: Level) -> str | None:
+    """Why the whole level is declined (EXAMINER, or KEYS: a key or a door on any board, which the search doesn't
+    follow yet, M5.5), or None when it is searched."""
+    if level.examine:
+        return EXAMINER
+    return KEYS if any(board.board.keys or board.board.doors for board in (level, *level.variants)) else None
 
 
 def _actions(level: Level) -> list[tuple]:
