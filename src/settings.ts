@@ -6,7 +6,7 @@ type Theme = "system" | "light" | "dark";
 type Motion = "system" | "full" | "reduced";
 export type CodeSize = "small" | "medium" | "large" | "x-large";
 type CodePanel = "right" | "bottom" | "left";
-export type Piece = "pawn" | "knight"; // which skin the player's piece wears (DESIGN.md §8); a locked one reads as the pawn
+export type Piece = "pawn" | "knight" | "bishop"; // which skin the player's piece wears (DESIGN.md §8); a locked one reads as the pawn
 
 export interface Settings {
   speed: number; // playback speed multiplier
@@ -29,7 +29,7 @@ const STORAGE_KEY = "rank-and-file:settings";
 const THEMES: readonly Theme[] = ["system", "light", "dark"];
 const MOTIONS: readonly Motion[] = ["system", "full", "reduced"];
 const CODE_PANELS: readonly CodePanel[] = ["right", "bottom", "left"];
-const PIECES: readonly Settings["piece"][] = ["auto", "pawn", "knight"];
+const PIECES: readonly Settings["piece"][] = ["auto", "pawn", "knight", "bishop"];
 const PIECE_AUTO_KEY = "rank-and-file:settings-piece-auto"; // present once the one-time move from "pawn" to "auto" has run
 
 export class SettingsStore {

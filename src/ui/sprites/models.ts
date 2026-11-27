@@ -1,6 +1,7 @@
 // Every model of the look: each piece and tile as a mesh (faces) plus loose 3D lines (bars,
 // text, glyphs). The world is drawn as wire, the hero as solid, enemies as broken wire (draw.ts).
 import { box, lathe, merge, type Face, type Model, type V3 } from "./mesh";
+import type { Decal } from "./draw";
 
 export interface Shape {
   model: Model;
@@ -136,6 +137,48 @@ export const knightEyes: Array<{ pts: V3[]; n: V3 }> = [
   { pts: [[-17, 41.5, -8.2], [-10, 43.5, -8.2], [-10, 41, -8.2], [-17, 39.5, -8.2]], n: [0, 0, -1] },
   { pts: [[-24.3, 36.6, 2.2], [-24.3, 39.4, 7.4], [-24.3, 37.6, 7.4], [-24.3, 35, 2.2]], n: [-1, 0, 0] },
   { pts: [[-24.3, 36.6, -2.2], [-24.3, 39.4, -7.4], [-24.3, 37.6, -7.4], [-24.3, 35, -2.2]], n: [-1, 0, 0] },
+];
+
+// -- the hero's bishop (the Prelate) ----------------------------------------------------------------
+
+export type Profile = Array<[number, number]>; // (height, radius), bottom up
+export const SEGMENTS = 10; // a facet is centred on the front (+z), so a lit mark there sits on one flat face
+const APOTHEM = Math.cos(Math.PI / SEGMENTS);
+
+/** The radius of a profile at a height, by interpolation. */
+function radiusAt(profile: Profile, y: number): number {
+  for (let i = 0; i + 1 < profile.length; i++) {
+    const [[h0, r0], [h1, r1]] = [profile[i]!, profile[i + 1]!];
+    if (y >= h0 && y <= h1 && h1 > h0) return r0 + ((r1 - r0) * (y - h0)) / (h1 - h0);
+  }
+  return profile[profile.length - 1]![1];
+}
+
+/**
+ * A lit mark on a turned body, laid on its surface a hair proud of it: points (x, height). It is on the front
+ * (+z) unless `back`. Its normal follows the body's slope, so it lights from the side it faces.
+ */
+export function onBody(profile: Profile, quad: Array<[number, number]>, back = false): Decal {
+  const side = back ? -1 : 1;
+  const y = quad.reduce((s, q) => s + q[1], 0) / quad.length;
+  const slope = (radiusAt(profile, y - 1) - radiusAt(profile, y + 1)) / 2;
+  const l = Math.hypot(slope, 1);
+  return { pts: quad.map(([x, py]): V3 => [side * x, py, side * (radiusAt(profile, py) * APOTHEM + 0.6)]), n: [0, slope / l, side / l] };
+}
+
+const PRELATE: Profile = [[0, 19], [3.5, 19], [6, 15.5], [10, 12.5], [21, 8.6], [24, 11.4], [27.5, 11.4], [28.5, 8], [33, 11.6], [40, 11.8], [47, 9], [54, 6], [61, 3], [66, 0]];
+
+/** The mitre and a collar on the hero's solid body, with the Charger's own base. Faces +z. */
+export function prelateModel(): Model {
+  return lathe(PRELATE, SEGMENTS);
+}
+
+/** The mitre's slanted cut lit from inside, two lit eyes on the neck, and the ribbon of the mitre down its back. */
+export const prelateLit: Decal[] = [
+  onBody(PRELATE, [[-7, 36.5], [-4, 35], [6.5, 49.5], [3.5, 51.5]]),
+  onBody(PRELATE, [[-6.5, 18.5], [-2.6, 18], [-2.6, 16.2], [-6.5, 16.8]]),
+  onBody(PRELATE, [[2.6, 18], [6.5, 18.5], [6.5, 16.8], [2.6, 16.2]]),
+  onBody(PRELATE, [[-1.5, 52], [1.5, 52], [1.8, 33], [-1.8, 33]], true),
 ];
 
 // -- tiles ---------------------------------------------------------------------------------------

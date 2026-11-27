@@ -1,5 +1,5 @@
 // Every sprite of the look, each centred on (0, 0) in its 64-unit square and staying inside it.
-//   the hero (pawn or knight skin): solid, the only floor shadow, HUD brackets that show its facing
+//   the hero (pawn, knight or bishop skin): solid, the only floor shadow, HUD brackets that show its facing
 //   enemies (rook, bishop, chaser): broken magenta wire, glitching now and then
 //   tiles: clean wire. Violet for structure, amber for things to act on, green for text the world holds
 // The registry at the bottom says which sprite each tile kind and enemy kind uses (board.ts).
@@ -7,14 +7,14 @@ import type { Enemy, Facing, TileKind } from "../../py/protocol";
 import { svg as el } from "../svg";
 import { fit, floor, pawnModel, project, pts, rookModel, rookSlit, wallModel, yaw, type Model, type V3 } from "./mesh";
 import { broken, fitShape, live, solid, wire, type Decal, type Frame } from "./draw";
-import { beaconShape, bishopCut, bishopModel, brickLines, gateShape, gemShape, knightEyes, knightModel, pitShape, plankShape, runeShape, signShape, virusEyes, virusModel, waypointShape, type Shape } from "./models";
+import { beaconShape, bishopCut, bishopModel, brickLines, gateShape, gemShape, knightEyes, knightModel, pitShape, prelateLit, prelateModel, plankShape, runeShape, signShape, virusEyes, virusModel, waypointShape, type Shape } from "./models";
 
 let ids = 0;
 const uid = (prefix: string) => `sprite-${prefix}-${++ids}`;
 
 // -- the hero ---------------------------------------------------------------------------------------
 
-export type Skin = "pawn" | "knight";
+export type Skin = "pawn" | "knight" | "bishop";
 
 // The low-poly pawn's visor points here after pawnModel's own turn; each facing turns it there.
 const VISOR = Math.PI / 2 + Math.PI / 8 + 0.25;
@@ -22,6 +22,9 @@ const PAWN_FACING: Record<Facing, number> = { east: 0.35, west: Math.PI - 0.35, 
 // The knight's head points along -x; a facing turns it, a little toward us for east and west. North and south are a
 // three-quarter turn, not straight away or toward us, so one cheek and its eye show (both lean to the same side).
 const KNIGHT_TURN: Record<Facing, number> = { west: -0.3, east: 0.3 - Math.PI, south: -Math.PI / 2 + 0.55, north: Math.PI / 2 - 0.55 };
+
+// The Prelate faces +z (south); east and west turn a little toward us, north a little short of straight away.
+const PRELATE_TURN: Record<Facing, number> = { south: 0, east: -Math.PI / 2 + 0.5, west: Math.PI / 2 - 0.5, north: Math.PI - 0.5 };
 
 const turn = (angle: number) => {
   const [c, s] = [Math.cos(angle), Math.sin(angle)];
@@ -64,10 +67,10 @@ export const hero = (skin: Skin, face: Facing): SVGElement => cached(`hero:${ski
 
 function buildHero(skin: Skin, face: Facing): SVGElement {
   if (skin === "pawn") return drawHero(yaw(pawnModel("low"), PAWN_FACING[face] - VISOR), [], face);
-  // the knight's head points along -x; a facing turns it, and its lit details turn with it
-  const angle = KNIGHT_TURN[face];
-  const lit = knightEyes.map((d) => ({ pts: d.pts.map(turn(angle)), n: turn(angle)(d.n) }));
-  return drawHero(yaw(knightModel(), angle), lit, face);
+  // the knight's head points along -x, the Prelate's front is +z; a facing turns it, and its lit details turn with it
+  const [angle, decals] = skin === "knight" ? [KNIGHT_TURN[face], knightEyes] : [PRELATE_TURN[face], prelateLit];
+  const lit = decals.map((d) => ({ pts: d.pts.map(turn(angle)), n: turn(angle)(d.n) }));
+  return drawHero(yaw(skin === "knight" ? knightModel() : prelateModel(), angle), lit, face);
 }
 
 /** The hero's drawing: brackets that show the facing, the floor shadow, and the solid model. */

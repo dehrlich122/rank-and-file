@@ -61,7 +61,7 @@ afterAll(() => {
 
 const draw = (art: unknown) => art as Node;
 const FACINGS: Facing[] = ["north", "east", "south", "west"];
-const SKINS: Skin[] = ["pawn", "knight"];
+const SKINS: Skin[] = ["pawn", "knight", "bishop"];
 
 describe("the registry", () => {
   it("draws every kind of tile except the floor", () => {
@@ -117,8 +117,14 @@ describe("the hero", () => {
     expect(shown("south") % 2).toBe(1);
   });
 
-  it("draws both skins differently", () => {
-    expect(text(draw(hero("pawn", "east")))).not.toBe(text(draw(hero("knight", "east"))));
+  it("draws the three skins differently", () => {
+    const [pawn, knight, bishop] = (["pawn", "knight", "bishop"] as const).map((skin) => text(draw(hero(skin, "east"))));
+    expect(new Set([pawn, knight, bishop]).size).toBe(3);
+  });
+
+  it("shows the bishop's lit marks in all four facings", () => {
+    const lit = (node: Node | string): number => (typeof node === "string" ? 0 : (node.attrs.class === "s-lit" ? 1 : 0) + node.children.reduce<number>((n, child) => n + lit(child), 0));
+    for (const face of FACINGS) expect(lit(draw(hero("bishop", face))), face).toBeGreaterThan(0);
   });
 });
 
