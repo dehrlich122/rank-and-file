@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { asFake, type Fake, fakeDocument } from "./dom.fake";
-import { applyList, boardsText, listControls, starsText, type ListState } from "./listControls";
+import { applyList, boardsText, listControls, showTier, starsText, type ListState } from "./listControls";
 
 const any: ListState = { tier: null, difficulty: null, sort: "order" };
 type Item = { id: string; tier: string | null; difficulty: number | null };
@@ -72,6 +72,18 @@ describe("listControls", () => {
     expect(row.controls.state()).toEqual({ tier: null, difficulty: null, sort: "hardest" });
     expect([row.tier!.value, row.difficulty!.value]).toEqual(["", ""]);
     expect(changes).toBe(4);
+  });
+  it("opens a list on one tier: difficulty any, the sort kept, other lists untouched", () => {
+    const first = rowOf("shown");
+    choose(first.tier, "pawn");
+    choose(first.difficulty, "2");
+    choose(first.sort, "hardest");
+    showTier("shown", "knight");
+    const row = rowOf("shown");
+    expect(row.controls.state()).toEqual({ tier: "knight", difficulty: null, sort: "hardest" });
+    const chosen = (select: Fake | undefined) => select!.all("option").filter((o) => o.attributes.has("selected")).map((o) => o.attributes.get("value"));
+    expect([chosen(row.tier), chosen(row.difficulty)]).toEqual([["knight"], [""]]);
+    expect(rowOf("not-shown").controls.state()).toEqual(any);
   });
   it("labels each select and offers Any first", () => {
     const row = asFake(listControls("c", ["pawn"], () => {}).element);

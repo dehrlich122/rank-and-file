@@ -11,6 +11,7 @@ import { asRecord, browserStorage, readJson, writeJson } from "../storage";
 import { BoardView } from "./board";
 import { h } from "./dom";
 import { icon } from "./icons";
+import { showTier } from "./listControls";
 import { crown } from "./sprites";
 import { svg } from "./svg";
 import { tierLabel } from "./tags";
@@ -194,7 +195,7 @@ export function mountLessons(main: HTMLElement, chapters: Chapter[], progress: P
       h("h2", { class: "tier-head" }, tierName(tier, i + 1)),
       ...chapters.filter((c) => c.curriculum && c.tier === tier).map(folder),
       // outside the arrow-key list (it walks folder heads and rows); Tab reaches it
-      ...(tierHasChallenges(tier) ? [h("a", { class: "tier-next", href: "#/free/challenges" }, `Next: the ${tierLabel(tier)} tier's challenges, in Free Play →`)] : []),
+      ...(tierHasChallenges(tier) ? [h("a", { class: "tier-next", href: "#/free/challenges", onClick: () => showTier("challenges", tier) }, `Next: the ${tierLabel(tier)} tier's challenges, in Free Play →`)] : []),
     ]),
     ...(outside.length ? [h("h2", { class: "tier-head" }, VOICE.outside), ...outside.map(folder)] : []),
   );

@@ -76,6 +76,11 @@ export function listControls(listId: string, tiers: string[], onChange: () => vo
   };
 }
 
+/** Open `listId` on one tier's items the next time it is built: that tier, difficulty any, the sort it had. */
+export function showTier(listId: string, tier: string): void {
+  remembered.set(listId, { tier, difficulty: null, sort: remembered.get(listId)?.sort ?? "order" });
+}
+
 /** What a list says when its filters leave nothing, with the way out. */
 export const noMatchRow = (clear: () => void): HTMLElement =>
   h("li", { class: "muted" }, "No levels match these filters. ", h("button", { class: "btn btn-small", onClick: clear }, "Clear filters"));

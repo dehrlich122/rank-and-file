@@ -38,6 +38,13 @@ export const SKIN_NAMES: Record<Piece, string> = { pawn: "Pawn", knight: "Charge
 /** The chapter that closes `tier`: clearing it earns the promotion. */
 export const lastChapterOf = (tier: string) => chapters.filter((chapter) => chapter.curriculum && chapter.tier === tier).at(-1);
 
+/** No curriculum chapter of a later tier follows `tier`'s last one: nothing comes after this tier yet. */
+export function isLastTier(tier: string, list: Array<{ curriculum: boolean; tier: string }> = chapters): boolean {
+  const curriculum = list.filter((c) => c.curriculum);
+  const at = curriculum.findLastIndex((c) => c.tier === tier);
+  return at >= 0 && curriculum.slice(at + 1).every((c) => c.tier === tier);
+}
+
 /** Every core level of the tier's last chapter is solved. */
 export function tierCleared(tier: string, store: ProgressStore = progress): boolean {
   const last = lastChapterOf(tier);

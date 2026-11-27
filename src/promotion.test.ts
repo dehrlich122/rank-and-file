@@ -1,12 +1,29 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { chapters } from "./content";
 import { ProgressStore } from "./progress";
-import { PROMOTIONS, SKIN_NAMES, tierCleared, unlockedPieces, wornPiece } from "./promotion";
+import { isLastTier, PROMOTIONS, SKIN_NAMES, tierCleared, unlockedPieces, wornPiece } from "./promotion";
 import { sanitize, settings } from "./settings";
 import { memoryStorage } from "./storage.fake";
 
 const tier = (name: string) => chapters.filter((c) => c.curriculum && c.tier === name).at(-1)!.levels; // the tier's last chapter
 const solve = (store: ProgressStore, ids: string[]) => ids.forEach((id) => store.update(id, { stars: 1 }));
+
+describe("isLastTier", () => {
+  it("is true for the Knight tier and false for the Pawn tier, with the real chapters", () => {
+    expect(isLastTier("knight")).toBe(true);
+    expect(isLastTier("pawn")).toBe(false);
+    expect(isLastTier("nowhere")).toBe(false);
+  });
+  it("is false while a later tier's chapter follows, and ignores chapters outside the curriculum", () => {
+    const list = [
+      { curriculum: true, tier: "a" },
+      { curriculum: true, tier: "b" },
+      { curriculum: false, tier: "a" },
+    ];
+    expect(isLastTier("a", list)).toBe(false);
+    expect(isLastTier("b", list)).toBe(true);
+  });
+});
 
 describe("promotion", () => {
   it("is earned when every core level of the tier's last chapter is solved, and not before", () => {
