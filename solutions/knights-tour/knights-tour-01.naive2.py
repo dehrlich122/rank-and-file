@@ -1,0 +1,7 @@
+# expect: lost
+knight.jump(-2, 1)
+for word in knight.read():
+    if word == "left":
+        knight.jump(-1, 2)
+    else:
+        knight.jump(1, 2)

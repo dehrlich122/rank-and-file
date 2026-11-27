@@ -602,18 +602,21 @@ def strangers(spec: dict) -> list[str]:
 # -- writing a challenge -----------------------------------------------------------------------------------
 
 
-def list_set() -> None:
-    """The set's entry in levels/challenges.yaml, rewritten only if it isn't there as it is here."""
+def list_set(this: dict) -> None:
+    """A set's entry in levels/challenges.yaml, rewritten only if it isn't there as it is here. (The Knight
+    tier's set, gen_tour.py, is listed through this too.)"""
     path = ROOT / "levels" / "challenges.yaml"
-    listed = yaml.safe_load(path.read_text(encoding="utf-8")) or []
-    if SET not in listed:
-        listed = [entry for entry in listed if entry["set"] != SET["set"]] + [SET]
-        save(path, yaml.safe_dump(listed, sort_keys=False, allow_unicode=True, width=200))
+    text = path.read_text(encoding="utf-8")
+    listed = yaml.safe_load(text) or []
+    if this not in listed:
+        listed = [entry for entry in listed if entry["set"] != this["set"]] + [this]
+        head = "".join(line for line in text.splitlines(keepends=True) if line.startswith("#"))  # the file's own comment stays
+        save(path, head + yaml.safe_dump(listed, sort_keys=False, allow_unicode=True, width=200))
 
 
 def build_one(spec: dict) -> list[str]:
     problems = strangers(spec)
-    list_set()
+    list_set(SET)
     words = {**drawn(spec), "hints": [said(hint) for hint in spec["hints"]], "note": said(spec["note"])}
     return problems + build(words, 0, spec["api"], lambda draft_level: WRITERS[spec["kind"]](spec, draft_level))
 

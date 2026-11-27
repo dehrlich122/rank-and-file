@@ -1,0 +1,1 @@
+The reference jumps onto the rune, cuts its text into words with split(), and loops over them: an if chooses the jump for each word. 6 lines for a ladder of any height. The route typed out for one board comes to 4 lines, and fails on the others.

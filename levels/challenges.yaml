@@ -6,3 +6,7 @@
   title: The Last Rank
   tier: pawn
   summary: Puzzles that mix the Pawn tier's chapters. No lessons; the Codex has everything.
+- set: knights-tour
+  title: The Knight's Tour
+  tier: knight
+  summary: Puzzles that mix the Knight tier's chapters with the Pawn tier's. No lessons; the Codex has everything.

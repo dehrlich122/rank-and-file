@@ -1,0 +1,60 @@
+id: knights-tour-01
+set: knights-tour
+difficulty: 2
+draws_on: [4, 6, 7, 8]
+title: "The Written Climb"
+trains: "A rune's text cut into words, and a choice made for each one"
+brief: "A ladder of stones, and one rune at its foot, a jump from where your knight stands. The rune spells the way up, a word for every jump: left or right. Every jump climbs two squares. No two ladders are alike."
+piece: knight
+map: |
+  O G O
+  O O O
+  . O O
+  O O O
+  O . O
+  O O O
+  R O O
+  O O P
+legend: {"O": "pit", "R": {"tile": "rune", "text": "right left right"}}
+start: {"facing": "north"}
+api: ["jump", "read"]
+par: {"lines": 6}
+hints:
+- "The rune at the ladder's foot holds one word for every jump. Compare it with the board: what does each word do?"
+- "read() gives the rune's text as one piece. split() cuts it into a list of its words. A for loop over that list takes one word a lap, and an if decides which way to jump. The knight has to stand on the rune to read it."
+- "The loop, and the choice:\nfor word in knight.read().split():\n    if word == ...:\n        ...\n    else:\n        ..."
+variants:
+- map: |
+    O G O O O
+    O O O O O
+    . O O O O
+    O O O O O
+    O . O O O
+    O O O O O
+    . O O O O
+    O O O O O
+    O . O O O
+    O O O O O
+    O O R O O
+    O O O O P
+  legend: {"R": {"tile": "rune", "text": "left left right left right"}}
+- map: |
+    O O G O
+    O O O O
+    O O O .
+    O O O O
+    O O . O
+    O O O O
+    O . O O
+    O O O O
+    R O O O
+    O O P O
+  legend: {"R": {"tile": "rune", "text": "right right right left"}}
+- map: |
+    O G O O
+    O O O O
+    . O O O
+    O O O O
+    O R O O
+    O O O P
+  legend: {"R": {"tile": "rune", "text": "left right"}}
