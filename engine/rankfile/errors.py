@@ -330,13 +330,18 @@ def _explain_function_name(name: str, exc: BaseException, has_suggestion: bool) 
     return ""
 
 
+def _unused_answers(tree: ast.Module) -> set[int]:
+    """The ids of the expressions that stand as a whole statement: nobody uses their answer."""
+    return {id(node.value) for node in ast.walk(tree) if isinstance(node, ast.Expr)}
+
+
 def _none_from_own_function(line: int | None) -> str:
     """Where the error's line calls a function of the player's own that returns no value, say so."""
     tree = _player_tree()
     if tree is None or line is None:
         return ""
     defs = {fn.name: fn for fn in _functions(tree)}
-    unused = {id(node.value) for node in ast.walk(tree) if isinstance(node, ast.Expr)}  # a whole-statement call: nobody uses its answer
+    unused = _unused_answers(tree)
     for node in ast.walk(tree):
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.lineno == line):
             continue
@@ -370,7 +375,7 @@ def _none_from_list_method(line: int | None) -> str:
     tree = _player_tree()
     if tree is None or line is None:
         return ""
-    unused = {id(node.value) for node in ast.walk(tree) if isinstance(node, ast.Expr)}
+    unused = _unused_answers(tree)
     assigned = {}  # name -> the list method its value came from
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign) and (method := _list_method_of(node.value)):
@@ -538,12 +543,8 @@ _MISSING = object()  # a value the line's code can't be read for
 
 def _player_scope(exc: BaseException) -> dict:
     """The names the innermost player frame can see (its locals over the program's own names), as they stood at the error."""
-    scope, tb = {}, exc.__traceback__
-    while tb is not None:
-        if tb.tb_frame.f_code.co_filename == PLAYER_FILENAME:
-            scope = {**tb.tb_frame.f_globals, **tb.tb_frame.f_locals}
-        tb = tb.tb_next
-    return scope
+    frame = _innermost_player_frame(exc)
+    return {**frame.f_globals, **frame.f_locals} if frame else {}
 
 
 def _nodes_on(line: int | None, *types: type[ast.AST]) -> list:
@@ -551,7 +552,7 @@ def _nodes_on(line: int | None, *types: type[ast.AST]) -> list:
     tree = _player_tree()
     if tree is None or line is None:
         return []
-    return [node for node in ast.walk(tree) if isinstance(node, types) and node.lineno == line]
+    return [node for node in ast.walk(tree) if isinstance(node, types) and getattr(node, "lineno", None) == line]
 
 
 def _value_of(node: ast.AST, scope: dict):
@@ -637,10 +638,10 @@ def _explain_past_the_end(kind: str, scope: dict, line: int | None) -> str:
 def _unpacking_on(line: int | None) -> tuple[ast.stmt, ast.expr | None] | None:
     """The one unpacking on the line, as (the statement, its value): `x, y = ...` or `for x, y in ...`; None if none or several."""
     found = [
-        (node, node.value)
-        for node in _nodes_on(line, ast.Assign)
-        if isinstance(node.targets[0], (ast.Tuple, ast.List))
-    ] + [(node, None) for node in _nodes_on(line, ast.For) if isinstance(node.target, (ast.Tuple, ast.List))]
+        (node, node.value if isinstance(node, ast.Assign) else None)
+        for node in _nodes_on(line, ast.Assign, ast.For)
+        if isinstance(node.targets[0] if isinstance(node, ast.Assign) else node.target, (ast.Tuple, ast.List))
+    ]
     return found[0] if len(found) == 1 else None
 
 
@@ -713,7 +714,7 @@ def _explain_unordered(left: str, right: str, scope: dict, line: int | None) -> 
     pairs = set()
     for seq in _sequences_ordered_on(line, scope):
         first = {type(item).__name__: item for item in reversed(seq)}  # the first of each kind wins
-        if left != right and left in first and right in first and (a := _shown(first[left])) and (b := _shown(first[right])):
+        if left in first and right in first and (a := _shown(first[left])) and (b := _shown(first[right])):
             pairs.add((a, b))
     if len(pairs) == 1:
         a, b = pairs.pop()
@@ -755,11 +756,8 @@ _ITEM_CALLS_OTHER = ("sorted", "min", "max", "sum")
 
 def _call_wanting_items(line: int | None) -> str:
     """The built-in (`list`, `sorted`...) the error's line calls on something without items, unless a `for` on the line goes through it."""
-    tree = _player_tree()
-    if tree is None or line is None:
-        return ""
     loops = (ast.For, ast.AsyncFor, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
-    nodes = [node for node in ast.walk(tree) if getattr(node, "lineno", None) == line]
+    nodes = _nodes_on(line, ast.AST)
     if any(isinstance(node, loops) for node in nodes):
         return ""
     for node in nodes:
@@ -769,9 +767,11 @@ def _call_wanting_items(line: int | None) -> str:
 
 
 def _explain_no_items(name: str, type_name: str) -> str:
+    kind = _kind(type_name)
+    kind = kind[0].upper() + kind[1:]
     if name in _ITEM_CALLS:
-        return f"`{name}()` makes {_ITEM_CALLS[name]} out of something that has items in it, like text or a tuple. {_kind(type_name)[0].upper() + _kind(type_name)[1:]} has none."
-    return f"`{name}()` needs something that has items in it, like a list, a tuple or text. {_kind(type_name)[0].upper() + _kind(type_name)[1:]} has none."
+        return f"`{name}()` makes {_ITEM_CALLS[name]} out of something that has items in it, like text or a tuple. {kind} has none."
+    return f"`{name}()` needs something that has items in it, like a list, a tuple or text. {kind} has none."
 
 
 def _explain_type(exc: TypeError, namespace: dict, line: int | None) -> str:
