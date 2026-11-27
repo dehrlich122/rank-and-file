@@ -22,6 +22,7 @@ import { jumpPlan, type JumpPlan, playableEvents } from "./motion";
 import { halftone, litGrid, M, S } from "./sprites/floor";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite, type Skin, type TileName } from "./sprites";
 import { svg } from "./svg";
+import { sprite, tooltip } from "./tileParts";
 
 let trails = 0; // numbers each trail's gradient
 
@@ -459,11 +460,6 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
   door: (left, top, level, pos) => doorTile(left, top, find(level.doors ?? [], pos)?.key ?? ""),
 };
 
-/** A tile's sprite, centred on its square. */
-function sprite(left: number, top: number, art: SVGElement): SVGGElement {
-  return svg("g", { class: "spr", transform: `translate(${left + S / 2} ${top + S / 2})` }, art);
-}
-
 const tile = (left: number, top: number, name: TileName) => sprite(left, top, tileSprite(name));
 
 function wall(left: number, top: number): SVGGElement {
@@ -617,13 +613,6 @@ function setBadgeText(group: SVGGElement, text: string): void {
   const width = Math.max(16, text.length * 6.5 + 8);
   pill.setAttribute("width", String(width));
   pill.setAttribute("x", String(Number(label.getAttribute("x")) - width / 2));
-}
-
-/** An SVG <title>: the text a browser shows on hover. */
-function tooltip(text: string): SVGTitleElement {
-  const title = svg("title", {});
-  title.textContent = text;
-  return title;
 }
 
 function restartAnimation(element: Element, className: string): void {

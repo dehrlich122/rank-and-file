@@ -1865,21 +1865,23 @@ pre {
   stroke-linecap: round;
 }
 
-.k-line {
-  fill: var(--key-fill);
+.k-line,
+.tag {
   stroke: var(--wire-amber);
   filter: drop-shadow(0 0 1.8px var(--glow-amber));
+}
+
+.k-line {
+  fill: var(--key-fill);
 }
 
 .tag {
   fill: var(--plate-fill);
-  stroke: var(--wire-amber);
-  filter: drop-shadow(0 0 1.8px var(--glow-amber));
 }
 
 .d-line {
   stroke: var(--wire-wall);
-  filter: drop-shadow(0 0 1.8px var(--glow-wall, transparent));
+  filter: drop-shadow(0 0 1.8px var(--glow-wall));
 }
 
 .d-slab {

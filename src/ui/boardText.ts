@@ -1,7 +1,7 @@
 // What the board says to a screen reader, as a pure function so a test can pin it.
 import type { LevelInfo, Pos, WorldState } from "../py/protocol";
 import { squareName } from "../editor/draft";
-import { openDoors } from "./keyDoor";
+import { keyWords, openDoors } from "./keyDoor";
 
 /** "b3", "b3 and c2", "b3, c2 and d5". */
 function nameList(names: string[]): string {
@@ -14,18 +14,15 @@ type BoardState = Pick<WorldState, "pos" | "facing" | "landings"> & Partial<Pick
 
 const has = (list: Pos[] | undefined, pos: Pos) => !!list?.some((p) => p[0] === pos[0] && p[1] === pos[1]);
 
-/** A key's name as the tooltips say it: "the brass key", "key 12". */
-const keyName = (name: string | number) => (typeof name === "number" ? `key ${name}` : `the ${name} key`);
-
 /** The keys still to pick up, the doors locked or open, and the guard's gates shut or open: one sentence each, as the state has them. */
 function obstacleSentences(level: BoardLevel, state: BoardState): string[] {
   const sentences: string[] = [];
   const left = (level.keys ?? []).filter((key) => !has(state.collected, key.pos));
-  if (left.length) sentences.push(`To pick up: ${nameList(left.map((key) => `${keyName(key.name)} on ${squareName(key.pos)}`))}`);
+  if (left.length) sentences.push(`To pick up: ${nameList(left.map((key) => `${keyWords(key.name)} on ${squareName(key.pos)}`))}`);
   const open = openDoors(level.doors, state.inventory);
   for (const door of level.doors ?? []) {
     const square = squareName(door.pos);
-    sentences.push(has(open, door.pos) ? `The door on ${square} is open` : `The door on ${square} is locked: it wants ${keyName(door.key)}`);
+    sentences.push(has(open, door.pos) ? `The door on ${square} is open` : `The door on ${square} is locked: it wants ${keyWords(door.key)}`);
   }
   (level.tiles ?? []).forEach((row, y) =>
     row.forEach((kind, x) => {
