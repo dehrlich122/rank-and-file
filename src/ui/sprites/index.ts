@@ -71,7 +71,7 @@ function buildHero(skin: Skin, face: Facing): SVGElement {
 }
 
 /** The hero's drawing: brackets that show the facing, the floor shadow, and the solid model. */
-function drawHero(model: Model, lit: Decal[], face: Facing): SVGElement {
+export function drawHero(model: Model, lit: Decal[], face: Facing): SVGElement {
   const f = fit(model, 52, 55, 27.5);
   const { c, rx, ry } = floor(f, 20);
   return el(
