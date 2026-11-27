@@ -13,8 +13,9 @@ import "./knight-piece.css";
 import "./bishop.css";
 import type { Facing } from "../src/py/protocol";
 import { h } from "../src/ui/dom";
-import { drawHero } from "../src/ui/sprites";
+import { drawHero, enemy, hero } from "../src/ui/sprites";
 import type { Decal } from "../src/ui/sprites/draw";
+import { litGrid, M, S } from "../src/ui/sprites/floor";
 import { lathe, yaw, type Face, type Model, type V3 } from "../src/ui/sprites/mesh";
 import { svg } from "../src/ui/svg";
 
@@ -174,6 +175,32 @@ function facingsPane(): HTMLElement {
   );
 }
 
+// -- pane 3: each take on a small board beside the enemy bishop, the Charger and the pawn ------------------------------------
+
+const BOARD_COLS = 4;
+
+/** A board of two rows: the pawn, the Charger, the take and the enemy bishop, facing north (upper row) and south (lower). */
+function compareBoard(take: Take): SVGSVGElement {
+  const el = svg("svg", { class: "compare-board", viewBox: `0 0 ${M + BOARD_COLS * S} ${2 * S}`, role: "img", "aria-label": `${take.name} beside the pawn, the Charger and the enemy bishop` });
+  const at = (col: number, row: number) => `translate(${M + col * S + S / 2} ${row * S + S / 2})`;
+  const squares = svg("g", { class: "squares" });
+  for (let row = 0; row < 2; row++) for (let col = 0; col < BOARD_COLS; col++) squares.append(svg("rect", { x: M + col * S, y: row * S, width: S, height: S, class: (col + row) % 2 === 1 ? "sq-light" : "sq-dark" }));
+  el.append(squares, litGrid(BOARD_COLS, 2));
+  for (const [face, row] of [["north", 0], ["south", 1]] as const) {
+    [hero("pawn", face), hero("knight", face), bishop(take, face)].forEach((art, col) => el.append(svg("g", { class: "spr", transform: at(col, row) }, art)));
+    el.append(svg("g", { class: "enemy enemy-bishop", transform: at(3, row) }, enemy("bishop", "rest")));
+  }
+  return el;
+}
+
+function comparePane(): HTMLElement {
+  return h(
+    "div",
+    { class: "row" },
+    ...TAKES.map((take) => h("figure", { class: "take" }, label(take.code, take.name), h("p", { class: "take-idea" }, "Left to right: the pawn, the Charger, the take, the enemy bishop. Upper row faces north, lower row south."), node(compareBoard(take)))),
+  );
+}
+
 // -- the sheet --------------------------------------------------------------------------------------------------------------
 
 const pane = (scheme: "dark" | "light", name: string, ...children: HTMLElement[]) => h("div", { class: "pane", "data-scheme": scheme }, h("p", { class: "pane-name" }, name), ...children);
@@ -188,4 +215,5 @@ document.getElementById("sheet")!.append(
   ),
   ...both("1 · Large", largePane),
   ...both("2 · The four facings at board size", facingsPane),
+  ...both("3 · Beside the enemy bishop, the Charger and the pawn", comparePane),
 );

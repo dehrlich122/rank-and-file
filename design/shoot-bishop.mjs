@@ -11,7 +11,7 @@ const base = option("base") ?? "http://localhost:5173/design/bishop.html";
 const outDir = option("out") ?? join(import.meta.dirname, "..", "docs", "M5", "M5.4", "shots");
 mkdirSync(outDir, { recursive: true });
 
-const names = ["large", "facings"];
+const names = ["large", "facings", "compare"];
 const browser = await launch({ width: 1500, height: 900 });
 try {
   await browser.send("Emulation.setScrollbarsHidden", { hidden: true });
