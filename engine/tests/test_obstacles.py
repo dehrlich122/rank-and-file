@@ -415,6 +415,49 @@ def test_the_question_is_shown_and_the_answer_is_not(toll):
     assert '"4"' not in str(described)
 
 
+# -- a gate's label (QA-068) ---------------------------------------------------------------
+
+
+def labelled(**details):
+    legend = {"X": {"tile": "gate", "question": "What is two plus two?", "passphrase": "4", **details}}
+    return make_level("G\nX\n.\nP\n", legend=legend, api=API)
+
+
+def test_a_gates_label_is_kept_and_described():
+    level = labelled(label="smallest")
+    assert level.board.labels == {(0, 2): "smallest"}
+    assert level.describe()["questions"] == [{"pos": [0, 2], "text": "What is two plus two?", "label": "smallest"}]
+
+
+def test_a_gate_without_a_label_describes_as_before(toll):
+    assert toll.board.labels == {}
+    assert list(toll.describe()["questions"][0]) == ["pos", "text"]
+
+
+@pytest.mark.parametrize(
+    ("details", "message"),
+    [
+        ({"label": "123456789"}, "label may be at most 8 characters"),
+        ({"label": ""}, "label can't be empty"),
+        ({"label": "   "}, "label can't be empty"),
+        ({"label": 7}, "label must be text"),
+    ],
+)
+def test_a_bad_label_is_refused(details, message):
+    with pytest.raises(LevelError, match=message) as refused:
+        labelled(**details)
+    assert "legend 'X'" in str(refused.value)
+
+
+def test_a_label_needs_a_question():
+    with pytest.raises(LevelError, match="legend 'X': a gate's label needs a question"):
+        make_level("G\nX\n.\nP\n", legend={"X": {"tile": "gate", "passphrase": "4", "label": "four"}}, api=API)
+
+
+def test_a_label_of_eight_characters_is_accepted():
+    assert labelled(label="12345678").board.labels == {(0, 2): "12345678"}
+
+
 # -- patrols and chasers ---------------------------------------------------------------------
 
 API_ALL = [*API, "capture_left", "capture_right"]

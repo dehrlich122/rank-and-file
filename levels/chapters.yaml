@@ -28,6 +28,10 @@
   title: Spellbook
   tier: knight
   summary: "Functions: spells of your own that take orders, hand back answers and cast each other, and a knight to cast them."
+- chapter: 8
+  title: The Satchel
+  tier: knight
+  summary: "Lists and tuples: routes to loop over, pairs to unpack, a satchel of keys, and lists your code builds and puts in order."
 - chapter: 0
   title: Testing ground
   tier: practice

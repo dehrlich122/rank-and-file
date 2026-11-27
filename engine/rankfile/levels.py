@@ -20,7 +20,7 @@ from .board import Board, Direction, Pos, Tile, Timer, sign, square_name
 from .constraints import NODE_NAMES, describe_rules
 from .pieces import PIECES
 from .words import and_list, count
-from .world import CHASERS, CHESS_LINES, CLOCKS, World
+from .world import CHASERS, CHESS_LINES, CLOCKS, World, key_words
 
 
 class LevelError(ValueError):
@@ -57,9 +57,11 @@ BUILTIN_SYMBOLS = {".": Tile.FLOOR, "#": Tile.WALL, START: Tile.FLOOR, GOAL: Til
 # details each one needs, then the ones it may add.
 TILE_DETAILS: dict[Tile, tuple[set[str], set[str]]] = {
     Tile.SIGN: ({"text"}, set()),
-    Tile.GATE: ({"passphrase"}, {"question"}),
+    Tile.GATE: ({"passphrase"}, {"label", "question"}),
     Tile.TIMED_GATE: ({"every"}, {"clock", "open"}),
     Tile.RUNE: ({"text"}, set()),
+    Tile.KEY: ({"name"}, set()),  # M5.3: a name is text or a whole number
+    Tile.DOOR: ({"key"}, set()),  # the name of the key it wants
 }
 
 # Enemies (M3.1): the keys each kind takes, and the ground they can walk on.
@@ -71,11 +73,16 @@ ENEMY_KEYS = {
 }
 OPEN_GROUND = (Tile.FLOOR, Tile.WAYPOINT, Tile.GEM, Tile.PLANK, Tile.RUNE)
 
+# Abilities the editor does not offer yet: keys and doors reach it in M5.5, so until then they could do nothing
+# on its boards. Take the names out of this set in M5.5. Levels, the Codex and the checker still read piece.ABILITIES.
+EDITOR_HIDDEN_ABILITIES = {"pick_up", "inventory"}
+
+
 def editor_options() -> dict:
     """What the level editor (M4.2) offers, read from the checker's own tables, so the editor keeps no rules of its own."""
     return {
         "max_side": MAX_SIDE,
-        "pieces": {name: list(piece.ABILITIES) for name, piece in PIECES.items()},
+        "pieces": {name: [a for a in piece.ABILITIES if a not in EDITOR_HIDDEN_ABILITIES] for name, piece in PIECES.items()},
         "tiles": {tile.value: {"needs": sorted(TILE_DETAILS.get(tile, (set(), set()))[0]), "may": sorted(TILE_DETAILS.get(tile, (set(), set()))[1])} for tile in Tile},
         "enemies": {kind: sorted(keys - {"kind"}) for kind, keys in ENEMY_KEYS.items()},
         "clocks": list(CLOCKS),
@@ -117,7 +124,8 @@ MAX_SIDE = 12  # squares along a board's edge (M4.2): the editor's limit, and a 
 MAX_BOARDS = 6  # a level and its other maps (M4.3); the repo's most is 4
 # How long each free-text field may be, and how many hints and enemies a level may have (M4.3). They guard what
 # arrives in a shared level; every level in the repo fits (engine/tests/test_editor_levels.py), well within them.
-LIMITS = {"title": 60, "brief": 600, "trains": 200, "hint": 600, "hints": 5, "text": 300, "enemies": 12, "solution": 2000, "starter": 2000}
+# "label" is how long a gate's label may be: the short word on the board where the guard's "?" would be (QA-068).
+LIMITS = {"title": 60, "brief": 600, "trains": 200, "hint": 600, "hints": 5, "text": 300, "label": 8, "enemies": 12, "solution": 2000, "starter": 2000}
 
 
 @dataclass
@@ -154,14 +162,16 @@ NOT_JUDGED = _Unset.NOT_JUDGED
 @dataclass
 class ExamineCall:
     """One call the examiner makes (M5.2; the file's `examine.calls`).
-    `args` are plain values, given in order: fewer than the function's parameters is how a default is exercised."""
+    `args` are plain values, lists and tuples (a list of pairs too, the file's convention is `_examine_value`'s),
+    given in order: fewer than the function's parameters is how a default is exercised."""
 
     args: list = field(default_factory=list)
     board: int = 1  # the board it's made on: 1 is the level's map, n is variants[n - 2]
-    returns: object = NOT_JUDGED  # the answer wanted, a plain value; never in describe()
+    returns: object = NOT_JUDGED  # the answer wanted: a plain value, a list or a tuple; never in describe()
 
     def text(self, function: str) -> str:
-        """The call as code writes it, e.g. "gallop(1, 3)": a case's label, and the result's `call.text`."""
+        """The call as code writes it, e.g. "gallop(1, 3)" or "visit([(2, 1), (3, 3)])" (lists in square brackets,
+        pairs in round ones, as Python prints them): a case's label, and the result's `call.text`."""
         return f"{function}({', '.join(repr(arg) for arg in self.args)})"
 
 
@@ -413,6 +423,15 @@ class Level:
             if any(enemy.kind == "chaser" for enemy in self.enemies):
                 obstacles.append("A chaser doesn't see pits: if its step lands on one, it falls in and is gone.")
         obstacles.extend(gate_rule(pos, timer) for pos, timer in sorted(self.board.timers.items()))
+        if keys := names(self.board.squares(Tile.KEY)):
+            where, stone = (f"A key on {keys[0]}", "its stone") if len(keys) == 1 else (f"Keys on {and_list(keys)}", "a key's stone")
+            obstacles.append(f"{where}: land on {stone} and `pick_up()` puts it in your satchel.")
+        if doors := self.board.squares(Tile.DOOR):
+            if len(doors) == 1:
+                rule = f"A door on {square_name(doors[0])}: you can land on it only while you carry {key_words(self.board.doors[doors[0]])}."
+            else:
+                rule = f"Doors on {and_list(names(doors))}: you can land on one only while you carry the key it names."
+            obstacles.append(rule)
         obstacles.extend(enemy.describe(self.piece) for enemy in self.enemies)
         if jumps:  # landing on an enemy takes it (or is an error, if it's armoured): only its own move or attack catches a knight
             if any(enemy.kind not in CHESS_LINES for enemy in self.enemies):
@@ -449,7 +468,10 @@ class Level:
             ],
             "signs": [{"pos": list(pos), "text": text} for pos, text in self.board.signs.items()],
             "runes": [{"pos": list(pos), "text": text} for pos, text in self.board.runes.items()],
-            "questions": [{"pos": list(pos), "text": text} for pos, text in self.board.questions.items()],
+            "questions": [
+                {"pos": list(pos), "text": text, **({"label": self.board.labels[pos]} if pos in self.board.labels else {})}
+                for pos, text in self.board.questions.items()
+            ],  # a label only where the level gives one (QA-068)
             "timed_gates": [{"pos": list(pos), **asdict(timer), "text": gate_rule(pos, timer)} for pos, timer in self.board.timers.items()],
             "enemies": [
                 {"kind": enemy.kind, "route": [list(pos) for pos in enemy.route], "loop": enemy.loop, "clock": enemy.clock, "armoured": enemy.armoured}
@@ -487,7 +509,17 @@ class Level:
                 "function": self.examine.function,
                 "calls": [{"text": call.text(self.examine.function), "board": call.board} for call in self.examine.calls],
             },
+            **self._satchel(),
         }
+
+    def _satchel(self) -> dict:
+        """The keys and doors (M5.3), only when the board has any, so every other level describes itself as it always did."""
+        satchel = {}
+        if self.board.keys:
+            satchel["keys"] = [{"pos": list(pos), "name": name} for pos, name in self.board.keys.items()]
+        if self.board.doors:
+            satchel["doors"] = [{"pos": list(pos), "key": key} for pos, key in self.board.doors.items()]
+        return satchel
 
 
 def parse_level(data: dict) -> Level:
@@ -556,6 +588,7 @@ def parse_level(data: dict) -> Level:
         level.variants = _parse_variants(data.get("variants") or [], legend, level)
         if level.variants and level.goal_spots:
             raise LevelError("a level has ? squares for a hidden goal or other maps (variants), not both")
+    _check_keys_and_doors(level._boards())
     if "examine" in data:  # after the other maps: they are copies of the level, and don't carry the examiner
         level.examine = _parse_examine(data["examine"], len(level.variants) + 1, bool(level.goal_spots), level.constraints.functions)
     return level
@@ -608,8 +641,14 @@ def parse_map(text: str, legend: dict) -> tuple[Board, Pos, Pos | None, list[Pos
                 board.gates[(x, y)] = details[symbol]["passphrase"]
                 if "question" in details[symbol]:
                     board.questions[(x, y)] = details[symbol]["question"]
+                if "label" in details[symbol]:
+                    board.labels[(x, y)] = details[symbol]["label"]
             if tile is Tile.TIMED_GATE:
                 board.timers[(x, y)] = Timer(**details[symbol])
+            if tile is Tile.KEY:
+                board.keys[(x, y)] = details[symbol]["name"]
+            if tile is Tile.DOOR:
+                board.doors[(x, y)] = details[symbol]["key"]
             if symbol == START:
                 if start is not None:
                     raise LevelError("the map has more than one start square (P)")
@@ -641,14 +680,46 @@ def _parse_details(symbol: str, tile: Tile, meaning: dict) -> dict:
                 raise LevelError(f"legend {symbol!r}: a timed gate needs {key}: a whole number of ticks")
         elif key == "clock":
             _check_clock(f"legend {symbol!r}", value)
+        elif key in ("name", "key"):  # a key's name, and the name its door wants: text or a whole number (M5.3)
+            if isinstance(value, bool) or not (isinstance(value, int) or (isinstance(value, str) and value)):
+                raise LevelError(f"legend {symbol!r}: a {tile.value} needs {key}: text or a whole number")
+            if isinstance(value, str) and len(value) > LIMITS["text"]:
+                raise LevelError(f"legend {symbol!r}: the {key} may be at most {LIMITS['text']} characters")
+        elif key == "label":  # a gate's label: a short word for the board's badge (QA-068)
+            if not isinstance(value, str):
+                raise LevelError(f"legend {symbol!r}: a gate's label must be text")
+            if not value.strip():
+                raise LevelError(f"legend {symbol!r}: a gate's label can't be empty")
+            if len(value) > LIMITS["label"]:
+                raise LevelError(f"legend {symbol!r}: a gate's label may be at most {LIMITS['label']} characters")
         elif not isinstance(value, str) or not value:
             raise LevelError(f"legend {symbol!r}: a {tile.value} needs {key}")
         elif len(value) > LIMITS["text"]:
             raise LevelError(f"legend {symbol!r}: the {key} may be at most {LIMITS['text']} characters")
+    if "label" in details and "question" not in details:
+        raise LevelError(f"legend {symbol!r}: a gate's label needs a question, because the label is the question in a word")
     open_for = details.get("open", Timer.open)
     if tile is Tile.TIMED_GATE and details["every"] <= open_for:
         raise LevelError(f"legend {symbol!r}: a timed gate's every must be more than its open ({open_for}), or it would never shut")
     return details
+
+
+def _check_keys_and_doors(boards: list[Level]) -> None:
+    """Keys and doors are the knight's, every door wants a key some board of the level has, and the names are all
+    text or all whole numbers (M5.3)."""
+    if any(level.piece != "knight" and (level.board.keys or level.board.doors) for level in boards):
+        raise LevelError("keys and doors are for the knight: the pawn learns them in M5.5", at={"field": "piece"})
+    keys = [name for level in boards for name in level.board.keys.values()]
+    wanted = [key for level in boards for key in level.board.doors.values()]
+    if len({isinstance(name, str) for name in [*keys, *wanted]}) > 1:
+        raise LevelError("keys are named with text or with whole numbers, not both in one level", at={"field": "legend"})
+    for number, level in enumerate(boards, start=1):
+        for pos, key in level.board.doors.items():
+            if key not in keys:
+                raise LevelError(
+                    f"the door on {square_name(pos)} wants the key {key!r}, and no board of the level has a key with that name",
+                    at={"square": square_name(pos), **({"board": number} if len(boards) > 1 else {})},
+                )
 
 
 @dataclass
@@ -1100,16 +1171,49 @@ def _parse_examine_call(number: int, call, boards: int) -> ExamineCall:
     args = call.get("args", [])
     if not isinstance(args, list):
         raise LevelError(f"examine call {number}: args must be a list of the values the function is called with")
-    if not all(_plain(arg) for arg in args):
-        raise LevelError(f"examine call {number}: each arg must be a plain value: a number, text, true, false or null")
+    args = [_examine_value(arg, f"examine call {number}: arg {place}") for place, arg in enumerate(args, start=1)]
     board = call.get("board", 1)
     if not _positive(board):
         raise LevelError(f"examine call {number}: board must be a whole number of at least 1")
     if board > boards:
         raise LevelError(f"examine call {number} is on board {board}, but the level has only {count(boards, 'board')}")
-    if "returns" in call and not _plain(call["returns"]):
-        raise LevelError(f"examine call {number}: returns must be a plain value: a number, text, true, false or null")
-    return ExamineCall(list(args), board, call.get("returns", NOT_JUDGED))
+    returns = _examine_value(call["returns"], f"examine call {number}: returns") if "returns" in call else NOT_JUDGED
+    return ExamineCall(args, board, returns)
+
+
+_VALUES = "a plain value (a number, text, true, false or null), a list of plain values or of pairs, or a tuple written {tuple: [...]}"
+
+
+def _examine_value(value, where: str):
+    """A value of an examine call's `args` or `returns`, as Python holds it. The one place that knows the file's
+    convention, since YAML has no tuple: a plain value is itself; a list is a list; a list INSIDE a list is a pair (a
+    tuple of plain values); `{tuple: [...]}` is a tuple wherever one stands outside a list. Nothing goes deeper.
+    `where` ("examine call 2: arg 1") names the value in the refusals."""
+    if _plain(value):
+        return value
+    if isinstance(value, dict):
+        if set(value) != {"tuple"}:
+            raise LevelError(f"{where} is a mapping, and the only mapping allowed is {{tuple: [...]}}, which writes a tuple")
+        items = value["tuple"]
+        if not (isinstance(items, list) and items and all(_plain(item) for item in items)):
+            raise LevelError(f"{where}: {{tuple: ...}} must hold a list of at least one plain value, with no list or tuple inside it")
+        return tuple(items)
+    if isinstance(value, list):
+        return [_examine_item(item, where) for item in value]
+    raise LevelError(f"{where} must be {_VALUES}")
+
+
+def _examine_item(item, where: str):
+    """An item of a list in an examine call: a plain value, or a pair (a list inside the list, made of plain values)."""
+    if _plain(item):
+        return item
+    if isinstance(item, list):
+        if not (item and all(_plain(part) for part in item)):
+            raise LevelError(f"{where}: a pair (a list inside the list) must hold at least one plain value, with no list, pair or mapping inside it")
+        return tuple(item)
+    if isinstance(item, dict):
+        raise LevelError(f"{where}: inside a list a tuple is written as an inner list, never as {{tuple: [...]}}")
+    raise LevelError(f"{where} must be {_VALUES}")
 
 
 def _plain(value) -> bool:

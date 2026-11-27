@@ -3,8 +3,10 @@
 import pytest
 
 from conftest import make_level
+from rankfile import codex, errors
 from rankfile.pieces import Knight
-from rankfile.runner import run_level, run_sandbox
+from rankfile.runner import run_level, run_sandbox, run_snippet
+from rankfile.tracer import StepBudgetExceeded
 
 
 @pytest.mark.parametrize(
@@ -173,6 +175,31 @@ def test_knight_friendly_messages(knight_runes, code, friendly, line):
     result = run_level(knight_runes, code)
     assert result.status == "error"
     assert friendly in result.error.friendly
+    assert result.error.line == line
+
+
+@pytest.fixture
+def knight_vault():
+    """Knight on a1, a brass key on a2, its door on c2, the goal on c3, with every knight ability."""
+    return make_level(
+        ". . G\nK . D\nP . .\n",
+        piece="knight",
+        api=list(Knight.ABILITIES),
+        legend={"K": {"tile": "key", "name": "brass"}, "D": {"tile": "door", "key": "brass"}},
+    )
+
+
+@pytest.mark.parametrize(
+    ("code", "friendly", "line"),
+    [
+        ("knight.pick_up()", "There is nothing to pick up on a1.", 1),
+        ("knight.wait()\nknight.jump(2, 1)", "The door on c2 is locked: it wants the brass key, and your satchel is empty.", 2),
+    ],
+)
+def test_the_satchels_errors_reach_the_card_in_the_worlds_words(knight_vault, code, friendly, line):
+    result = run_level(knight_vault, code)
+    assert result.status == "error"
+    assert result.error.friendly == friendly
     assert result.error.line == line
 
 
@@ -390,3 +417,324 @@ def test_a_keyword_the_knights_ability_does_not_have(knight_runes):
     assert "`jump()` has nothing called `steps` to fill inside its parentheses. Give its values in order, without names." in result.error.friendly
     assert "Knight." not in result.error.friendly
     assert result.error.line == 1
+
+
+# -- None from a list method, and a call that wanted items (M5.3-E1) -------------------
+
+_W1 = "`.{}()` changes the list itself and hands back nothing (None). Call it on a line of its own, and keep using the list's own name."
+
+
+@pytest.mark.parametrize(
+    "code, method",
+    [
+        ("a = [3, 1]\nb = a.sort()\nb[0]", "sort"),
+        ("a = [1]\na = a.append(2)\na.append(4)", "append"),
+        ("a = [3, 1]\nfor x in a.sort():\n    print(x)", "sort"),
+        ("a = [1]\nb = a.append(2)\nlen(b)", "append"),
+        ("a = [3, 1]\nprint(a.sort()[0])", "sort"),
+    ],
+)
+def test_a_none_from_a_list_method_names_the_method(corridor, code, method):
+    friendly = run_level(corridor, code).error.friendly
+    assert friendly.endswith(_W1.format(method))
+    assert "rune" not in friendly and "read()" not in friendly and "range()" not in friendly
+
+
+@pytest.mark.parametrize(
+    "code, friendly",
+    [
+        ("list(5)", "`list()` makes a list out of something that has items in it, like text or a tuple. A whole number (an int) has none."),
+        ("tuple(5)", "`tuple()` makes a tuple out of something that has items in it, like text or a tuple. A whole number (an int) has none."),
+        ("sorted(5)", "`sorted()` needs something that has items in it, like a list, a tuple or text. A whole number (an int) has none."),
+        ("min(5)", "`min()` needs something that has items in it, like a list, a tuple or text. A whole number (an int) has none."),
+        ("max(5)", "`max()` needs something that has items in it, like a list, a tuple or text. A whole number (an int) has none."),
+        ("sum(5)", "`sum()` needs something that has items in it, like a list, a tuple or text. A whole number (an int) has none."),
+    ],
+)
+def test_a_call_given_something_without_items_says_so(corridor, code, friendly):
+    assert run_level(corridor, code).error.friendly == friendly
+
+
+def test_a_for_loop_over_a_number_keeps_the_range_words(corridor):
+    friendly = run_level(corridor, "for x in 5:\n    pass").error.friendly
+    assert friendly == (
+        "Python can't go through a whole number (an int) one item at a time, "
+        "the way a for loop needs. To repeat something a number of times, give the number to range(): "
+        "for step in range(5):"
+    )
+    assert run_level(corridor, "for x in list(5):\n    pass").error.friendly == friendly
+
+
+def test_a_none_from_read_keeps_the_rune_words_next_to_a_list_method(rune_corridor):
+    friendly = run_level(rune_corridor, "a = [1]\na.append(2)\ntext = pawn.read()\nprint(text[0])").error.friendly
+    assert "If it came from `read()`, your pawn isn't standing on a rune" in friendly
+    assert "hands back nothing" not in friendly
+
+
+# -- the mistakes lists and tuples bring (M5.3-E2) --------------------------------------------
+
+_PAST_END = "That {} has 3 items, so the last one is at `[2]`: places count from 0. There is nothing at `[{}]`."
+_PAST_END_ANY = "That place is past the end of the {}. Places count from 0, so a {} with 4 items ends at `[3]`; a negative place counts back from the end, and -1 is the last one."
+
+
+@pytest.mark.parametrize(
+    "code, friendly",
+    [
+        ("a = [5, 6, 7]\nprint(a[3])", _PAST_END.format("list", 3)),
+        ("a = (5, 6, 7)\nprint(a[3])", _PAST_END.format("tuple", 3)),
+        ("a = [5, 6, 7]\ni = 2\nprint(a[i + 3])", _PAST_END.format("list", 5)),
+        ("a = [5, 6, 7]\na[3] = 1", _PAST_END.format("list", 3)),
+        ("grid = [[1, 2, 3], [4]]\nprint(grid[0][3])", _PAST_END.format("list", 3)),
+        ("a = [5, 6, 7]\nprint(a[-4])", "That list has 3 items, so its places run from `[0]` to `[2]`, and back from the end from `[-1]` to `[-3]`. There is nothing at `[-4]`."),
+        ("a = [5]\nprint(a[-2])", "That list has 1 item, so its only place is `[0]` (or `[-1]`, counting back from the end). There is nothing at `[-2]`."),
+        ("a = []\nprint(a[0])", "That list is empty, so there is nothing at `[0]`."),
+        ("def f(items):\n    return items[3]\nf([5, 6, 7])", _PAST_END.format("list", 3)),
+        # not readable from the line: the sentence stands without the numbers
+        ("def f():\n    return [1, 2]\nprint(f()[5])", _PAST_END_ANY.format("list", "list")),
+        ("a = (5, 6)\nb = (1,)\nprint(a[7], b[7])", _PAST_END_ANY.format("tuple", "tuple")),
+    ],
+)
+def test_a_place_past_the_end_of_a_list_or_tuple(corridor, code, friendly):
+    assert run_level(corridor, code).error.friendly == friendly
+
+
+def test_text_keeps_its_words_for_a_place_past_the_end(corridor):
+    friendly = run_level(corridor, "t = 'abc'\nprint(t[5])").error.friendly
+    assert friendly.startswith("That position is past the end of the text.")
+    assert run_level(corridor, "'abc'.index('z')").error.friendly == "Python stopped with a ValueError: substring not found"
+
+
+_UNPACK = "Unpacking needs exactly one name for each value."
+
+
+@pytest.mark.parametrize(
+    "code, friendly",
+    [
+        ("x, y = [1, 2, 3]", f"There are 2 names on the left of the `=` and 3 values on the right. {_UNPACK}"),
+        ("x, y, z = (1, 2)", f"There are 3 names on the left of the `=` and 2 values on the right. {_UNPACK}"),
+        ("x, = [1, 2]", f"There are 1 name on the left of the `=` and 2 values on the right. {_UNPACK}"),
+        ("for x, y in [(1, 2, 3)]:\n    pass", f"There are 2 names after the `for` and 3 values in the item it was given. {_UNPACK}"),
+        ("x, y = iter([1, 2, 3])", f"There are 2 names on the left of the `=` and more values than that on the right. {_UNPACK}"),
+        ("x, y = 1, 2; a, b = [1]", f"There are 2 names on the left and 1 value on the right. {_UNPACK}"),
+    ],
+)
+def test_unpacking_the_wrong_number_of_values(corridor, code, friendly):
+    assert run_level(corridor, code).error.friendly == friendly
+
+
+@pytest.mark.parametrize(
+    "code, friendly",
+    [
+        ("x, y = 5", "5 is a whole number (an int): there is nothing inside it to hand out to `x` and `y`. Unpacking needs a tuple or a list."),
+        ("n = 2.5\nx, y, z = n", "2.5 is a number with a decimal point (a float): there is nothing inside it to hand out to `x`, `y` and `z`. Unpacking needs a tuple or a list."),
+        ("def f():\n    return 5\nx, y = f()", "The value on the right is a whole number (an int): there is nothing inside it to hand out to `x` and `y`. Unpacking needs a tuple or a list."),
+        ("a = [0, 0]\na[0], y = 5", "5 is a whole number (an int): there is nothing inside it to hand out to the names on the left. Unpacking needs a tuple or a list."),
+        ("x, y = None", "The value on the right is None: there is nothing inside it to hand out to `x` and `y`. Unpacking needs a tuple or a list."),
+        ("for x, y in [1, 2]:\n    pass", "Each item it goes through is a whole number (an int): there is nothing inside it to hand out to `x` and `y`. Unpacking needs a tuple or a list."),
+    ],
+)
+def test_unpacking_something_that_is_not_a_row_of_values(corridor, code, friendly):
+    assert run_level(corridor, code).error.friendly == friendly
+
+
+def test_changing_a_tuples_item(corridor):
+    friendly = run_level(corridor, "t = (1, 2)\nt[0] = 5").error.friendly
+    assert friendly == "A tuple can't be changed once it is made. Build a new one, or use a list if the values have to change."
+    assert run_level(corridor, "t = 'ab'\nt[0] = 'c'").error.friendly.startswith("Text can't be changed once it's made")
+
+
+_NO_ORDER = "Python can't put text and numbers in one order: it has no rule for {}."
+
+
+@pytest.mark.parametrize(
+    "code, rule",
+    [
+        ("a = [3, 'a', 1]\nprint(sorted(a))", "whether 'a' comes before 3"),
+        ("a = [3, 'a', 1]\na.sort()", "whether 'a' comes before 3"),
+        ("a = (2.5, 'b')\nprint(max(a))", "whether 'b' comes before 2.5"),
+        ("a = ['b', 7]\nprint(min(a))", "whether 7 comes before 'b'"),
+        ("print(max(3, 'a'))", "whether 'a' comes before 3"),
+        ("print(sorted(2 * [1] + ['x']))", "which of them comes first"),
+        ("a = [1, 'a']\nb = [2, 'b']\nprint(sorted(a), sorted(b))", "which of them comes first"),
+        ("print(sorted([4, 'z']))", "whether 'z' comes before 4"),
+        ("def f():\n    return [1, 'a']\nprint(sorted(f()))", "which of them comes first"),
+        ("a = [1, 'a']\nb = [2, 'b']\nprint(sorted(a) + sorted(b))", "which of them comes first"),
+    ],
+)
+def test_putting_text_and_numbers_in_order(corridor, code, rule):
+    assert run_level(corridor, code).error.friendly == _NO_ORDER.format(rule)
+
+
+def test_other_kinds_with_no_order_between_them(corridor):
+    friendly = run_level(corridor, "print([1] < 3)").error.friendly
+    assert friendly == "Python stopped with a TypeError: '<' not supported between instances of 'list' and 'int'"
+
+
+@pytest.mark.parametrize(
+    "code, kind",
+    [
+        ("a = [1]\na.remove(2)", "list"),
+        ("a = [1]\nprint(a.index(2))", "list"),
+        ("a = (1,)\nprint(a.index(2))", "tuple"),
+    ],
+)
+def test_remove_or_index_of_something_that_is_not_there(corridor, code, kind):
+    assert run_level(corridor, code).error.friendly == f"That value isn't in the {kind}. Ask first with `in`."
+
+
+@pytest.mark.parametrize(
+    "code, friendly",
+    [
+        ("a = []\nprint(max(a))", "`max()` was handed an empty list, so there is no largest item to hand back."),
+        ("a = []\nprint(min(a))", "`min()` was handed an empty list, so there is no smallest item to hand back."),
+        ("print(min(()))", "`min()` was handed an empty tuple, so there is no smallest item to hand back."),
+        ("print(max(''))", "`max()` was handed empty text, so there is no largest item to hand back."),
+        ("print(max([]), max([]))", "`max()` was handed an empty list, so there is no largest item to hand back."),
+        ("print(max(x for x in []))", "`max()` was handed something with no items in it, so there is no largest item to hand back."),
+        ("def f():\n    return []\nprint(max(f()))", "`max()` was handed something with no items in it, so there is no largest item to hand back."),
+    ],
+)
+def test_the_largest_or_smallest_of_nothing(corridor, code, friendly):
+    assert run_level(corridor, code).error.friendly == friendly
+
+
+@pytest.mark.parametrize(
+    "code, friendly",
+    [
+        ("a = [1, 2]\nprint(a[1.0])", "A place in a list is a whole number, like `[0]`. 1.0 is a number with a decimal point (a float)."),
+        ("a = (1, 2)\nprint(a['1'])", "A place in a tuple is a whole number, like `[0]`. '1' is text (a str)."),
+        ("a = [1, 2]\nplace = 3 / 2\nprint(a[place])", "A place in a list is a whole number, like `[0]`. 1.5 is a number with a decimal point (a float)."),
+        ("def f():\n    return [1, 2]\nprint(f()[1.0])", "A place in a list is a whole number, like `[0]`. That place is a number with a decimal point (a float)."),
+        ("a = [1, 2]\nprint(a[0.5], a[1.5])", "A place in a list is a whole number, like `[0]`. That place is a number with a decimal point (a float)."),
+    ],
+)
+def test_a_place_that_is_not_a_whole_number(corridor, code, friendly):
+    assert run_level(corridor, code).error.friendly == friendly
+
+
+def test_text_keeps_its_words_for_a_place_that_is_not_a_whole_number(corridor):
+    friendly = run_level(corridor, "t = 'abc'\nprint(t[1.0])").error.friendly
+    assert friendly == "Python stopped with a TypeError: string indices must be integers, not 'float'"
+
+
+# -- translating an error never raises, and never names the wrong place (M5.3-R1) ---------------
+
+_PAST_END_8 = "That list has 8 items, so the last one is at `[7]`: places count from 0. There is nothing at `[8]`."
+_UNPACK_ANY = "The value on the right is {}: there is nothing inside it to hand out to `x` and `y`. Unpacking needs a tuple or a list."
+_ORDER_ANY = "Python can't put text and numbers in one order: it has no rule for which of them comes first."
+_BIG = "n = 10 ** 5000\n"  # past the 4300 digits Python will turn into text
+
+
+@pytest.mark.parametrize(
+    "code, friendly",
+    [
+        (_BIG + "x, y = n", _UNPACK_ANY.format("a whole number (an int)")),
+        (_BIG + "print(sorted([n, 'a']))", _ORDER_ANY),
+        (
+            "class Thing:\n    def __repr__(self):\n        raise KeyError('no')\nthing = Thing()\nx, y = thing",
+            _UNPACK_ANY.format("a Thing"),
+        ),
+        # a huge place that only the line's other subscript can name: no numbers, no raise
+        (
+            _BIG + "def f():\n    return []\na = [1]\nprint(f()[0], a[n])",
+            _PAST_END_ANY.format("list", "list"),
+        ),
+    ],
+)
+def test_a_translation_with_a_value_that_cannot_be_shown_still_gives_its_sentence(code, friendly):
+    result = run_snippet(code)
+    assert result.status == "error"
+    assert result.error.friendly == friendly
+
+
+def test_showing_a_value_never_runs_the_players_code():
+    calls = []
+    code = (
+        "class Thing:\n"
+        "    def __repr__(self):\n        calls.append('repr')\n        return 'T'\n"
+        "    def __str__(self):\n        calls.append('str')\n        return 'T'\n"
+        "    def __format__(self, spec):\n        calls.append('format')\n        return 'T'\n"
+        "class Count(int):\n"
+        "    def __repr__(self):\n        calls.append('int repr')\n        return '5'\n"
+        "class Row(list):\n"
+        "    def __getitem__(self, place):\n        calls.append('getitem')\n        return 0\n"
+        "    def __repr__(self):\n        calls.append('list repr')\n        return '[]'\n"
+    )
+    for failing in (
+        "x, y = Thing()",
+        "x, y = Count(5)",
+        "a = [1, 2]\nprint(a[Thing()])",
+        "a = [1, 2]\nprint(a[Count(5)])",
+        "row = Row([1, 'a'])\nrow.sort()",
+        "print(sorted([Count(5), 'a']))",
+        "print(sorted(Row([1, 'a'])))",
+        "print(max(Row()))",
+    ):
+        run = run_snippet(code + failing, namespace=codex.player_namespace(calls=calls))
+        assert run.status == "error"
+        assert calls == [], failing
+
+
+def test_a_short_list_of_plain_values_is_shown():
+    friendly = run_snippet("a = [1, 2]\nprint(a[[1, 'x']])").error.friendly
+    assert friendly == "A place in a list is a whole number, like `[0]`. [1, 'x'] is a list."
+
+
+def test_a_translation_that_raises_falls_back_to_the_untranslated_sentence(monkeypatch):
+    def broken(*_):
+        raise ValueError("a bug in a translation")
+
+    monkeypatch.setattr(errors, "_explain_name", broken)
+    result = run_snippet("print(pwan)")
+    assert result.status == "error"
+    assert result.error.friendly == "Python stopped with a NameError: name 'pwan' is not defined"
+    # and when the error's own text can't be made either
+    class Silent(Exception):
+        def __str__(self):
+            raise RuntimeError("no text")
+
+    assert errors.friendly_message(Silent(), {}) == "Python stopped with a Silent."
+
+
+def test_what_stops_a_run_or_the_program_is_not_swallowed_by_a_translation(monkeypatch):
+    assert not issubclass(StepBudgetExceeded, Exception)  # so `except Exception` lets the tracer's stop through
+
+    def stop(*_):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(errors, "_explain_name", stop)
+    with pytest.raises(KeyboardInterrupt):
+        run_snippet("print(pwan)")
+
+
+@pytest.mark.parametrize(
+    "loop",
+    [
+        "b = [a[i] for i in range(10)]",
+        "b = {a[i] for i in range(10)}",
+        "b = {i: a[i] for i in range(10)}",
+        "b = [a[j] for i in range(10) for j in [i]]",
+        "b = [0 for i in range(10) if a[i] == 0]",
+    ],
+)
+def test_a_comprehension_does_not_name_the_place_of_another_variable_of_its_name(loop):
+    # `i` and `j` are 9 outside the comprehension; inside, the place that failed is 8
+    result = run_snippet("i = 9\nj = 9\na = [0] * 8\n" + loop)
+    assert result.error.friendly == _PAST_END_ANY.format("list", "list")
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "i = 9\na = [0] * 8\nfor i in range(10):\n    b = a[i]",
+        "i = 9\na = [0] * 8\nb = list(a[i] for i in range(10))",
+        "a = [0] * 8\nb = [a[8] for i in range(10)]",
+    ],
+)
+def test_a_loop_or_a_generator_still_names_the_real_place(code):
+    assert run_snippet(code).error.friendly == _PAST_END_8
+
+
+def test_a_line_that_reads_and_writes_the_same_place_names_it():
+    friendly = run_snippet("a = [0] * 8\nfor i in range(10): a[i] = a[i]").error.friendly
+    assert friendly == _PAST_END_8

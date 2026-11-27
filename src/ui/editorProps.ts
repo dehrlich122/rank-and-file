@@ -110,7 +110,7 @@ function levelFields(ctx: PropsContext): HTMLElement {
 const DETAIL_LABELS: Record<string, Record<string, string>> = {
   sign: { text: "Words on the sign" },
   rune: { text: "What the rune says" },
-  gate: { passphrase: "The answer that opens it", question: "What the guard asks (optional)" },
+  gate: { passphrase: "The answer that opens it", question: "What the guard asks (optional)", label: "A word on the gate (optional)" },
   timed_gate: { every: "Opens and shuts every … ticks", open: "Open for … of those ticks", clock: "Ticks with" },
 };
 const DETAIL_NOTES: Record<string, string> = {
@@ -143,7 +143,8 @@ function squareFields(ctx: PropsContext): HTMLElement {
     if (key === "every" || key === "open") return field(label, numberInput(value as number | undefined, 1, (n) => set(k, n)), undefined, key);
     if (key === "clock") return field(label, select((value as string | undefined) ?? options.timed_gate.clock, options.clocks, (c) => set(k, c as Clock)), undefined, key);
     if (key === "text") return field(label, textArea((value as string | undefined) ?? "", 3, (t) => set(k, t)), DETAIL_NOTES[key], key);
-    return field(label, textInput((value as string | undefined) ?? "", (t) => set(k, t)), DETAIL_NOTES[key], key);
+    const note = key === "label" ? `Shown on the gate instead of "?"; up to ${options.limits.label} characters, and the gate needs a question.` : DETAIL_NOTES[key];
+    return field(label, textInput((value as string | undefined) ?? "", (t) => set(k, t)), note, key);
   });
   return h(
     "div",

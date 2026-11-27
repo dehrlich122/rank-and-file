@@ -5,14 +5,17 @@
 // or the examiner levels (a do-nothing function); none is a level's solution. Checks report facts (lines, counts,
 // squares), never the editor's contents.
 import { sleep } from "./cdp.mjs";
-import { levelHelpers } from "./helpers.mjs";
+import { codexHelpers, examinerHelpers, lessonHelpers, levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const LEVEL = "practice-11";
 const ARROW = "↩";
 
 export default async function functionsChecks({ browser: b, base, root, check }) {
-  const { openLevel, setCode, run, brief, solution, challengeTab, codexTab, button, press } = levelHelpers(b, base, root);
+  const { openLevel, setCode, run, brief, solution, challengeTab, codexTab, button, press, toStart } = levelHelpers(b, base, root);
+  const { lessonAt, runSnippet } = lessonHelpers(b, openLevel);
+  const { readCodex } = codexHelpers(b);
+  const { examinerView, examinerCard, challengeCalls, stubFunction } = examinerHelpers(b);
 
   const boardLabel = `document.querySelector('.board-host .board').getAttribute('aria-label')`;
 
@@ -58,8 +61,7 @@ export default async function functionsChecks({ browser: b, base, root, check })
 
   /** Rewind to before the first step and wait for the board to settle there. */
   async function rewind() {
-    await press(0);
-    await b.waitFor(`/Step 0 /.test(document.querySelector('.step-label').textContent)`, 5000, "back at step 0");
+    await toStart();
     await settle();
   }
   /**
@@ -275,61 +277,8 @@ export default async function functionsChecks({ browser: b, base, root, check })
   const MARK = { ok: "✓", no: "✗" };
   const caseButtons = `[...document.querySelectorAll('.board-host .case-row button')]`;
 
-  /** What the board host shows of the examiner's calls (the calls' own text, counts, booleans, the board's shape). */
-  const examinerView = () =>
-    b.evaluate(`(() => {
-      const row = document.querySelector('.board-host .case-row');
-      const buttons = row ? [...row.querySelectorAll('button')] : [];
-      const caption = document.querySelector('.board-host p.boards-caption');
-      const board = document.querySelector('.board-host .board');
-      const box = board.getBoundingClientRect();
-      return {
-        row: row?.getAttribute('aria-label') ?? null,
-        calls: buttons.map((e) => e.textContent.replace(/ [${MARK.ok}${MARK.no}]$/, '')),
-        marks: buttons.map((e) => e.textContent.slice(-1)),
-        pressed: buttons.flatMap((e, i) => (e.getAttribute('aria-pressed') === 'true' ? [i] : [])),
-        thumbs: document.querySelectorAll('.board-host button.board-thumb').length,
-        caption: caption?.textContent ?? null,
-        top: box.top,
-        shape: box.width + 'x' + box.height + '/' + board.querySelectorAll('*').length,
-        cases: document.querySelectorAll('.board-host .case-row').length,
-      };
-    })()`);
-
-  /** The outcome card's examiner parts and its table of calls (null when there is none): booleans and the calls' text only. */
-  const examinerCard = () =>
-    b.evaluate(`(() => {
-      const table = document.querySelector('.outcome-host table.calls');
-      const rows = table ? [...table.querySelectorAll('tr')] : [];
-      return {
-        line: !!document.querySelector('.outcome-host p.examiner-line'),
-        mark: document.querySelector('.outcome-host p.examiner-line .examiner-mark')?.textContent ?? null,
-        text: document.querySelector('.outcome-host .outcome').innerText.replace(/\\s+/g, ' '),
-        table: table && {
-          head: rows[0].children.length,
-          rows: rows.slice(1).map((tr) => {
-            const [call, wanted, got, mark] = [...tr.children];
-            return {
-              call: call.textContent.trim(),
-              wanted: wanted.textContent.trim() !== '',
-              none: got.textContent.trim() === 'None',
-              same: got.textContent.trim() === wanted.textContent.trim(),
-              mark: mark.textContent.trim(),
-              markClass: mark.classList.contains('ok') ? 'ok' : mark.classList.contains('no') || mark.querySelector('.no') ? 'no' : '',
-              picked: tr.classList.contains('picked'),
-            };
-          }),
-        },
-      };
-    })()`);
-
-  /** The made-up function: the call list's function name, a catch-all signature, a body that does nothing. */
-  async function stub() {
-    const call = await b.evaluate(`document.querySelector('ol.call-list code.call-code').textContent`);
-    return `def ${call.split("(")[0].trim()}(*args, **kwargs):\n    pass`;
-  }
   /** Open the level, type the made-up function and run it (jumping to the last frame unless `jump` is false). */
-  const stubRun = (id, opts) => runOn(id, stub, opts);
+  const stubRun = (id, opts) => runOn(id, stubFunction, opts);
   const clickCase = (index) => b.evaluate(`${caseButtons}[${index}].click()`);
   const pressedIs = (index) => `${caseButtons}[${index}]?.getAttribute('aria-pressed') === 'true'`;
   const rowPicked = (index) => `document.querySelectorAll('.outcome-host table.calls tr')[${index + 1}]?.classList.contains('picked')`;
@@ -441,10 +390,39 @@ export default async function functionsChecks({ browser: b, base, root, check })
     return `${n} rows, none returned, the picked row follows the pressed call both ways`;
   });
 
+  await check("M5.3: after a run the buttons say call 1, call 2 … each with its mark, the table's first column says call N, and the full call is each button's tooltip (the table's after Replay)", async () => {
+    const r = await stubRun(ANSWER);
+    expect(r.head !== "Solved!", `the made-up function solved the level: ${r.head}`);
+    const listed = await challengeCalls(); // the Challenge panel's numbered list: "call N" is its Nth item
+    const view = await examinerView();
+    const card = await examinerCard();
+    const n = listed.length;
+    expect(n >= 2 && view.texts.length === n, `${n} calls listed, ${view.texts.length} buttons`);
+    const numbered = listed.map((_, i) => `call ${i + 1}`);
+    expect(JSON.stringify(view.texts) === JSON.stringify(numbered.map((words) => `${words} ${MARK.no}`)), `the buttons read ${JSON.stringify(view.texts)}`);
+    expect(JSON.stringify(view.calls) === JSON.stringify(listed), "a button's tooltip is not the Challenge panel's item of the same number");
+    expect(card.table && card.table.rows.length === n, `the table has ${card.table?.rows.length} rows for ${n} calls`);
+    const rows = card.table.rows;
+    expect(JSON.stringify(rows.map((row) => row.words)) === JSON.stringify(numbered), `the table's first column reads ${JSON.stringify(rows.map((row) => row.words))}`);
+    expect(rows.every((row, i) => row.replays && row.call === listed[i]), "a table button's tooltip is not Replay and the Challenge panel's item of the same number");
+    return `${n} buttons and rows: ${numbered.join(", ")}; tooltips match the Challenge list`;
+  });
+
+  await check("M5.3: a hidden-goal level's case buttons keep their square labels and carry no tooltip and no call number", async () => {
+    const r = await runOn("practice-01", "pass"); // a made-up program that moves nothing: every case fails
+    expect(r.head !== "Solved!", `the made-up program solved the level: ${r.head}`);
+    const row = await b.evaluate(`[...document.querySelectorAll('.board-host .case-row button')].map((e) => ({ text: e.textContent, titled: e.hasAttribute('title') }))`);
+    expect(row.length === 4, `${row.length} buttons in the case row`);
+    expect(row.every((e) => new RegExp("^[a-h][1-8] [" + MARK.ok + MARK.no + "]$").test(e.text)), `the buttons read ${JSON.stringify(row.map((e) => e.text))}`);
+    expect(row.every((e) => !e.titled), `${row.filter((e) => e.titled).length} buttons carry a title`);
+    expect((await examinerCard()).table === null, "a table of calls on a hidden-goal level");
+    return `${row.length} buttons read ${row.map((e) => e.text).join(", ")}, none with a tooltip`;
+  });
+
   await check("M5.2: a program that makes the examiner's call itself is refused before the run, naming the line", async () => {
     await openLevel(BOARD_ONLY, { fresh: true });
     const before = await examinerView();
-    const own = await stub();
+    const own = await stubFunction();
     const line = own.split("\n").length + 1;
     await setCode(`${own}\n${own.slice(4, own.indexOf("("))}()`);
     const r = await run();
@@ -497,23 +475,6 @@ export default async function functionsChecks({ browser: b, base, root, check })
       call: s.querySelector('.snippet-call')?.textContent ?? null,
       code: s.querySelector('.snippet-call code')?.textContent ?? null,
     }))`);
-  /** Open a lesson and page to the step holding snippet `index` (a step ends with its snippet, so step N holds snippet N). */
-  async function lessonAt(id, index) {
-    await openLevel(id, { fresh: true });
-    for (let i = 0; i < index; i++) await b.evaluate(`document.querySelector('.lesson-pager .btn-primary').click()`);
-    await b.waitFor(`document.querySelectorAll('.lesson .lesson-step')[${index}]?.hidden === false`, 5000, `lesson step ${index} on show`);
-  }
-  /** Press Run on snippet `index` (its step on show) and wait for its ending status, which starts with a mark. */
-  async function runSnippet(index) {
-    const snippet = `document.querySelectorAll('.lesson .lesson-step')[${index}].querySelector('.snippet')`;
-    await b.evaluate(`${snippet}.querySelector('.btn').click()`);
-    await b.waitFor(`/^[✓✗⏱]/.test(${snippet}.querySelector('.snippet-status').textContent)`, 30_000, "the snippet's ending status");
-    return b.evaluate(`(() => {
-      const s = ${snippet};
-      const summary = s.querySelector('.snippet-summary');
-      return { status: s.querySelector('.snippet-status').textContent, summary: summary.textContent, codes: [...summary.querySelectorAll('code')].map((e) => e.textContent), caption: s.querySelector('.snippet-call code')?.textContent ?? null };
-    })()`);
-  }
   /** Where the lesson's one caption is, and what a run of the called snippet says (A1 and A2, and A3's first half). */
   async function calledSnippet(id, index, total) {
     await lessonAt(id, index);
@@ -556,15 +517,8 @@ export default async function functionsChecks({ browser: b, base, root, check })
     await openLevel(id, { fresh: true });
     await codexTab();
     await b.waitFor(`document.querySelector('.codex .codex-entry')`, 20_000, "the Codex's entries");
-    return b.evaluate(`(() => {
-      let group = '';
-      const names = [];
-      for (const el of document.querySelector('.codex').children) {
-        if (el.tagName === 'H3') group = el.textContent;
-        else if (group === 'Keywords' && el.classList.contains('codex-entry')) names.push(el.dataset.codex);
-      }
-      return { group: [...document.querySelectorAll('.codex h3')].some((e) => e.textContent === 'Keywords'), names };
-    })()`);
+    const { headings, entries } = await readCodex();
+    return { group: headings.includes("Keywords"), names: entries.filter((e) => e.group === "Keywords").map((e) => e.name) };
   }
 
   await check("M5.2: the Codex's keywords: def comes with ch07-l02, return with ch07-l04 (not before)", async () => {

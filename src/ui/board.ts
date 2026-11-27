@@ -17,10 +17,12 @@ import { motionReduced, settings } from "../settings";
 import { sound } from "../sound";
 import { landingSounds, soundsForStep } from "../sound/events";
 import { describeBoard } from "./boardText";
+import { doorTile, keyTile, openDoors } from "./keyDoor";
 import { jumpPlan, type JumpPlan, playableEvents } from "./motion";
 import { halftone, litGrid, M, S } from "./sprites/floor";
 import { ENEMY_SPRITE, enemy as enemySprite, goal as goalSprite, hero, TILE_SPRITE, tile as tileSprite, type Skin, type TileName } from "./sprites";
 import { svg } from "./svg";
+import { sprite, tooltip } from "./tileParts";
 
 let trails = 0; // numbers each trail's gradient
 
@@ -279,6 +281,9 @@ export class BoardView {
     this.mark("gem", "collected", state.collected);
     this.mark("plank", "collected", state.collected);
     this.mark("pit", "bridged", state.bridged);
+    this.mark("key", "collected", state.collected);
+    // A door stands open while its key is carried: the engine lists the names carried, so the board reads the doors off that.
+    this.mark("door", "open", openDoors(this.level.doors, state.inventory));
     // The shaded squares only change when a piece is taken, so skip the rebuild otherwise.
     const attackedKey = state.attacked?.join(";");
     if (state.attacked && attackedKey !== this.attackedKey) {
@@ -435,8 +440,8 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
   wall: (left, top) => wall(left, top),
   sign: (left, top, level, pos) => signpost(left, top, find(level.signs, pos)?.text ?? ""),
   gate: (left, top, level, pos) => {
-    const question = find(level.questions, pos)?.text;
-    return question ? gate(left, top, `The guard asks: "${question}"`, "?") : gate(left, top, "A locked gate. A guard keeps it shut.");
+    const asked = find(level.questions, pos);
+    return asked?.text ? gate(left, top, `The guard asks: "${asked.text}"`, asked.label ?? "?") : gate(left, top, "A locked gate. A guard keeps it shut.");
   },
   timed_gate: (left, top, level, pos) => {
     const timer = find(level.timed_gates, pos);
@@ -451,12 +456,9 @@ const TILE_ART: Record<TileKind, TileArt | null> = {
   waypoint: (left, top) => waypoint(left, top),
   gem: (left, top) => gem(left, top),
   rune: (left, top, level, pos) => rune(left, top, find(level.runes, pos)?.text ?? ""),
+  key: (left, top, level, pos) => keyTile(left, top, find(level.keys ?? [], pos)?.name ?? ""),
+  door: (left, top, level, pos) => doorTile(left, top, find(level.doors ?? [], pos)?.key ?? ""),
 };
-
-/** A tile's sprite, centred on its square. */
-function sprite(left: number, top: number, art: SVGElement): SVGGElement {
-  return svg("g", { class: "spr", transform: `translate(${left + S / 2} ${top + S / 2})` }, art);
-}
 
 const tile = (left: number, top: number, name: TileName) => sprite(left, top, tileSprite(name));
 
@@ -611,13 +613,6 @@ function setBadgeText(group: SVGGElement, text: string): void {
   const width = Math.max(16, text.length * 6.5 + 8);
   pill.setAttribute("width", String(width));
   pill.setAttribute("x", String(Number(label.getAttribute("x")) - width / 2));
-}
-
-/** An SVG <title>: the text a browser shows on hover. */
-function tooltip(text: string): SVGTitleElement {
-  const title = svg("title", {});
-  title.textContent = text;
-  return title;
 }
 
 function restartAnimation(element: Element, className: string): void {

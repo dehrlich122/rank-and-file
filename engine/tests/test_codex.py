@@ -1,5 +1,6 @@
 """The Codex (docs/Codex.md): its entries, a level's list, help(), and Scratch Python's stand-in piece."""
 
+import ast
 import builtins
 import types
 from dataclasses import replace
@@ -76,7 +77,8 @@ def test_every_documented_builtin_and_method_is_real_and_has_a_full_entry(name):
     if name in codex.BUILTINS:
         assert hasattr(builtins, name) and entry.kind == "builtin"
     else:
-        assert hasattr(str, name.removeprefix("str.")) and entry.kind == "method"
+        kind, _, method = name.partition(".")
+        assert hasattr({"str": str, "list": list}[kind], method) and entry.kind == "method"
     assert entry.calls and entry.paragraphs and entry.returns and entry.example
     assert bool(entry.args) == ("()" not in entry.calls[0]), f"{name}: its entry lists arguments exactly when it takes some"
 
@@ -93,7 +95,7 @@ def test_taught_so_far_is_the_curriculum_before_a_level_then_its_own_chapter_up_
 
 def test_a_levels_codex_is_its_abilities_then_the_builtins_taught_so_far():
     entries = codex.entries("t1", CHAPTERS)
-    assert [entry.name for entry in entries] == ["pawn.move", "pawn.wait", "print", "range", "for"]  # a keyword the lesson uses comes last (M5.2-7)
+    assert [entry.name for entry in entries] == ["pawn.move", "pawn.wait", "print", "range", "for", "whole number"]  # a keyword the lesson uses, then a kind of value (M5.2-7, M5.3)
     introduced = {entry.name: (entry.introduced, entry.new) for entry in entries}
     assert introduced["pawn.move"] == ("c1", False)
     assert introduced["print"] == ("c2", False)  # the snippet that isn't Python is skipped
@@ -103,7 +105,7 @@ def test_a_levels_codex_is_its_abilities_then_the_builtins_taught_so_far():
 
 def test_only_this_levels_abilities_are_listed():
     # An ability unlocked earlier but locked here can't be used, so it isn't listed.
-    assert [entry.name for entry in codex.entries("t2", CHAPTERS)] == ["pawn.move", "print", "range", "for"]  # the built-ins and keywords still work
+    assert [entry.name for entry in codex.entries("t2", CHAPTERS)] == ["pawn.move", "print", "range", "for", "whole number"]  # the built-ins, keywords and kinds of value still work
 
 
 def test_a_lessons_built_ins_are_found_with_ast():
@@ -123,7 +125,7 @@ def test_a_lessons_text_methods_are_found_with_ast():
 def test_a_levels_codex_lists_text_methods_after_the_builtins_once_taught():
     chapters = [{"curriculum": True, "levels": [level("r1", ["move"], "print(int('4'.strip()))")]}]
     entries = codex.entries("r1", chapters)
-    assert [(entry.name, entry.kind) for entry in entries] == [("pawn.move", "ability"), ("print", "builtin"), ("int", "builtin"), ("str.strip", "method")]
+    assert [(entry.name, entry.kind) for entry in entries] == [("pawn.move", "ability"), ("print", "builtin"), ("int", "builtin"), ("str.strip", "method"), ("text", "value")]
 
 
 def test_help_shows_a_text_method_however_it_is_asked_for():
@@ -188,9 +190,9 @@ def test_help_on_a_locked_ability_says_it_isnt_learned_yet():
 
 def test_help_on_a_plain_value_or_unknown_text_says_so_briefly():
     # help(pawn.position) gets the position itself, and help(pawn.facing) gets "north".
-    output = run_sandbox("help(pawn.position)\nhelp(pawn.facing)", ["move", "position", "facing"]).output
-    assert "is a value (a tuple)" in output and "There's no help on 'north'" in output
-    assert len(output.splitlines()) < 8  # not Python's whole page on tuples
+    output = run_sandbox("help(2.5)\nhelp(pawn.facing)", ["move", "position", "facing"]).output
+    assert "2.5 is a value (a float)" in output and "There's no help on 'north'" in output
+    assert len(output.splitlines()) < 8  # not Python's whole page on floats
 
 
 def test_help_with_nothing_explains_itself():
@@ -224,10 +226,27 @@ def test_help_on_help_shows_its_own_entry_however_it_is_asked_for():
     assert expected.startswith("Help on help:") and "help(thing) or help()" in expected
 
 
-def test_help_is_the_last_builtin_taught_and_a_full_builtin_entry():
+def test_help_is_the_last_of_the_first_builtins_taught_and_a_full_builtin_entry():
     entry = codex.python_entry("help")
-    assert list(codex.BUILTINS)[-1] == "help"
+    assert list(codex.BUILTINS)[-5] == "help"  # chapter 8's four (M5.3) come after it
     assert entry.kind == "builtin" and entry.calls[0] == "help(thing)"
+
+
+def test_chapter_eights_five_entries_are_the_last_of_their_kind_in_order():
+    assert list(codex.BUILTINS)[-4:] == ["sorted", "min", "max", "sum"]
+    assert list(codex.METHODS)[-1] == "list.append"
+    kinds = {name: codex.python_entry(name).kind for name in ("sorted", "min", "max", "sum", "list.append")}
+    assert kinds == {"sorted": "builtin", "min": "builtin", "max": "builtin", "sum": "builtin", "list.append": "method"}
+
+
+def test_the_new_builtins_and_list_append_are_found_with_ast():
+    code = "keys = []\nkeys.append(1)\nprint(sorted(keys), min(keys), max(keys), sum(keys), 'x'.upper())"
+    assert codex.python_called(code) == {"print", "sorted", "min", "max", "sum", "list.append", "str.upper"}
+
+
+def test_help_shows_the_new_entries_however_they_are_asked_for():
+    for code, name in (("help(sorted)", "sorted"), ("help(min)", "min"), ("help(max)", "max"), ("help(sum)", "sum"), ("help([].append)", "list.append")):
+        assert run_sandbox(code, ["move"]).output == codex.format_entry(codex.python_entry(name)) + "\n\n"
 
 
 def test_a_lesson_that_calls_help_brings_its_entry_in_on_its_level_and_not_before():
@@ -262,17 +281,17 @@ def test_help_on_a_knight_level_introduces_the_knight():
 def test_help_on_the_knight_lists_its_abilities_and_never_says_pawn():
     output = knight_says("help(knight)")
     listed = [line.strip() for line in output.splitlines() if line.startswith("    knight.")]
-    assert listed == ["knight.jump(dx, dy)", "knight.look(dx, dy)", "knight.at_goal()", "knight.position", "knight.wait(ticks=1)", "knight.read()"]
+    assert listed == ["knight.jump(dx, dy)", "knight.look(dx, dy)", "knight.at_goal()", "knight.position", "knight.wait(ticks=1)", "knight.read()", "knight.pick_up()", "knight.inventory"]
     assert "Help on knight: your piece. In this level it knows:" in output
     assert "pawn" not in output.lower()
 
 
 def test_help_on_a_value_or_unknown_text_names_the_knight_on_a_knight_level():
-    output = knight_says('help(knight.position)\nhelp("nonsense")')
+    output = knight_says('help(2.5)\nhelp("nonsense")')
     assert 'Try help(print), help(knight) for what your knight knows, or help("knight.position") for one of them.' in output
     assert "There's no help on 'nonsense'. Try help(print), or help(knight) for what your knight knows." in output
     assert "pawn" not in output.lower()
-    pawn = run_sandbox('help(pawn.position)\nhelp("nonsense")', ["move", "position"]).output
+    pawn = run_sandbox('help(2.5)\nhelp("nonsense")', ["move", "position"]).output
     assert 'Try help(print), help(pawn) for what your pawn knows, or help("pawn.position") for one of them.' in pawn
     assert "There's no help on 'nonsense'. Try help(print), or help(pawn) for what your pawn knows." in pawn
 
@@ -525,7 +544,7 @@ def test_a_keyword_is_listed_from_the_first_lesson_that_uses_it_and_not_before()
 
 def test_keywords_come_after_the_text_methods():
     chapters = [{"curriculum": True, "levels": [level("r1", ["move"], "for c in 'a'.upper():\n    print(c)")]}]
-    assert [entry.kind for entry in codex.entries("r1", chapters)] == ["ability", "builtin", "method", "keyword"]
+    assert [entry.kind for entry in codex.entries("r1", chapters)] == ["ability", "builtin", "method", "keyword", "value"]
 
 
 def test_help_on_a_keyword_shows_its_entry_on_any_level():
@@ -537,6 +556,103 @@ def test_help_on_a_keyword_shows_its_entry_on_any_level():
 
 def test_help_on_other_text_keeps_its_behaviour():
     assert "There's no help on 'zzz'" in run_sandbox('help("zzz")', ["move"]).output
+
+
+# -- kinds of value (M5.3-K2) --------------------------------------------------------
+
+VALUE_NAMES = ["whole number", "text", "True and False", "None", "list", "tuple"]
+
+
+def test_every_kind_of_value_has_a_full_entry_whose_example_runs():
+    assert list(codex.VALUES) == VALUE_NAMES
+    assert not set(codex.VALUES) & (set(codex.PYTHON) | set(codex.KEYWORDS))
+    for name in VALUE_NAMES:
+        entry = codex.value_entry(name)
+        assert entry.kind == "value" and entry.name == name and entry.calls and entry.paragraphs and entry.example
+        ast.parse(entry.example)
+        assert run_snippet(entry.example).status == "ok", name
+    assert codex.value_entry("True and False").calls == ["True", "False"]
+    assert codex.value_entry("list").calls == ["[1, 2, 3]"]
+
+
+def kinds_made(code: str) -> set[str]:
+    return set(codex._kinds_made(f"{FENCE}python run\n{code}\n{FENCE}\n"))
+
+
+@pytest.mark.parametrize(
+    ("code", "kind"),
+    [
+        ("x = 7", "whole number"),
+        ('x = "a"', "text"),
+        ("x = f'{y}'", "text"),
+        ("x = True", "True and False"),
+        ("x = False", "True and False"),
+        ("x = None", "None"),
+        ("x = []", "list"),
+        ("print([1, 2])", "list"),
+        ("x = (3, 2)", "tuple"),
+        ("def f():\n    return 1, 2", "tuple"),
+    ],
+)
+def test_a_lesson_makes_a_kind_of_value_by_writing_one(code, kind):
+    assert kind in kinds_made(code)
+
+
+def test_what_does_not_make_a_value_brings_in_nothing():
+    assert kinds_made("x = True") == {"True and False"}  # a bool is no whole number
+    assert kinds_made("x, y = pair") == set()  # an unpacking target makes no tuple
+    assert kinds_made("[a, b] = pair") == set()  # nor an assigned-to list display
+    assert kinds_made("for x, y in pairs:\n    pass") == set()
+    assert kinds_made("print(a, b)") == set()
+    assert kinds_made("this is not Python") == set()
+
+
+def values_chapters() -> list[dict]:
+    return [
+        {"curriculum": True, "levels": [level("v1", ["move"], "pawn.move()"), level("v2", ["move"], "x = 'a'\ny = [1]"), level("v3", ["move"], "z = (1, 2)\nx, y = z")]},
+    ]
+
+
+def test_a_kind_of_value_is_listed_from_the_first_lesson_that_makes_it_after_the_keywords():
+    def at(level_id: str) -> list[tuple[str, str, bool]]:
+        return [(e.name, e.introduced, e.new) for e in codex.entries(level_id, values_chapters()) if e.kind == "value"]
+
+    assert at("v1") == []
+    assert at("v2") == [("whole number", "v2", True), ("text", "v2", True), ("list", "v2", True)]
+    assert at("v3") == [("whole number", "v2", False), ("text", "v2", False), ("list", "v2", False), ("tuple", "v3", True)]
+    kinds = [entry.kind for entry in codex.entries("v3", values_chapters())]
+    assert kinds == ["ability", "value", "value", "value", "value"]
+
+
+def test_help_on_a_kind_of_value_by_name_alias_or_type():
+    output = run_sandbox('help("list")\nhelp("tuple")\nhelp("text")\nhelp("whole number")\nhelp("True and False")\nhelp("None")', ["move"]).output
+    for name in VALUE_NAMES:
+        assert f"Help on {name}:" in output
+    assert "Help on int:" in run_sandbox('help("int")\nhelp(int)', ["move"]).output
+    assert "Help on whole number:" not in run_sandbox('help("int")\nhelp(int)', ["move"]).output
+    by_alias = run_sandbox('help("str")\nhelp("bool")', ["move"]).output
+    assert "Help on text:" in by_alias and "Help on True and False:" in by_alias
+    by_type = run_sandbox("help(list)\nhelp(tuple)\nhelp(str)\nhelp(bool)", ["move"]).output
+    for name in ("list", "tuple", "text", "True and False"):
+        assert f"Help on {name}:" in by_type
+    assert "There's no help on 'north'" in run_sandbox('help("north")', ["move"]).output
+
+
+def test_help_on_a_value_answers_for_its_kind_and_points_at_the_piece():
+    pointer = "help() explains what things do: try help(print), or help(pawn) for what your pawn knows."
+    for code, name in (("[]", "list"), ("(3, 2)", "tuple"), ("7", "whole number"), ("True", "True and False"), ("None", "None"), ("pawn.position", "tuple")):
+        output = run_sandbox(f"help({code})", ["move", "position"]).output
+        assert f"Help on {name}:" in output, code
+        assert output.endswith(f"\n\n{pointer}\n\n"), code
+    knight = knight_says("help(knight.position)")
+    assert "help(knight) for what your knight knows." in knight and "pawn" not in knight.lower()
+
+
+def test_help_on_a_float_a_dict_or_a_set_keeps_the_one_sentence():
+    output = run_sandbox("help(2.5)\nhelp({})\nhelp({1})", ["move"]).output
+    for kind in ("float", "dict", "set"):
+        assert f"is a value (a {kind}), and help() explains what things do." in output
+    assert "Help on" not in output
 
 
 def function_help(code: str) -> str:
@@ -624,5 +740,6 @@ def test_help_without_a_builtins_help_still_looks_things_up(monkeypatch):
     for code in ("help(None)", "help(42)", "def f():\n    pass\nhelp(f)"):
         result = run_snippet(code)
         assert result.status == "ok", code
-        assert "Help on" not in result.output, code
+        assert "Help on help:" not in result.output, code
+    assert "Help on None:" in run_snippet("help(None)").output  # the value's own kind answers (M5.3)
     assert "Help on print:" in run_snippet("help(print)").output

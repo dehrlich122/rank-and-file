@@ -22,7 +22,7 @@ export interface SnippetResult {
 
 export type Facing = "north" | "east" | "south" | "west";
 export type Pos = [number, number];
-export type TileKind = "floor" | "wall" | "sign" | "gate" | "pit" | "waypoint" | "gem" | "timed_gate" | "plank" | "rune";
+export type TileKind = "floor" | "wall" | "sign" | "gate" | "pit" | "waypoint" | "gem" | "timed_gate" | "plank" | "rune" | "key" | "door";
 export type Clock = "action" | "line" | "new_line";
 
 /** The world at one moment: where the piece is, which gates are open, and the obstacles (M3.1). */
@@ -40,6 +40,7 @@ export interface WorldState {
   clock_ticks?: Partial<Record<Clock, number>>; // the code clocks' counts, on levels with clockwork (QA-021)
   attacked?: Pos[]; // the squares enemy chess pieces attack, on levels with any (M3.4)
   landings?: Pos[]; // the squares a jump from here could land on without an error, on knight levels; empty once lost (M5.1)
+  inventory?: Array<string | number>; // the names of the keys the piece carries, in the order picked up; on levels with keys or doors (M5.3)
 }
 
 /** A level as the engine describes it (levels.Level.describe). */
@@ -55,7 +56,9 @@ export interface LevelInfo {
   tiles: TileKind[][]; // tiles[y][x]; y = 0 is the bottom rank
   signs: Array<{ pos: Pos; text: string }>;
   runes: Array<{ pos: Pos; text: string }>; // the text on each rune tile, which `pawn.read()` gives back (M3.6)
-  questions: Array<{ pos: Pos; text: string }>; // what the guard asks, at gates that ask (never the answer)
+  keys?: Array<{ pos: Pos; name: string | number }>; // each key's name, only on a board with keys (M5.3)
+  doors?: Array<{ pos: Pos; key: string | number }>; // the key each door wants, only on a board with doors (M5.3)
+  questions: Array<{ pos: Pos; text: string; label?: string }>; // what the guard asks, at gates that ask (never the answer); label: a short word for the badge, where the level gives one (QA-068)
   timed_gates: Array<{ pos: Pos; every: number; open: number; clock: Clock; text: string }>; // open for the first `open` ticks of every `every` (QA-024); text: its rule in words
   enemies: Enemy[]; // patrols and chasers; where they are is in each WorldState
   goal: Pos | null;
@@ -133,7 +136,7 @@ export interface EditorOptions {
 }
 
 /** How the solvability check (M4.3) got on with one board: a route of plain calls, none, a cap reached, clockwork it can't judge, or an examiner level (M5.2: the examiner calls the player's function, so plain calls say nothing; declined whole). */
-type SolveStatus = "route" | "no_route" | "gave_up" | "clocks" | "examiner";
+type SolveStatus = "route" | "no_route" | "gave_up" | "clocks" | "examiner" | "keys";
 
 /** Where the check has got to. Counts and words only: the route is never sent (engine/rankfile/search.py). */
 export interface SolveProgress {
@@ -245,7 +248,7 @@ export interface CodexEntry {
   name: string; // as code writes it: "pawn.move", "print"
   // a property is used without parentheses (pawn.position); a method is called on text (str.upper, M3.6); a keyword
   // is a word of the language itself (def, return: M5.2-7)
-  kind: "ability" | "property" | "builtin" | "method" | "keyword";
+  kind: "ability" | "property" | "builtin" | "method" | "keyword" | "value";
   calls: string[]; // how to use it: ["pawn.move(squares=1)"]; some built-ins have more than one form
   paragraphs: string[]; // what it does; `code` is in backticks
   args: Array<{ name: string; about: string }>;

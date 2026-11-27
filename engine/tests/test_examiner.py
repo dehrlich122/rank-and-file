@@ -85,11 +85,10 @@ def test_a_calls_json_keys_are_in_the_order_the_ui_reads_them():
         ({"function": "gallop", "calls": [{}, 3]}, "examine call 2 must be a mapping"),
         ({"function": "gallop", "calls": [{"arg": [1]}]}, "unknown key(s) in examine call 1: arg"),
         ({"function": "gallop", "calls": [{"args": 3}]}, "examine call 1: args must be a list"),
-        ({"function": "gallop", "calls": [{"args": [[1]]}]}, "each arg must be a plain value"),
-        ({"function": "gallop", "calls": [{"args": [{"a": 1}]}]}, "each arg must be a plain value"),
-        ({"function": "gallop", "calls": [{"args": [float("inf")]}]}, "each arg must be a plain value"),
-        ({"function": "gallop", "calls": [{"returns": [1, 2]}]}, "returns must be a plain value"),
-        ({"function": "gallop", "calls": [{"returns": {"a": 1}}]}, "returns must be a plain value"),
+        ({"function": "gallop", "calls": [{"args": [{"a": 1}]}]}, "examine call 1: arg 1 is a mapping, and the only mapping allowed is"),
+        ({"function": "gallop", "calls": [{"args": [1, float("inf")]}]}, "examine call 1: arg 2 must be a plain value"),
+        ({"function": "gallop", "calls": [{"returns": float("nan")}]}, "examine call 1: returns must be a plain value"),
+        ({"function": "gallop", "calls": [{"returns": {"a": 1}}]}, "examine call 1: returns is a mapping, and the only mapping allowed"),
         ({"function": "gallop", "calls": [{"board": 0}]}, "board must be a whole number of at least 1"),
         ({"function": "gallop", "calls": [{"board": "1"}]}, "board must be a whole number of at least 1"),
         ({"function": "gallop", "calls": [{"board": True}]}, "board must be a whole number of at least 1"),
@@ -101,6 +100,82 @@ def test_a_bad_examiner_is_refused_where_it_is_wrong(examine, message):
     with pytest.raises(LevelError, match=message.replace("(", r"\(").replace(")", r"\)")) as raised:
         make_level(ROW, api=API, examine=examine)
     assert raised.value.at == {"field": "examine"}
+
+
+# -- M5.3-4: lists and pairs, in the file and in what the examiner says ---------------------------------------------
+
+def test_a_list_a_list_of_pairs_and_a_tuple_are_read_as_python_holds_them():
+    level = examiner(
+        {"args": [[1, -1, 1]], "returns": [4, 9]},
+        {"args": [[[2, 1], [3, 3]], 5], "returns": [[0, 1], [2, 3]]},
+        {"args": [{"tuple": [1, "a"]}], "returns": {"tuple": [4, 9]}},
+        {"args": [[]], "returns": []},
+        {"args": [["a", True, None, 2.5]], "returns": [[1]]},
+    )
+    calls = level.examine.calls
+    assert [call.args for call in calls] == [[[1, -1, 1]], [[(2, 1), (3, 3)], 5], [(1, "a")], [[]], [["a", True, None, 2.5]]]
+    assert [call.returns for call in calls] == [[4, 9], [(0, 1), (2, 3)], (4, 9), [], [(1,)]]
+    assert [type(call.args[0]) for call in calls] == [list, list, tuple, list, list]
+    assert type(calls[0].returns) is list and type(calls[2].returns) is tuple
+    assert all(type(item) is tuple for item in calls[1].args[0] + calls[1].returns)
+
+
+def test_an_empty_list_is_allowed_and_a_pair_needs_a_value():
+    assert examiner({"args": [[], [[1, 2]]], "returns": []}).examine.calls[0].args == [[], [(1, 2)]]
+    with pytest.raises(LevelError, match="a pair"):
+        examiner({"args": [[[]]]})
+
+
+def test_a_call_reads_as_python_prints_it():
+    call = examiner({"args": [[1, -1], [[2, 1], [3, 3]], {"tuple": [4, 9]}, [], "up", None]}).examine.calls[0]
+    assert call.text("visit") == "visit([1, -1], [(2, 1), (3, 3)], (4, 9), [], 'up', None)"
+    assert examiner({"args": [{"tuple": [4]}]}).examine.calls[0].text("visit") == "visit((4,))"
+    assert examiner({"args": [[[7]]]}).examine.calls[0].text("visit") == "visit([(7,)])"
+
+
+def test_the_label_and_describe_carry_the_text_and_no_answer():
+    level = examiner({"args": [[[2, 1], [3, 3]]], "returns": [[777, 888]]}, {"args": [[5, 6]], "returns": {"tuple": [31337, 0]}})
+    assert [case.label for case in level.cases()] == ["gallop([(2, 1), (3, 3)])", "gallop([5, 6])"]
+    described = json.dumps(level.describe())
+    assert "gallop([(2, 1), (3, 3)])" in described and "gallop([5, 6])" in described
+    assert "777" not in described and "31337" not in described
+
+
+@pytest.mark.parametrize(
+    ("call", "message"),
+    [
+        ({"args": [[[1, [2]]]]}, "examine call 1: arg 1: a pair .a list inside the list. must hold at least one plain value, with no list, pair or mapping inside it"),
+        ({"args": [[[1, [2, 3]], [4, 5]]]}, "examine call 1: arg 1: a pair"),  # a pair inside a pair
+        ({"args": [[[[1]]]]}, "examine call 1: arg 1: a pair"),  # a list three deep
+        ({"args": [[[1, {"tuple": [2]}]]]}, "examine call 1: arg 1: a pair"),
+        ({"args": [1, [[]]]}, "examine call 1: arg 2: a pair"),  # an empty pair
+        ({"args": [[{"tuple": [1, 2]}]]}, "examine call 1: arg 1: inside a list a tuple is written as an inner list"),
+        ({"args": [[{"a": 1}]]}, "examine call 1: arg 1: inside a list a tuple is written as an inner list"),
+        ({"args": [{"tuple": [1], "x": 2}]}, "examine call 1: arg 1 is a mapping, and the only mapping allowed is"),
+        ({"args": [{"tuples": [1]}]}, "examine call 1: arg 1 is a mapping, and the only mapping allowed is"),
+        ({"args": [{}]}, "examine call 1: arg 1 is a mapping, and the only mapping allowed is"),
+        ({"args": [{"tuple": [[1, 2]]}]}, "examine call 1: arg 1: .tuple: .... must hold a list of at least one plain value"),  # a list inside a tuple
+        ({"args": [{"tuple": [{"tuple": [1]}]}]}, "examine call 1: arg 1: .tuple: .... must hold a list"),
+        ({"args": [{"tuple": []}]}, "examine call 1: arg 1: .tuple: .... must hold a list of at least one plain value"),
+        ({"args": [{"tuple": None}]}, "examine call 1: arg 1: .tuple: .... must hold a list of at least one plain value"),
+        ({"args": [{"tuple": 5}]}, "examine call 1: arg 1: .tuple: .... must hold a list of at least one plain value"),
+        ({"args": [[1, float("nan")]]}, "examine call 1: arg 1 must be a plain value"),
+        ({"returns": [[1, [2]]]}, "examine call 1: returns: a pair"),
+        ({"returns": [[[1]]]}, "examine call 1: returns: a pair"),
+        ({"returns": {"tuple": [[1]]}}, "examine call 1: returns: .tuple: ...."),
+        ({"returns": {"tuple": []}}, "examine call 1: returns: .tuple: ...."),
+        ({"returns": {"x": [1]}}, "examine call 1: returns is a mapping"),
+    ],
+)  # fmt: skip
+def test_what_the_examiner_cannot_hold_is_refused_in_a_sentence_naming_the_call(call, message):
+    with pytest.raises(LevelError, match=message) as raised:
+        examiner(call)
+    assert raised.value.at == {"field": "examine"}
+
+
+def test_a_call_that_is_refused_is_named_by_its_number():
+    with pytest.raises(LevelError, match="examine call 3: arg 2: a pair"):
+        examiner({}, {"args": [[[1]]]}, {"args": [0, [[1, [2]]]]})
 
 
 def test_a_call_to_a_board_that_is_not_there_names_the_boards_there_are():
@@ -609,6 +684,130 @@ def test_the_answer_wanted_is_shown_only_where_the_table_shows_it():
     assert str(WANTS) in call_of({"args": [1], "returns": WANTS}, code="def gallop(n):\n    return 1\n", constraints=False).summary
 
 
+# -- M5.3-4: lists and pairs, judged and said ---------------------------------------------------------------------
+
+PAIRS = [[2, 1], [3, 3]]  # a list of two pairs, as a level file writes it
+
+
+def answer(returns, gives, args=(1,), function="visit"):
+    """Run `function` handing back `gives` (code) on a call wanting `returns`: the result, whose summary has the words."""
+    code = f"def {function}(*given):\n{MOVES}    return {gives}\n"
+    return call_of({"args": list(args), "returns": returns}, code=code, constraints=False, function=function)
+
+
+@pytest.mark.parametrize(
+    ("returns", "gives"),
+    [([4, 9], "[4, 9]"), ([], "[]"), ([[1, 2]], "[(1, 2)]"), (PAIRS, "[(2, 1), (3, 3)]"), ({"tuple": [4, 9]}, "(4, 9)"), ({"tuple": [4]}, "(4,)"),
+     ([["a", True], [None, 2.5]], "[('a', True), (None, 2.5)]")],
+)  # fmt: skip
+def test_a_list_of_pairs_or_a_tuple_that_is_the_same_kind_and_equal_passes(returns, gives):
+    result = answer(returns, gives)
+    assert result.status == "solved" and "it wanted" in result.summary and CORRECT in result.summary
+
+
+@pytest.mark.parametrize(
+    ("returns", "gives", "got", "wanted"),
+    [
+        ([4, 9], "[9, 4]", "[9, 4]", "[4, 9]"),  # the order is part of the value
+        ([4, 9], "[4]", "[4]", "[4, 9]"),  # shorter
+        ([4], "[4, 9]", "[4, 9]", "[4]"),  # longer
+        ([4], "[]", "[]", "[4]"),
+        ([], "[4]", "[4]", "[]"),
+        (PAIRS, "[(3, 3), (2, 1)]", "[(3, 3), (2, 1)]", "[(2, 1), (3, 3)]"),
+        (PAIRS, "[(2, 1), (3, 4)]", "[(2, 1), (3, 4)]", "[(2, 1), (3, 3)]"),
+        ({"tuple": [4, 9]}, "(9, 4)", "(9, 4)", "(4, 9)"),
+        ([[1, 2]], "[(1, 2), (3, 4)]", "[(1, 2), (3, 4)]", "[(1, 2)]"),
+    ],
+)  # fmt: skip
+def test_the_right_kinds_with_another_value_or_order_are_a_wrong_value(returns, gives, got, wanted):
+    result = answer(returns, gives)
+    assert result.status == "incomplete"
+    assert result.summary == f"The examiner called `visit(1)`: it wanted {wanted} and got {got}. {NOT_THE_ANSWER}"
+
+
+@pytest.mark.parametrize(
+    ("returns", "gives", "said"),
+    [
+        ({"tuple": [4, 9]}, "[4, 9]", "it wanted (4, 9) and got [4, 9], which is a list, not a tuple."),
+        ([4, 9], "(4, 9)", "it wanted [4, 9] and got (4, 9), which is a tuple, not a list."),
+        ([], "()", "it wanted [] and got (), which is a tuple, not a list."),
+        (PAIRS, "[[2, 1], [3, 3]]", "it wanted [(2, 1), (3, 3)] and got [[2, 1], [3, 3]], which has a list in it where a tuple was wanted."),
+        (PAIRS, "[(2, 1), [3, 3]]", "it wanted [(2, 1), (3, 3)] and got [(2, 1), [3, 3]], which has a list in it where a tuple was wanted."),
+        ([[2, 1]], "[(2.0, 1)]", "it wanted [(2, 1)] and got [(2.0, 1)], which has a number with a decimal point (a float) in it where a whole number (an int) was wanted."),
+        ([1, 2], "[1, True]", "it wanted [1, 2] and got [1, True], which has True or False (a bool) in it where a whole number (an int) was wanted."),
+        ([4, 9], "[4, '9']", "it wanted [4, 9] and got [4, '9'], which has text (a str) in it where a whole number (an int) was wanted."),
+        ([[1, 2]], "[1]", "it wanted [(1, 2)] and got [1], which has a whole number (an int) in it where a tuple was wanted."),
+        ([4, 9], "7", "it wanted [4, 9] and got 7, which is a whole number (an int), not a list."),
+        (7, "[7]", "it wanted 7 and got [7], which is a list, not a whole number (an int)."),
+        ({"tuple": [7]}, "7", "it wanted (7,) and got 7, which is a whole number (an int), not a tuple."),
+        ([4, 9], "'49'", "it wanted [4, 9] and got '49', which is text (a str), not a list."),
+        ([[1, 2]], "[(1, 2.5), 7]", "it wanted [(1, 2)] and got [(1, 2.5), 7], which has a number with a decimal point (a float) in it where a whole number (an int) was wanted."),
+    ],
+)  # fmt: skip
+def test_the_kinds_are_compared_all_the_way_down_and_the_words_name_them(returns, gives, said):
+    result = answer(returns, gives)
+    assert result.status == "incomplete"
+    assert result.summary == f"The examiner called `visit(1)`: {said} {WRONG_KIND}"
+
+
+def test_a_function_that_hands_back_nothing_where_a_list_was_wanted_says_so():
+    result = call_of({"args": [[1, 2]], "returns": [3]}, code=f"def visit(items):\n{MOVES}", constraints=False, function="visit")
+    assert result.status == "incomplete" and result.call.returned == "None" and result.call.wanted == "[3]"
+    assert result.summary == (
+        "The examiner called `visit([1, 2])` and got nothing back (None); it wanted [3]. A function hands a value back only "
+        f"with `return`: check that every way through `visit` reaches one. {NOTHING_PUT}"
+    )
+
+
+def test_a_list_printed_instead_of_handed_back_is_the_printed_words():
+    code = f"def visit(items):\n    print([4, 9])\n{MOVES}"
+    result = call_of({"args": [[1]], "returns": [4, 9]}, code=code, constraints=False, function="visit")
+    assert result.summary.startswith("The examiner called `visit([1])` and got nothing back (None); it wanted [4, 9]. Your function printed its answer")
+
+
+def test_nothing_wanted_but_a_list_handed_back_is_the_wrong_value():
+    result = answer(None, "[]")
+    assert result.summary == f"The examiner called `visit(1)`: it wanted nothing back (None) and got []. {NOT_THE_ANSWER}"
+
+
+def test_an_empty_list_is_handed_over_and_an_empty_list_is_handed_back():
+    code = f"def visit(items):\n{MOVES}    return items\n"
+    result = call_of({"args": [[]], "returns": []}, code=code, constraints=False, function="visit")
+    assert result.status == "solved" and result.call.text == "visit([])"
+    assert (result.call.returned, result.call.wanted) == ("[]", "[]")
+
+
+def test_the_function_gets_real_lists_and_tuples():
+    code = f"def visit(items, pair, spots, whole):\n{MOVES}    return [type(items).__name__, type(pair).__name__, type(spots[0]).__name__, type(whole).__name__]\n"
+    args = [[1, 2], {"tuple": [3, 4]}, [[1, 2]], 5]
+    result = call_of({"args": args, "returns": ["list", "tuple", "tuple", "int"]}, code=code, constraints=False, function="visit")
+    assert result.status == "solved" and result.call.text == "visit([1, 2], (3, 4), [(1, 2)], 5)"
+
+
+def test_what_the_function_does_to_its_list_changes_neither_the_next_call_nor_the_answer_wanted():
+    code = f"def visit(items, spots):\n{MOVES}    items.append(9)\n    spots.clear()\n    n = len(items)\n    items.clear()\n    return [n]\n"
+    call = {"args": [[1, 2], [[1, 2]]], "returns": [3]}
+    level = examiner(call, call, start=EAST, function="visit")
+    for _ in range(2):  # two calls on one level, and the level run again
+        result = run_level(level, code, enforce_constraints=False)
+        assert result.status == "solved"
+    assert [call.args for call in level.examine.calls] == [[[1, 2], [(1, 2)]]] * 2
+    assert [call.returns for call in level.examine.calls] == [[3], [3]]
+
+
+def test_a_function_that_hands_back_its_own_list_cannot_reach_the_answer_wanted():
+    code = f"def visit(items):\n{MOVES}    items.append(9)\n    return items\n"
+    level = examiner({"args": [[1]], "returns": [1, 9]}, start=EAST, function="visit")
+    assert run_level(level, code, enforce_constraints=False).status == "solved"
+    assert level.examine.calls[0].args == [[1]] and level.examine.calls[0].returns == [1, 9]
+
+
+def test_a_level_of_plain_values_is_read_and_judged_as_before():
+    level = examiner({"args": [1, "a", None, 2.5, True], "returns": "x"}, {"args": [], "returns": None}, {})
+    assert [(call.args, call.returns) for call in level.examine.calls[:2]] == [([1, "a", None, 2.5, True], "x"), ([], None)]
+    assert level.examine.calls[2].returns is NOT_JUDGED
+
+
 # -- M5.2-4c: the review's fixes ------------------------------------------------------------------------------------
 
 DOCTORED = [
@@ -689,7 +888,7 @@ def test_a_snippets_call_is_read_with_ast(text, parsed):
 @pytest.mark.parametrize(
     "text",
     ["pawn.move(1)", "gallop(a=1)", "gallop(x)", "gallop(1 + 2)", "gallop(-True)", "gallop(-'a')", "gallop(--1)", "gallop(+1)",
-     "gallop([1])", "gallop(b'a')", "gallop(1j)", "gallop(*args)", "gallop(1)(2)", "gallop", "gallop(1); gallop(2)", "gallop(",
+     "gallop(b'a')", "gallop(1j)", "gallop(*args)", "gallop(1)(2)", "gallop", "gallop(1); gallop(2)", "gallop(",
      "gallop(1)\ngallop(2)", "", "x = gallop(1)"],
 )  # fmt: skip
 def test_a_snippets_call_that_is_not_one_plain_call_is_a_lesson_authors_mistake(text):
@@ -699,6 +898,41 @@ def test_a_snippets_call_that_is_not_one_plain_call_is_a_lesson_authors_mistake(
     if text:  # run_sandbox refuses it the same way, before anything runs
         with pytest.raises(ValueError, match="plain function name"):
             sandbox(DEFINES, call=text)
+
+
+@pytest.mark.parametrize(
+    ("text", "shown"),
+    [
+        ("visit([1, -2, 3])", ("visit", "[[1, -2, 3]]")),
+        ("visit([])", ("visit", "[[]]")),
+        ("visit([True, None, 2.5, 'a', -0.5])", ("visit", "[[True, None, 2.5, 'a', -0.5]]")),
+        ("visit([(2, 1), (3, -3)], 5)", ("visit", "[[(2, 1), (3, -3)], 5]")),
+        ("visit([(7,)])", ("visit", "[[(7,)]]")),
+        ("visit((1, 'a'))", ("visit", "[(1, 'a')]")),
+        ("visit([1, 2], (3, 4), 'x')", ("visit", "[[1, 2], (3, 4), 'x']")),
+    ],
+)
+def test_a_snippets_call_may_hand_lists_tuples_and_lists_of_pairs(text, shown):
+    name, args = parse_snippet_call(text)
+    assert (name, repr(args)) == shown  # repr tells a list from a tuple, and True from 1
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["visit([[1]])", "visit([(1, (2,))])", "visit([(1, [2])])", "visit(((1, 2), 3))", "visit(([1], 2))", "visit([[(1, 2)]])", "visit([x])",
+     "visit([1, *a])", "visit([i for i in (1,)])", "visit(list(1))", "visit([1 + 2])", "visit({1})", "visit({'a': 1})", "visit(())",
+     "visit([()])", "visit([1][0])", "visit([-True])", "visit([b'a'])", "visit(x, [1])", "visit((1, 2)[0])", "visit(sorted([1]))"],
+)  # fmt: skip
+def test_a_snippets_call_with_anything_else_in_it_is_refused_in_the_widened_sentence(text):
+    with pytest.raises(ValueError, match="must be one call of a plain function name with plain values") as raised:
+        parse_snippet_call(text)
+    assert repr(text) in str(raised.value) and "a list or tuple of them, or a list of pairs of them" in str(raised.value)
+
+
+def test_a_snippets_list_reaches_the_function_as_a_list_and_is_named_in_the_words():
+    result = sandbox("def visit(items, pair):\n    return [len(items), type(pair).__name__]\n", call="visit([1, 2, 3], (4, 5))")
+    assert (result.status, result.summary) == ("finished", "The examiner called `visit([1, 2, 3], (4, 5))` and got [3, 'tuple'] back.")
+    assert result.call.text == "visit([1, 2, 3], (4, 5))" and result.call.returned == "[3, 'tuple']"
 
 
 def test_a_call_that_is_made_is_a_finished_run_that_says_so():

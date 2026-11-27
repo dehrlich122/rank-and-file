@@ -288,7 +288,7 @@ class Knight(Piece):
 
     NAME = "knight"
     LANDS = True
-    ABILITIES = ("jump", "look", "at_goal", "position", "wait", "read")
+    ABILITIES = ("jump", "look", "at_goal", "position", "wait", "read", "pick_up", "inventory")
     CANT: ClassVar[dict[str, str]] = {
         "move": f"{_WALK} `knight.jump(1, 2)` jumps one square right and two up.",
         "turn_left": f"{_WALK} A jump can go any way from where the knight stands, so it never needs to turn.",
@@ -339,8 +339,8 @@ class Knight(Piece):
 
         Returns:
             What's there, as a word (a str): "wall", "edge", "pit", "gate",
-            "portcullis", "signpost", "rune", "gem", "plank", or an enemy
-            such as "rook". None if the square is empty.
+            "portcullis", "signpost", "rune", "gem", "plank", "key", "door",
+            or an enemy such as "rook". None if the square is empty.
 
         Example:
             print(knight.look(1, 2))
@@ -409,6 +409,44 @@ class Knight(Piece):
             print(knight.read())
         """
         return self._world.read()
+
+    def pick_up(self):
+        """Pick up the key on the stone your knight is standing on.
+
+        Land on a key's stone first, then call `knight.pick_up()`. The key's
+        name goes into your knight's satchel, `knight.inventory`, after the
+        ones already there. Picking up takes a tick. With no key on the
+        square, it stops your program with an error.
+
+        Returns:
+            Nothing.
+
+        Example:
+            knight.pick_up()
+        """
+        self._world.pick_up()
+
+    @property
+    def inventory(self) -> list:
+        """What's in your knight's satchel: the names of the keys it carries.
+
+        No parentheses, like `position`. It's a list, in the order the keys
+        were picked up, so what works on a list works on it:
+        `"brass" in knight.inventory`, `len(knight.inventory)`, a `for` loop.
+        A door lets your knight land on it while its key is in the satchel,
+        and the key stays there.
+
+        Each time you ask, you get a fresh copy. Changing the copy changes
+        nothing on the board: the satchel fills only with `pick_up()`.
+
+        Returns:
+            A list of the keys' names: text like "brass", or whole numbers
+            like 12. An empty list, [], before the first key.
+
+        Example:
+            print(knight.inventory)
+        """
+        return list(self._world.inventory)
 
 
 PIECES: dict[str, type[Piece]] = {"pawn": Pawn, "knight": Knight}

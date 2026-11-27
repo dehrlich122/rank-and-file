@@ -84,6 +84,79 @@ export function hoverHelpers(browser) {
   };
 }
 
+/**
+ * The examiner's calls on the level screen and the result card, for the suites that run an examiner level. A button says
+ * "call N" (with its mark above the board); the call itself is the button's tooltip, minus "Replay " in the table.
+ * Both readers hand back the calls' own text, counts, booleans and measures only: never an answer (a wanted or got
+ * value, which is a spoiler on a real level).
+ */
+export function examinerHelpers(browser) {
+  const challengeCalls = () => browser.evaluate(`[...document.querySelectorAll('ol.call-list li code.call-code')].map((e) => e.textContent)`);
+  return {
+    /** What the board host shows of the calls: the buttons' text, tooltips and tops, the pressed one, the caption, the board's shape. */
+    examinerView: () =>
+      browser.evaluate(`(() => {
+        const row = document.querySelector('.board-host .case-row');
+        const buttons = row ? [...row.querySelectorAll('button')] : [];
+        const caption = document.querySelector('.board-host p.boards-caption');
+        const board = document.querySelector('.board-host .board');
+        const box = board.getBoundingClientRect();
+        return {
+          row: row?.getAttribute('aria-label') ?? null,
+          calls: buttons.map((e) => e.title),
+          texts: buttons.map((e) => e.textContent),
+          marks: buttons.map((e) => e.textContent.slice(-1)),
+          tops: buttons.map((e) => e.getBoundingClientRect().top),
+          pressed: buttons.flatMap((e, i) => (e.getAttribute('aria-pressed') === 'true' ? [i] : [])),
+          thumbs: document.querySelectorAll('.board-host button.board-thumb').length,
+          caption: caption?.textContent ?? null,
+          top: box.top,
+          shape: box.width + 'x' + box.height + '/' + board.querySelectorAll('*').length,
+          cases: document.querySelectorAll('.board-host .case-row').length,
+        };
+      })()`),
+
+    /** The Challenge panel's call list, in order: each call's text (in the DOM whether or not the tab is on show). */
+    challengeCalls,
+
+    /** The made-up function the suites type: the call list's function name, a catch-all signature, a body of `pass`. It solves nothing. */
+    async stubFunction() {
+      const name = (await challengeCalls())[0].split("(")[0].trim();
+      return `def ${name}(*args, **kwargs):\n    pass`;
+    },
+
+    /** The outcome card's examiner parts and its table of calls (null when there is none): booleans, the calls' text and the buttons' words. */
+    examinerCard: () =>
+      browser.evaluate(`(() => {
+        const table = document.querySelector('.outcome-host table.calls');
+        const rows = table ? [...table.querySelectorAll('tr')] : [];
+        return {
+          line: !!document.querySelector('.outcome-host p.examiner-line'),
+          mark: document.querySelector('.outcome-host p.examiner-line .examiner-mark')?.textContent ?? null,
+          text: document.querySelector('.outcome-host .outcome').innerText.replace(/\\s+/g, ' '),
+          table: table && {
+            head: rows[0].children.length,
+            rows: rows.slice(1).map((tr) => {
+              const [call, wanted, got, mark] = [...tr.children];
+              const replay = call.querySelector('button');
+              return {
+                call: replay.title.replace(/^Replay /, ''),
+                words: replay.textContent,
+                replays: replay.title.startsWith('Replay '),
+                wanted: wanted.textContent.trim() !== '',
+                none: got.textContent.trim() === 'None',
+                same: got.textContent.trim() === wanted.textContent.trim(),
+                mark: mark.textContent.trim(),
+                markClass: mark.classList.contains('ok') ? 'ok' : mark.classList.contains('no') || mark.querySelector('.no') ? 'no' : '',
+                picked: tr.classList.contains('picked'),
+              };
+            }),
+          },
+        };
+      })()`),
+  };
+}
+
 /** The settings key, for checks that change a setting and must put it back. */
 export function settingsHelpers(browser) {
   const key = JSON.stringify("rank-and-file:settings");
@@ -101,6 +174,72 @@ export function settingsHelpers(browser) {
         const put = kept === null ? `localStorage.removeItem(${key})` : `localStorage.setItem(${key}, ${JSON.stringify(kept)})`;
         await browser.evaluate(`document.querySelector('.settings-dialog')?.close(); ${put}; true`);
       }
+    },
+  };
+}
+
+/** Reading the level screen's Codex tab. */
+export function codexHelpers(browser) {
+  return {
+    /**
+     * What the Codex tab shows now, read by walking its children: the group headings in order, and per entry its name,
+     * group ("" before the first heading), whether it is marked New, whether it is open, and its "Introduced in" line
+     * ("" when there is none). It does not open the tab or wait: the caller shows the tab and waits for what it needs.
+     */
+    readCodex: () =>
+      browser.evaluate(`(() => {
+        const entries = [];
+        const headings = [];
+        for (const el of document.querySelector('.codex').children) {
+          if (el.tagName === 'H3') headings.push(el.textContent);
+          else if (el.classList.contains('codex-entry')) {
+            entries.push({
+              name: el.dataset.codex,
+              group: headings.at(-1) ?? '',
+              isNew: !!el.querySelector('.codex-new'),
+              open: el.open,
+              introduced: el.querySelector('.codex-body > p.muted')?.textContent ?? '',
+            });
+          }
+        }
+        return { headings, entries };
+      })()`),
+  };
+}
+
+/** Running the snippets in a lesson's Learn panel. `openLevel` is the one from `levelHelpers`. */
+export function lessonHelpers(browser, openLevel) {
+  return {
+    /** Open a lesson and page to the step holding snippet `index` (a step ends with its snippet, so step N holds snippet N). */
+    async lessonAt(id, index) {
+      await openLevel(id, { fresh: true });
+      for (let i = 0; i < index; i++) await browser.evaluate(`document.querySelector('.lesson-pager .btn-primary').click()`);
+      await browser.waitFor(`document.querySelectorAll('.lesson .lesson-step')[${index}]?.hidden === false`, 5000, `lesson step ${index} on show`);
+    },
+
+    /**
+     * Press Run on snippet `index` (its step on show) and wait for its ending status, which starts with a mark. Reads the
+     * status, the summary (and the code spans in it), the called snippet's caption, the error card's sentence (null when
+     * there is none) with its code spans, and how many snippets the lesson has.
+     */
+    async runSnippet(index) {
+      const snippet = `document.querySelectorAll('.lesson .lesson-step')[${index}].querySelector('.snippet')`;
+      await browser.evaluate(`${snippet}.querySelector('.btn').click()`);
+      await browser.waitFor(`/^[✓✗⏱]/.test(${snippet}.querySelector('.snippet-status').textContent)`, 30_000, "the snippet's ending status");
+      return browser.evaluate(`(() => {
+        const s = ${snippet};
+        const summary = s.querySelector('.snippet-summary');
+        const card = s.querySelector('.error-detail p');
+        return {
+          snippets: document.querySelectorAll('.lesson .snippet').length,
+          status: s.querySelector('.snippet-status').textContent,
+          summary: summary.textContent,
+          codes: [...summary.querySelectorAll('code')].map((e) => e.textContent),
+          caption: s.querySelector('.snippet-call code')?.textContent ?? null,
+          card: card ? card.innerText.replace(/\\s+/g, ' ').trim() : null,
+          cardCodes: card ? card.querySelectorAll('code').length : 0,
+        };
+      })()`);
     },
   };
 }
@@ -143,12 +282,18 @@ function runHelpers(browser) {
       stars: document.querySelectorAll('.outcome-host .stars li.earned').length,
     })`);
   }
+  const press = (index) => browser.evaluate(`${playbackButton(index)}.click()`);
   return {
     outcome,
     /** The playback button `index` (see BUTTONS), as a JS expression for `evaluate`. */
     button: playbackButton,
     /** Click the playback button `index`. */
-    press: (index) => browser.evaluate(`${playbackButton(index)}.click()`),
+    press,
+    /** Press "back to start" and wait until the step label reads step 0. */
+    async toStart() {
+      await press(0);
+      await browser.waitFor(`/Step 0 /.test(document.querySelector('.step-label').textContent)`, 5000, "back at step 0");
+    },
     /** Press Run, optionally jump to the end, and describe the outcome. */
     async run({ jump = true } = {}) {
       await browser.evaluate(`document.querySelector('.level-right .btn-primary').click()`);

@@ -1,0 +1,59 @@
+id: ch08-l06
+chapter: 8
+title: "The Vault"
+trains: "Mastery: a list of pairs, the satchel, and an answer handed back in order"
+brief: "The examiner's last test of the tier: a hub, keys scattered around it, and a list of where they lie. It names the hub's place first. Fetch every key, end on the hub, and hand their numbers back, smallest first."
+piece: knight
+map: |
+  O O O O O O O
+  O O O O O O O
+  O O O O d O O
+  O O G O O O O
+  c O O O a O O
+  O P O b O O O
+  O O O O O O O
+legend: {"O": "pit", "a": {"tile": "key", "name": 24}, "b": {"tile": "key", "name": 2}, "c": {"tile": "key", "name": 6}, "d": {"tile": "key", "name": 32}}
+start: {"facing": "north"}
+api: ["jump", "position", "pick_up", "inventory"]
+examine: {"function": "fetch_keys", "calls": [{"args": [{"tuple": [2, 3]}, [[4, 2], [3, 1], [0, 2], [4, 4]]], "board": 1, "returns": [2, 6, 24, 32]}, {"args": [{"tuple": [3, 3]}, [[1, 4], [2, 1], [1, 2], [4, 1], [2, 5]]], "board": 2, "returns": [3, 20, 33, 36, 37]}, {"args": [{"tuple": [2, 4]}, [[4, 5], [1, 2]]], "board": 3, "returns": [5, 16]}, {"args": [{"tuple": [2, 2]}, [[1, 0], [0, 1], [1, 4]]], "board": 4, "returns": [4, 9, 31]}]}
+par: {"lines": 9}
+hints:
+- "The examiner names the hub first, then where the keys lie. Every key is one jump from the hub: out, pick it up, and back."
+- "Unpack the hub into two names, and jump there from where the knight stands. Then loop over the places with two names: a jump is the difference between two places, there and back. When the loop is done, the satchel holds every key: hand back its numbers in order, as a list."
+- "The loop, and the answer:\n    for x, y in places:\n        knight.jump(x - hub_x, y - hub_y)\n        ...\n    return sorted(...)"
+lesson: ch08/ch08-l06.md
+mastery: true
+lesson_board:
+  map: |
+    . . . . .
+    . . . . .
+    P . . . .
+  start: {"facing": "north"}
+variants:
+- map: |
+    O O O O O O O
+    O O e O O O O
+    O a O O O O O
+    O O O G O O O
+    O c O O O P O
+    O O b O d O O
+    O O O O O O O
+  legend: {"a": {"tile": "key", "name": 20}, "b": {"tile": "key", "name": 3}, "c": {"tile": "key", "name": 33}, "d": {"tile": "key", "name": 36}, "e": {"tile": "key", "name": 37}}
+- map: |
+    O O O O O O O
+    O O O O a O O
+    O O G O O O O
+    O O O O O O O
+    O b O P O O O
+    O O O O O O O
+    O O O O O O O
+  legend: {"a": {"tile": "key", "name": 16}, "b": {"tile": "key", "name": 5}}
+- map: |
+    O O O O O O O
+    O O O O O O O
+    O c O O O O O
+    O O O O P O O
+    O O G O O O O
+    b O O O O O O
+    O a O O O O O
+  legend: {"a": {"tile": "key", "name": 31}, "b": {"tile": "key", "name": 9}, "c": {"tile": "key", "name": 4}}

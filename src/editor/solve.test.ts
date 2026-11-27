@@ -86,6 +86,12 @@ describe("the answers in words", () => {
     expect(solveFootnote(one)).toBeNull();
   });
 
+  it("decline a level with keys or doors in one sentence", () => {
+    const one = progress({ done: true, results: [result("keys", { label: "level", where: "on this level", positions: 0 })] });
+    expect(solveLines(one)).toEqual([{ mark: "skip", text: "Can't judge: this level has keys or doors, and the check doesn't follow them yet. Your own solution, from test-play, shows it can be solved." }]);
+    expect(solveFootnote(one)).toBeNull();
+  });
+
   it("name each place a hidden goal could be", () => {
     const [line] = solveLines(progress({ cases: 2, unit: "place", results: [result("route", { lines: 4, label: "b3", where: "with the goal on b3" })] }));
     expect(line!.text).toBe("With the goal on b3: a route exists, 4 lines of plain calls.");

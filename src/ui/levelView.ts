@@ -3,7 +3,8 @@
 import type { EditorView } from "@codemirror/view";
 import { challengeSetOf, chapters, codexChapters, type LevelSource } from "../content";
 import { PythonHungError, StoppedError, type PyClient } from "../py/client";
-import type { LevelInfo, LevelResult } from "../py/protocol";
+import type { LevelInfo, LevelResult, WorldState } from "../py/protocol";
+import { SatchelView } from "./satchel";
 import { BoardView, squareName } from "./board";
 import { levelTagsRow } from "./challengeTags";
 import { askTier } from "./tierTags";
@@ -46,6 +47,8 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
   let callCaption: HTMLElement | null = null; // an examiner level's "The examiner calls ..." line, above the board on show
   let thumbs: BoardView[] = []; // a level's other boards, small, beside the one on show (QA-032)
   const shownBoard = () => caseBoard ?? board;
+  let satchel: SatchelView | null = null; // beside the board on show, on a level whose state carries an inventory (M5.3)
+  const lastState = new WeakMap<BoardView, WorldState>(); // the state each board was last given: its satchel is that state's inventory
   let runResult: LevelResult | null = null; // the last run as a whole: its verdict, stars and cases
   let player: Player | null = null;
   let lesson: Lesson | null = null;
@@ -287,8 +290,9 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       }
       level = loaded.level;
       board = new BoardView(level);
+      satchel = level.start.inventory === undefined ? null : new SatchelView();
       if (level.boards.length) showBoards(0, null); // with its other boards beside it (QA-032)
-      else boardHost.replaceChildren(board.element);
+      else boardHost.replaceChildren(onStage(board, level.start));
       help = new HelpPanel(source.id, level.hints, () => getCode(editor), { store, solution: host.solution });
       const tagsSlot = h("div", { class: "level-tags" });
       challengePanel.replaceChildren(...describeChallenge(level, tagsSlot, openCodexEntry, chipTooltip, () => codex, host.stars), help.element);
@@ -301,6 +305,20 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       boardHost.replaceChildren(noticeCard("bad", "Python couldn't start", String(error)));
     }
   })();
+
+  /** What stands where a board is put on show: the board, with the satchel beside it on a level that has one. `start` is the state it holds if it was never given another. */
+  function onStage(view: BoardView, start: WorldState): Element {
+    if (!satchel) return view.element;
+    satchel.show((lastState.get(view) ?? start).inventory ?? []);
+    return h("div", { class: "satchel-stage" }, view.element, satchel.element);
+  }
+
+  /** The board on show was given this state (it has drawn it, or is playing its way there): so does the satchel. */
+  function noteState(state: WorldState): void {
+    const view = shownBoard();
+    if (view) lastState.set(view, state);
+    satchel?.show(state.inventory ?? []);
+  }
 
   /** The tags in the Challenge panel: a challenge knows its tier from its set, a level of the editor or a stranger's asks the engine, and fills in when it answers. */
   async function showTags(loaded: LevelInfo, slot: HTMLElement): Promise<void> {
@@ -392,6 +410,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       (frame, index, { animate, durationMs }) => {
         if (animate && frame.step) shownBoard()!.animate(frame.step.events, durationMs);
         else shownBoard()!.show(frame.state);
+        noteState(frame.state);
         setActiveLine(editor, frame.step?.line ?? null);
         setCallLine(editor, callingLine(result.steps, index - 1, result.call?.first_step));
         setErrorLine(editor, null);
@@ -465,10 +484,15 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     caseBoard = new BoardView(run.cases[index]!.level, { spots });
     const title = examiner ? "The examiner's calls" : (level?.case_title ?? "");
     const buttons = run.cases.map((c, i) =>
-      h("button", { class: "btn btn-small btn-toggle", "aria-pressed": String(i === index), onClick: () => showCase(i, "play") }, `${c.label} ${verdict(c)}`),
+      h(
+        "button",
+        // an examiner's call is long (it carries lists): the button says "call 1", the tooltip has the call in full
+        { class: "btn btn-small btn-toggle", "aria-pressed": String(i === index), title: examiner ? c.label : undefined, onClick: () => showCase(i, "play") },
+        `${examiner ? `call ${i + 1}` : c.label} ${verdict(c)}`,
+      ),
     );
     callCaption = examiner ? h("p", { class: "boards-caption" }, " ") : null; // the words come with the playback: they start at the call's first step
-    boardHost.replaceChildren(h("div", { class: "case-row", role: "group", "aria-label": title }, examiner ? null : h("span", { class: "muted small" }, `${title}:`), ...buttons), ...(callCaption ? [callCaption] : []), caseBoard.element);
+    boardHost.replaceChildren(h("div", { class: "case-row", role: "group", "aria-label": title }, examiner ? null : h("span", { class: "muted small" }, `${title}:`), ...buttons), ...(callCaption ? [callCaption] : []), onStage(caseBoard, run.cases[index]!.level.start));
   }
 
   // -- other maps (M3.2, QA-032) ---------------------------------------------------------
@@ -481,7 +505,9 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     caseBoard?.dispose();
     for (const thumb of thumbs) thumb.dispose();
     const boards = level.boards; // the same boards a run's cases come back with
-    const wide = boards.some((info) => info.width > 8); // a board wider than a chessboard would be drawn too small beside the others: the small boards go under it (QA-064)
+    // a board wider than a chessboard would be drawn too small beside the others: the small boards go under it (QA-064);
+    // so do they on a level with a satchel, whose column beside the board would leave the large board hardly bigger than the small ones
+    const wide = boards.some((info) => info.width > 8) || satchel !== null;
     caseBoard = shown > 0 ? new BoardView(boards[shown]!) : null; // board 1 is the level's own
     const mark = (i: number) => (run ? ` ${verdict(run.cases[i]!)}` : "");
     thumbs = [];
@@ -505,7 +531,7 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
       h(
         "div",
         { class: wide ? "boards boards-wide" : "boards" },
-        h("div", { class: "boards-main" }, h("p", { class: "boards-caption" }, caption), (caseBoard ?? board).element),
+        h("div", { class: "boards-main" }, h("p", { class: "boards-caption" }, caption), onStage(caseBoard ?? board, boards[shown]!.start)),
         h("div", { class: "boards-side", role: "group", "aria-label": "The other boards" }, ...others),
       ),
     );
@@ -520,9 +546,12 @@ export function mountLevel(root: HTMLElement, context: LevelContext, source: Lev
     else if (caseBoard && board) {
       caseBoard.dispose();
       caseBoard = null;
-      boardHost.replaceChildren(board.element);
+      boardHost.replaceChildren(onStage(board, level!.start));
     }
-    if (level) board?.show(level.start);
+    if (level) {
+      board?.show(level.start);
+      noteState(level.start);
+    }
   }
 
   /** Opens the Challenge panel at the help (expanding a collapsed panel), focused on the next hint or the solution. */

@@ -93,6 +93,13 @@
   --bracket: light-dark(#0a6f8a, #9af5ff);
   --bracket-facing: light-dark(#04506a, #eafeff);
 
+  /* the key and the door (M5.3): the fill of a key and of a name plate, the door's slab and the dark doorway behind an open one */
+  --key-fill: light-dark(#fff3dc, #2b1d06);
+  --plate-fill: light-dark(#fff8e8, #1a1206);
+  --slab-fill: light-dark(#e4e0f8, #1a1240);
+  --doorway: var(--void);
+  --name-halo: light-dark(rgb(248 247 253 / 0.92), rgb(9 4 22 / 0.92));
+
   /* the goal's beacon */
   --beacon: light-dark(#925600, #ffb02e);
 
@@ -578,7 +585,11 @@ pre {
     height: 100%;
   }
 
-  :root[data-code-panel="bottom"] .boards-main .board {
+  :root[data-code-panel="bottom"] .satchel-stage {
+    height: 100%;
+  }
+
+  :root[data-code-panel="bottom"] .boards-main :is(.board, .satchel-stage) {
     flex: 1 1 0;
     min-height: 0;
   }
@@ -1189,6 +1200,13 @@ pre {
   outline-offset: -2px;
 }
 
+/* the first column says "call 1": one line, no wider than its words, so wanted and got get the room */
+.outcome .calls th:first-child,
+.outcome .calls td:first-child {
+  white-space: nowrap;
+  width: 1%;
+}
+
 .outcome .calls .ok {
   color: var(--accent);
 }
@@ -1385,6 +1403,87 @@ pre {
   height: auto;
   max-height: var(--board-max-height, 60vh);
   user-select: none;
+}
+
+/* The satchel (M5.3): on a level whose state carries an inventory, the board and a column of eight slots stand side by side.
+   A level without one has no .satchel-stage: its board is where it always was. */
+.satchel-stage {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.satchel-stage .board {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.satchel-box {
+  display: grid;
+  flex: none;
+  gap: 4px;
+  justify-items: start;
+  min-width: 0;
+}
+
+.satchel-head {
+  margin: 0;
+  display: flex;
+  gap: 8px;
+  font: 700 11px var(--font-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.satchel-head span {
+  font: 11px var(--font-code);
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+.satchel {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.satchel-chip,
+.satchel-slot {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 96px;
+  height: 26px;
+  padding: 0 4px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.satchel-slot {
+  border-style: dashed;
+}
+
+.satchel-glyph {
+  flex: none;
+  width: 24px;
+  height: 15px;
+}
+
+.satchel-glyph .k-line {
+  stroke-width: 2.6;
+}
+
+.satchel-chip-name {
+  font: 700 13px var(--font-code);
+  color: var(--text);
+  white-space: nowrap;
 }
 
 .board-mini {
@@ -1653,6 +1752,7 @@ pre {
 }
 
 .gate.open .spr-open,
+.door.open .spr-open,
 .waypoint.crossed .spr-done {
   opacity: 1;
 }
@@ -1660,6 +1760,10 @@ pre {
 .gate.open .spr-closed {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+.door.open .spr-closed {
+  opacity: 0;
 }
 
 .waypoint.crossed .spr-todo {
@@ -1738,14 +1842,79 @@ pre {
 
 /* a plank on the floor vanishes once picked up; one over a pit appears once laid */
 .plank,
+.key,
 .pit-plank {
   transition: opacity 250ms ease-in-out;
 }
 
 .plank.collected,
+.key.collected,
 .pit:not(.bridged) .pit-plank {
   opacity: 0;
   pointer-events: none; /* so its tooltip doesn't show */
+}
+
+/* the key and the door (M5.3): line work in amber for the key, violet for the door; names are plain text on a plate or a
+   halo and carry no glow */
+.k-line,
+.d-line,
+.tag,
+.edge-rule {
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.k-line,
+.tag {
+  stroke: var(--wire-amber);
+  filter: drop-shadow(0 0 1.8px var(--glow-amber));
+}
+
+.k-line {
+  fill: var(--key-fill);
+}
+
+.tag {
+  fill: var(--plate-fill);
+}
+
+.d-line {
+  stroke: var(--wire-wall);
+  filter: drop-shadow(0 0 1.8px var(--glow-wall));
+}
+
+.d-slab {
+  fill: var(--slab-fill);
+}
+
+.d-void {
+  fill: var(--doorway);
+}
+
+.d-grain {
+  fill: none;
+  stroke: var(--wire-wall);
+  stroke-width: 1.4;
+  opacity: 0.7;
+}
+
+.edge-rule {
+  fill: none;
+  stroke: var(--wire-amber);
+  opacity: 0.8;
+}
+
+.name {
+  fill: var(--text);
+  font-family: var(--font-code);
+  font-weight: 700;
+}
+
+.name.edge-name {
+  paint-order: stroke;
+  stroke: var(--name-halo);
+  stroke-width: 4px;
 }
 
 .gem {
@@ -2083,7 +2252,7 @@ pre {
 /* Animations setting: "Reduced" always stops movement; "Match system" follows
    the OS preference; "Full" ignores it. (Colour flashes stay: they aren't motion.)
    An enemy's rest frame is already broken, so it needs no motion to read as hostile. */
-:root[data-motion="reduced"] :is(.piece, .enemy, .plank, .pit-plank, .gem, .level-left, .spr-closed, .spr-open, .spr-todo, .spr-done) {
+:root[data-motion="reduced"] :is(.piece, .enemy, .plank, .key, .pit-plank, .gem, .level-left, .spr-closed, .spr-open, .spr-todo, .spr-done) {
   transition: none;
 }
 
@@ -2092,7 +2261,7 @@ pre {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion="full"]) :is(.piece, .enemy, .plank, .pit-plank, .gem, .level-left, .spr-closed, .spr-open, .spr-todo, .spr-done) {
+  :root:not([data-motion="full"]) :is(.piece, .enemy, .plank, .key, .pit-plank, .gem, .level-left, .spr-closed, .spr-open, .spr-todo, .spr-done) {
     transition: none;
   }
 

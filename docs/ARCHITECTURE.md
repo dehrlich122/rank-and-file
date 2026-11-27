@@ -309,6 +309,12 @@ must reach the goal whichever `?` it's on). Legend tiles:
     another number get "Do you not know how to count!?". Anything else,
     such as a typo, gets "I can't understand you!". A yes/no question's
     other answer (True for False, or False for True) gets "Wrong!" *(M3.4)*.
+  - With a `label` *(QA-068)*, a gate that asks shows that word in its badge on
+    the board, where a gate without one shows "?". It is text of 1 to 8
+    characters (`LIMITS["label"]`: what the badge holds inside one square) and
+    only for a gate with a `question`. It says what is asked in a word, never
+    how to answer it. `describe()` reports it inside the question's entry, and
+    leaves the key out where there is none.
   - The guard lines live in `world.py`.
   - `describe()` never includes the passphrase.
 - `timed_gate` *(M3.1)*: open for the first `open` ticks (default 2) of every

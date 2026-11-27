@@ -16,15 +16,29 @@ const levels = Object.entries(files).map(([path, source]) => ({ path, data: pars
 type Run = (command: string, args: string[], options: object) => { status: number | null; stdout: string; stderr: string };
 const nodeModule = async (name: string): Promise<Record<string, unknown>> => import(/* @vite-ignore */ name);
 
+// Keys and doors are beyond the editor until M5.5: it refuses such a level on purpose, and says so.
+const legendsOf = (data: Record<string, unknown>) => [data.legend, ...((data.variants as { legend?: unknown }[] | undefined) ?? []).map((v) => v.legend)];
+const hasKeysOrDoors = (data: Record<string, unknown>) =>
+  legendsOf(data).some((legend) => Object.values((legend ?? {}) as Record<string, { tile?: string }>).some((entry) => entry?.tile === "key" || entry?.tile === "door"));
+const declined = levels.filter(({ data }) => hasKeysOrDoors(data));
+const roundTripped = levels.filter(({ data }) => !hasKeysOrDoors(data));
+
 describe("every level in the game", () => {
   it("is found", () => {
     expect(levels.length).toBeGreaterThanOrEqual(45);
+    expect(roundTripped.length).toBeGreaterThanOrEqual(45); // the exemption can't swallow the game
+  });
+
+  it("is refused by the editor while it has keys or doors (when M5.5 teaches it keys, take the exemption out)", () => {
+    for (const { path, data } of declined) {
+      expect(() => levelDataToDraft(data), `${path}: the editor now reads keys or doors; remove the exemption`).toThrow();
+    }
   });
 
   it("is written again as the same level, by the draft and by its YAML text", () => {
     // compared as true or false, so a failure never prints a level (its hints are spoilers)
     const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-    for (const { path, data } of levels) {
+    for (const { path, data } of roundTripped) {
       const draft = levelDataToDraft(data);
       expect(same(draftToLevelData(draft), draftToLevelData(yamlToDraft(draftToYaml(draft)))), `${path}: the draft written, read and written again`).toBe(true);
       // reading the text a draft was written to gives the same level back: the YAML layout never changes the data
@@ -39,7 +53,7 @@ describe("every level in the game", () => {
     const child = (await nodeModule("node:child_process")) as { spawnSync: Run };
 
     const entries: Record<string, unknown> = {};
-    for (const { data } of levels) {
+    for (const { data } of roundTripped) {
       const draft = levelDataToDraft(data);
       const boards = Array.from({ length: boardCount(draft) }, (_, i) => draftToLevelInfo(viewOf(draft, i))); // each board as the editor draws it
       entries[String(data.id)] = { original: data, exported: draftToLevelData(draft), info: draftToLevelInfo(draft), boards };

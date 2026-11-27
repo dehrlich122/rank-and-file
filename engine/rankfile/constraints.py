@@ -331,9 +331,14 @@ def lint(tree: ast.Module, namespace: dict, examine=None) -> list[LintWarning]:
     defs = _own_functions(tree)
     unused = {name: fn for name, fn in defs.items() if examine is None or name != examine.function}
     warnings = _never_called_warnings(tree, unused)
+    satchel_lines = set()
     for node in ast.walk(tree):
         if isinstance(node, (ast.While, ast.If)):
             warnings += _condition_warnings(node, pieces)
+        owner = _satchel_change(node, pieces)
+        if owner and node.lineno not in satchel_lines:
+            satchel_lines.add(node.lineno)
+            warnings.append(LintWarning(node.lineno, _satchel_warning(owner, pieces[owner])))
         if not isinstance(node, ast.Expr):
             continue
         value = node.value
@@ -388,6 +393,33 @@ def _never_called_warnings(tree: ast.Module, defs: dict) -> list[LintWarning]:
             LintWarning(fn.lineno, f"`{fn.name}` is defined here but never called. {_def_needs_a_call('it', _call_text(fn))}")
         )
     return found
+
+
+_LIST_CHANGERS = {"append", "extend", "insert", "remove", "pop", "clear", "sort", "reverse"}
+
+
+def _satchel_change(node: ast.AST, pieces: dict) -> str | None:
+    """The piece's name when `node` changes `<piece>.inventory` in place: a list method that changes the list, or
+    an item or slice of it stored to or deleted. The inventory is a copy, so such a change is lost."""
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in _LIST_CHANGERS:
+        target = node.func.value
+    elif isinstance(node, ast.Subscript) and isinstance(node.ctx, (ast.Store, ast.Del)):
+        target = node.value
+    else:
+        return None
+    if isinstance(target, ast.Attribute) and target.attr == "inventory" and isinstance(target.value, ast.Name):
+        owner = target.value.id
+        if owner in pieces and "inventory" in pieces[owner].ABILITIES:
+            return owner
+    return None
+
+
+def _satchel_warning(piece: str, piece_type: type) -> str:
+    """The lint warning for a change to `<piece>.inventory`, in the piece's own words."""
+    return (
+        f"Your {piece_type.NAME}'s satchel fills only with `pick_up()`. "
+        f"Changing `{piece}.inventory` changes a copy."
+    )
 
 
 def _condition_warnings(node: ast.While | ast.If, pieces: dict) -> list[LintWarning]:

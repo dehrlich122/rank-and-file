@@ -1,0 +1,13 @@
+# expect: constraint
+knight.jump(2, -1)
+a = int(knight.read())
+knight.jump(2, -1)
+b = int(knight.read())
+knight.jump(2, -1)
+c = int(knight.read())
+knight.jump(2, -1)
+d = int(knight.read())
+knight.jump(a, 2)
+knight.jump(b, 2)
+knight.jump(c, 2)
+knight.jump(d, 2)

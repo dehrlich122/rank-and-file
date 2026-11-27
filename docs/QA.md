@@ -1997,6 +1997,82 @@ No finding, so no QA item. He overruled none of the choices the build made (`doc
 "for QA1"): they stand *(the orchestrator's reading: he raised no objection; the wordings were not answered one
 by one)*. The pass started the `/simplify` pass on the M5.2 diff.
 
+## Session 21 — 2026-11-26 · M5.3 QA1, Chapter 8, The Satchel (`m5-3-chapter-8`, PR #29)
+
+The designer's play-test of Chapter 8. **QA1 passed** *(Designer, 2026-11-27)*: "Okay, tested the chapter 8
+programs. They are good, and the changes I called for are already in." Two findings, both fixed during the
+play-test (QA-067, QA-068). He overruled none of the choices the build made (`docs/M5/M5.3.md`, "As built",
+every "for QA1"), so they stand *(the orchestrator's reading: he raised no objection; they were not answered one
+by one)*. That includes item 11 of the hand-test list, 8.5's board at about 31 px a square beside the satchel:
+he played the level, asked for the gates' words and for nothing about its size. The pass started the
+`/simplify` pass on the M5.3 diff.
+
+### QA-067 · 8.3 The Satchel: boards 1 and 2 ask the same thing of the program · Fixed: two boards
+
+- **Observed** *(Designer, 2026-11-26)*: "8.3 how are boards 1 and 2 different? they accept the exact same
+  solution..."
+- **Why it happens:** the three boards share one map and differ only in which two of the three keys lie on the
+  two key stones. Board 1 holds iron and bone (only the iron door opens), board 2 iron and brass (**both** doors
+  open), board 3 bone and brass (only the brass door opens). Board 2 refuses nothing: whichever door a program
+  takes, it passes. So a program that never asks the satchel anything and always takes the iron door passes
+  boards 1 and 2 and stops at the locked door on board 3. The level as a whole still needs the question (boards
+  1 and 3 between them), but board 2 adds nothing to it.
+- **Where it came from:** the spec's "two of three kinds, a different two on every board". Three kinds have
+  exactly three pairs, and one of them is the pair that opens both doors.
+- **A limit worth knowing:** with two doors, any three boards include two that want the same door. Only two
+  boards, or a third door, give boards that each refuse what another accepts.
+- **Options, for the designer:**
+  1. *Two boards (recommended):* drop board 2. One board opens only the iron door, the other only the brass
+     door; nothing is there twice. Par and the lesson stay; the hints and the note are checked for "three boards".
+  2. *Three boards, board 2 given a job:* board 2 holds the same two keys as board 1 with the stones swapped,
+     so the key that matters is picked up at the other stone. A program that asks the satchel by place (the
+     first item, as 8.1 taught) then fails, and `in` is what the level needs. Boards 1 and 2 still both pass
+     a program that always takes the iron door.
+  3. Leave it: the board where either door opens stays as a board with nothing to decide.
+- **Decided** *(Designer, 2026-11-26)*: option 1. "yeah drop it to 2 boards, it's enough to get the point across
+  and the third board was a red herring."
+- **Done** (`4996341`): `scripts/gen_satchel.py` draws as before and drops the pair that opens both doors, so
+  the map and the other two boards are as they were: board 1 holds iron and bone, board 2 bone and brass. Only
+  the level file changed (ten lines out). The reference, its note, the hints, par (12 lines) and the lesson are
+  unchanged; the reference solves both boards with three stars and the three wrong attempts end as before. No
+  hint and no note speaks of a number of boards (counted by a script, not read). `npm run check` exit 0.
+- **Its e2e check** (M5.3-Q67, `d40278e`): one `satchel` check expected at least two small boards beside the
+  large one on 8.3, and there is one now; an `implementer` changed the number and a comment. `satchel` 26 of 26.
+
+### QA-068 · 8.5 In Order: two gates side by side, both marked "?" · Fixed: a gate may carry a word; 8.5's say "smallest" and "in order"
+
+- **Observed** *(Designer, 2026-11-26)*: "8.5 the gates with two question marks don't scan easily better to
+  replace the '?' with a real piece of information, like 'max' and 'list'".
+- **Why it happens:** every guard's gate that asks a question carries the same badge, "?" (`board.ts`, the
+  gate's art); what it asks is in its tooltip and in the Challenge panel only. 8.5 is the first level with two
+  such gates on neighbouring squares, so the board itself does not say which guard asks what.
+- **The fix, as a rule for every level:** a gate in a level file may carry a short `label` (1 to 8 characters,
+  only on a gate that asks a question), and the board shows it in the badge where "?" is; a gate without one
+  keeps "?". The engine checks it and reports it with the gate's question; the editor's gate gets the field
+  too (it builds its fields from what the engine offers). No older level changes.
+  - Eight characters is what the badge holds inside one square (its pill is 6.5 units a character plus 8, in
+    a square of 64).
+  - On 8.5 a square is about 31 px at 1400 by 860 (the hand-test list's item 11), so the badge's text is under
+    5 px high there, whatever it says. The words help most once that board is larger.
+- **Packages:** Q68-1 the engine and the protocol; Q68-2 the board and the editor; then 8.5's two labels
+  (level content, Fable's, by the generator); Q68-3 the e2e check.
+- **The words, for the designer:** "min" would name the built-in the level asks the player to find. Three
+  pairs were put to him: "smallest" / "in order" (what each guard asks, in the brief's words; recommended),
+  "number" / "list" (the kind of answer), "min" / "list" (nearest his example).
+- **Decided** *(Designer, 2026-11-26)*: "smallest" / "in order".
+- **Done:** Q68-1 `54a16ec` (the rule in the engine, the protocol), Q68-2 `0216adf` (the badge, the editor's
+  field "A word on the gate (optional)"), 8.5's labels `458e319` (level content), Q68-3 `795a59d` (e2e). The
+  details are in `docs/M5/M5.3.md`, "As built", QA1. After the last merge, from the main checkout: `npm run
+  check` exit 0, `satchel` 28 of 28, `editor` 50 of 50; `app` 161 of 161 after Q68-2.
+- **Pinned in e2e:** on 8.5 the left gate says "smallest" and the right one "in order", neither says "?", each
+  tooltip still gives the whole question, each pill sits inside its own square and they do not touch; an
+  older gate (The Toll, `practice-08`) still says "?"; in the editor the word's field follows the question's,
+  the badge follows the field, and the engine's two sentences answer a word with no question and a word of 9
+  characters.
+- **Measured, and left with item 11 of the hand-test list:** at 1400 by 860 each pill on 8.5 is 28.9 px wide
+  with 1.9 px between them, so eight characters are about 3 px each. The words are there and they fit; they
+  are small because that board is (about 31 px a square beside the satchel).
+
 ---
 
 ## Queued work

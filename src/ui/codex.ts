@@ -25,7 +25,11 @@ export interface CodexView extends CodexLookup {
   show(name: string): void;
 }
 
-/** The Codex tab: the piece's abilities, then Python's built-ins, text methods and keywords. Entries new in this level start open. */
+/**
+ * The Codex tab: the piece's abilities, then Python's built-ins, the methods of text and of lists, the keywords and the
+ * kinds of value. Entries new in this level start open. The tooltips' lookup leaves the kinds of value out (M5.3): a
+ * variable called `text` or `list` must not show one; `show` still opens them.
+ */
 export function renderCodex(entries: CodexEntry[], piece: string): CodexView {
   const items = new Map(entries.map((entry) => [entry.name, codexEntry(entry)]));
   const group = (title: string, kind: (entry: CodexEntry) => boolean) => {
@@ -34,15 +38,17 @@ export function renderCodex(entries: CodexEntry[], piece: string): CodexView {
   };
   return {
     piece,
-    entries: new Map(entries.map((entry) => [entry.name, entry])),
+    entries: new Map(entries.filter((entry) => entry.kind !== "value").map((entry) => [entry.name, entry])),
     element: h(
       "div",
       { class: "codex" },
       h("p", { class: "muted small" }, "Everything you've learned so far. Hover a function in your code to see its entry, or ask Python with help()."),
       ...group(`Your ${piece}`, (entry) => entry.kind === "ability" || entry.kind === "property"),
       ...group("Python", (entry) => entry.kind === "builtin"),
-      ...group("Text", (entry) => entry.kind === "method"),
+      ...group("Text", (entry) => entry.kind === "method" && entry.name.startsWith("str.")),
+      ...group("Lists", (entry) => entry.kind === "method" && entry.name.startsWith("list.")),
       ...group("Keywords", (entry) => entry.kind === "keyword"),
+      ...group("Kinds of value", (entry) => entry.kind === "value"),
     ),
     show(name) {
       const item = items.get(name);
@@ -111,7 +117,8 @@ const label = (text: string) => h("span", { class: "codex-label" }, text);
  * print, and "str.upper" on the `upper` of any other `x.upper()` (a method of
  * text, M3.6). That's a candidate: the Codex only has an entry for it once a lesson
  * has taught it, and the editor can't tell a text from any other value, so the lookup
- * simply finds nothing for a name that isn't in the level's Codex.
+ * simply finds nothing for a name that isn't in the level's Codex. (A kind of value has no hover: its names, such as
+ * `list`, are also what players call their variables, so the lookup holds none.)
  */
 export function codexNameAt(state: EditorState, pos: number, side: -1 | 1, piece: string): { name: string; from: number; to: number } | null {
   const node = syntaxTree(state).resolveInner(pos, side);
