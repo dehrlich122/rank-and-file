@@ -7,7 +7,7 @@
 // route): they are part of a way through a real level, so no check reports them, a program's text or an examiner's answer.
 // Checks report facts (labels, counts, class names, the words of a card), never the editor's contents.
 import { sleep } from "./cdp.mjs";
-import { examinerHelpers, lessonHelpers, levelHelpers, settingsHelpers } from "./helpers.mjs";
+import { codexHelpers, examinerHelpers, lessonHelpers, levelHelpers, settingsHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const CHAPTER = ["ch08-l01", "ch08-l02", "ch08-l03", "ch08-l04", "ch08-l05", "ch08-l06"];
@@ -19,6 +19,7 @@ const MARK = { no: "✗" };
 export default async function satchelChecks({ browser: b, base, root, check }) {
   const { openLevel, setCode, run, brief, codexTab, press, toStart } = levelHelpers(b, base, root);
   const { lessonAt, runSnippet } = lessonHelpers(b, openLevel);
+  const { readCodex } = codexHelpers(b);
   const { examinerView, examinerCard, challengeCalls, stubFunction } = examinerHelpers(b);
 
   // ---- The level list ----
@@ -146,20 +147,12 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
   });
 
   // ---- The Codex ----
-  /** Open level `id` and read its Codex tab: the group headings in order, and each entry's name, group and whether it is marked New. */
+  /** Open level `id` and read its Codex tab (`readCodex`): the group headings in order, and each entry's name, group and whether it is marked New. */
   async function codexOf(id) {
     await openLevel(id, { fresh: true });
     await codexTab();
     await b.waitFor(`document.querySelector('.codex .codex-entry')`, 20_000, "the Codex's entries");
-    return b.evaluate(`(() => {
-      const entries = [];
-      const headings = [];
-      for (const el of document.querySelector('.codex').children) {
-        if (el.tagName === 'H3') headings.push(el.textContent);
-        else if (el.classList.contains('codex-entry')) entries.push({ name: el.dataset.codex, group: headings.at(-1) ?? '', isNew: !!el.querySelector('.codex-new') });
-      }
-      return { headings, entries };
-    })()`);
+    return readCodex();
   }
   const newOnes = (codex, names) => names.filter((name) => codex.entries.some((e) => e.name === name && e.isNew));
   const allNew = (codex) => codex.entries.filter((e) => e.isNew).map((e) => e.name);

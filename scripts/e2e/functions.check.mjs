@@ -5,7 +5,7 @@
 // or the examiner levels (a do-nothing function); none is a level's solution. Checks report facts (lines, counts,
 // squares), never the editor's contents.
 import { sleep } from "./cdp.mjs";
-import { examinerHelpers, lessonHelpers, levelHelpers } from "./helpers.mjs";
+import { codexHelpers, examinerHelpers, lessonHelpers, levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const LEVEL = "practice-11";
@@ -14,6 +14,7 @@ const ARROW = "↩";
 export default async function functionsChecks({ browser: b, base, root, check }) {
   const { openLevel, setCode, run, brief, solution, challengeTab, codexTab, button, press, toStart } = levelHelpers(b, base, root);
   const { lessonAt, runSnippet } = lessonHelpers(b, openLevel);
+  const { readCodex } = codexHelpers(b);
   const { examinerView, examinerCard, challengeCalls, stubFunction } = examinerHelpers(b);
 
   const boardLabel = `document.querySelector('.board-host .board').getAttribute('aria-label')`;
@@ -516,15 +517,8 @@ export default async function functionsChecks({ browser: b, base, root, check })
     await openLevel(id, { fresh: true });
     await codexTab();
     await b.waitFor(`document.querySelector('.codex .codex-entry')`, 20_000, "the Codex's entries");
-    return b.evaluate(`(() => {
-      let group = '';
-      const names = [];
-      for (const el of document.querySelector('.codex').children) {
-        if (el.tagName === 'H3') group = el.textContent;
-        else if (group === 'Keywords' && el.classList.contains('codex-entry')) names.push(el.dataset.codex);
-      }
-      return { group: [...document.querySelectorAll('.codex h3')].some((e) => e.textContent === 'Keywords'), names };
-    })()`);
+    const { headings, entries } = await readCodex();
+    return { group: headings.includes("Keywords"), names: entries.filter((e) => e.group === "Keywords").map((e) => e.name) };
   }
 
   await check("M5.2: the Codex's keywords: def comes with ch07-l02, return with ch07-l04 (not before)", async () => {

@@ -2,7 +2,7 @@
 // Solutions are read from solutions/ and typed into the editor; this file never
 // contains solution code, and nothing here prints it.
 import { sleep } from "./cdp.mjs";
-import { hoverHelpers, levelHelpers, settingsHelpers } from "./helpers.mjs";
+import { codexHelpers, hoverHelpers, levelHelpers, settingsHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const LEVELS = ["ch01-l01", "ch01-l02", "ch01-l03", "ch01-l04", "ch01-l05"];
@@ -11,6 +11,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
   const { solution, withoutExpectLine, openLevel, setCode, editorText, clickButton, hasButton, challengeTab, codexTab, press, run, outcome, brief } = levelHelpers(b, base, root);
   const { wordAt, hover, hoverAway } = hoverHelpers(b);
   const { keepingSettings } = settingsHelpers(b);
+  const { readCodex } = codexHelpers(b);
 
   /** What the game said in the console (guards, pick-ups, falls). Check it in Node; never report it: it can give a solution away. */
   const gameMessages = () => b.evaluate(`[...document.querySelectorAll('.console .game-message')].map((e) => e.textContent)`);
@@ -770,14 +771,12 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   // -- The Codex (docs/Codex.md) ---------------------------------------------------------------
   // Entries are documentation, not spoilers; the code typed here is test code, never a solution.
-  const codexEntries = async () => {
+  const showCodex = async () => {
     await codexTab();
     await b.waitFor(`document.querySelector('.codex')`, 20_000, "the Codex");
-    return b.evaluate(`[...document.querySelectorAll('.codex-entry')].map((e) => ({
-      name: e.dataset.codex, open: e.open, isNew: !!e.querySelector('.codex-new'),
-      introduced: e.querySelector('.codex-body > p.muted')?.textContent ?? '',
-      group: (() => { let n = e.previousElementSibling; while (n && n.tagName !== 'H3') n = n.previousElementSibling; return n?.textContent ?? ''; })() }))`);
+    return readCodex();
   };
+  const codexEntries = async () => (await showCodex()).entries;
 
   await check("Codex: the tab lists the level's abilities, then the built-ins taught so far, then the kinds of value its lessons wrote, and marks what's new", async () => {
     await openLevel("ch01-l04", { fresh: true });
@@ -794,8 +793,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
 
   await check("Codex: 'Kinds of value' is the last group, holding the value entries; each method sits under its owner's group", async () => {
     await openLevel("ch06-l03", { fresh: true });
-    const entries = await codexEntries();
-    const headings = await b.evaluate(`[...document.querySelectorAll('.codex h3')].map((e) => e.textContent)`);
+    const { headings, entries } = await showCodex();
     const kinds = ["whole number", "text", "True and False", "None", "list", "tuple"];
     const inKinds = entries.filter((e) => e.group === "Kinds of value").map((e) => e.name);
     expect(headings.at(-1) === "Kinds of value" && headings.indexOf("Text") >= 0 && headings.indexOf("Text") < headings.indexOf("Keywords"), headings.join("|"));
@@ -1177,9 +1175,8 @@ export default async function appChecks({ browser: b, base, root, check }) {
     await openLevel("ch06-l02", { fresh: true });
     const early = (await codexEntries()).map((e) => e.name);
     await openLevel("ch06-l03", { fresh: true });
-    const entries = await codexEntries();
+    const { headings: heading, entries } = await showCodex();
     const names = entries.map((e) => e.name);
-    const heading = await b.evaluate(`[...document.querySelectorAll('.codex h3')].map((e) => e.textContent)`);
     await setCode("text = 'ab'\nprint(text.upper())\n");
     await sleep(300);
     await hover(await wordAt("upper"));
