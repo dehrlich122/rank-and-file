@@ -7,7 +7,7 @@
 // route): they are part of a way through a real level, so no check reports them, a program's text or an examiner's answer.
 // Checks report facts (labels, counts, class names, the words of a card), never the editor's contents.
 import { sleep } from "./cdp.mjs";
-import { examinerHelpers, levelHelpers, settingsHelpers } from "./helpers.mjs";
+import { examinerHelpers, lessonHelpers, levelHelpers, settingsHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const CHAPTER = ["ch08-l01", "ch08-l02", "ch08-l03", "ch08-l04", "ch08-l05", "ch08-l06"];
@@ -17,8 +17,9 @@ const EXAMINER = "ch08-l06"; // an examiner level whose calls carry lists and wh
 const MARK = { no: "✗" };
 
 export default async function satchelChecks({ browser: b, base, root, check }) {
-  const { openLevel, setCode, run, brief, codexTab, press } = levelHelpers(b, base, root);
-  const { examinerView, examinerCard, challengeCalls } = examinerHelpers(b);
+  const { openLevel, setCode, run, brief, codexTab, press, toStart } = levelHelpers(b, base, root);
+  const { lessonAt, runSnippet } = lessonHelpers(b, openLevel);
+  const { examinerView, examinerCard, challengeCalls, stubFunction } = examinerHelpers(b);
 
   // ---- The level list ----
   await check("M5.3: Chapter 8 is listed after Chapter 7 as The Satchel, in the Knight tier, with six levels and a last one that is the mastery", async () => {
@@ -60,24 +61,8 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
   // ---- The lessons' snippets (Learn panel) ----
   /** Open lesson `id`, page to the step holding snippet `index`, run it and read what it shows: its ending status, the examiner's words, the error card. */
   async function runLessonSnippet(id, index) {
-    await openLevel(id, { fresh: true });
-    for (let i = 0; i < index; i++) await b.evaluate(`document.querySelector('.lesson-pager .btn-primary').click()`);
-    const step = `document.querySelectorAll('.lesson .lesson-step')[${index}]`;
-    await b.waitFor(`${step}?.hidden === false`, 5000, `lesson step ${index} on show`);
-    await b.evaluate(`${step}.querySelector('.snippet .btn').click()`);
-    await b.waitFor(`/^[✓✗⏱]/.test(${step}.querySelector('.snippet-status').textContent)`, 30_000, "the snippet's ending status");
-    return b.evaluate(`(() => {
-      const s = ${step}.querySelector('.snippet');
-      const card = s.querySelector('.error-detail p');
-      return {
-        snippets: document.querySelectorAll('.lesson .snippet').length,
-        status: s.querySelector('.snippet-status').textContent,
-        caption: s.querySelector('.snippet-call code')?.textContent ?? null,
-        summary: s.querySelector('.snippet-summary').textContent,
-        card: card ? card.innerText.replace(/\\s+/g, ' ').trim() : null,
-        cardCodes: card ? card.querySelectorAll('code').length : 0,
-      };
-    })()`);
+    await lessonAt(id, index);
+    return runSnippet(index);
   }
 
   const ERROR_SNIPPETS = [
@@ -111,29 +96,29 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
     await setCode(code);
     return run();
   }
-  /** Go back to step 0, then step forward to the end: for each step, the variables panel as {name: value}. */
-  async function stepThrough() {
-    await press(0);
-    await b.waitFor(`/Step 0 /.test(document.querySelector('.step-label').textContent)`, 5000, "back at step 0");
-    const panel = () => b.evaluate(`({
-      label: document.querySelector('.step-label').textContent,
-      vars: Object.fromEntries([...document.querySelectorAll('.inspector tr')].map((r) => [r.querySelector('.var-name').textContent, r.querySelector('.var-value').textContent])),
-    })`);
-    const steps = [await panel()];
-    const total = Number(/of (\d+)/.exec(steps[0].label)?.[1]);
+  /** Back to the first frame, then forward one step at a time to the last: what `read()` gives at each frame. */
+  async function framesOf(read) {
+    const label = () => b.evaluate(`document.querySelector('.step-label').textContent`);
+    await toStart();
+    const frames = [await read()];
+    const total = Number(/of (\d+)/.exec(await label())?.[1]);
     for (let i = 0; i < total; i++) {
+      const before = await label();
       await press(3);
-      await b.waitFor(`document.querySelector('.step-label').textContent !== ${JSON.stringify(steps.at(-1).label)}`, 5000, "the next step");
-      steps.push(await panel());
+      await b.waitFor(`document.querySelector('.step-label').textContent !== ${JSON.stringify(before)}`, 5000, "the next step");
+      frames.push(await read());
     }
-    return steps;
+    return frames;
   }
+  /** The variables panel as {vars: {name: value}}. */
+  const panel = () =>
+    b.evaluate(`({ vars: Object.fromEntries([...document.querySelectorAll('.inspector tr')].map((r) => [r.querySelector('.var-name').textContent, r.querySelector('.var-value').textContent])) })`);
 
   await check("M5.3: stepping shows a list growing in the variables panel, and both names of a for over pairs with their values", async () => {
     // moves nothing, and is no route: an empty list, three appends of numbers, then a loop over two pairs
     const r = await runMadeUp(SCRATCH, "found = []\nfound.append(5)\nfound.append(6)\nfound.append(7)\nfor first, second in [(1, 2), (3, 4)]:\n    print(first, second)\n");
     expect(r.head !== "Python stopped", brief(r));
-    const steps = await stepThrough();
+    const steps = await framesOf(panel);
     const seen = (name) => [...new Set(steps.map((s) => s.vars[name]).filter((v) => v !== undefined))];
     const found = seen("found");
     // the list's value grows: each value after the first holds the one before it, minus its closing bracket
@@ -217,9 +202,7 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
   // booleans) and never read their text out.
   async function stubRun() {
     await openLevel(EXAMINER, { fresh: true });
-    const name = (await challengeCalls())[0].split("(")[0].trim();
-    await setCode(`def ${name}(*args, **kwargs):
-    pass`);
+    await setCode(await stubFunction());
     return run();
   }
 
@@ -432,25 +415,9 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
     return `a key picked up in ${plan.jumps.length} jumps; ${wanting.length} of ${end.doors.length} doors open`;
   });
 
-  /** Back to the first frame, then forward one step at a time to the last: the settled look at each frame. */
-  async function framesOf() {
-    const label = () => b.evaluate(`document.querySelector('.step-label').textContent`);
-    await press(0);
-    await b.waitFor(`/Step 0 /.test(document.querySelector('.step-label').textContent)`, 5000, "back at step 0");
-    const frames = [await settledLook()];
-    const total = Number(/of (\d+)/.exec(await label())?.[1]);
-    for (let i = 0; i < total; i++) {
-      const before = await label();
-      await press(3);
-      await b.waitFor(`document.querySelector('.step-label').textContent !== ${JSON.stringify(before)}`, 5000, "the next step");
-      frames.push(await settledLook());
-    }
-    return frames;
-  }
-
   await check("M5.3: at every frame of the run, the keys the label still lists plus the keys in the satchel make the board's number of keys, and the tiles marked collected are the satchel's", async () => {
     const { start } = await pickedUp();
-    const frames = await framesOf();
+    const frames = await framesOf(settledLook);
     const total = start.keys.length;
     expect(frames.length >= 3, `${frames.length} frames`);
     const sums = frames.map((f) => f.left.length + f.chips.length);
@@ -463,8 +430,7 @@ export default async function satchelChecks({ browser: b, base, root, check }) {
 
   await check("M5.3: a rewind undoes it all (the satchel empty, the key on the board and in the label, the door locked) and the end, by Jump to end and by playing through, is as the run left it", async () => {
     const { start, end } = await pickedUp();
-    await press(0);
-    await b.waitFor(`/Step 0 /.test(document.querySelector('.step-label').textContent)`, 5000, "back at step 0");
+    await toStart();
     const back = await settledLook();
     expect(back.chips.length === 0 && back.count === "0 of 8" && back.slots === 8 && same(facts(back), facts(start)), `at the start: ${JSON.stringify(facts(back))}`);
     expect(end.chips.length === 1 && !same(facts(back), facts(end)), "the start and the end are not told apart");

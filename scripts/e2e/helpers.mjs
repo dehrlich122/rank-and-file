@@ -91,6 +91,7 @@ export function hoverHelpers(browser) {
  * value, which is a spoiler on a real level).
  */
 export function examinerHelpers(browser) {
+  const challengeCalls = () => browser.evaluate(`[...document.querySelectorAll('ol.call-list li code.call-code')].map((e) => e.textContent)`);
   return {
     /** What the board host shows of the calls: the buttons' text, tooltips and tops, the pressed one, the caption, the board's shape. */
     examinerView: () =>
@@ -116,7 +117,13 @@ export function examinerHelpers(browser) {
       })()`),
 
     /** The Challenge panel's call list, in order: each call's text (in the DOM whether or not the tab is on show). */
-    challengeCalls: () => browser.evaluate(`[...document.querySelectorAll('ol.call-list li code.call-code')].map((e) => e.textContent)`),
+    challengeCalls,
+
+    /** The made-up function the suites type: the call list's function name, a catch-all signature, a body of `pass`. It solves nothing. */
+    async stubFunction() {
+      const name = (await challengeCalls())[0].split("(")[0].trim();
+      return `def ${name}(*args, **kwargs):\n    pass`;
+    },
 
     /** The outcome card's examiner parts and its table of calls (null when there is none): booleans, the calls' text and the buttons' words. */
     examinerCard: () =>
@@ -171,6 +178,43 @@ export function settingsHelpers(browser) {
   };
 }
 
+/** Running the snippets in a lesson's Learn panel. `openLevel` is the one from `levelHelpers`. */
+export function lessonHelpers(browser, openLevel) {
+  return {
+    /** Open a lesson and page to the step holding snippet `index` (a step ends with its snippet, so step N holds snippet N). */
+    async lessonAt(id, index) {
+      await openLevel(id, { fresh: true });
+      for (let i = 0; i < index; i++) await browser.evaluate(`document.querySelector('.lesson-pager .btn-primary').click()`);
+      await browser.waitFor(`document.querySelectorAll('.lesson .lesson-step')[${index}]?.hidden === false`, 5000, `lesson step ${index} on show`);
+    },
+
+    /**
+     * Press Run on snippet `index` (its step on show) and wait for its ending status, which starts with a mark. Reads the
+     * status, the summary (and the code spans in it), the called snippet's caption, the error card's sentence (null when
+     * there is none) with its code spans, and how many snippets the lesson has.
+     */
+    async runSnippet(index) {
+      const snippet = `document.querySelectorAll('.lesson .lesson-step')[${index}].querySelector('.snippet')`;
+      await browser.evaluate(`${snippet}.querySelector('.btn').click()`);
+      await browser.waitFor(`/^[✓✗⏱]/.test(${snippet}.querySelector('.snippet-status').textContent)`, 30_000, "the snippet's ending status");
+      return browser.evaluate(`(() => {
+        const s = ${snippet};
+        const summary = s.querySelector('.snippet-summary');
+        const card = s.querySelector('.error-detail p');
+        return {
+          snippets: document.querySelectorAll('.lesson .snippet').length,
+          status: s.querySelector('.snippet-status').textContent,
+          summary: summary.textContent,
+          codes: [...summary.querySelectorAll('code')].map((e) => e.textContent),
+          caption: s.querySelector('.snippet-call code')?.textContent ?? null,
+          card: card ? card.innerText.replace(/\\s+/g, ' ').trim() : null,
+          cardCodes: card ? card.querySelectorAll('code').length : 0,
+        };
+      })()`);
+    },
+  };
+}
+
 /** Find buttons by their label, within a CSS `scope`. */
 export function buttonHelpers(browser) {
   const find = (label, scope) =>
@@ -209,12 +253,18 @@ function runHelpers(browser) {
       stars: document.querySelectorAll('.outcome-host .stars li.earned').length,
     })`);
   }
+  const press = (index) => browser.evaluate(`${playbackButton(index)}.click()`);
   return {
     outcome,
     /** The playback button `index` (see BUTTONS), as a JS expression for `evaluate`. */
     button: playbackButton,
     /** Click the playback button `index`. */
-    press: (index) => browser.evaluate(`${playbackButton(index)}.click()`),
+    press,
+    /** Press "back to start" and wait until the step label reads step 0. */
+    async toStart() {
+      await press(0);
+      await browser.waitFor(`/Step 0 /.test(document.querySelector('.step-label').textContent)`, 5000, "back at step 0");
+    },
     /** Press Run, optionally jump to the end, and describe the outcome. */
     async run({ jump = true } = {}) {
       await browser.evaluate(`document.querySelector('.level-right .btn-primary').click()`);
