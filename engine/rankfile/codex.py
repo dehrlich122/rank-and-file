@@ -652,7 +652,7 @@ def value_entry(name: str) -> Entry:
 
 
 def python_entry(name: str) -> Entry:
-    """The entry for one of Python's own tools: a built-in (`print`) or a method of text (`str.upper`)."""
+    """The entry for one of Python's own tools: a built-in (`print`) or a method of text or of a list (`str.upper`)."""
     calls, doc = PYTHON[name]
     return Entry(name, "builtin" if name in BUILTINS else "method", calls, **parse_docstring(doc))
 
@@ -680,7 +680,7 @@ def _methods_in(callees: list[ast.expr]) -> set[str]:
 
 
 def python_called(code: str) -> set[str]:
-    """The built-ins (print, range, ...) and methods of text ("str.upper") `code` calls by name. The level checker uses it too."""
+    """The built-ins (print, range, ...) and methods of text or lists ("str.upper") `code` calls by name. The level checker uses it too."""
     callees = _callees(code)
     return _builtins_in(callees) | _methods_in(callees)
 
@@ -704,7 +704,7 @@ def lesson_snippets(markdown: str) -> list[str]:
 
 
 def taught(markdown: str) -> set[str]:
-    """The documented built-ins and text methods a lesson's snippets call."""
+    """The documented built-ins and text or list methods a lesson's snippets call."""
     return {name for code in lesson_snippets(markdown) for name in python_called(code) if name in PYTHON}
 
 
@@ -772,26 +772,28 @@ def _rule_nodes(level: Level) -> set[str]:
 
 
 @functools.lru_cache(maxsize=256)  # a list asks about every level in it, and the lessons are the same each time
-def _nodes_used(lesson: str) -> frozenset[str]:
-    """The names of the syntax a lesson's snippets use ("For", "While"...). A snippet that isn't Python adds none."""
-    used: set[str] = set()
+def _parsed(lesson: str) -> tuple[ast.Module, ...]:
+    """A lesson's snippets, parsed. A snippet that isn't Python is left out."""
+    trees = []
     for code in lesson_snippets(lesson):
         try:
-            used |= {type(node).__name__ for node in ast.walk(ast.parse(code))}
+            trees.append(ast.parse(code))
         except SyntaxError:
             continue
-    return frozenset(used)
+    return tuple(trees)
+
+
+@functools.lru_cache(maxsize=256)
+def _nodes_used(lesson: str) -> frozenset[str]:
+    """The names of the syntax a lesson's snippets use ("For", "While"...). A snippet that isn't Python adds none."""
+    return frozenset(type(node).__name__ for tree in _parsed(lesson) for node in ast.walk(tree))
 
 
 def _kind_of(node: ast.AST) -> str | None:
     """The kind of value a piece of syntax makes, if any: a constant, an f-string, or a list or tuple display that is
     read. An unpacking target (`x, y = pair`) or an assigned-to list display is a Store, which makes nothing."""
     if isinstance(node, ast.Constant):
-        value = node.value
-        if value is None:
-            return "None"
-        kinds = {bool: "True and False", int: "whole number", str: "text"}
-        return kinds.get(type(value))
+        return "text" if isinstance(node.value, str) else _VALUE_KINDS.get(type(node.value))
     if isinstance(node, ast.JoinedStr):
         return "text"
     if isinstance(node, (ast.List, ast.Tuple)) and isinstance(node.ctx, ast.Load):
@@ -802,17 +804,11 @@ def _kind_of(node: ast.AST) -> str | None:
 @functools.lru_cache(maxsize=256)
 def _kinds_made(lesson: str) -> frozenset[str]:
     """The kinds of value a lesson's snippets make (VALUES' names). A snippet that isn't Python makes none."""
-    made: set[str] = set()
-    for code in lesson_snippets(lesson):
-        try:
-            made |= {kind for node in ast.walk(ast.parse(code)) if (kind := _kind_of(node))}
-        except SyntaxError:
-            continue
-    return frozenset(made)
+    return frozenset(kind for tree in _parsed(lesson) for node in ast.walk(tree) if (kind := _kind_of(node)))
 
 
 def entries(level_id: str, chapters: list[dict]) -> list[Entry]:
-    """A level's Codex: its piece's abilities, then every built-in and text method taught so far.
+    """A level's Codex: its piece's abilities, then every built-in and text or list method taught so far.
 
     The piece's entries are exactly this level's abilities, since a locked one
     can't be used. Python's own tools always work, so every one taught so far
@@ -832,7 +828,7 @@ def entries(level_id: str, chapters: list[dict]) -> list[Entry]:
                 introduced.setdefault(name, item["id"])
         for name in _kinds_made(item["lesson"]):
             introduced.setdefault(name, item["id"])
-    here =parse_level(counted[-1]["data"])
+    here = parse_level(counted[-1]["data"])
     piece = PIECES[here.piece]
     found = [ability_entry(piece, name) for name in piece.ABILITIES if name in here.api]
     found += [python_entry(name) for name in PYTHON if name in introduced]
@@ -931,7 +927,7 @@ def _is_help(thing) -> bool:
 
 
 def _entry_for(thing, piece: type[Piece] = Pawn) -> Entry | None:
-    """The Codex entry for an ability (`pawn.move`), a built-in (`print`), a method of text (`"x".upper`), or any of their names as text.
+    """The Codex entry for an ability (`pawn.move`), a built-in (`print`), a method of text or of a list (`"x".upper`), or any of their names as text.
     A name as text answers for the level's own piece only: help("knight.jump") on a pawn level knows nothing."""
     if _is_help(thing):
         return python_entry("help")
@@ -951,11 +947,10 @@ def _entry_for(thing, piece: type[Piece] = Pawn) -> Entry | None:
         method = f"{kind.__name__}.{getattr(thing, '__name__', '')}"
         if method in METHODS and (isinstance(owner, kind) or thing is getattr(kind, thing.__name__)):  # "x".upper, or str.upper
             return python_entry(method)
-    # `help` is in `builtins` only once `site` has run; a missing one is None, which must not match help(None)
-    built_in = next((python_entry(name) for name in BUILTINS if thing is not None and thing is getattr(builtins, name, None)), None)
-    if built_in is None and isinstance(thing, type) and thing in _VALUE_TYPES:
+    if isinstance(thing, type) and thing in _VALUE_TYPES:
         return value_entry(_VALUE_TYPES[thing])  # help(list)
-    return built_in
+    # `help` is in `builtins` only once `site` has run; a missing one is None, which must not match help(None)
+    return next((python_entry(name) for name in BUILTINS if thing is not None and thing is getattr(builtins, name, None)), None)
 
 
 def format_entry(entry: Entry) -> str:

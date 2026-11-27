@@ -409,12 +409,13 @@ def _satchel_change(node: ast.AST, pieces: dict) -> str | None:
         return None
     if isinstance(target, ast.Attribute) and target.attr == "inventory" and isinstance(target.value, ast.Name):
         owner = target.value.id
-        if owner in pieces and "inventory" in getattr(pieces[owner], "ABILITIES", ()):
+        if owner in pieces and "inventory" in pieces[owner].ABILITIES:
             return owner
     return None
 
 
 def _satchel_warning(piece: str, piece_type: type) -> str:
+    """The lint warning for a change to `<piece>.inventory`, in the piece's own words."""
     return (
         f"Your {piece_type.NAME}'s satchel fills only with `pick_up()`. "
         f"Changing `{piece}.inventory` changes a copy."
