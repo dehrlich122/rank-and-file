@@ -1126,8 +1126,9 @@ export default async function editorChecks({ browser: b, base, root, check }) {
   });
 
   // -- QA-068: a gate's word ---------------------------------------------------------------------------------------
-  const gateBadges = () => b.evaluate(`[...document.querySelectorAll('.ed-board .board .squares g.gate:not(.timed-gate) .badge-text')].map((e) => e.textContent)`);
-  const waitBadges = (wanted, what) => b.waitFor(`JSON.stringify([...document.querySelectorAll('.ed-board .board .squares g.gate:not(.timed-gate) .badge-text')].map((e) => e.textContent)) === ${JSON.stringify(JSON.stringify(wanted))}`, 30_000, what);
+  const badgeTexts = `[...document.querySelectorAll('.ed-board .board .squares g.gate:not(.timed-gate) .badge-text')].map((e) => e.textContent)`;
+  const gateBadges = () => b.evaluate(badgeTexts);
+  const waitBadges = (wanted, what) => b.waitFor(`JSON.stringify(${badgeTexts}) === ${JSON.stringify(JSON.stringify(wanted))}`, 30_000, what);
 
   await check("QA-068: a gate's word: its field follows the question's, the board's badge says the word (and ? again when it is emptied), the engine's sentences answer a word with no question and one that is too long", async () => {
     await newLevel();
