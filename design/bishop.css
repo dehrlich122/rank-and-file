@@ -1,0 +1,37 @@
+/* M5.4 (design sheet, dev-only): the bishop as the player's piece. The frame comes from knight-piece.css (panes,
+   takes, labels) and the game's own classes draw the art; only what is new here is defined below. */
+
+.facing-label {
+  margin: 0;
+  font: 600 11px var(--font-code);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.take-idea {
+  margin: 0 0 4px;
+  max-width: 46ch;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.stack {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+}
+
+.large-art {
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  background: var(--panel-2, var(--panel));
+  border: 1px solid var(--border);
+}
+
+.compare-board {
+  display: block;
+  width: 420px;
+  max-width: 100%;
+}
