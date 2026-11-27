@@ -1,0 +1,52 @@
+id: knights-tour-02
+set: knights-tour
+difficulty: 3
+draws_on: [3, 7, 8]
+title: "Out and Back"
+trains: "A list walked forwards, then backwards: the way back worked out from the way out"
+brief: "A winding trail of stones leads out to a key. The door it opens is one jump from where your knight starts, and the goal one jump behind the door: the same two jumps on every board. The examiner calls your spell out_and_back with the way out, a list of jumps, each a (dx, dy) pair. Nobody hands you the way back, and the trail is the only ground there is."
+piece: knight
+map: |
+  O O P O O O G
+  O O O O D O O
+  O . O O O O O
+  O O O O O O O
+  O O . O O O O
+  O O O O O O O
+  O O O . O O O
+  a O O O O O O
+  O O . O O O O
+legend: {"O": "pit", "a": {"tile": "key", "name": "brass"}, "D": {"tile": "door", "key": "brass"}}
+start: {"facing": "north"}
+api: ["jump", "pick_up"]
+examine: {"function": "out_and_back", "calls": [{"args": [[[-1, -2], [1, -2], [1, -2], [-1, -2], [-2, 1]]], "board": 1}, {"args": [[[-2, 1], [-1, -2], [-1, -2], [1, -2], [1, -2], [-2, 1]]], "board": 2}, {"args": [[[-1, -2], [1, -2], [-1, -2], [-2, -1]]], "board": 3}, {"args": [[[-1, 2], [-2, -1], [-1, -2]]], "board": 4}]}
+par: {"lines": 9}
+hints:
+- "The way back is the way out again: the same jumps, each one turned round, in the opposite order. Which jump comes first on the way back?"
+- "A list's items have places, counted from 0, and len() says how many there are. range() can count down: from the last place to 0, with a step of -1. Take the pair at each place, unpack it, and jump the other way: minus both numbers. Pick up the key before you turn back."
+- "The way back, counted down:\n    for i in range(len(route) - 1, -1, -1):\n        dx, dy = route[i]\n        knight.jump(..., ...)"
+variants:
+- map: |
+    O O . O O O O O O
+    O O O O P O O O G
+    O . O O O O D O O
+    O O O O O O O O O
+    . O O O O O O O O
+    O O O O O O O O O
+    O . O O O O O O O
+    a O O O O O O O O
+    O O . O O O O O O
+- map: |
+    O O O P O O O G
+    O O O O O D O O
+    O O . O O O O O
+    O O O O O O O O
+    O O O . O O O O
+    O O O O O O O O
+    O O . O O O O O
+    a O O O O O O O
+- map: |
+    O O O . O O O O O
+    O . O O O O O O O
+    O O O O P O O O G
+    a O O O O O D O O

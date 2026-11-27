@@ -1,0 +1,1 @@
+The reference rides the way out with a for loop that unpacks each pair, picks up the key, and counts back down the same list with range() and len(), jumping each pair the other way. Then the door and the goal: 9 lines.

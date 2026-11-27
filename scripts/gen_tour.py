@@ -17,11 +17,11 @@ between boards reaches the code as a rune, an argument, a guard's question or th
 """
 
 import random
-from itertools import permutations
+from itertools import islice, permutations
 
 from gen_mastery import list_set
-from gen_satchel import PIT, TRIES
-from gen_spellbook import JUMP, SIDE, board, fits, indented, jumping, laid, snake, tight, writers
+from gen_satchel import FLOOR, PICK, PIT, TRIES, Pos, alone, back, keys_of, on
+from gen_spellbook import JUMP, RUNES, SIDE, board, fits, indented, jumping, laid, routes, snake, tight, writers
 from levelgen import main, said
 
 from rankfile.world import KNIGHT_JUMPS
@@ -80,7 +80,81 @@ def written(spec: dict, rng: random.Random) -> dict | None:
     }
 
 
-MAKERS = {"written": written}
+# -- 2: a trail out to a key, and back ------------------------------------------------------------------
+
+KEY = "brass"
+RETURN = {  # challenge 2's fixed lines
+    "head": "qrs bhg_naq_onpx(ebhgr):",
+    "out": "sbe qk, ql va ebhgr:",
+    "step": "xavtug.whzc(qk, ql)",
+    "down": "sbe v va enatr(yra(ebhgr) - 1, -1, -1):",
+    "pair": "qk, ql = ebhgr[v]",
+    "undo": "xavtug.whzc(-qk, -ql)",
+}
+
+
+def trail(rng: random.Random, length: int, gate: list[Pos], size: tuple[int, int]) -> tuple[list[Pos], list[Pos]] | None:
+    """A winding trail of `length` jumps from the origin, with the door and the goal (`gate`) beside its start:
+    its jumps, and every stone (the trail's, then the door's and the goal's). Nothing joins two stones but the
+    trail and the two jumps through the door, and the way out undone in the order it was made leaves the stones."""
+    plan = [f"j{at}" for at in range(length)]
+    for chosen, squares in islice(routes(rng, plan, size), 4000):
+        jumps, stones = [chosen[name] for name in plan], [*squares, *gate]
+        links = [*zip(squares, squares[1:], strict=False), (squares[0], gate[0]), (gate[0], gate[1])]
+        strays = any(on(squares[-1], square) not in stones for square in laid([back(jump) for jump in jumps]))
+        if len(set(jumps)) >= 3 and strays and alone(stones, links) and fits(stones, size):
+            return jumps, stones
+    return None
+
+
+def out_and_back(spec: dict, rng: random.Random) -> dict | None:
+    """The examiner calls with the way out, a list of jumps as pairs, on four trails of different lengths. A key
+    lies on the trail's last stone; its door is one jump from the start, the same jump on every board, and the
+    goal one jump beyond it. The way back is nobody's to hand over."""
+    lengths = rng.sample(spec["lengths"], len(spec["lengths"]))
+    for _ in range(TRIES):
+        door, last = rng.choice(KNIGHT_JUMPS), rng.choice(KNIGHT_JUMPS)
+        trails = [trail(rng, length, laid([door, last])[1:], spec["size"]) for length in lengths]
+        if all(trails):
+            break
+    else:
+        return None
+    boards, calls = [], []
+    for n, (jumps, stones) in enumerate(trails, start=1):
+        stones, size = tight(stones)
+        boards.append(board(stones, size, {stones[-3]: RUNES[0], stones[-2]: "D"}))
+        calls.append({"args": [[list(jump) for jump in jumps]], "board": n})
+    line = {key: said(value) for key, value in RETURN.items()}
+    out, end = [line["out"], *indented([line["step"]])], jumping([door, last])
+    undone = [line["down"], *indented([line["pair"], line["undo"]])]
+    first = trails[0][0]
+
+    def spell(*body: str) -> list[str]:
+        return [line["head"], *indented(list(body))]
+
+    return {
+        "level": {
+            "map": boards[0],
+            "variants": boards[1:],
+            "legend": {**PIT, **keys_of([KEY]), "D": {"tile": "door", "key": KEY}},
+            "examine": {"function": "out_and_back", "calls": calls},
+        },
+        # counted with the key and the door as plain stones: two jumps, through the door (`trail` keeps every other way shut)
+        "open": {"map": boards[0], "variants": boards[1:], "legend": {**PIT, RUNES[0]: FLOOR, "D": FLOOR}},
+        "reference": spell(*out, PICK, *undone, *end),
+        "wrong": {
+            "oneway": spell(*out, PICK, *end),
+            "sameorder": spell(*out, PICK, line["out"], *indented([line["undo"]]), *end),
+            "nokey": spell(*out, *undone, *end),
+            "typed": spell(*jumping(first), PICK, *jumping([back(jump) for jump in reversed(first)]), *end),
+        },
+        "shape": f"4 trails of {lengths} jumps",
+        "fills": {},
+        "lengths": [2] * len(lengths),
+    }
+
+
+MAKERS = {"written": written, "back": out_and_back}
 
 # -- the challenges ---------------------------------------------------------------------------------------
 
@@ -107,6 +181,31 @@ LEVELS = [
         ],
         "note": "Gur ersrerapr whzcf bagb gur ehar, phgf vgf grkg vagb jbeqf jvgu fcyvg(), naq ybbcf bire gurz: na vs pubbfrf gur whzc sbe rnpu jbeq. "
         "{yvarf} yvarf sbe n ynqqre bs nal urvtug. Gur ebhgr glcrq bhg sbe bar obneq pbzrf gb {glcrq} yvarf, naq snvyf ba gur bguref.",
+    },
+    {
+        "id": "knights-tour-02",
+        "set": SET["set"],
+        "difficulty": 3,
+        "draws_on": [3, 7, 8],
+        "kind": "back",
+        "seed": 5402,
+        "title": "Out and Back",
+        "trains": "A list walked forwards, then backwards: the way back worked out from the way out",
+        "brief": "A winding trail of stones leads out to a key. The door it opens is one jump from where your knight starts, and the goal one jump behind the door: "
+        "the same two jumps on every board. The examiner calls your spell out_and_back with the way out, a list of jumps, each a (dx, dy) pair. "
+        "Nobody hands you the way back, and the trail is the only ground there is.",
+        "api": ["jump", "pick_up"],
+        "lengths": [3, 4, 5, 6],
+        "size": (9, 9),
+        "hint3": ["said", "Gur jnl onpx, pbhagrq qbja:\n    sbe v va enatr(yra(ebhgr) - 1, -1, -1):\n        qk, ql = ebhgr[v]\n        xavtug.whzc(..., ...)"],
+        "wrong": ["oneway", "sameorder", "nokey", "typed"],
+        "hints": [
+            "Gur jnl onpx vf gur jnl bhg ntnva: gur fnzr whzcf, rnpu bar ghearq ebhaq, va gur bccbfvgr beqre. Juvpu whzc pbzrf svefg ba gur jnl onpx?",
+            "N yvfg'f vgrzf unir cynprf, pbhagrq sebz 0, naq yra() fnlf ubj znal gurer ner. enatr() pna pbhag qbja: sebz gur ynfg cynpr gb 0, jvgu n fgrc bs -1. "
+            "Gnxr gur cnve ng rnpu cynpr, hacnpx vg, naq whzc gur bgure jnl: zvahf obgu ahzoref. Cvpx hc gur xrl orsber lbh ghea onpx.",
+        ],
+        "note": "Gur ersrerapr evqrf gur jnl bhg jvgu n sbe ybbc gung hacnpxf rnpu cnve, cvpxf hc gur xrl, naq pbhagf onpx qbja gur fnzr yvfg jvgu enatr() naq yra(), "
+        "whzcvat rnpu cnve gur bgure jnl. Gura gur qbbe naq gur tbny: {yvarf} yvarf.",
     },
 ]
 

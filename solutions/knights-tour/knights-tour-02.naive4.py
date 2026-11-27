@@ -1,0 +1,15 @@
+# expect: lost
+def out_and_back(route):
+    knight.jump(-1, -2)
+    knight.jump(1, -2)
+    knight.jump(1, -2)
+    knight.jump(-1, -2)
+    knight.jump(-2, 1)
+    knight.pick_up()
+    knight.jump(2, -1)
+    knight.jump(1, 2)
+    knight.jump(-1, 2)
+    knight.jump(-1, 2)
+    knight.jump(1, 2)
+    knight.jump(2, -1)
+    knight.jump(2, 1)
