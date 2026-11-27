@@ -4,8 +4,8 @@
 // All the art is in a 64-unit square centred on (0, 0). A name is text ("brass") or a whole number (12).
 // Which look a key or door has never depends on a rule: the board marks the tile `collected` or `open` from the state.
 import type { LevelInfo, Pos } from "../py/protocol";
-import { S } from "./sprites/floor";
 import { svg } from "./svg";
+import { sprite, tooltip } from "./tileParts";
 
 type Name = string | number;
 
@@ -41,25 +41,17 @@ export function doorArt(name: Name, open: boolean): SVGElement {
 /** The squares of the doors that stand open: the engine lists the names of the keys carried, and a door is open while its key is among them. */
 export const openDoors = (doors: LevelInfo["doors"] = [], inventory: Name[] = []): Pos[] => doors.filter((door) => inventory.includes(door.key)).map((door) => door.pos);
 
-const titled =(text: string) => {
-  const title = svg("title", {});
-  title.textContent = text;
-  return title;
-};
-
-/** A sprite group centred on the square whose top-left corner is (left, top). */
-const centred = (left: number, top: number, ...art: SVGElement[]) => svg("g", { class: "spr", transform: `translate(${left + S / 2} ${top + S / 2})` }, ...art);
-
-const keyWords = (name: Name) => (typeof name === "number" ? `key ${name}` : `the ${name} key`);
+/** A key's name as the tooltips say it: "the brass key", "key 12". */
+export const keyWords =(name: Name) => (typeof name === "number" ? `key ${name}` : `the ${name} key`);
 
 /** A key on the board. The `collected` class (styles.css) takes it away once the piece has picked it up. */
 export function keyTile(left: number, top: number, name: Name): SVGGElement {
   const words = typeof name === "number" ? `Key ${name}` : `The ${name} key`;
-  return svg("g", { class: "key" }, titled(`${words}. Stand on its stone and call pick_up().`), centred(left, top, keyArt(name)));
+  return svg("g", { class: "key" }, tooltip(`${words}. Stand on its stone and call pick_up().`), sprite(left, top, keyArt(name)));
 }
 
 /** A door on the board: both drawings are in it, and the `open` class (styles.css) swings from one to the other. */
 export function doorTile(left: number, top: number, name: Name): SVGGElement {
   const both = svg("g", {}, svg("g", { class: "spr-closed" }, doorArt(name, false)), svg("g", { class: "spr-open" }, doorArt(name, true)));
-  return svg("g", { class: "door" }, titled(`A locked door. It opens for a knight carrying ${keyWords(name)}.`), centred(left, top, both));
+  return svg("g", { class: "door" }, tooltip(`A locked door. It opens for a knight carrying ${keyWords(name)}.`), sprite(left, top, both));
 }

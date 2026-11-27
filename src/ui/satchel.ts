@@ -20,13 +20,11 @@ interface Options {
 
 /** The head and the list of a satchel holding `keys`. Past the capacity every key still shows, no slot is left, and the count is just "n". */
 export function satchelContents(keys: readonly Key[], { slots = true, extra, cls = "" }: Options = {}): HTMLElement[] {
-  const rows = keys.map((name, i) => h("li", { class: "satchel-chip" }, glyphNode(), h("span", { class: "satchel-chip-name" }, String(name)), ...(extra?.(i) ?? [])));
+  const rows = keys.map((name, i) => h("li", { class: "satchel-chip" }, keyGlyph(), h("span", { class: "satchel-chip-name" }, String(name)), ...(extra?.(i) ?? [])));
   const empty = slots ? Array.from({ length: Math.max(0, CAPACITY - keys.length) }, () => h("li", { class: "satchel-slot", "aria-hidden": "true" })) : [];
   const count = keys.length > CAPACITY ? `${keys.length}` : `${keys.length} of ${CAPACITY}`;
   return [h("p", { class: "satchel-head" }, "Satchel", h("span", {}, count)), h("ul", { class: `satchel ${cls}`.trim(), "aria-label": "The satchel" }, ...rows, ...empty)];
 }
-
-const glyphNode = () => keyGlyph() as unknown as Node;
 
 /** The satchel on a level screen: `show()` replaces what it holds with the keys of a state. */
 export class SatchelView {
