@@ -784,7 +784,7 @@ export default async function appChecks({ browser: b, base, root, check }) {
     const names = entries.map((e) => e.name).join(",");
     const newOnes = entries.filter((e) => e.isNew && e.open).map((e) => e.name).join(",");
     const groups = [...new Set(entries.map((e) => e.group))].join("|");
-    // whole numbers and text are brought in by earlier lessons of the chapter, so they are listed here but not new (M5.3-K2)
+    // whole numbers and text are brought in by earlier lessons of the chapter, so they are listed here but not new: only print is New, and only it starts open
     expect(names === "pawn.move,pawn.turn_left,pawn.turn_right,print,whole number,text" && newOnes === "print", JSON.stringify(entries.map((e) => [e.name, e.isNew, e.open])));
     expect(groups === "Your pawn|Python|Kinds of value", groups);
     expect(entries[0].introduced.startsWith("Introduced in 1.1 "), entries[0].introduced);
@@ -798,8 +798,8 @@ export default async function appChecks({ browser: b, base, root, check }) {
     const inKinds = entries.filter((e) => e.group === "Kinds of value").map((e) => e.name);
     expect(headings.at(-1) === "Kinds of value" && headings.indexOf("Text") >= 0 && headings.indexOf("Text") < headings.indexOf("Keywords"), headings.join("|"));
     expect(inKinds.length > 0 && inKinds.every((name) => kinds.includes(name)) && entries.filter((e) => kinds.includes(e.name)).every((e) => e.group === "Kinds of value"), inKinds.join());
-    // Text holds only str. entries, Lists only list. entries, and Lists comes after Text. No level shows a list. method
-    // yet (8.4 teaches .append(), M5.3), so Lists is absent today and the Chapter 8 e2e package pins its presence.
+    // Text holds only str. entries, Lists only list. entries, and Lists, if shown, comes right after Text. ch06-l03
+    // has no list. method, so its Codex has no Lists group; the `satchel` suite pins the Lists group itself on ch08-l04.
     expect(entries.filter((e) => e.group === "Text").length > 0 && entries.every((e) => (e.group === "Text") === e.name.startsWith("str.")), JSON.stringify(entries.map((e) => [e.name, e.group])));
     expect(entries.every((e) => (e.group === "Lists") === e.name.startsWith("list.")), "a list. method outside Lists, or the reverse");
     expect(!headings.includes("Lists") || headings.indexOf("Lists") === headings.indexOf("Text") + 1, headings.join("|"));
