@@ -44,8 +44,9 @@ menu, the Lessons directory, the promotion ceremony and the knight skin (§8), t
 motion kit and an accessibility pass. M4 (`docs/M4/M4.md`) is complete and
 published. M5, the Knight tier (§7, `docs/M5/M5.md`), is under way: the knight
 as a piece with its own rules is merged (M5.1, three practice levels in the
-Testing ground), and so is Chapter 7, Spellbook (M5.2: functions, played as the
-knight); Chapter 8, the promotion to bishop and the tier's mastery set follow.
+Testing ground), and so are Chapter 7, Spellbook (M5.2: functions, played as the
+knight) and Chapter 8, The Satchel (M5.3: lists and tuples, with keys, locked
+doors and a satchel); the promotion to bishop and the tier's mastery set follow.
 
 ---
 
@@ -186,7 +187,7 @@ The decisions are recorded in `docs/ARCHITECTURE.md`, with the level file format
 | M3.6 Chapter 6 | Runes | Merged 2026-10-02 (`docs/M3/M3.6.md`), PR #16 |
 | **M3.7 Look & Feel** | the first major design pass (§9), with the **promotion ceremony** and the knight skin (§8) | Merged 2026-10-03 (`docs/M3/M3.7.md`), PR #17 |
 | **M4 Sound, editor and free play** | **sound** (a soundtrack and effects); author levels without hand-writing YAML, and **share** them; **free play** (challenges, your own and shared levels, a sandbox, the skins gallery); the Pawn tier's set of mastery challenges | Done: M4.0 to M4.5 merged between 2026-10-08 and 2026-11-17 (`docs/M4/M4.md`) |
-| **M5 The Knight tier** | the knight as a piece (M5.1), Chapter 7 (M5.2), Chapter 8 (M5.3), the promotion to bishop and the tier's mastery set (M5.4), the editor learns the tier (M5.5) | Plan approved 2026-11-17 (`docs/M5/M5.md`); M5.1 merged 2026-11-18 (PR #27); M5.2 merged 2026-11-21 (PR #28); M5.3 building |
+| **M5 The Knight tier** | the knight as a piece (M5.1), Chapter 7 (M5.2), Chapter 8 (M5.3), the promotion to bishop and the tier's mastery set (M5.4), the editor learns the tier (M5.5) | Plan approved 2026-11-17 (`docs/M5/M5.md`); M5.1 merged 2026-11-18 (PR #27); M5.2 merged 2026-11-21 (PR #28); M5.3 merged 2026-11-27 (PR #29); M5.4 next |
 | M6 The Bishop tier | Chapters 9 and 10; a piece that slides along diagonals; teleporter pairs, crumbling floor, traps that raise real exceptions | Roadmap |
 | M7 The Rook tier | Chapters 11 and 12; the first Workshop levels; player-defined pieces running inside the engine | Roadmap. Both chapters look heavy and may each split in two |
 | M8 The Queen tier | Chapters 13 to 16; fog and `sense()`; several files and a pretend file system; the player's own tests | Roadmap. Probably two milestones |
