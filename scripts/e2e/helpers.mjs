@@ -178,6 +178,35 @@ export function settingsHelpers(browser) {
   };
 }
 
+/** Reading the level screen's Codex tab. */
+export function codexHelpers(browser) {
+  return {
+    /**
+     * What the Codex tab shows now, read by walking its children: the group headings in order, and per entry its name,
+     * group ("" before the first heading), whether it is marked New, whether it is open, and its "Introduced in" line
+     * ("" when there is none). It does not open the tab or wait: the caller shows the tab and waits for what it needs.
+     */
+    readCodex: () =>
+      browser.evaluate(`(() => {
+        const entries = [];
+        const headings = [];
+        for (const el of document.querySelector('.codex').children) {
+          if (el.tagName === 'H3') headings.push(el.textContent);
+          else if (el.classList.contains('codex-entry')) {
+            entries.push({
+              name: el.dataset.codex,
+              group: headings.at(-1) ?? '',
+              isNew: !!el.querySelector('.codex-new'),
+              open: el.open,
+              introduced: el.querySelector('.codex-body > p.muted')?.textContent ?? '',
+            });
+          }
+        }
+        return { headings, entries };
+      })()`),
+  };
+}
+
 /** Running the snippets in a lesson's Learn panel. `openLevel` is the one from `levelHelpers`. */
 export function lessonHelpers(browser, openLevel) {
   return {
