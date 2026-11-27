@@ -17,7 +17,7 @@ describe("skinCards", () => {
 
   it("has the pawn always unlocked, and not worn under Auto, the default", () => {
     const cards = skinCards(new ProgressStore(null));
-    expect(cards.map((c) => c.piece)).toEqual(["pawn", "knight"]);
+    expect(cards.map((c) => c.piece)).toEqual(["pawn", "knight", "bishop"]);
     expect(cards[0]).toMatchObject({ piece: "pawn", name: "Pawn", unlocked: true, worn: false, how: "Yours from the start" });
     expect(cards.some((c) => c.worn)).toBe(false);
   });
@@ -25,10 +25,10 @@ describe("skinCards", () => {
   it("marks the chosen skin worn, and only it", () => {
     const store = new ProgressStore(memoryStorage());
     settings.set({ piece: "pawn" });
-    expect(skinCards(store).map((c) => c.worn)).toEqual([true, false]);
+    expect(skinCards(store).map((c) => c.worn)).toEqual([true, false, false]);
     for (const level of pawnTier().levels.filter((l) => !l.mastery)) store.update(level.id, { stars: 1 });
     settings.set({ piece: "knight" });
-    expect(skinCards(store).map((c) => c.worn)).toEqual([false, true]);
+    expect(skinCards(store).map((c) => c.worn)).toEqual([false, true, false]);
   });
 
   it("locks the knight, naming the chapter to clear, until the tier is cleared", () => {

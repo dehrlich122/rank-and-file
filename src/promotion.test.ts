@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { chapters } from "./content";
 import { ProgressStore } from "./progress";
-import { PROMOTIONS, tierCleared, unlockedPieces, wornPiece } from "./promotion";
+import { PROMOTIONS, SKIN_NAMES, tierCleared, unlockedPieces, wornPiece } from "./promotion";
 import { sanitize, settings } from "./settings";
 import { memoryStorage } from "./storage.fake";
 
@@ -38,6 +38,15 @@ describe("promotion", () => {
     expect(PROMOTIONS[0]!.teaser).toBe("The knight moves in an L, over anything in its way. Chapter 7 is waiting.");
   });
 
+  it("has a second row, knight to bishop, earned by the Knight tier's last chapter", () => {
+    expect(PROMOTIONS[1]).toMatchObject({ tier: "knight", from: "knight", to: "bishop", headline: "Promoted: knight to bishop" });
+    expect(SKIN_NAMES.bishop).toBe("Prelate");
+    const store = new ProgressStore(memoryStorage());
+    expect(unlockedPieces(store)).not.toContain("bishop");
+    solve(store, tier("knight").filter((l) => !l.mastery).map((l) => l.id));
+    expect(unlockedPieces(store)).toContain("bishop");
+  });
+
   it("is never earned for a tier with no chapters, or outside the curriculum", () => {
     expect(tierCleared("queen", new ProgressStore(memoryStorage()))).toBe(false);
     expect(tierCleared("practice", new ProgressStore(memoryStorage()))).toBe(false);
@@ -63,6 +72,7 @@ describe("the piece setting", () => {
   it("is auto unless it names a known skin", () => {
     expect(sanitize({}).piece).toBe("auto");
     expect(sanitize({ piece: "knight" }).piece).toBe("knight");
+    expect(sanitize({ piece: "bishop" }).piece).toBe("bishop");
     expect(sanitize({ piece: "dragon" }).piece).toBe("auto");
   });
 });
@@ -95,6 +105,14 @@ describe("wornPiece", () => {
     expect(wornPiece(undefined, earned())).toBe("knight");
     expect(wornPiece("pawn", earned())).toBe("knight");
     expect(wornPiece(undefined, fresh())).toBe("pawn");
+    expect(wornPiece("knight", fresh())).toBe("pawn");
+  });
+
+  it("under an explicit bishop needs the Knight tier's promotion", () => {
+    settings.set({ piece: "bishop" });
+    const store = fresh();
+    solve(store, tier("knight").filter((l) => !l.mastery).map((l) => l.id));
+    expect(wornPiece(undefined, store)).toBe("bishop");
     expect(wornPiece("knight", fresh())).toBe("pawn");
   });
 

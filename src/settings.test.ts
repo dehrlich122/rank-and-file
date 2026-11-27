@@ -101,6 +101,11 @@ describe("the piece setting's move to auto", () => {
     expect(piece(storage)).toBe("knight");
   });
 
+  it("leaves a saved bishop alone", () => {
+    const storage = memoryStorage({ [KEY]: '{"piece":"bishop"}' });
+    expect(piece(storage)).toBe("bishop");
+  });
+
   it("keeps a pawn chosen right after a fresh start", () => {
     const storage = memoryStorage();
     new SettingsStore(storage).set({ piece: "pawn" });

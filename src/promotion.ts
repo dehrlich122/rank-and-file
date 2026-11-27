@@ -23,10 +23,17 @@ export const PROMOTIONS: Promotion[] = [
     headline: "Promoted: pawn to knight",
     teaser: "The knight moves in an L, over anything in its way. Chapter 7 is waiting.",
   },
+  {
+    tier: "knight",
+    from: "knight",
+    to: "bishop",
+    headline: "Promoted: knight to bishop",
+    teaser: "The bishop slides along the diagonals, as far as the way is clear. Its chapters aren't built yet: the skin is yours now, and the Knight tier's challenges are waiting in Free Play.",
+  },
 ];
 
 /** What each skin is called (the Skins page and Settings → Piece). */
-export const SKIN_NAMES: Record<Piece, string> = { pawn: "Pawn", knight: "Charger" };
+export const SKIN_NAMES: Record<Piece, string> = { pawn: "Pawn", knight: "Charger", bishop: "Prelate" };
 
 /** The chapter that closes `tier`: clearing it earns the promotion. */
 export const lastChapterOf = (tier: string) => chapters.filter((chapter) => chapter.curriculum && chapter.tier === tier).at(-1);
