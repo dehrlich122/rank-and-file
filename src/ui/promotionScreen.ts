@@ -3,10 +3,11 @@
 // It shows once, automatically, when the tier's core levels are solved; Lessons can replay it.
 import { chapters, tierHasChallenges } from "../content";
 import type { ProgressStore } from "../progress";
-import { PROMOTIONS, tierCleared } from "../promotion";
+import { isLastTier, PROMOTIONS, tierCleared } from "../promotion";
 import type { SettingsStore } from "../settings";
 import { sound } from "../sound";
 import { h } from "./dom";
+import { showTier } from "./listControls";
 import { hero } from "./sprites";
 import { svg } from "./svg";
 import { tierLabel } from "./tags";
@@ -34,6 +35,10 @@ export function mountPromotion(main: HTMLElement, tier: string, progress: Progre
   });
   paint();
 
+  // the last tier with chapters has nothing after it yet: the ceremony leads on to its challenges
+  const onward = tierHasChallenges(tier) && isLastTier(tier);
+  const remember = () => showTier("challenges", tier);
+
   main.replaceChildren(
     h(
       "section",
@@ -54,8 +59,15 @@ export function mountPromotion(main: HTMLElement, tier: string, progress: Progre
           h("p", { class: "muted small" }, "Every function you used is in the Codex tab on any level."),
         ),
         h("p", { class: "pr-teaser" }, promotion.teaser),
-        h("div", { class: "pr-actions" }, h("a", { class: "btn btn-primary", href: "#/lessons" }, "Back to Lessons"), wear),
-        ...(tierHasChallenges(tier) ? [h("a", { class: "pr-free", href: "#/free/challenges" }, `Free Play: the ${tierLabel(tier)} tier's challenges →`)] : []),
+        h(
+          "div",
+          { class: "pr-actions" },
+          ...(onward
+            ? [h("a", { class: "btn btn-primary", href: "#/free/challenges", onClick: remember }, `The ${tierLabel(tier)} tier's challenges →`), h("a", { class: "btn", href: "#/lessons" }, "Back to Lessons")]
+            : [h("a", { class: "btn btn-primary", href: "#/lessons" }, "Back to Lessons")]),
+          wear,
+        ),
+        ...(tierHasChallenges(tier) && !onward ? [h("a", { class: "pr-free", href: "#/free/challenges", onClick: remember },`Free Play: the ${tierLabel(tier)} tier's challenges →`)] : []),
       ),
     ),
   );

@@ -37,6 +37,7 @@ const GROUPS: Array<{ key: keyof Settings; title: string; hint?: string; choices
       { value: "auto", label: "Auto" },
       { value: "pawn", label: "Pawn" },
       { value: "knight", label: `Knight · ${SKIN_NAMES.knight}` },
+      { value: "bishop", label: `Bishop · ${SKIN_NAMES.bishop}` },
     ],
   },
   {
