@@ -5,16 +5,16 @@
 // or the examiner levels (a do-nothing function); none is a level's solution. Checks report facts (lines, counts,
 // squares), never the editor's contents.
 import { sleep } from "./cdp.mjs";
-import { examinerHelpers, levelHelpers } from "./helpers.mjs";
+import { examinerHelpers, lessonHelpers, levelHelpers } from "./helpers.mjs";
 import { expect } from "./suite.mjs";
 
 const LEVEL = "practice-11";
 const ARROW = "↩";
 
 export default async function functionsChecks({ browser: b, base, root, check }) {
-  const { openLevel, setCode, run, brief, solution, challengeTab, codexTab, button, press } = levelHelpers(b, base, root);
-
-  const { examinerView, examinerCard, challengeCalls } = examinerHelpers(b);
+  const { openLevel, setCode, run, brief, solution, challengeTab, codexTab, button, press, toStart } = levelHelpers(b, base, root);
+  const { lessonAt, runSnippet } = lessonHelpers(b, openLevel);
+  const { examinerView, examinerCard, challengeCalls, stubFunction } = examinerHelpers(b);
 
   const boardLabel = `document.querySelector('.board-host .board').getAttribute('aria-label')`;
 
@@ -60,8 +60,7 @@ export default async function functionsChecks({ browser: b, base, root, check })
 
   /** Rewind to before the first step and wait for the board to settle there. */
   async function rewind() {
-    await press(0);
-    await b.waitFor(`/Step 0 /.test(document.querySelector('.step-label').textContent)`, 5000, "back at step 0");
+    await toStart();
     await settle();
   }
   /**
@@ -277,13 +276,8 @@ export default async function functionsChecks({ browser: b, base, root, check })
   const MARK = { ok: "✓", no: "✗" };
   const caseButtons = `[...document.querySelectorAll('.board-host .case-row button')]`;
 
-  /** The made-up function: the call list's function name, a catch-all signature, a body that does nothing. */
-  async function stub() {
-    const call = await b.evaluate(`document.querySelector('ol.call-list code.call-code').textContent`);
-    return `def ${call.split("(")[0].trim()}(*args, **kwargs):\n    pass`;
-  }
   /** Open the level, type the made-up function and run it (jumping to the last frame unless `jump` is false). */
-  const stubRun = (id, opts) => runOn(id, stub, opts);
+  const stubRun = (id, opts) => runOn(id, stubFunction, opts);
   const clickCase = (index) => b.evaluate(`${caseButtons}[${index}].click()`);
   const pressedIs = (index) => `${caseButtons}[${index}]?.getAttribute('aria-pressed') === 'true'`;
   const rowPicked = (index) => `document.querySelectorAll('.outcome-host table.calls tr')[${index + 1}]?.classList.contains('picked')`;
@@ -427,7 +421,7 @@ export default async function functionsChecks({ browser: b, base, root, check })
   await check("M5.2: a program that makes the examiner's call itself is refused before the run, naming the line", async () => {
     await openLevel(BOARD_ONLY, { fresh: true });
     const before = await examinerView();
-    const own = await stub();
+    const own = await stubFunction();
     const line = own.split("\n").length + 1;
     await setCode(`${own}\n${own.slice(4, own.indexOf("("))}()`);
     const r = await run();
@@ -480,23 +474,6 @@ export default async function functionsChecks({ browser: b, base, root, check })
       call: s.querySelector('.snippet-call')?.textContent ?? null,
       code: s.querySelector('.snippet-call code')?.textContent ?? null,
     }))`);
-  /** Open a lesson and page to the step holding snippet `index` (a step ends with its snippet, so step N holds snippet N). */
-  async function lessonAt(id, index) {
-    await openLevel(id, { fresh: true });
-    for (let i = 0; i < index; i++) await b.evaluate(`document.querySelector('.lesson-pager .btn-primary').click()`);
-    await b.waitFor(`document.querySelectorAll('.lesson .lesson-step')[${index}]?.hidden === false`, 5000, `lesson step ${index} on show`);
-  }
-  /** Press Run on snippet `index` (its step on show) and wait for its ending status, which starts with a mark. */
-  async function runSnippet(index) {
-    const snippet = `document.querySelectorAll('.lesson .lesson-step')[${index}].querySelector('.snippet')`;
-    await b.evaluate(`${snippet}.querySelector('.btn').click()`);
-    await b.waitFor(`/^[✓✗⏱]/.test(${snippet}.querySelector('.snippet-status').textContent)`, 30_000, "the snippet's ending status");
-    return b.evaluate(`(() => {
-      const s = ${snippet};
-      const summary = s.querySelector('.snippet-summary');
-      return { status: s.querySelector('.snippet-status').textContent, summary: summary.textContent, codes: [...summary.querySelectorAll('code')].map((e) => e.textContent), caption: s.querySelector('.snippet-call code')?.textContent ?? null };
-    })()`);
-  }
   /** Where the lesson's one caption is, and what a run of the called snippet says (A1 and A2, and A3's first half). */
   async function calledSnippet(id, index, total) {
     await lessonAt(id, index);
