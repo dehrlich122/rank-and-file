@@ -1999,7 +1999,13 @@ by one)*. The pass started the `/simplify` pass on the M5.2 diff.
 
 ## Session 21 — 2026-11-26 · M5.3 QA1, Chapter 8, The Satchel (`m5-3-chapter-8`, PR #29)
 
-The designer's play-test of Chapter 8, in progress. Findings as they come.
+The designer's play-test of Chapter 8. **QA1 passed** *(Designer, 2026-11-27)*: "Okay, tested the chapter 8
+programs. They are good, and the changes I called for are already in." Two findings, both fixed during the
+play-test (QA-067, QA-068). He overruled none of the choices the build made (`docs/M5/M5.3.md`, "As built",
+every "for QA1"), so they stand *(the orchestrator's reading: he raised no objection; they were not answered one
+by one)*. That includes item 11 of the hand-test list, 8.5's board at about 31 px a square beside the satchel:
+he played the level, asked for the gates' words and for nothing about its size. The pass started the
+`/simplify` pass on the M5.3 diff.
 
 ### QA-067 · 8.3 The Satchel: boards 1 and 2 ask the same thing of the program · Fixed: two boards
 
