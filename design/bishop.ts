@@ -50,7 +50,7 @@ function onBody(profile: Profile, quad: Array<[number, number]>, back = false): 
 
 // -- B1 · Prelate: the chess bishop made the hero's -----------------------------------------------------------
 
-const PRELATE: Profile = [[0, 19], [3.5, 19], [6, 15.5], [10, 12.5], [21, 8.6], [24, 11.4], [27.5, 11.4], [28.5, 8], [33, 11.6], [40, 11.8], [46, 8.6], [51, 4.4], [56, 0]];
+const PRELATE: Profile = [[0, 19], [3.5, 19], [6, 15.5], [10, 12.5], [21, 8.6], [24, 11.4], [27.5, 11.4], [28.5, 8], [33, 11.6], [40, 11.8], [47, 9], [54, 6], [61, 3], [66, 0]];
 
 /** The mitre and a collar on the hero's solid body, with the Charger's own base. Faces +z. */
 export function prelateModel(): Model {
@@ -59,10 +59,10 @@ export function prelateModel(): Model {
 
 /** The mitre's slanted cut lit from inside, two lit eyes on the neck, and the ribbon of the mitre down its back. */
 export const prelateLit: Decal[] = [
-  onBody(PRELATE, [[-7, 35.5], [-4, 34], [7.5, 45], [4.5, 47]]),
+  onBody(PRELATE, [[-7, 36.5], [-4, 35], [6.5, 49.5], [3.5, 51.5]]),
   onBody(PRELATE, [[-6.5, 18.5], [-2.6, 18], [-2.6, 16.2], [-6.5, 16.8]]),
   onBody(PRELATE, [[2.6, 18], [6.5, 18.5], [6.5, 16.8], [2.6, 16.2]]),
-  onBody(PRELATE, [[-1.5, 46], [1.5, 46], [1.8, 33], [-1.8, 33]], true),
+  onBody(PRELATE, [[-1.5, 52], [1.5, 52], [1.8, 33], [-1.8, 33]], true),
 ];
 
 // -- B2 · Oracle: a hooded figure ------------------------------------------------------------------------------------
